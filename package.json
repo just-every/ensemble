@@ -1,11 +1,32 @@
 {
-    "name": "@magi-system/ensemble",
-    "version": "4.0.0",
-    "description": "Shared model-provider utilities for MAGI System",
+    "name": "@just-every/ensemble",
+    "version": "1.0.0",
+    "description": "LLM provider abstraction layer with unified streaming interface",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
-    "files": ["dist", "package.json"],
+    "files": ["dist", "package.json", "README.md"],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/just-every/ensemble.git"
+    },
+    "keywords": [
+        "llm",
+        "ai",
+        "openai",
+        "anthropic",
+        "gemini",
+        "deepseek",
+        "grok",
+        "streaming",
+        "model-providers"
+    ],
+    "author": "just-every",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/just-every/ensemble/issues"
+    },
+    "homepage": "https://github.com/just-every/ensemble#readme",
     "scripts": {
         "build": "tsc -p .",
         "clean": "rimraf dist",
@@ -36,9 +57,6 @@
             "types": "./dist/utils/*.d.ts"
         }
     },
-    "keywords": ["llm", "openai", "anthropic", "model-providers"],
-    "author": "MAGI System",
-    "license": "MIT",
     "dependencies": {
         "@anthropic-ai/sdk": "^0.51.0",
         "@google/genai": "^0.12.0",
@@ -50,6 +68,10 @@
         "typescript": "^5.8.2",
         "@types/node": "^22.14.0",
         "vitest": "^1.0.0",
-        "@vitest/coverage-v8": "^1.0.0"
+        "@vitest/coverage-v8": "^1.0.0",
+        "rimraf": "^5.0.0"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
