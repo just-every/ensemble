@@ -2,7 +2,7 @@
 
 This directory contains automated workflows for CI/CD.
 
-## Workflows
+## Active Workflows
 
 ### 1. Test Workflow (`test.yml`)
 - **Trigger**: On pull requests to `main`
@@ -14,21 +14,16 @@ This directory contains automated workflows for CI/CD.
   4. Run tests
   5. Build project
 
-### 2. Release Workflow (`ci-cd.yml`) 
-- **Trigger**: On push to `main` branch
-- **Purpose**: Automatically bump version and publish to npm
-- **Features**: 
-  - Supports GitHub App tokens for better permissions
-  - Falls back to PAT or GITHUB_TOKEN
-  - Complex permission handling
-
-### 3. Simple Release Workflow (`release-simple.yml`) - RECOMMENDED
-- **Trigger**: On push to `main` branch
-- **Purpose**: Simpler version that's more reliable
+### 2. Release Workflow (`release.yml`)
+- **Trigger**: On push to `main` branch (excluding test files)
+- **Purpose**: Automatically test, bump version, and publish to npm
 - **Features**:
-  - Uses github-push-action for reliable pushes
-  - Simpler configuration
-  - Less likely to fail
+  - Runs tests before release
+  - Automatically bumps patch version
+  - Publishes to npm
+  - Pushes version commit and tag back to GitHub
+  - Uses GH_PAT for authentication
+- **Skip**: Add `[skip ci]` to commit message to skip
 
 ## Required Secrets
 
