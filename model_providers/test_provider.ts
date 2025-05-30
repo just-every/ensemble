@@ -16,7 +16,7 @@ import {
 } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
-import { costTracker } from '@just-every/ensemble/cost_tracker';
+import { costTracker } from '../cost_tracker.js';
 
 /**
  * Configuration for the test provider behavior

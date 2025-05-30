@@ -16,7 +16,7 @@ import {
 } from '../types.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
-import { costTracker } from '@just-every/ensemble/cost_tracker';
+import { costTracker } from '../cost_tracker.js';
 import {
     log_llm_request,
     log_llm_response,

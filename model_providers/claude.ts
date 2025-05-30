@@ -97,7 +97,7 @@ import {
     ResponseOutputMessage,
     EnsembleAgent,
 } from '../types.js';
-import { costTracker } from '@just-every/ensemble/cost_tracker';
+import { costTracker } from '../cost_tracker.js';
 import {
     log_llm_error,
     log_llm_request,
