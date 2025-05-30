@@ -267,13 +267,22 @@ export class TestProvider implements ModelProvider {
             content: response,
         };
 
+        // Emit usage/cost event
+        const outputTokenCount = this.config.tokenUsage?.outputTokens || Math.ceil(response.length / 4);
+        yield {
+            type: 'cost_update',
+            usage: {
+                input_tokens: inputTokenCount,
+                output_tokens: outputTokenCount,
+                total_tokens: inputTokenCount + outputTokenCount
+            }
+        };
+
         // Track token usage for cost calculation
         costTracker.addUsage({
             model,
             input_tokens: inputTokenCount,
-            output_tokens:
-                this.config.tokenUsage?.outputTokens ||
-                Math.ceil(response.length / 4),
+            output_tokens: outputTokenCount,
         });
     }
 
@@ -293,8 +302,12 @@ export class TestProvider implements ModelProvider {
             lowercaseInput.includes('problem')
         ) {
             return "I understand you're experiencing an issue. Let me help troubleshoot the problem.";
+        } else if (lowercaseInput.includes('json') || lowercaseInput.includes('person')) {
+            return '{"name": "John Doe", "age": 30}';
         } else if (lowercaseInput.includes('test')) {
             return 'This is a test response. The test provider is working correctly!';
+        } else if (lowercaseInput.includes('weather')) {
+            return 'The weather is sunny and 72°F.';
         } else if (lowercaseInput.includes('?')) {
             return "That's an interesting question. As a test model, I'm designed to provide simulated responses for testing purposes.";
         } else {

@@ -16,8 +16,30 @@ const modelClassOverrides = new Map<string, Partial<ModelClass>>();
 
 /**
  * Register an external model with ensemble
- * @param model The model configuration
- * @param provider The provider instance that handles this model
+ * 
+ * @param model - The model configuration including id, provider, cost, and features
+ * @param provider - The provider instance that handles this model
+ * 
+ * @example
+ * ```typescript
+ * import { registerExternalModel } from '@just-every/ensemble';
+ * 
+ * const myProvider = new MyCustomProvider();
+ * 
+ * registerExternalModel({
+ *   id: 'my-custom-model',
+ *   provider: 'custom',
+ *   cost: {
+ *     input_per_million: 5,
+ *     output_per_million: 15
+ *   },
+ *   features: {
+ *     context_length: 8192,
+ *     tool_use: true,
+ *     streaming: true
+ *   }
+ * }, myProvider);
+ * ```
  */
 export function registerExternalModel(model: ModelEntry, provider: ModelProvider): void {
     const modelId = model.id;
@@ -35,13 +57,18 @@ export function registerExternalModel(model: ModelEntry, provider: ModelProvider
 
 /**
  * Get an external model by ID
+ * 
+ * @param modelId - The model identifier to look up
+ * @returns The model entry if found, undefined otherwise
  */
 export function getExternalModel(modelId: string): ModelEntry | undefined {
     return externalModels.get(modelId);
 }
 
 /**
- * Get all external models
+ * Get all external models that have been registered
+ * 
+ * @returns Array of all registered external model entries
  */
 export function getAllExternalModels(): ModelEntry[] {
     return Array.from(externalModels.values());

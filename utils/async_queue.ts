@@ -13,7 +13,8 @@ export class AsyncQueue<T> {
      */
     push(item: T): void {
         if (this.completed) {
-            throw new Error('Cannot push to completed queue');
+            // Silently ignore pushes after completion
+            return;
         }
 
         if (this.waiters.length > 0) {

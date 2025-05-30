@@ -23,10 +23,16 @@ export interface ToolParameter {
     optional?: boolean;
     minItems?: number;
 
-    [key: string]: any;
+    additionalProperties?: boolean;
+    default?: unknown;
+    minimum?: number;
+    maximum?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
 }
 
-export type ExecutableFunction = (...args: any[]) => Promise<string> | string;
+export type ExecutableFunction = (...args: unknown[]) => Promise<string> | string;
 
 /**
  * Definition for a tool that can be used by an agent
@@ -331,7 +337,7 @@ export interface TalkEvent extends MessageEventBase {
 export interface ToolEvent extends StreamEvent {
     type: 'tool_start' | 'tool_delta' | 'tool_done';
     tool_calls: ToolCall[];
-    results?: any;
+    results?: Array<{ call_id: string; output: string; error?: string }>;
 }
 
 /**
@@ -347,7 +353,12 @@ export interface ErrorEvent extends StreamEvent {
  */
 export interface CostUpdateEvent extends StreamEvent {
     type: 'cost_update';
-    usage: any; // Simplified for ensemble usage
+    usage: {
+        input_tokens: number;
+        output_tokens: number;
+        total_tokens?: number;
+        cached_tokens?: number;
+    };
     thought_delay?: number;
 }
 
@@ -370,7 +381,7 @@ export interface ModelProvider {
     createResponseStream(
         model: string,
         messages: ResponseInput,
-        agent: any
+        agent: EnsembleAgent
     ): AsyncGenerator<EnsembleStreamEvent>;
 }
 
@@ -479,7 +490,7 @@ export interface ModelUsage {
     output_tokens?: number; // Number of output tokens
     cached_tokens?: number; // Number of cached input tokens
     image_count?: number; // Number of images generated (for models like Imagen)
-    metadata?: Record<string, any>; // Allow any type for metadata flexibility
+    metadata?: Record<string, unknown>; // Additional metadata for usage tracking
     timestamp?: Date; // Timestamp of the usage, crucial for time-based pricing
     isFreeTierUsage?: boolean; // Flag for free tier usage override
 }
@@ -520,7 +531,7 @@ export interface ProviderQuota {
     creditBalance?: number;
     creditLimit?: number;
     // Provider-specific information (like OpenAI free tier quotas)
-    info?: Record<string, any>;
+    info?: Record<string, unknown>;
     // Model-specific quotas
     models: Record<string, ModelSpecificQuota>;
     // Last reset date for the provider (used to trigger daily reset check)

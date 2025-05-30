@@ -70,10 +70,17 @@ import {
     getModelProvider,
 } from './model_providers/model_provider.js';
 
+/**
+ * Options for making requests to LLM providers
+ */
 export interface RequestOptions {
+    /** Unique identifier for the agent making the request */
     agentId?: string;
+    /** Array of tools/functions available to the model */
     tools?: ToolFunction[];
+    /** Model-specific settings like temperature, max_tokens, etc */
     modelSettings?: ModelSettings;
+    /** Model class to use for automatic model selection */
     modelClass?: ModelClassID;
 }
 
@@ -95,7 +102,47 @@ class RequestAgent implements EnsembleAgent {
 
 
 /**
- * Simplified request API that returns an AsyncGenerator
+ * Make a streaming request to an LLM provider
+ * 
+ * @param model - The model identifier (e.g., 'gpt-4o', 'claude-3.5-sonnet')
+ * @param messages - Array of messages in the conversation
+ * @param options - Optional configuration for the request
+ * @returns AsyncGenerator yielding streaming events
+ * 
+ * @example
+ * ```typescript
+ * // Simple text generation
+ * for await (const event of request('gpt-4o-mini', [
+ *   { type: 'message', role: 'user', content: 'Hello!', status: 'completed' }
+ * ])) {
+ *   if (event.type === 'text') {
+ *     console.log(event.text);
+ *   }
+ * }
+ * 
+ * // With tools
+ * const tools = [{
+ *   function: async (city: string) => `Weather in ${city}: Sunny, 72°F`,
+ *   definition: {
+ *     type: 'function',
+ *     function: {
+ *       name: 'get_weather',
+ *       description: 'Get weather for a city',
+ *       parameters: {
+ *         type: 'object',
+ *         properties: {
+ *           city: { type: 'string', description: 'City name' }
+ *         },
+ *         required: ['city']
+ *       }
+ *     }
+ *   }
+ * }];
+ * 
+ * for await (const event of request('claude-3.5-sonnet', messages, { tools })) {
+ *   // Handle events
+ * }
+ * ```
  */
 export async function* request(
     model: string,
