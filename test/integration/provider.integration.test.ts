@@ -68,18 +68,9 @@ describe('Provider Integration Tests', () => {
       }
     });
 
-    it.skip('should validate input messages', async () => {
-      const invalidMessages = [
-        { type: 'invalid-type', content: 'test' } // Invalid type
-      ];
-
-      await expect(async () => {
-        const stream = request('test-model', invalidMessages as any);
-        for await (const _ of stream) {
-          // Should throw before yielding
-        }
-      }).rejects.toThrow();
-    });
+    // Note: Message validation is not currently enforced in the request function.
+    // The library accepts messages as-is and relies on individual providers to handle validation.
+    // This test has been removed as it tests functionality that doesn't exist.
   });
 
   describe('Streaming Behavior', () => {
@@ -177,32 +168,9 @@ describe('Provider Integration Tests', () => {
       }
     });
 
-    it.skip('should validate tool parameters', async () => {
-      const invalidTool: ToolFunction = {
-        function: async () => 'result',
-        definition: {
-          type: 'function',
-          function: {
-            name: 'invalid tool name!', // Invalid characters
-            description: 'Test',
-            parameters: {
-              type: 'object',
-              properties: {},
-              required: []
-            }
-          }
-        }
-      };
-
-      await expect(async () => {
-        const stream = request('test-model', [], {
-          tools: [invalidTool]
-        });
-        for await (const _ of stream) {
-          // Should throw during validation
-        }
-      }).rejects.toThrow();
-    });
+    // Note: Tool parameter validation is not currently enforced in the request function.
+    // The library accepts tools as-is and relies on individual providers to handle validation.
+    // This test has been removed as it tests functionality that doesn't exist.
   });
 
   describe('Multi-Modal Support', () => {

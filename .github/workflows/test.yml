@@ -20,10 +20,7 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      run: |
-        # Workaround for npm optional dependency bug
-        npm install --no-save @rollup/rollup-linux-x64-gnu
-        npm ci
+      run: npm install
       
     - name: Run tests
       run: npm test

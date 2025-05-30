@@ -80,6 +80,9 @@
         "typescript": "^5.8.2",
         "vitest": "^3.1.4"
     },
+    "optionalDependencies": {
+        "@rollup/rollup-linux-x64-gnu": "4.9.5"
+    },
     "publishConfig": {
         "access": "public"
     }
