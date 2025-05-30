@@ -31,7 +31,10 @@ jobs:
         registry-url: 'https://registry.npmjs.org'
         
     - name: Install dependencies
-      run: npm ci
+      run: |
+        # Workaround for npm optional dependency bug
+        npm install --no-save @rollup/rollup-linux-x64-gnu
+        npm ci
       
     - name: Run tests
       run: npm test
