@@ -1,11 +1,15 @@
 {
     "name": "@just-every/ensemble",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "LLM provider abstraction layer with unified streaming interface",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
-    "files": ["dist", "package.json", "README.md"],
+    "files": [
+        "dist",
+        "package.json",
+        "README.md"
+    ],
     "repository": {
         "type": "git",
         "url": "git+https://github.com/just-every/ensemble.git"
