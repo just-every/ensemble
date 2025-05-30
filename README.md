@@ -1,5 +1,8 @@
 # @just-every/ensemble
 
+[![npm version](https://badge.fury.io/js/@just-every%2Fensemble.svg)](https://www.npmjs.com/package/@just-every/ensemble)
+[![GitHub Actions](https://github.com/just-every/ensemble/workflows/Simple%20Release/badge.svg)](https://github.com/just-every/ensemble/actions)
+
 Shared model-provider utilities for MAGI System. This package provides a unified interface for interacting with multiple LLM providers including OpenAI, Anthropic Claude, Google Gemini, Deepseek, Grok, and OpenRouter.
 
 ## Features
