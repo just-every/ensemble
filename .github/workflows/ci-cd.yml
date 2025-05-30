@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/test.yml'
+      - 'examples/**'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Build project
+      run: npm run build
+
+  version-and-publish:
+    name: Version Bump and Publish
+    needs: test
+    runs-on: ubuntu-latest
+    # Only run on push to main, not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        # Need full history for version bump
+        fetch-depth: 0
+        # Use a Personal Access Token to allow pushing
+        token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        registry-url: 'https://registry.npmjs.org'
+        
+    - name: Configure Git
+      run: |
+        git config user.name "GitHub Actions Bot"
+        git config user.email "actions@github.com"
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Check if version bump needed
+      id: check_changes
+      run: |
+        # Check if last commit was a version bump (to avoid infinite loop)
+        if git log -1 --pretty=%B | grep -q "^chore(release):"; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Bump version
+      if: steps.check_changes.outputs.skip == 'false'
+      run: |
+        # Bump patch version
+        npm version patch -m "chore(release): %s [skip ci]"
+        
+    - name: Build
+      if: steps.check_changes.outputs.skip == 'false'
+      run: npm run build
+      
+    - name: Publish to npm
+      if: steps.check_changes.outputs.skip == 'false'
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+    - name: Push version bump
+      if: steps.check_changes.outputs.skip == 'false'
+      run: |
+        git push --follow-tags origin main
