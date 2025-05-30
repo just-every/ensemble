@@ -1,4 +1,4 @@
-# @magi-system/ensemble
+# @just-every/ensemble
 
 Shared model-provider utilities for MAGI System. This package provides a unified interface for interacting with multiple LLM providers including OpenAI, Anthropic Claude, Google Gemini, Deepseek, Grok, and OpenRouter.
 
@@ -18,13 +18,13 @@ Shared model-provider utilities for MAGI System. This package provides a unified
 ## Installation
 
 ```bash
-npm install @magi-system/ensemble
+npm install @just-every/ensemble
 ```
 
 ## Quick Start
 
 ```typescript
-import { request } from '@magi-system/ensemble';
+import { request } from '@just-every/ensemble';
 
 // Simple request with AsyncGenerator API
 const stream = request('claude-3-5-sonnet-20241022', [

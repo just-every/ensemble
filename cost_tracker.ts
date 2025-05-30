@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { costTracker } from '@magi-system/ensemble/cost_tracker';
+ * import { costTracker } from '@just-every/ensemble/cost_tracker';
  *
  * // Listen for cost updates
  * costTracker.onAddUsage((usage) => {

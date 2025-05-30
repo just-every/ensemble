@@ -28,7 +28,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@magi-system/ensemble': path.resolve(__dirname, './dist'),
+            '@just-every/ensemble': path.resolve(__dirname, './dist'),
         },
     },
 });

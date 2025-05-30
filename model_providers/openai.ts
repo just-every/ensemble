@@ -16,7 +16,7 @@ import {
 } from '../types.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
-import { costTracker } from '@magi-system/ensemble/cost_tracker';
+import { costTracker } from '@just-every/ensemble/cost_tracker';
 import {
     log_llm_request,
     log_llm_response,
