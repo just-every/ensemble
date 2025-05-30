@@ -152,7 +152,7 @@ interface ModelProvider {
 Convert streaming events into conversation history for chaining LLM calls:
 
 ```typescript
-import { convertStreamToMessages, chainRequests } from '@magi-system/ensemble';
+import { convertStreamToMessages, chainRequests } from '@just-every/ensemble';
 
 // Convert a single stream to messages
 const stream = request('claude-3-5-sonnet-20241022', [
@@ -200,7 +200,7 @@ const toolResult = await convertStreamToMessages(streamWithTools, [], {
 The ensemble package includes a pluggable logging system for LLM requests and responses:
 
 ```typescript
-import { setEnsembleLogger, EnsembleLogger } from '@magi-system/ensemble';
+import { setEnsembleLogger, EnsembleLogger } from '@just-every/ensemble';
 
 // Implement custom logger
 class CustomLogger implements EnsembleLogger {
