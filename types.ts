@@ -602,3 +602,19 @@ export interface EnsembleAgent {
     modelClass?: ModelClassID;
 }
 
+/**
+ * Options for making requests to LLM providers
+ */
+export interface RequestOptions {
+    /** Agent ID for tracking */
+    agentId?: string;
+    /** Model-specific settings */
+    modelSettings?: ModelSettings;
+    /** Preferred model class */
+    modelClass?: ModelClassID;
+    /** Tools available to the model */
+    tools?: ToolFunction[];
+    /** Tool choice configuration */
+    toolChoice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
+}
+

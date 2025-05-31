@@ -324,10 +324,10 @@ export async function* requestWithTools(
                                     });
                                 }
                             }
-                        } else if (options.tools) {
+                        } else if (requestOptions.tools) {
                             // Execute tools from the tools array
                             for (const toolCall of event.tool_calls) {
-                                const tool = options.tools.find(
+                                const tool = requestOptions.tools.find(
                                     t => t.definition.function.name === toolCall.function.name
                                 );
                                 
