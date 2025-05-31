@@ -153,7 +153,7 @@ describe('Provider Integration Tests', () => {
       const stream = request('test-model', messages, {
         tools: [weatherTool],
         toolChoice: 'auto',
-        executeTools: false
+        maxToolCalls: 0
       });
 
       for await (const event of stream) {

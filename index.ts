@@ -103,7 +103,7 @@ class RequestAgent implements EnsembleAgent {
 
 
 /**
- * Make a streaming request to an LLM provider
+ * Make a streaming request to an LLM provider with automatic tool execution support
  * 
  * @param model - The model identifier (e.g., 'gpt-4o', 'claude-3.5-sonnet')
  * @param messages - Array of messages in the conversation
@@ -114,16 +114,16 @@ class RequestAgent implements EnsembleAgent {
  * ```typescript
  * // Simple text generation
  * for await (const event of request('gpt-4o-mini', [
- *   { type: 'message', role: 'user', content: 'Hello!', status: 'completed' }
+ *   { type: 'message', role: 'user', content: 'Hello!' }
  * ])) {
- *   if (event.type === 'text') {
- *     console.log(event.text);
+ *   if (event.type === 'text_delta') {
+ *     process.stdout.write(event.delta);
  *   }
  * }
  * 
- * // With tools
+ * // With tools (automatically executed)
  * const tools = [{
- *   function: async (city: string) => `Weather in ${city}: Sunny, 72°F`,
+ *   function: async ({ city }) => `Weather in ${city}: Sunny, 72°F`,
  *   definition: {
  *     type: 'function',
  *     function: {
@@ -132,7 +132,7 @@ class RequestAgent implements EnsembleAgent {
  *       parameters: {
  *         type: 'object',
  *         properties: {
- *           city: { type: 'string', description: 'City name' }
+ *           city: { type: 'string' }
  *         },
  *         required: ['city']
  *       }
@@ -147,6 +147,14 @@ class RequestAgent implements EnsembleAgent {
  *     process.stdout.write(event.delta);
  *   }
  * }
+ * 
+ * // Disable tool execution
+ * for await (const event of request('claude-3.5-sonnet', messages, { 
+ *   tools,
+ *   maxToolCalls: 0  // Tools sent to model but not executed
+ * })) {
+ *   // Handle events including tool_start without execution
+ * }
  * ```
  */
 export async function* request(
@@ -154,13 +162,11 @@ export async function* request(
     messages: ResponseInput,
     options: RequestOptions = {}
 ): AsyncGenerator<EnsembleStreamEvent> {
-    // If tools are provided and executeTools is not explicitly false, handle tool execution
-    const shouldExecuteTools = options.tools && options.tools.length > 0 && 
-        options.executeTools !== false;
+    const { maxToolCalls = 10 } = options;
     
-    if (shouldExecuteTools) {
-        // Use requestWithTools for automatic tool execution
-        yield* requestWithTools(model, messages, options);
+    // If tools are provided and maxToolCalls > 0, handle tool execution
+    if (options.tools && options.tools.length > 0 && maxToolCalls > 0) {
+        yield* requestWithToolsImpl(model, messages, options);
     } else {
         // Direct streaming without tool execution
         const provider = getModelProvider(model);
@@ -180,51 +186,23 @@ export async function* request(
 }
 
 /**
- * Make a streaming request to an LLM provider with automatic tool execution.
- * This function will automatically execute tools when the model requests them
- * and feed the results back to continue the conversation.
- * 
- * @param model - The model identifier (e.g., 'gpt-4o', 'claude-3.5-sonnet')
- * @param messages - Array of messages in the conversation
- * @param options - Configuration including tools and execution options
- * @returns AsyncGenerator yielding streaming events
- * 
- * @example
- * ```typescript
- * const tools = [{
- *   function: async ({ city }) => `Weather in ${city}: Sunny, 72°F`,
- *   definition: {
- *     type: 'function',
- *     function: {
- *       name: 'get_weather',
- *       description: 'Get weather for a city',
- *       parameters: {
- *         type: 'object',
- *         properties: {
- *           city: { type: 'string', description: 'City name' }
- *         },
- *         required: ['city']
- *       }
- *     }
- *   }
- * }];
- * 
- * for await (const event of requestWithTools('claude-3.5-sonnet', [
- *   { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
- * ], { tools })) {
- *   if (event.type === 'text_delta') {
- *     process.stdout.write(event.delta);
- *   }
- * }
- * ```
+ * @deprecated Use request() instead - it now handles tools automatically
  */
 export async function* requestWithTools(
     model: string,
     messages: ResponseInput,
     options: RequestOptions = {}
 ): AsyncGenerator<EnsembleStreamEvent> {
+    yield* request(model, messages, options);
+}
+
+// Internal implementation that handles tool execution
+async function* requestWithToolsImpl(
+    model: string,
+    messages: ResponseInput,
+    options: RequestOptions = {}
+): AsyncGenerator<EnsembleStreamEvent> {
     const {
-        executeTools = true,
         maxToolCalls = 10,
         processToolCall,
         ...requestOptions
@@ -269,7 +247,6 @@ export async function* requestWithTools(
                 }
                 
                 case 'tool_start': {
-                    if (!executeTools) continue;
                     
                     if (hasToolCalls(event)) {
                         // Collect tool calls
@@ -363,7 +340,7 @@ export async function* requestWithTools(
         }
         
         // If no tool calls were made, we're done
-        if (collectedToolCalls.length === 0 || !executeTools) {
+        if (collectedToolCalls.length === 0) {
             yield { type: 'stream_end', timestamp: new Date().toISOString() } as EnsembleStreamEvent;
             break;
         }

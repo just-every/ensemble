@@ -2,7 +2,7 @@
  * Example demonstrating automatic tool execution with streaming
  */
 
-import { request, requestWithTools } from '../index.js';
+import { request } from '../index.js';
 import type { EnsembleStreamEvent } from '../types/extended_types.js';
 
 // Define some example tools
@@ -129,12 +129,12 @@ async function main() {
         }
         console.log('\n\n---\n');
         
-        // Example 3: Using requestWithTools directly with custom handler
+        // Example 3: Using request with custom tool handler
         console.log('Example 3: Custom tool handler');
         console.log('User: What\'s the weather in London?');
         console.log('Assistant: ', '');
         
-        for await (const event of requestWithTools(
+        for await (const event of request(
             'gpt-4o-mini',
             [
                 {
@@ -180,7 +180,7 @@ async function main() {
             ],
             { 
                 tools,
-                executeTools: false // Tools are sent to model but not executed
+                maxToolCalls: 0 // Tools are sent to model but not executed
             } as any
         )) {
             if (event.type === 'text_delta') {

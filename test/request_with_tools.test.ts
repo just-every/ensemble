@@ -35,7 +35,7 @@ describe('requestWithTools', () => {
         const events: EnsembleStreamEvent[] = [];
         let fullText = '';
         
-        for await (const event of requestWithTools(
+        for await (const event of request(
             'test-model',
             [
                 {
@@ -127,7 +127,7 @@ describe('requestWithTools', () => {
         const events: EnsembleStreamEvent[] = [];
         let fullText = '';
         
-        for await (const event of requestWithTools(
+        for await (const event of request(
             'test-model',
             [
                 {
@@ -157,7 +157,7 @@ describe('requestWithTools', () => {
         const events: EnsembleStreamEvent[] = [];
         let fullText = '';
         
-        for await (const event of requestWithTools(
+        for await (const event of request(
             'test-model',
             [
                 {
@@ -169,7 +169,8 @@ describe('requestWithTools', () => {
             {
                 modelSettings: {
                     temperature: 0
-                }
+                },
+                maxToolCalls: 0
             }
         )) {
             events.push(event);
