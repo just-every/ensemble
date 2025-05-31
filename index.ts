@@ -66,7 +66,7 @@ export * from './model_providers/test_provider.js';
 
 // Export all utils
 export * from './utils/async_queue.js';
-export * from './utils/stream_converter.js';
+export { convertStreamToMessages, chainRequests } from './utils/stream_converter.js';
 export * from './utils/delta_buffer.js';
 export * from './utils/cost_tracker.js';
 export * from './utils/quota_tracker.js';

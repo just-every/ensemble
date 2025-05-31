@@ -16,6 +16,8 @@ node dist/examples/tool-calling.js
 node dist/examples/tool-execution.js
 node dist/examples/model-rotation.js
 node dist/examples/stream-conversion.js
+node dist/examples/chain-requests.js
+node dist/examples/embeddings.js
 node dist/examples/error-handling.js
 node dist/examples/cost-optimization.js
 node dist/examples/openai-compatibility.js
