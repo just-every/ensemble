@@ -234,7 +234,7 @@ function convertToOpenAITools(
     tools?: ToolFunction[] | undefined
 ): any {
     requestParams.tools = tools.map((tool: ToolFunction) => {
-        if (tool.definition.function.name === 'openai_web_search') {
+        if (tool.definition.function.name === 'openai_web_search' || tool.definition.function.name === 'web_search') {
             delete requestParams.reasoning;
             return {
                 type: 'web_search_preview',

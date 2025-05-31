@@ -1,14 +1,14 @@
 #!/usr/bin/env npx tsx
 /**
- * Dynamically fetch model data using web search
- * Designed to run in GitHub Actions for automated updates
+ * Fetch model data from provider APIs where available
+ * This script queries actual provider APIs instead of using unreliable web search
  */
 
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import { Anthropic } from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,384 +16,263 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || ''
-});
-
-interface ProviderSearchConfig {
-  name: string;
+interface ModelInfo {
+  id: string;
   provider: string;
-  searchQueries: string[];
-  modelPatterns: string[];
+  description?: string;
+  contextLength?: number;
+  deprecated?: boolean;
 }
 
-// Provider configurations
-const PROVIDERS: ProviderSearchConfig[] = [
+// Fetch OpenAI models
+async function fetchOpenAIModels(): Promise<ModelInfo[]> {
+  if (!process.env.OPENAI_API_KEY) {
+    console.log('⚠️  No OpenAI API key, skipping OpenAI models');
+    return [];
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const models = await openai.models.list();
+    
+    return models.data
+      .filter(model => 
+        model.id.includes('gpt') || 
+        model.id.includes('dall-e') || 
+        model.id.includes('text-embedding')
+      )
+      .map(model => ({
+        id: model.id,
+        provider: 'openai',
+        description: `OpenAI model ${model.id}`
+      }));
+  } catch (error) {
+    console.error('❌ Error fetching OpenAI models:', error);
+    return [];
+  }
+}
+
+// Known models that can't be fetched via API
+const KNOWN_MODELS: ModelInfo[] = [
+  // Anthropic (no public model listing API)
   {
-    name: 'Anthropic Claude',
+    id: 'claude-3-5-sonnet-20241022',
     provider: 'anthropic',
-    searchQueries: [
-      'Anthropic Claude models API latest {CURRENT_DATE}',
-      'Claude API pricing documentation {CURRENT_YEAR}',
-      'Claude benchmark scores artificialanalysis',
-      'site:anthropic.com/api models pricing'
-    ],
-    modelPatterns: ['claude-', 'claude-3', 'claude-4', 'claude-opus', 'claude-sonnet', 'claude-haiku']
+    description: 'Most capable Claude model, excels at complex tasks',
+    contextLength: 200000
   },
   {
-    name: 'OpenAI',
-    provider: 'openai',
-    searchQueries: [
-      'OpenAI GPT models API latest {CURRENT_DATE}',
-      'OpenAI o3 o1 pricing {CURRENT_YEAR}',
-      'GPT-4o benchmark scores {CURRENT_YEAR}',
-      'site:openai.com/api models pricing'
-    ],
-    modelPatterns: ['gpt-', 'o1', 'o3', 'text-embedding-', 'dall-e-']
+    id: 'claude-3-5-haiku-20241022', 
+    provider: 'anthropic',
+    description: 'Fast and efficient Claude model',
+    contextLength: 200000
   },
   {
-    name: 'Google Gemini',
+    id: 'claude-3-haiku-20240307',
+    provider: 'anthropic',
+    description: 'Previous generation fast Claude model',
+    contextLength: 200000
+  },
+  {
+    id: 'claude-3-opus-20240229',
+    provider: 'anthropic',
+    description: 'Previous generation powerful Claude model',
+    contextLength: 200000,
+    deprecated: true
+  },
+  {
+    id: 'claude-3-sonnet-20240229',
+    provider: 'anthropic',
+    description: 'Previous generation balanced Claude model',
+    contextLength: 200000,
+    deprecated: true
+  },
+
+  // Google Gemini (would need Google AI API)
+  {
+    id: 'gemini-2.0-flash-exp',
     provider: 'google',
-    searchQueries: [
-      'Google Gemini models API latest {CURRENT_DATE}',
-      'Gemini 2.5 pricing context window {CURRENT_YEAR}',
-      'Gemini Pro Flash benchmark scores',
-      'site:ai.google.dev models pricing'
-    ],
-    modelPatterns: ['gemini-', 'gemini-1.5', 'gemini-2.0', 'gemini-2.5']
+    description: 'Experimental Gemini 2.0 Flash model',
+    contextLength: 1048576
   },
   {
-    name: 'DeepSeek',
+    id: 'gemini-1.5-pro-002',
+    provider: 'google',
+    description: 'Gemini 1.5 Pro with improvements',
+    contextLength: 2097152
+  },
+  {
+    id: 'gemini-1.5-flash-002',
+    provider: 'google',
+    description: 'Fast Gemini 1.5 model',
+    contextLength: 1048576
+  },
+  {
+    id: 'gemini-1.5-flash-8b-latest',
+    provider: 'google',
+    description: 'Lightweight 8B parameter Gemini model',
+    contextLength: 1048576
+  },
+
+  // DeepSeek
+  {
+    id: 'deepseek-chat',
     provider: 'deepseek',
-    searchQueries: [
-      'DeepSeek API models latest {CURRENT_DATE}',
-      'DeepSeek V3 reasoner pricing {CURRENT_YEAR}',
-      'DeepSeek benchmark scores',
-      'site:api-docs.deepseek.com models pricing'
-    ],
-    modelPatterns: ['deepseek-', 'deepseek-chat', 'deepseek-reasoner', 'deepseek-coder']
+    description: 'DeepSeek chat model',
+    contextLength: 64000
   },
   {
-    name: 'xAI Grok',
+    id: 'deepseek-reasoner',
+    provider: 'deepseek',
+    description: 'DeepSeek reasoning model with advanced capabilities',
+    contextLength: 64000
+  },
+
+  // xAI
+  {
+    id: 'grok-2-1212',
     provider: 'xai',
-    searchQueries: [
-      'xAI Grok models API latest {CURRENT_DATE}',
-      'Grok 3 pricing {CURRENT_YEAR}',
-      'Grok benchmark scores',
-      'site:x.ai/api models pricing'
-    ],
-    modelPatterns: ['grok-', 'grok-3', 'grok-2']
+    description: 'Grok 2 model',
+    contextLength: 131072
+  },
+  {
+    id: 'grok-2-vision-1212',
+    provider: 'xai',
+    description: 'Grok 2 with vision capabilities',
+    contextLength: 131072
   }
 ];
 
-// Get current date info
-function getCurrentDateInfo() {
-  const now = new Date();
-  return {
-    CURRENT_DATE: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-    CURRENT_YEAR: now.getFullYear().toString(),
-    ISO_DATE: now.toISOString()
-  };
-}
+// Pricing data (would need to be manually updated or fetched from pricing pages)
+const PRICING_DATA: Record<string, { input: number; output: number }> = {
+  // Anthropic
+  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
+  'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
+  'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
+  'claude-3-opus-20240229': { input: 15.00, output: 75.00 },
+  'claude-3-sonnet-20240229': { input: 3.00, output: 15.00 },
 
-// Replace date placeholders in search queries
-function formatSearchQuery(query: string, dateInfo: Record<string, string>): string {
-  let formatted = query;
-  for (const [key, value] of Object.entries(dateInfo)) {
-    formatted = formatted.replace(`{${key}}`, value);
-  }
-  return formatted;
-}
+  // OpenAI
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gpt-4': { input: 30.00, output: 60.00 },
+  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
 
-// Search for model information using Claude with web search
-async function searchProviderModels(config: ProviderSearchConfig, dateInfo: Record<string, string>) {
-  console.log(`\n🔍 Searching for ${config.name} models...`);
-  
-  const formattedQueries = config.searchQueries.map(q => formatSearchQuery(q, dateInfo));
-  
-  const prompt = `You are a technical researcher gathering the latest AI model information.
+  // Google (per million tokens)
+  'gemini-2.0-flash-exp': { input: 0.00, output: 0.00 }, // Free during experimental
+  'gemini-1.5-pro-002': { input: 1.25, output: 5.00 },
+  'gemini-1.5-flash-002': { input: 0.075, output: 0.30 },
+  'gemini-1.5-flash-8b-latest': { input: 0.0375, output: 0.15 },
 
-IMPORTANT: Use web search to find CURRENT information as of ${dateInfo.CURRENT_DATE}. Do not use outdated training data.
+  // DeepSeek
+  'deepseek-chat': { input: 0.14, output: 0.28 },
+  'deepseek-reasoner': { input: 0.55, output: 2.19 },
 
-Search for information about ${config.name} models using these queries:
-${formattedQueries.map((q, i) => `${i + 1}. "${q}"`).join('\n')}
+  // xAI
+  'grok-2-1212': { input: 2.00, output: 10.00 },
+  'grok-2-vision-1212': { input: 2.00, output: 10.00 }
+};
 
-For each model you find, extract:
-1. Model ID (exact string used in API calls, e.g., "claude-3-5-sonnet-20241022")
-2. Aliases (alternative names like "claude-3.5-sonnet")
-3. Context window/length in tokens
-4. Pricing per million input/output tokens
-5. Key features (vision, function calling, streaming, system messages)
-6. Benchmark scores if available (HumanEval, MMLU, etc.)
-7. Release date or version
-8. Description of capabilities
-9. Whether it's deprecated
-10. Rate limits if mentioned
-
-Focus on models with these patterns: ${config.modelPatterns.join(', ')}
-
-Return a JSON object with this structure:
-{
-  "provider": "${config.provider}",
-  "searchDate": "${dateInfo.ISO_DATE}",
-  "models": [
-    {
-      "id": "model-id",
-      "aliases": ["alt-name-1", "alt-name-2"],
-      "contextLength": 200000,
-      "cost": {
-        "input": 3.00,
-        "output": 15.00
-      },
-      "features": {
-        "supportsVision": true,
-        "supportsFunctions": true,
-        "supportsStreaming": true,
-        "supportsSystemMessages": true
-      },
-      "benchmarks": {
-        "humanEval": 85.0,
-        "mmlu": 88.5,
-        "other": {}
-      },
-      "releaseDate": "2024-10-22",
-      "description": "Description of the model",
-      "deprecated": false,
-      "rateLimits": {
-        "rpm": 1000,
-        "tpm": 1000000
-      }
-    }
-  ],
-  "metadata": {
-    "sources": ["URLs or references found"],
-    "lastUpdated": "Date of information"
-  }
-}`;
-
-  try {
-    const response = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 4096,
-      temperature: 0,
-      messages: [{ role: 'user', content: prompt }]
-    });
-
-    const content = response.content[0];
-    if (content.type === 'text') {
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    }
-    throw new Error('No valid JSON found in response');
-  } catch (error) {
-    console.error(`❌ Error searching ${config.name}:`, error);
-    return null;
-  }
-}
-
-// Convert search results to model entries
-function convertToModelEntries(searchResult: any): any[] {
-  if (!searchResult || !searchResult.models) return [];
-  
-  return searchResult.models.map((model: any) => {
-    const entry: any = {
-      id: model.id,
-      provider: searchResult.provider,
-      cost: model.cost || { input: 0, output: 0 },
-      features: {
-        contextLength: model.contextLength || 0,
-        supportsFunctions: model.features?.supportsFunctions ?? false,
-        supportsVision: model.features?.supportsVision ?? false,
-        supportsStreaming: model.features?.supportsStreaming ?? true,
-        supportsSystemMessages: model.features?.supportsSystemMessages ?? true
-      }
-    };
-
-    // Add optional fields
-    if (model.aliases && model.aliases.length > 0) {
-      entry.aliases = model.aliases;
-    }
-    if (model.description) {
-      entry.description = model.description;
-    }
-    if (model.deprecated) {
-      entry.deprecated = true;
-    }
-    if (model.benchmarks) {
-      entry.scores = {
-        code: model.benchmarks.humanEval,
-        reasoning: model.benchmarks.mmlu,
-        monologue: model.benchmarks.other?.hle || model.benchmarks.other?.aime
-      };
-    }
-    if (model.rateLimits) {
-      entry.rateLimits = model.rateLimits;
-    }
-
-    return entry;
-  });
-}
-
-// Generate TypeScript code from model data
-function generateTypeScriptCode(allModels: any[], metadata: any): string {
-  const timestamp = metadata.generatedAt;
+// Generate TypeScript code
+function generateTypeScriptCode(models: ModelInfo[]): string {
+  const timestamp = new Date().toISOString();
   
   let code = `/**
- * Model data dynamically generated on ${timestamp}
- * Generated using web search via Claude API
- * 
- * This file contains the latest model information gathered from:
-${metadata.sources.map((s: string) => ` * - ${s}`).join('\n')}
+ * Model data fetched on ${timestamp}
+ * Generated from provider APIs and known model information
  */
 
 import { ModelEntry } from './types.js';
 
-// ============================================
-// MODEL_REGISTRY - Dynamically Generated
-// ============================================
-
 export const MODEL_REGISTRY: Record<string, ModelEntry> = {
 `;
 
-  // Group models by provider
-  const byProvider: Record<string, any[]> = {};
-  for (const model of allModels) {
-    if (!byProvider[model.provider]) byProvider[model.provider] = [];
-    byProvider[model.provider].push(model);
-  }
+  // Group by provider
+  const byProvider = models.reduce((acc, model) => {
+    if (!acc[model.provider]) acc[model.provider] = [];
+    acc[model.provider].push(model);
+    return acc;
+  }, {} as Record<string, ModelInfo[]>);
 
-  // Generate entries
-  for (const [provider, models] of Object.entries(byProvider)) {
+  for (const [provider, providerModels] of Object.entries(byProvider)) {
     code += `\n  // ${provider.toUpperCase()} Models\n`;
     
-    for (const model of models) {
+    for (const model of providerModels) {
+      const pricing = PRICING_DATA[model.id] || { input: 0, output: 0 };
+      
       code += `  '${model.id}': {\n`;
       code += `    id: '${model.id}',\n`;
-      
-      if (model.aliases) {
-        code += `    aliases: ${JSON.stringify(model.aliases)},\n`;
-      }
-      
-      code += `    provider: '${model.provider}' as const,\n`;
+      code += `    provider: '${provider}' as const,\n`;
       code += `    cost: {\n`;
-      code += `      input: ${model.cost.input},\n`;
-      code += `      output: ${model.cost.output}\n`;
+      code += `      input: ${pricing.input},\n`;
+      code += `      output: ${pricing.output}\n`;
       code += `    },\n`;
-      code += `    features: ${JSON.stringify(model.features, null, 6).replace(/\n/g, '\n    ')},\n`;
+      code += `    features: {\n`;
+      code += `      contextLength: ${model.contextLength || 4096},\n`;
+      code += `      supportsFunctions: true,\n`;
+      code += `      supportsVision: ${model.id.includes('vision') || model.id.includes('gpt-4o')},\n`;
+      code += `      supportsStreaming: true,\n`;
+      code += `      supportsSystemMessages: true\n`;
+      code += `    }`;
       
       if (model.description) {
-        code += `    description: '${model.description.replace(/'/g, "\\'")}',\n`;
-      }
-      
-      if (model.scores) {
-        code += `    scores: {\n`;
-        if (model.scores.code !== undefined) {
-          code += `      code: ${model.scores.code},\n`;
-        }
-        if (model.scores.reasoning !== undefined) {
-          code += `      reasoning: ${model.scores.reasoning},\n`;
-        }
-        if (model.scores.monologue !== undefined) {
-          code += `      monologue: ${model.scores.monologue}\n`;
-        }
-        code += `    },\n`;
+        code += `,\n    description: '${model.description}'`;
       }
       
       if (model.deprecated) {
-        code += `    deprecated: true,\n`;
+        code += `,\n    deprecated: true`;
       }
       
-      code += `  },\n`;
+      code += `\n  },\n`;
     }
   }
   
   code += `};\n\n`;
-  code += `// Total models found: ${allModels.length}\n`;
+  code += `// Total models: ${models.length}\n`;
   code += `// Generated on: ${timestamp}\n`;
   
   return code;
 }
 
 // Main function
-async function fetchModelDataDynamic() {
-  console.log('🚀 Dynamic Model Data Fetcher');
-  console.log('============================\n');
+async function fetchModelData() {
+  console.log('🚀 Model Data Fetcher');
+  console.log('====================\n');
   
-  const dateInfo = getCurrentDateInfo();
-  console.log(`📅 Current date: ${dateInfo.CURRENT_DATE}`);
+  // Fetch from APIs
+  console.log('📡 Fetching from provider APIs...');
+  const openaiModels = await fetchOpenAIModels();
+  console.log(`  ✓ OpenAI: ${openaiModels.length} models`);
   
-  const allResults = [];
-  const allModels = [];
-  const sources = new Set<string>();
+  // Combine with known models
+  const allModels = [...KNOWN_MODELS, ...openaiModels];
   
-  // Search each provider
-  for (const config of PROVIDERS) {
-    const result = await searchProviderModels(config, dateInfo);
-    
-    if (result) {
-      allResults.push(result);
-      const models = convertToModelEntries(result);
-      allModels.push(...models);
-      
-      console.log(`✅ Found ${models.length} models for ${config.name}`);
-      
-      if (result.metadata?.sources) {
-        result.metadata.sources.forEach((s: string) => sources.add(s));
-      }
-    }
-    
-    // Delay between searches
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
+  // Remove duplicates
+  const uniqueModels = Array.from(
+    new Map(allModels.map(m => [m.id, m])).values()
+  );
   
-  // Generate metadata
-  const metadata = {
-    generatedAt: dateInfo.ISO_DATE,
-    searchDate: dateInfo.CURRENT_DATE,
-    totalModels: allModels.length,
-    providers: PROVIDERS.map(p => p.provider),
-    sources: Array.from(sources)
-  };
+  console.log(`\n📊 Total unique models: ${uniqueModels.length}`);
   
-  // Save raw search results
-  const searchResultsPath = path.join(__dirname, '..', 'model-search-results-dynamic.json');
-  await fs.writeFile(searchResultsPath, JSON.stringify({
-    metadata,
-    searchResults: allResults,
-    models: allModels
+  // Save raw data
+  const dataPath = path.join(__dirname, '..', 'model-search-results-dynamic.json');
+  await fs.writeFile(dataPath, JSON.stringify({
+    timestamp: new Date().toISOString(),
+    totalModels: uniqueModels.length,
+    models: uniqueModels
   }, null, 2));
-  console.log(`\n📄 Search results saved to: model-search-results-dynamic.json`);
   
-  // Generate TypeScript code
-  const tsCode = generateTypeScriptCode(allModels, metadata);
+  // Generate TypeScript
+  const tsCode = generateTypeScriptCode(uniqueModels);
   const tsPath = path.join(__dirname, '..', 'model-data-dynamic.ts');
   await fs.writeFile(tsPath, tsCode);
-  console.log(`📝 TypeScript code saved to: model-data-dynamic.ts`);
   
-  // Generate summary
-  console.log('\n📊 Summary');
-  console.log('==========');
-  console.log(`Total models found: ${allModels.length}`);
-  
-  const byProvider = allModels.reduce((acc, m) => {
-    acc[m.provider] = (acc[m.provider] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  for (const [provider, count] of Object.entries(byProvider)) {
-    console.log(`  ${provider}: ${count} models`);
-  }
-  
-  console.log('\n✨ Done! Review the generated files and run validation.');
+  console.log('\n✅ Files generated:');
+  console.log('  - model-search-results-dynamic.json');
+  console.log('  - model-data-dynamic.ts');
+  console.log('\n✨ Done! Run validation and tests next.');
 }
 
-// Export for use in other scripts
-export { fetchModelDataDynamic, PROVIDERS };
-
-// Run if called directly
-if (import.meta.url === `file://${__filename}`) {
-  fetchModelDataDynamic().catch(console.error);
-}
+// Run
+fetchModelData().catch(console.error);

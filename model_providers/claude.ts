@@ -120,7 +120,7 @@ import {
 function convertToClaudeTools(tools: ToolFunction[]): any[] {
     return tools.map(tool => {
         // Special handling for web search tool
-        if (tool.definition.function.name === 'claude_web_search') {
+        if (tool.definition.function.name === 'claude_web_search' || tool.definition.function.name === 'web_search') {
             return {
                 type: 'web_search_20250305',
                 name: 'web_search',
