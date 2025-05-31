@@ -230,12 +230,12 @@ export async function convertStreamToMessages(
  * Takes the output of one request and feeds it as input to the next.
  */
 export async function chainRequests(
+    initialMessages: ResponseInput = [],
     requests: Array<{
         model: string;
         systemPrompt?: string;
         options?: ConversionOptions;
-    }>,
-    initialMessages: ResponseInput = []
+    }>
 ): Promise<ConversionResult> {
     let currentMessages = initialMessages;
     let lastResult: ConversionResult = {

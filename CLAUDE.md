@@ -2,12 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Development Rules
+
+**ALWAYS run these commands before committing or pushing code:**
+1. `npm run build` - Ensure TypeScript compiles without errors
+2. `npm test` - Ensure all tests pass
+
+If either command fails, fix the issues before proceeding with commits.
+
 ## Commands
 
 ### Development
-- `npm run build` - Compile TypeScript to JavaScript
+- `npm run build` - Compile TypeScript to JavaScript (REQUIRED before commit)
 - `npm run clean` - Remove dist directory
-- `npm test` - Run all tests once
+- `npm test` - Run all tests once (REQUIRED before commit)
 - `npm run test:watch` - Run tests in watch mode
 - `npm run test:coverage` - Run tests with coverage report
 

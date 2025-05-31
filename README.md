@@ -39,14 +39,14 @@ If you're currently using the OpenAI SDK, migration is simple:
 ```typescript
 // Before:
 import OpenAI from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // After:
 import OpenAIEnsemble from '@just-every/ensemble/openai-compat';
-const openai = OpenAIEnsemble;
+const client = OpenAIEnsemble;
 
 // Your existing code works unchanged!
-const completion = await openai.chat.completions.create({ /* ... */ });
+const completion = await client.chat.completions.create({ /* ... */ });
 ```
 
 ## Quick Start
@@ -505,17 +505,29 @@ if (quotaTracker.canMakeRequest('gpt-4o', 'openai')) {
 ```typescript
 import { convertStreamToMessages, chainRequests } from '@just-every/ensemble';
 
-// Convert stream to conversation history
-const stream = request('claude-3.5-sonnet', [
-  { type: 'message', role: 'user', content: 'Write a haiku about coding' }
-]);
+let currentMessages = [
+  { type: 'message', role: 'user', content: 'Write a haiku about coding' },
+  { type: 'message', role: 'user', content: 'Make it really long' }
+];
 
-const result = await convertStreamToMessages(stream);
+let messages = [
+  { type: 'message', role: 'developer', content: 'You are a helpful coding assistant' },
+  { type: 'message', role: 'user', content: 'How do I center a div in CSS?' },
+];
+messages = [...messages, ...(await convertStreamToMessages(request('claude-4-sonnet', messages))).messages];
+messages = [...messages, ...(await convertStreamToMessages(request(getModelFromClass('reasoning_mini'), messages))).messages];
+messages = [...messages, ...(await convertStreamToMessages(request('gemini-2.5-flash', messages))).messages];
+
+
 console.log(result.messages);     // Full conversation history
 console.log(result.fullResponse); // Just the assistant's response
 
 // Chain multiple models for multi-step tasks
-const analysis = await chainRequests([
+const analysis = await chainRequests(
+[
+  { type: 'message', role: 'user', content: codeToAnalyze }
+], 
+[
   {
     model: getModelFromClass('code'),
     systemPrompt: 'Analyze this code for bugs and security issues',
@@ -525,11 +537,9 @@ const analysis = await chainRequests([
     systemPrompt: 'Prioritize the issues found and suggest fixes',
   },
   {
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
     systemPrompt: 'Summarize the analysis in 3 bullet points',
   }
-], [
-  { type: 'message', role: 'user', content: codeToAnalyze }
 ]);
 ```
 

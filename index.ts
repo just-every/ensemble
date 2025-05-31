@@ -12,14 +12,21 @@ export {
 } from './model_providers/model_provider.js';
 
 // Export OpenAI compatibility layer
-export { chat, completions, default as OpenAIEnsemble } from './openai-compat.js';
+export { chat, completions, responses, default as OpenAIEnsemble } from './openai-compat.js';
 export type {
+    ResponsesCreateParams,
+    ResponsesCreateResponse,
+    ResponsesCreateChunk
+} from './openai-compat.js';
+
+// Re-export OpenAI types from our compatibility layer
+export type {
+    ChatCompletion,
+    ChatCompletionChunk,
+    ChatCompletionCreateParams,
     OpenAIMessage,
     OpenAITool,
-    ChatCompletionCreateParams,
-    CompletionCreateParams,
-    ChatCompletionResponse,
-    ChatCompletionChunk
+    CompletionCreateParams
 } from './openai-compat.js';
 
 // Export external model registration functions
