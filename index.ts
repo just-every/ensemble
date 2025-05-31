@@ -72,6 +72,8 @@ export * from './utils/cost_tracker.js';
 export * from './utils/quota_tracker.js';
 export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
+export { createToolFunction } from './utils/create_tool_function.js';
+export type { ToolParameter, ToolParameterMap, ToolParameterType } from './utils/create_tool_function.js';
 
 // Re-export singleton instances
 import { costTracker as _costTracker } from './utils/cost_tracker.js';

@@ -158,10 +158,19 @@ XAI_API_KEY=your_key_here
 OPENROUTER_API_KEY=your_key_here
 ```
 
+## Key Features
+
+- **Unified streaming API** across all LLM providers
+- **Automatic tool execution** with type-safe function calling
+- **Smart model rotation** based on availability and performance
+- **Built-in embeddings** with caching
+- **OpenAI SDK compatibility** - drop-in replacement
+- **Cost tracking** and quota management
+
 ## Documentation
 
 - [Model Selection & Management](./docs/models.md)
-- [Advanced Usage](./docs/advanced-usage.md)
+- [Advanced Usage](./docs/advanced-usage.md) - Tools, structured output, images
 - [Error Handling](./docs/error-handling.md)
 - [OpenAI Compatibility](./docs/openai-compatibility.md)
 - [Utility Functions](./docs/utilities.md)

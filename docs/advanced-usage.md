@@ -2,7 +2,64 @@
 
 ## Tool Calling & Function Execution
 
-### Defining Tools
+### Using createToolFunction (Recommended)
+
+The easiest way to create tools is with the `createToolFunction` utility:
+
+```typescript
+import { createToolFunction } from '@just-every/ensemble';
+
+// Simple weather tool - types are preserved
+const weatherTool = createToolFunction(
+  async (city: string, unit = 'celsius') => {
+    // Real implementation would call weather API
+    const temp = unit === 'celsius' ? 22 : 72;
+    return `${temp}°${unit[0].toUpperCase()} in ${city}`;
+  },
+  'Get current weather for a city',
+  {
+    city: 'The city to get weather for',
+    unit: {
+      type: 'string',
+      description: 'Temperature unit',
+      enum: ['celsius', 'fahrenheit'],
+      optional: true
+    }
+  }
+);
+
+// Even simpler - let it infer everything
+const timeTool = createToolFunction(
+  async () => new Date().toLocaleTimeString(),
+  'Get the current time'
+);
+
+// Complex tool with multiple parameter types
+const searchTool = createToolFunction(
+  async (query: string, limit = 10, filters = {}) => {
+    // Implementation
+    return `Found ${limit} results for "${query}"`;
+  },
+  'Search for information',
+  {
+    query: 'Search query',
+    limit: {
+      type: 'number',
+      description: 'Max results',
+      optional: true
+    },
+    filters: {
+      type: 'object',
+      description: 'Search filters',
+      optional: true
+    }
+  }
+);
+```
+
+### Manual Tool Definition
+
+For more control, you can define tools manually:
 
 ```typescript
 interface WeatherParams {
