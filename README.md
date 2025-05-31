@@ -5,6 +5,14 @@
 
 A unified interface for interacting with multiple LLM providers including OpenAI, Anthropic Claude, Google Gemini, Deepseek, Grok, and OpenRouter.
 
+## Why Use an Ensemble Approach?
+
+The ensemble pattern - rotating between multiple LLM providers dynamically - offers compelling advantages over relying on a single model. Research has shown that sampling multiple reasoning chains and using consensus answers can improve performance by double-digit margins on complex tasks. By automating this at runtime rather than prompt-engineering time, ensemble delivers more reliable and robust AI interactions.
+
+Beyond accuracy improvements, ensemble requests provide practical benefits for production systems. Different models carry unique training biases and stylistic patterns - rotating between them dilutes individual quirks and prevents conversations from getting "stuck" in one voice. The approach also ensures resilience: when one provider experiences an outage, quota limit, or latency spike, requests seamlessly route to alternatives. You can optimize costs by routing simple tasks to cheaper models while reserving premium models for complex reasoning. Need regex help? Route to a code-specialized model. Need emotional calibration? Use a dialogue expert. The ensemble gives you this granularity without complex conditional logic.
+
+Perhaps most importantly, the ensemble approach future-proofs your application. Model quality and pricing change weekly in the fast-moving LLM landscape. With ensemble, you can trial newcomers on a small percentage of traffic, compare real metrics, then scale up or roll back within minutes - all without changing your code.
+
 ## Features
 
 - **Multi-provider support**: Claude, OpenAI, Gemini, Deepseek, Grok, OpenRouter
