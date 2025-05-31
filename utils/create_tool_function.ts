@@ -1,23 +1,20 @@
 import { ToolFunction } from '../types.js';
 
-export type ToolParameterType = 'string' | 'number' | 'boolean' | 'array' | 'object';
+export type ToolParameterType = 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null';
 
 export interface ToolParameter {
-    type: ToolParameterType;
-    description: string | (() => string);
-    enum?: string[] | (() => string[]);
-    items?: {
-        type: ToolParameterType;
-        enum?: string[];
-    } | {
-        type: 'object';
-        properties: Record<string, ToolParameter>;
-        required?: string[];
-    };
+    type?: ToolParameterType;
+    description?: string | (() => string);
+    enum?: string[] | (() => Promise<string[]>);
+    items?: ToolParameter | { type: ToolParameterType; enum?: string[] | (() => Promise<string[]>) };
+    properties?: Record<string, ToolParameter>;
+    required?: string[];
     optional?: boolean;
+    minItems?: number;
+    additionalProperties?: boolean;
+    default?: unknown;
     minimum?: number;
     maximum?: number;
-    default?: unknown;
     minLength?: number;
     maxLength?: number;
     pattern?: string;
@@ -25,7 +22,7 @@ export interface ToolParameter {
 
 export type ToolParameterMap = Record<string, string | ToolParameter>;
 
-const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boolean', 'array', 'object'];
+const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boolean', 'array', 'object', 'null'];
 
 /**
  * Create a tool definition from a function
@@ -232,10 +229,33 @@ export function createToolFunction(
             }
         }
 
+        // Handle object properties and required
+        if (paramType === 'object') {
+            if (paramInfoObj?.properties) {
+                paramDef.properties = paramInfoObj.properties;
+            }
+            if (paramInfoObj?.required) {
+                paramDef.required = paramInfoObj.required;
+            }
+        }
+
         // Handle enum
         if (paramInfoObj?.enum) {
             if (typeof paramInfoObj.enum === 'function') {
-                paramDef.enum = paramInfoObj.enum();
+                // Check if it's an async function by looking at its constructor
+                const enumFn = paramInfoObj.enum;
+                const fnStr = enumFn.toString();
+                const isAsync = fnStr.includes('__awaiter') || fnStr.startsWith('async ') || 
+                               enumFn.constructor.name === 'AsyncFunction';
+                
+                if (isAsync) {
+                    // For async functions, pass the function through
+                    // The provider will need to handle async enum resolution
+                    paramDef.enum = enumFn;
+                } else {
+                    // For sync functions, call it immediately for backward compatibility
+                    paramDef.enum = enumFn();
+                }
             } else {
                 paramDef.enum = paramInfoObj.enum;
             }
@@ -259,6 +279,12 @@ export function createToolFunction(
         }
         if (paramInfoObj?.pattern !== undefined) {
             paramDef.pattern = paramInfoObj.pattern;
+        }
+        if (paramInfoObj?.minItems !== undefined) {
+            paramDef.minItems = paramInfoObj.minItems;
+        }
+        if (paramInfoObj?.additionalProperties !== undefined) {
+            paramDef.additionalProperties = paramInfoObj.additionalProperties;
         }
 
         properties[apiParamName] = paramDef;
