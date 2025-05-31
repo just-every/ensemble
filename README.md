@@ -150,6 +150,55 @@ interface ModelProvider {
 - **Delta Buffer**: Handle streaming response deltas
 - **AsyncQueue**: Generic async queue for bridging callbacks to async iteration (used internally)
 
+### Automatic Tool Execution
+
+The `requestWithTools` function provides automatic tool execution, similar to the `runStreamedWithTools` functionality in MAGI:
+
+```typescript
+import { requestWithTools } from '@just-every/ensemble';
+
+// Define tools
+const tools = [{
+  function: async ({ city }: { city: string }) => {
+    return `Weather in ${city}: Sunny, 72°F`;
+  },
+  definition: {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: 'Get weather for a city',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: { type: 'string', description: 'City name' }
+        },
+        required: ['city']
+      }
+    }
+  }
+}];
+
+// Make a request with automatic tool execution
+const response = await requestWithTools('claude-3-5-sonnet-20241022', [
+  { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
+], { 
+  tools,
+  maxToolCalls: 10 // Maximum rounds of tool execution (default: 10)
+});
+
+console.log(response); // "Based on the current weather data, Paris is experiencing sunny weather..."
+
+// Custom tool execution handler
+const responseWithCustomHandler = await requestWithTools('gpt-4o', messages, {
+  tools,
+  processToolCall: async (toolCalls) => {
+    // Custom tool execution logic
+    console.log('Executing tools:', toolCalls);
+    return toolCalls.map(tc => 'Custom result');
+  }
+});
+```
+
 ### Stream Conversion
 
 Convert streaming events into conversation history for chaining LLM calls:

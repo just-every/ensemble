@@ -1,0 +1,145 @@
+name: Update Model Data
+
+on:
+  # Run weekly on Mondays at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * 1'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      create_pr:
+        description: 'Create a pull request with updates'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  update-models:
+    name: Fetch and Update Model Data
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Create .env file
+      run: |
+        echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" > .env
+        # Add other API keys if needed for validation
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+        echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> .env
+        echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env
+        echo "XAI_API_KEY=${{ secrets.XAI_API_KEY }}" >> .env
+      
+    - name: Fetch latest model data
+      run: npx tsx scripts/fetch-model-data-dynamic.ts
+      
+    - name: Validate model data
+      run: |
+        echo "Running cross-validation..."
+        npx tsx scripts/cross-validate-data.ts || true
+        
+        echo "Testing models with API calls..."
+        npx tsx scripts/test-new-models.ts || true
+      continue-on-error: true
+      
+    - name: Generate summary
+      run: npx tsx scripts/summarize-updates.ts || echo "Summary generation failed"
+      
+    - name: Check for changes
+      id: check_changes
+      run: |
+        if git diff --quiet model-data-dynamic.ts; then
+          echo "No model data changes detected"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "Model data changes detected"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Pull Request
+      if: steps.check_changes.outputs.has_changes == 'true' && (github.event_name == 'schedule' || github.event.inputs.create_pr == 'true')
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        commit-message: "chore: update model data [automated]"
+        title: "🤖 Update Model Data - ${{ steps.date.outputs.date }}"
+        body: |
+          ## Automated Model Data Update
+          
+          This PR contains automatically fetched model data updates.
+          
+          ### Changes
+          - Updated model information from all providers
+          - Fetched latest pricing and features
+          - Updated benchmark scores where available
+          
+          ### Files Changed
+          - `model-data-dynamic.ts` - Generated model registry entries
+          - `model-search-results-dynamic.json` - Raw search results
+          
+          ### Validation Results
+          Check the workflow logs for validation results.
+          
+          ### Next Steps
+          1. Review the changes in `model-data-dynamic.ts`
+          2. Check validation reports in the workflow artifacts
+          3. Manually verify any suspicious changes
+          4. Merge into `model_data.ts` if everything looks good
+          
+          ---
+          *Generated automatically by GitHub Actions*
+        branch: update-model-data-${{ github.run_number }}
+        delete-branch: true
+        
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: model-data-update-${{ github.run_number }}
+        path: |
+          model-data-dynamic.ts
+          model-search-results-dynamic.json
+          *-validation-report.json
+          *-test-report.json
+        retention-days: 30
+        
+    - name: Job Summary
+      if: always()
+      run: |
+        echo "## Model Data Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f model-search-results-dynamic.json ]; then
+          echo "### Models Found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          jq '.metadata' model-search-results-dynamic.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Validation Status" >> $GITHUB_STEP_SUMMARY
+        echo "- Cross-validation: Check logs" >> $GITHUB_STEP_SUMMARY
+        echo "- API tests: Check logs" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.check_changes.outputs.has_changes }}" == "true" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Changes detected and PR created**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ **No changes detected**" >> $GITHUB_STEP_SUMMARY
+        fi
