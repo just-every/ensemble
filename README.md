@@ -152,10 +152,10 @@ interface ModelProvider {
 
 ### Automatic Tool Execution
 
-The `requestWithTools` function provides automatic tool execution, similar to the `runStreamedWithTools` functionality in MAGI:
+The `request` function provides automatic tool execution, similar to the `runStreamedWithTools` functionality in MAGI:
 
 ```typescript
-import { requestWithTools } from '@just-every/ensemble';
+import { request } from '@just-every/ensemble';
 
 // Define tools
 const tools = [{
@@ -179,7 +179,7 @@ const tools = [{
 }];
 
 // Make a request with automatic tool execution
-const response = await requestWithTools('claude-3-5-sonnet-20241022', [
+const response = await request('claude-3-5-sonnet-20241022', [
   { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
 ], { 
   tools,
@@ -189,7 +189,7 @@ const response = await requestWithTools('claude-3-5-sonnet-20241022', [
 console.log(response); // "Based on the current weather data, Paris is experiencing sunny weather..."
 
 // Custom tool execution handler
-const responseWithCustomHandler = await requestWithTools('gpt-4o', messages, {
+const responseWithCustomHandler = await request('gpt-4o', messages, {
   tools,
   processToolCall: async (toolCalls) => {
     // Custom tool execution logic

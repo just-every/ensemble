@@ -157,47 +157,8 @@ class RequestAgent implements EnsembleAgent {
  * }
  * ```
  */
+// Main request function that handles tool execution
 export async function* request(
-    model: string,
-    messages: ResponseInput,
-    options: RequestOptions = {}
-): AsyncGenerator<EnsembleStreamEvent> {
-    const { maxToolCalls = 10 } = options;
-    
-    // If tools are provided and maxToolCalls > 0, handle tool execution
-    if (options.tools && options.tools.length > 0 && maxToolCalls > 0) {
-        yield* requestWithToolsImpl(model, messages, options);
-    } else {
-        // Direct streaming without tool execution
-        const provider = getModelProvider(model);
-        const agent = new RequestAgent(options);
-
-        // Get the stream from the provider
-        const stream = provider.createResponseStream(model, messages, agent as any);
-        
-        // Yield all events from the stream
-        for await (const event of stream) {
-            yield event;
-        }
-        
-        // Emit stream_end event
-        yield { type: 'stream_end', timestamp: new Date().toISOString() } as EnsembleStreamEvent;
-    }
-}
-
-/**
- * @deprecated Use request() instead - it now handles tools automatically
- */
-export async function* requestWithTools(
-    model: string,
-    messages: ResponseInput,
-    options: RequestOptions = {}
-): AsyncGenerator<EnsembleStreamEvent> {
-    yield* request(model, messages, options);
-}
-
-// Internal implementation that handles tool execution
-async function* requestWithToolsImpl(
     model: string,
     messages: ResponseInput,
     options: RequestOptions = {}

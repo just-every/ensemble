@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { request, requestWithTools } from '../index';
+import { request } from '../index';
 import type { EnsembleTool, EnsembleStreamEvent } from '../types/extended_types';
 
-describe('requestWithTools', () => {
+describe('request', () => {
     it('should execute tool functions using test provider', async () => {
         // Mock console.log to verify tool execution
         const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -194,7 +194,7 @@ describe('requestWithTools', () => {
     });
 
     it('should work with request() when tools are provided', async () => {
-        // Test that request() automatically uses requestWithTools when tools are provided
+        // Test that request() automatically uses request when tools are provided
         const tools: EnsembleTool[] = [{
             function: async ({ x, y }: { x: number; y: number }) => {
                 return `${x + y}`;
