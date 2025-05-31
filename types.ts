@@ -616,5 +616,11 @@ export interface RequestOptions {
     tools?: ToolFunction[];
     /** Tool choice configuration */
     toolChoice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
+    /** Whether to execute tools automatically (default: true when tools are provided) */
+    executeTools?: boolean;
+    /** Maximum number of tool call rounds (default: 10) */
+    maxToolCalls?: number;
+    /** Handler for custom tool execution */
+    processToolCall?: (toolCalls: ToolCall[]) => Promise<any>;
 }
 

@@ -282,7 +282,7 @@ describe('requestWithTools', () => {
                 modelSettings: {
                     temperature: 0
                 }
-            } as any
+            }
         )) {
             events.push(event);
         }

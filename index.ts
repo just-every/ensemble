@@ -84,18 +84,6 @@ function isMessageComplete(event: any): event is { type: 'message_complete'; con
     return event && event.type === 'message_complete' && typeof event.content === 'string';
 }
 
-/** 
- * Extended options for requestWithTools 
- * @deprecated Use RequestOptions with tools instead
- */
-export interface RequestWithToolsOptions extends RequestOptions {
-    /** Whether to execute tools automatically (default: true) */
-    executeTools?: boolean;
-    /** Maximum number of tool call rounds (default: 10) */
-    maxToolCalls?: number;
-    /** Handler for tool execution */
-    processToolCall?: (toolCalls: ToolCall[]) => Promise<any>;
-}
 
 class RequestAgent implements EnsembleAgent {
     agent_id: string;
@@ -168,11 +156,11 @@ export async function* request(
 ): AsyncGenerator<EnsembleStreamEvent> {
     // If tools are provided and executeTools is not explicitly false, handle tool execution
     const shouldExecuteTools = options.tools && options.tools.length > 0 && 
-        (options as RequestWithToolsOptions).executeTools !== false;
+        options.executeTools !== false;
     
     if (shouldExecuteTools) {
         // Use requestWithTools for automatic tool execution
-        yield* requestWithTools(model, messages, options as RequestWithToolsOptions);
+        yield* requestWithTools(model, messages, options);
     } else {
         // Direct streaming without tool execution
         const provider = getModelProvider(model);
@@ -233,7 +221,7 @@ export async function* request(
 export async function* requestWithTools(
     model: string,
     messages: ResponseInput,
-    options: RequestWithToolsOptions = {}
+    options: RequestOptions = {}
 ): AsyncGenerator<EnsembleStreamEvent> {
     const {
         executeTools = true,

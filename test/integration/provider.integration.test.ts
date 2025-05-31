@@ -154,7 +154,7 @@ describe('Provider Integration Tests', () => {
         tools: [weatherTool],
         toolChoice: 'auto',
         executeTools: false
-      } as any);
+      });
 
       for await (const event of stream) {
         events.push(event);
