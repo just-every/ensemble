@@ -1,5 +1,5 @@
 /**
- * DeepSeek model provider for the MAGI system.
+ * DeepSeek model provider for the ensemble system.
  *
  * We extend OpenAIChat as DeepSeek is a drop in replacement.
  * This version includes workarounds for deepseek-reasoner limitations:

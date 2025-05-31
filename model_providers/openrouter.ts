@@ -1,5 +1,5 @@
 /**
- * OpenRouter model provider for the MAGI system.
+ * OpenRouter model provider for the ensemble system.
  */
 
 import { OpenAIChat } from './openai_chat.js';

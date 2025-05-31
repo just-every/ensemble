@@ -1,5 +1,5 @@
 /**
- * Claude model provider for the MAGI system.
+ * Claude model provider for the ensemble system.
  *
  * This module provides an implementation of the ModelProvider interface
  * for Anthropic's Claude models and handles streaming responses.

@@ -2,7 +2,7 @@
  * Cost tracking module for the ensemble package.
  *
  * This is a simplified version that provides the basic interface without
- * the full MAGI system integration (no streaming events or quota management).
+ * the full ensemble system integration (no streaming events or quota management).
  */
 
 import {

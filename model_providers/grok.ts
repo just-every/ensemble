@@ -1,5 +1,5 @@
 /**
- * Grok model provider for the MAGI system.
+ * Grok model provider for the ensemble system.
  *
  * We extend OpenAIChat as Grok is a drop in replacement
  */

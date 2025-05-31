@@ -1,5 +1,5 @@
 /**
- * Gemini model provider for the MAGI system.
+ * Gemini model provider for the ensemble system.
  *
  * This module provides an implementation of the ModelProvider interface
  * for Google's Gemini models and handles streaming responses using the

@@ -1,5 +1,5 @@
 /**
- * OpenAI model provider for the MAGI system.
+ * OpenAI model provider for the ensemble system.
  *
  * This module provides an implementation of the ModelProvider interface
  * for OpenAI's models and handles streaming responses.

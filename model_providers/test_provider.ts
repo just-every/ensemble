@@ -1,5 +1,5 @@
 /**
- * Test model provider for the MAGI system.
+ * Test model provider for the ensemble system.
  *
  * This module provides a mock implementation of the ModelProvider interface
  * for testing purposes. It allows simulating different LLM behaviors, error conditions,

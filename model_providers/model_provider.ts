@@ -1,5 +1,5 @@
 /**
- * Model provider interface for the MAGI system.
+ * Model provider interface for the ensemble system.
  *
  * This module defines the ModelProvider interface and factory function
  * to get the appropriate provider implementation.
