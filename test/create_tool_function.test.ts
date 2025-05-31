@@ -231,4 +231,130 @@ describe('createToolFunction', () => {
         expect(tool.definition.function.parameters.properties).toHaveProperty('name');
         expect(tool.definition.function.parameters.properties).toHaveProperty('age');
     });
+
+    it('should handle inject_agent_id parameter', () => {
+        const agentTool = async (query: string, inject_agent_id: string) => {
+            return `Agent ${inject_agent_id} processed: ${query}`;
+        };
+
+        const tool = createToolFunction(
+            agentTool,
+            'Tool that uses agent ID',
+            {
+                query: 'The query to process'
+            }
+        );
+
+        // inject_agent_id should not appear in parameters
+        expect(tool.definition.function.parameters.properties).not.toHaveProperty('inject_agent_id');
+        expect(tool.definition.function.parameters.properties).toHaveProperty('query');
+        expect(tool.definition.function.parameters.required).toEqual(['query']);
+        
+        // Should have the injectAgentId flag
+        expect(tool.injectAgentId).toBe(true);
+    });
+
+    it('should handle abort_signal parameter', () => {
+        const abortableTool = async (data: string, abort_signal?: AbortSignal) => {
+            if (abort_signal?.aborted) return 'Aborted';
+            return `Processed: ${data}`;
+        };
+
+        const tool = createToolFunction(
+            abortableTool,
+            'Abortable tool'
+        );
+
+        // abort_signal should not appear in parameters
+        expect(tool.definition.function.parameters.properties).not.toHaveProperty('abort_signal');
+        expect(tool.definition.function.parameters.properties).toHaveProperty('data');
+        
+        // Should have the injectAbortSignal flag
+        expect(tool.injectAbortSignal).toBe(true);
+    });
+
+    it('should handle both special parameters together', () => {
+        const fullTool = async (
+            query: string,
+            limit = 5,
+            inject_agent_id: string,
+            abort_signal?: AbortSignal
+        ) => {
+            return `Agent ${inject_agent_id} found ${limit} results for "${query}"`;
+        };
+
+        const tool = createToolFunction(
+            fullTool,
+            'Full featured tool'
+        );
+
+        // Only regular parameters should appear
+        expect(Object.keys(tool.definition.function.parameters.properties)).toEqual(['query', 'limit']);
+        expect(tool.definition.function.parameters.required).toEqual(['query']);
+        
+        // Both flags should be set
+        expect(tool.injectAgentId).toBe(true);
+        expect(tool.injectAbortSignal).toBe(true);
+    });
+
+    it('should detect special parameters from function signature when using paramMap', () => {
+        const func = async (text: string, inject_agent_id: string, abort_signal?: AbortSignal) => {
+            return `${inject_agent_id}: ${text}`;
+        };
+
+        const tool = createToolFunction(
+            func,
+            'Tool with special params',
+            {
+                text: 'Text to process'
+                // Note: we don't include inject_agent_id or abort_signal in paramMap
+            }
+        );
+
+        // Should still detect the special parameters from the function signature
+        expect(tool.injectAgentId).toBe(true);
+        expect(tool.injectAbortSignal).toBe(true);
+        expect(Object.keys(tool.definition.function.parameters.properties)).toEqual(['text']);
+    });
+
+    it('should not set flags when special parameters are not present', () => {
+        const simpleTool = async (message: string) => {
+            return `Echo: ${message}`;
+        };
+
+        const tool = createToolFunction(simpleTool);
+
+        // Flags should not be set
+        expect(tool.injectAgentId).toBeUndefined();
+        expect(tool.injectAbortSignal).toBeUndefined();
+    });
+
+    it('should handle rest parameters correctly', () => {
+        const varargsTool = async (command: string, ...args: string[]) => {
+            return `${command}: ${args.join(', ')}`;
+        };
+
+        const tool = createToolFunction(
+            varargsTool,
+            'Tool with variable arguments'
+        );
+
+        const props = tool.definition.function.parameters.properties;
+        expect(props.command.type).toBe('string');
+        expect(props.args.type).toBe('array');
+        expect(props.args.items).toEqual({ type: 'string' });
+        expect(tool.definition.function.parameters.required).toEqual(['command', 'args']);
+    });
+
+    it('should properly clean function names with spaces', () => {
+        const tool = createToolFunction(
+            async () => 'test',
+            'Test function',
+            {},
+            undefined,
+            'my awesome tool function'
+        );
+
+        expect(tool.definition.function.name).toBe('my_awesome_tool_function');
+    });
 });

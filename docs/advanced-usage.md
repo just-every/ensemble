@@ -55,6 +55,30 @@ const searchTool = createToolFunction(
     }
   }
 );
+
+// Tool with special parameters (automatically injected)
+const contextAwareTool = createToolFunction(
+  async (query: string, inject_agent_id: string, abort_signal?: AbortSignal) => {
+    // inject_agent_id is automatically provided by the system
+    // abort_signal allows cancellation of long-running operations
+    if (abort_signal?.aborted) {
+      return 'Operation cancelled';
+    }
+    return `Agent ${inject_agent_id} processed: ${query}`;
+  },
+  'Context-aware tool',
+  {
+    query: 'The query to process'
+  }
+);
+
+// Tool with variable arguments
+const commandTool = createToolFunction(
+  async (command: string, ...args: string[]) => {
+    return `Executed: ${command} ${args.join(' ')}`;
+  },
+  'Execute command with arguments'
+);
 ```
 
 ### Manual Tool Definition

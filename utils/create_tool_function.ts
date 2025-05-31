@@ -74,6 +74,19 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  *     }
  *   }
  * );
+ * 
+ * @example
+ * // Function with special parameters (inject_agent_id, abort_signal)
+ * const agentTool = createToolFunction(
+ *   async (query: string, inject_agent_id: string, abort_signal?: AbortSignal) => {
+ *     // inject_agent_id and abort_signal are automatically handled
+ *     return `Agent ${inject_agent_id} processed: ${query}`;
+ *   },
+ *   'Tool that uses agent context',
+ *   {
+ *     query: 'The query to process'
+ *   }
+ * );
  */
 export function createToolFunction(
     func: (...args: any[]) => Promise<any> | any,
@@ -83,7 +96,7 @@ export function createToolFunction(
     functionName?: string
 ): ToolFunction {
     const funcStr = func.toString();
-    const funcName = (functionName || '').replace(/\s+/g, '_') || func.name || 'anonymous_function';
+    const funcName = (functionName || '').replaceAll(' ', '_') || func.name || 'anonymous_function';
 
     let toolDescription = description || `Tool for ${funcName}`;
     if (returns) {
@@ -91,11 +104,14 @@ export function createToolFunction(
     }
 
     // Clean up multiline parameter definitions
-    const cleanFuncStr = funcStr.replace(/\n\s*/g, ' ');
+    const cleanFuncStr = funcStr.replaceAll(/\n\s*/g, ' ');
     const paramMatch = cleanFuncStr.match(/\(([^)]*)\)/);
 
     const properties: Record<string, any> = {};
     const required: string[] = [];
+
+    let injectAgentId = false;
+    let injectAbortSignal = false;
 
     const params = paramMap
         ? Object.keys(paramMap)
@@ -129,6 +145,17 @@ export function createToolFunction(
         // Handle rest parameters
         const isRestParam = paramName.startsWith('...');
         const cleanParamName = isRestParam ? paramName.substring(3) : paramName;
+
+        // Handle special parameters
+        if (cleanParamName === 'inject_agent_id') {
+            injectAgentId = true;
+            continue;  // Skip adding to parameters
+        }
+
+        if (cleanParamName === 'abort_signal') {
+            injectAbortSignal = true;
+            continue;  // Skip adding to parameters
+        }
 
         // Check if we have custom mapping for this parameter
         const paramInfoRaw: ToolParameter | string | undefined =
@@ -216,6 +243,19 @@ export function createToolFunction(
         }
     }
 
+    // If the underlying function signature expects an inject_agent_id argument
+    // but we built the paramNames list from paramMap (thereby skipping it),
+    // we still need to flag injectAgentId so that the caller knows to inject it
+    if (!injectAgentId && /\(\s*[^)]*\binject_agent_id\b/.test(funcStr)) {
+        injectAgentId = true;
+    }
+
+    // Similarly check for abort_signal if paramMap omitted it but the function
+    // signature includes it so we can inject the abort signal automatically
+    if (!injectAbortSignal && /\(\s*[^)]*\babort_signal\b/.test(funcStr)) {
+        injectAbortSignal = true;
+    }
+
     // Create and return tool definition
     return {
         function: func,
@@ -231,5 +271,7 @@ export function createToolFunction(
                 },
             },
         },
+        ...(injectAgentId && { injectAgentId }),
+        ...(injectAbortSignal && { injectAbortSignal }),
     };
 }
