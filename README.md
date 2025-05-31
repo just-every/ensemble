@@ -160,6 +160,36 @@ type EnsembleStreamEvent =
   | { type: 'error', error: Error };
 ```
 
+#### `embed(text, options?)`
+
+Generate an embedding vector for the given text using any supported embedding model.
+
+**Parameters:**
+- `text` (string): Text to embed
+- `options` (object): Optional configuration
+  - `model` (string): Specific model to use (e.g., 'text-embedding-3-small')
+  - `modelClass` (ModelClassID): Model class to use (default: 'embedding')
+  - `agentId` (string): Agent identifier for tracking
+  - `opts` (EmbedOpts): Provider-specific embedding options
+
+**Returns:** `Promise<number[]>` - The embedding vector
+
+```typescript
+// Simple embedding
+const embedding = await embed('Hello, world!');
+console.log(`Dimension: ${embedding.length}`);
+
+// With specific model
+const embedding = await embed('Search query', { 
+  model: 'text-embedding-3-large' 
+});
+
+// With provider options (e.g., for Gemini)
+const embedding = await embed('Document text', { 
+  opts: { taskType: 'RETRIEVAL_DOCUMENT' }
+});
+```
+
 
 ### Working with Models
 

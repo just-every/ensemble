@@ -90,7 +90,7 @@ import type {
     EnsembleStreamEvent,
     ToolCall
 } from './types.js';
-import { getModelProvider } from './model_providers/model_provider.js';
+import { getModelProvider, getModelFromClass, type EmbedOpts } from './model_providers/model_provider.js';
 
 // Type guard for tool calls in events
 function hasToolCalls(event: any): event is { type: string; tool_calls: ToolCall[] } {
@@ -366,3 +366,89 @@ export async function* request(
         // The loop will make another request with the updated message history
     }
 }
+
+// Cache to avoid repeated embedding calls for the same text
+const embeddingCache = new Map<
+    string,
+    {
+        embedding: number[];
+        timestamp: Date;
+    }
+>();
+
+/**
+ * Generate an embedding vector for the given text
+ * 
+ * @param text - Text to embed
+ * @param options - Optional configuration
+ * @returns Promise that resolves to a normalized embedding vector
+ * 
+ * @example
+ * ```typescript
+ * // Simple embedding
+ * const embedding = await embed('Hello, world!');
+ * console.log(`Embedding dimension: ${embedding.length}`);
+ * 
+ * // With specific model
+ * const embedding = await embed('Search query', { 
+ *   model: 'text-embedding-3-large' 
+ * });
+ * 
+ * // With model class
+ * const embedding = await embed('Document text', { 
+ *   modelClass: 'embedding' 
+ * });
+ * ```
+ */
+export async function embed(
+    text: string, 
+    options: {
+        model?: string;
+        modelClass?: ModelClassID;
+        agentId?: string;
+        opts?: EmbedOpts;
+    } = {}
+): Promise<number[]> {
+    const { 
+        model, 
+        modelClass = 'embedding', 
+        agentId = 'ensemble',
+        opts 
+    } = options;
+    
+    // Determine which model to use
+    const modelToUse = model || await getModelFromClass(modelClass);
+    
+    // Use a hash of the text and model as the cache key
+    const cacheKey = `${modelToUse}:${text}`;
+    
+    // Check if we have a cached embedding
+    if (embeddingCache.has(cacheKey)) {
+        const cached = embeddingCache.get(cacheKey)!;
+        return cached.embedding;
+    }
+    
+    // Get the provider for this model
+    const provider = getModelProvider(modelToUse);
+    
+    if (!provider.createEmbedding) {
+        throw new Error(
+            `Provider for model ${modelToUse} does not support embeddings`
+        );
+    }
+    
+    // Generate the embedding using the provider
+    const result = await provider.createEmbedding(modelToUse, text, opts);
+    
+    // Handle array result (single text input should return single vector)
+    const embedding = Array.isArray(result[0]) ? result[0] : result as number[];
+    
+    // Cache the result
+    embeddingCache.set(cacheKey, {
+        embedding,
+        timestamp: new Date(),
+    });
+    
+    return embedding;
+}
+
