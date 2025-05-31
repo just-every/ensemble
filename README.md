@@ -32,6 +32,23 @@ Perhaps most importantly, the ensemble approach future-proofs your application. 
 npm install @just-every/ensemble
 ```
 
+### Migration from OpenAI SDK
+
+If you're currently using the OpenAI SDK, migration is simple:
+
+```typescript
+// Before:
+import OpenAI from 'openai';
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// After:
+import OpenAICompat from '@just-every/ensemble/openai-compat';
+const openai = OpenAICompat;
+
+// Your existing code works unchanged!
+const completion = await openai.chat.completions.create({ /* ... */ });
+```
+
 ## Quick Start
 
 ```typescript
@@ -604,6 +621,55 @@ if (process.env.NODE_ENV === 'development') {
 ```
 
 ## Advanced Topics
+
+### OpenAI SDK Compatibility
+
+Ensemble provides a drop-in replacement for the OpenAI SDK, allowing you to use any supported model with OpenAI's familiar API:
+
+```typescript
+import OpenAICompat from '@just-every/ensemble/openai-compat';
+// Or named imports: import { chat, completions } from '@just-every/ensemble';
+
+// Replace OpenAI client
+const openai = OpenAICompat;  // Instead of: new OpenAI({ apiKey: '...' })
+
+// Use exactly like OpenAI SDK - but with any model!
+const completion = await openai.chat.completions.create({
+  model: 'claude-3.5-sonnet',  // or 'gpt-4o', 'gemini-2.0-flash', etc.
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Hello!' }
+  ],
+  temperature: 0.7
+});
+
+console.log(completion.choices[0].message.content);
+
+// Streaming
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+  stream: true
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0].delta.content || '');
+}
+
+// Legacy completions API also supported
+const legacyCompletion = await openai.completions.create({
+  model: 'deepseek-chat',
+  prompt: 'Once upon a time',
+  max_tokens: 100
+});
+```
+
+This compatibility layer supports:
+- All chat.completions.create parameters (temperature, tools, response_format, etc.)
+- Streaming and non-streaming responses
+- Tool/function calling
+- Legacy completions.create API
+- Proper TypeScript types matching OpenAI's SDK
 
 ### Custom Model Providers
 

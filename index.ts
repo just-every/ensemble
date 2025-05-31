@@ -11,6 +11,17 @@ export {
     EmbedOpts
 } from './model_providers/model_provider.js';
 
+// Export OpenAI compatibility layer
+export { chat, completions, default as OpenAICompat } from './openai-compat.js';
+export type {
+    OpenAIMessage,
+    OpenAITool,
+    ChatCompletionCreateParams,
+    CompletionCreateParams,
+    ChatCompletionResponse,
+    ChatCompletionChunk
+} from './openai-compat.js';
+
 // Export external model registration functions
 export {
     registerExternalModel,

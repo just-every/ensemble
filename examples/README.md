@@ -18,6 +18,7 @@ node dist/examples/model-rotation.js
 node dist/examples/stream-conversion.js
 node dist/examples/error-handling.js
 node dist/examples/cost-optimization.js
+node dist/examples/openai-compatibility.js
 ```
 
 **Note:** Make sure you have the required API keys set in your environment variables before running the examples.
@@ -87,6 +88,16 @@ Strategies for minimizing API costs while maintaining quality.
 - Batch processing
 - Progressive enhancement
 - Budget tracking and limits
+
+### 8. OpenAI Compatibility (`openai-compatibility.ts`)
+Drop-in replacement for OpenAI SDK with multi-model support.
+
+**Key concepts:**
+- OpenAI SDK compatible API
+- chat.completions.create method
+- Legacy completions.create support
+- Streaming and non-streaming modes
+- Using any ensemble model with OpenAI's API format
 
 ## Common Patterns
 
