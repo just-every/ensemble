@@ -15,6 +15,12 @@ export interface ToolParameter {
         required?: string[];
     };
     optional?: boolean;
+    minimum?: number;
+    maximum?: number;
+    default?: unknown;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
 }
 
 export type ToolParameterMap = Record<string, string | ToolParameter>;
@@ -233,6 +239,26 @@ export function createToolFunction(
             } else {
                 paramDef.enum = paramInfoObj.enum;
             }
+        }
+
+        // Handle additional properties from the extended interface
+        if (paramInfoObj?.minimum !== undefined) {
+            paramDef.minimum = paramInfoObj.minimum;
+        }
+        if (paramInfoObj?.maximum !== undefined) {
+            paramDef.maximum = paramInfoObj.maximum;
+        }
+        if (paramInfoObj?.default !== undefined) {
+            paramDef.default = paramInfoObj.default;
+        }
+        if (paramInfoObj?.minLength !== undefined) {
+            paramDef.minLength = paramInfoObj.minLength;
+        }
+        if (paramInfoObj?.maxLength !== undefined) {
+            paramDef.maxLength = paramInfoObj.maxLength;
+        }
+        if (paramInfoObj?.pattern !== undefined) {
+            paramDef.pattern = paramInfoObj.pattern;
         }
 
         properties[apiParamName] = paramDef;
