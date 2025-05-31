@@ -104,187 +104,569 @@ for await (const event of earlyStream) {
 
 ## API Reference
 
-### `request(model, messages, options?)`
+### Core Functions
 
-Main function for making LLM requests using the AsyncGenerator API.
+#### `request(model, messages, options?)`
+
+Main function for making LLM requests with streaming responses and automatic tool execution.
 
 **Parameters:**
-- `model` (string): Model identifier
-- `messages` (ResponseInput): Array of message objects
+- `model` (string): Model identifier (e.g., 'gpt-4o', 'claude-3.5-sonnet', 'gemini-2.0-flash')
+- `messages` (ResponseInput): Array of message objects in the conversation
 - `options` (RequestOptions): Optional configuration object
 
 **Returns:** `AsyncGenerator<EnsembleStreamEvent>` - An async generator that yields streaming events
 
 ```typescript
 interface RequestOptions {
-  agentId?: string;
-  tools?: ToolFunction[];
-  modelSettings?: ModelSettings;
-  modelClass?: ModelClassID;
+  agentId?: string;              // Identifier for logging/tracking
+  tools?: ToolFunction[];         // Array of tool definitions
+  toolChoice?: ToolChoice;        // Control tool selection behavior
+  maxToolCalls?: number;          // Max rounds of tool execution (default: 10, 0 = disabled)
+  processToolCall?: (toolCalls: ToolCall[]) => Promise<any>; // Custom tool handler
+  modelSettings?: ModelSettings;  // Temperature, maxTokens, etc.
+  modelClass?: ModelClassID;      // 'standard' | 'code' | 'reasoning' | 'monologue'
+  responseFormat?: ResponseFormat; // JSON mode or structured output
+  maxImageDimension?: number;     // Auto-resize images (default: provider-specific)
+  fallbackModels?: string[];      // Models to try if primary fails
 }
 
-// Usage with try/catch for error handling
-try {
-  for await (const event of request(model, messages, options)) {
-    // Process events
-  }
-} catch (error) {
-  // Handle errors
-}
+// Stream event types
+type EnsembleStreamEvent = 
+  | { type: 'text_delta', delta: string }
+  | { type: 'text', text: string }
+  | { type: 'message_delta', content: string }
+  | { type: 'message_complete', content: string }
+  | { type: 'tool_start', tool_calls: ToolCall[] }
+  | { type: 'cost_update', usage: TokenUsage }
+  | { type: 'stream_end', timestamp: string }
+  | { type: 'error', error: Error };
 ```
 
 
-### Model Provider Interface
+### Working with Models
 
-Each provider implements the `ModelProvider` interface:
+#### Model Selection
 
 ```typescript
-interface ModelProvider {
-  createResponseStream(
-    model: string, 
-    messages: ResponseInput, 
-    agent: EnsembleAgent
-  ): AsyncGenerator<EnsembleStreamEvent>;
+import { getModelFromClass, findModel, MODEL_REGISTRY } from '@just-every/ensemble';
+
+// Get best model for a specific task type
+const codeModel = getModelFromClass('code');      // Returns best available code model
+const reasoningModel = getModelFromClass('reasoning'); // For complex reasoning tasks
+
+// Check if a model exists
+const modelInfo = findModel('gpt-4o');
+if (modelInfo) {
+  console.log(`Provider: ${modelInfo.provider}`);
+  console.log(`Input cost: $${modelInfo.inputCost}/million tokens`);
+}
+
+// List all available models
+for (const [modelName, info] of Object.entries(MODEL_REGISTRY)) {
+  console.log(`${modelName}: ${info.provider}`);
 }
 ```
 
-### Utilities
+#### Model Classes
 
-- **Cost Tracking**: Monitor token usage and costs with cost_tracker
-- **Quota Management**: Track API quotas and rate limits with quota_tracker
-- **Image Processing**: Convert images to text, resize, and optimize
-- **Logging System**: Pluggable request/response logging with configurable backends
-- **Communication**: Logging and debugging utilities
-- **Delta Buffer**: Handle streaming response deltas
-- **AsyncQueue**: Generic async queue for bridging callbacks to async iteration (used internally)
+- **standard**: General-purpose models for everyday tasks
+- **code**: Optimized for programming and technical tasks
+- **reasoning**: Advanced models for complex logical reasoning
+- **monologue**: Models supporting extended thinking/reasoning traces
 
-### Automatic Tool Execution
+### Message Types
 
-The `request` function provides automatic tool execution:
+```typescript
+// User/Assistant messages
+interface TextMessage {
+  type: 'message';
+  role: 'user' | 'assistant' | 'developer';
+  content: string | MessageContent[];
+  status?: 'completed' | 'in_progress';
+}
+
+// Multi-modal content
+type MessageContent = 
+  | { type: 'input_text', text: string }
+  | { type: 'input_image', image_url: string, detail?: 'auto' | 'low' | 'high' }
+  | { type: 'tool_use', id: string, name: string, arguments: any };
+
+// Tool-related messages
+interface FunctionCall {
+  type: 'function_call';
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+interface FunctionCallOutput {
+  type: 'function_call_output';
+  id: string;
+  output: string;
+}
+```
+
+## Common Use Cases
+
+### 1. Basic Conversations
 
 ```typescript
 import { request } from '@just-every/ensemble';
 
-// Define tools
-const tools = [{
-  function: async ({ city }: { city: string }) => {
-    return `Weather in ${city}: Sunny, 72°F`;
+// Simple Q&A
+for await (const event of request('gpt-4o-mini', [
+  { type: 'message', role: 'user', content: 'Explain quantum computing in simple terms' }
+])) {
+  if (event.type === 'text_delta') {
+    process.stdout.write(event.delta);
+  }
+}
+
+// Multi-turn conversation
+const messages = [
+  { type: 'message', role: 'developer', content: 'You are a helpful coding assistant' },
+  { type: 'message', role: 'user', content: 'How do I center a div in CSS?' },
+  { type: 'message', role: 'assistant', content: 'Here are several ways...' },
+  { type: 'message', role: 'user', content: 'What about using flexbox?' }
+];
+
+for await (const event of request('claude-3.5-sonnet', messages)) {
+  // Handle streaming response
+}
+```
+
+### 2. Tool Calling & Function Execution
+
+```typescript
+// Define tools with TypeScript types
+interface WeatherParams {
+  city: string;
+  unit?: 'celsius' | 'fahrenheit';
+}
+
+const weatherTool: ToolFunction = {
+  function: async ({ city, unit = 'celsius' }: WeatherParams) => {
+    // Real implementation would call weather API
+    const temp = unit === 'celsius' ? 22 : 72;
+    return `${temp}°${unit[0].toUpperCase()} in ${city}`;
   },
   definition: {
     type: 'function',
     function: {
       name: 'get_weather',
-      description: 'Get weather for a city',
+      description: 'Get current weather for a city',
       parameters: {
         type: 'object',
         properties: {
-          city: { type: 'string', description: 'City name' }
+          city: { type: 'string', description: 'City name' },
+          unit: { 
+            type: 'string', 
+            enum: ['celsius', 'fahrenheit'],
+            description: 'Temperature unit'
+          }
         },
         required: ['city']
       }
     }
   }
-}];
+};
 
-// Make a request with automatic tool execution
-const response = await request('claude-3-5-sonnet-20241022', [
-  { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
-], { 
-  tools,
-  maxToolCalls: 10 // Maximum rounds of tool execution (default: 10)
+// Use with automatic execution
+for await (const event of request('gpt-4o', [
+  { type: 'message', role: 'user', content: 'What\'s the weather in Tokyo and New York?' }
+], { tools: [weatherTool] })) {
+  if (event.type === 'tool_start') {
+    console.log('Calling tool:', event.tool_calls[0].function.name);
+  } else if (event.type === 'text_delta') {
+    process.stdout.write(event.delta);
+  }
+}
+```
+
+### 3. Model Selection Strategies
+
+```typescript
+import { getModelFromClass, request } from '@just-every/ensemble';
+
+// Route based on task type
+async function intelligentRequest(task: string, messages: ResponseInput) {
+  let model: string;
+  
+  if (task.includes('code') || task.includes('debug')) {
+    model = getModelFromClass('code'); // Best code model
+  } else if (task.includes('analyze') || task.includes('reasoning')) {
+    model = getModelFromClass('reasoning'); // Best reasoning model
+  } else {
+    model = getModelFromClass('standard'); // Cost-effective general model
+  }
+  
+  console.log(`Using ${model} for ${task}`);
+  
+  return request(model, messages, {
+    fallbackModels: ['gpt-4o-mini', 'claude-3-5-haiku'] // Fallback options
+  });
+}
+
+// Use model rotation for consensus
+async function consensusRequest(messages: ResponseInput) {
+  const models = ['gpt-4o', 'claude-3.5-sonnet', 'gemini-2.0-flash'];
+  const responses = [];
+  
+  for (const model of models) {
+    const stream = request(model, messages);
+    const result = await convertStreamToMessages(stream);
+    responses.push(result.fullResponse);
+  }
+  
+  // Analyze responses for consensus
+  return analyzeConsensus(responses);
+}
+```
+
+### 4. Structured Output & JSON Mode
+
+```typescript
+// JSON mode for reliable parsing
+const jsonStream = request('gpt-4o', [
+  { type: 'message', role: 'user', content: 'List 3 programming languages with their pros/cons as JSON' }
+], {
+  responseFormat: { type: 'json_object' }
 });
 
-console.log(response); // "Based on the current weather data, Paris is experiencing sunny weather..."
+let jsonContent = '';
+for await (const event of jsonStream) {
+  if (event.type === 'text_delta') {
+    jsonContent += event.delta;
+  }
+}
 
-// Custom tool execution handler
-const responseWithCustomHandler = await request('gpt-4o', messages, {
-  tools,
-  processToolCall: async (toolCalls) => {
-    // Custom tool execution logic
-    console.log('Executing tools:', toolCalls);
-    return toolCalls.map(tc => 'Custom result');
+const data = JSON.parse(jsonContent);
+
+// Structured output with schema validation
+const schema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    age: { type: 'number' },
+    skills: { 
+      type: 'array',
+      items: { type: 'string' }
+    }
+  },
+  required: ['name', 'age', 'skills']
+};
+
+const structuredStream = request('gpt-4o', [
+  { type: 'message', role: 'user', content: 'Generate a developer profile' }
+], {
+  responseFormat: {
+    type: 'json_schema',
+    json_schema: {
+      name: 'developer_profile',
+      schema: schema,
+      strict: true
+    }
   }
 });
 ```
 
-### Stream Conversion
+### 5. Image Processing
 
-Convert streaming events into conversation history for chaining LLM calls:
+```typescript
+// Analyze images with vision models
+const imageStream = request('gpt-4o', [
+  {
+    type: 'message',
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'What\'s in this image? Describe any text you see.' },
+      { 
+        type: 'input_image', 
+        image_url: 'data:image/jpeg;base64,...',
+        detail: 'high' // 'auto' | 'low' | 'high'
+      }
+    ]
+  }
+], {
+  maxImageDimension: 2048 // Auto-resize large images
+});
+
+// Multiple images
+const comparison = request('claude-3.5-sonnet', [
+  {
+    type: 'message',
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'Compare these two designs:' },
+      { type: 'input_image', image_url: 'https://example.com/design1.png' },
+      { type: 'input_image', image_url: 'https://example.com/design2.png' }
+    ]
+  }
+]);
+```
+
+### 6. Error Handling & Resilience
+
+```typescript
+import { isRateLimitError, isAuthenticationError } from '@just-every/ensemble';
+
+async function robustRequest(model: string, messages: ResponseInput, options?: RequestOptions) {
+  const maxRetries = 3;
+  let lastError;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const events = [];
+      for await (const event of request(model, messages, options)) {
+        if (event.type === 'error') {
+          throw event.error;
+        }
+        events.push(event);
+      }
+      return events;
+      
+    } catch (error) {
+      lastError = error;
+      
+      if (isAuthenticationError(error)) {
+        throw error; // Don't retry auth errors
+      }
+      
+      if (isRateLimitError(error)) {
+        const waitTime = error.retryAfter || Math.pow(2, i) * 1000;
+        console.log(`Rate limited. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      // Try fallback model
+      if (options?.fallbackModels?.[i]) {
+        model = options.fallbackModels[i];
+        console.log(`Falling back to ${model}`);
+        continue;
+      }
+    }
+  }
+  
+  throw lastError;
+}
+```
+
+## Utilities
+
+### Cost & Usage Tracking
+
+```typescript
+import { costTracker, quotaTracker } from '@just-every/ensemble';
+
+// Track costs across requests
+for await (const event of request('gpt-4o', messages)) {
+  if (event.type === 'cost_update') {
+    console.log(`Tokens: ${event.usage.input_tokens} in, ${event.usage.output_tokens} out`);
+    console.log(`Cost: $${event.usage.total_cost.toFixed(4)}`);
+  }
+}
+
+// Get cumulative costs
+const usage = costTracker.getAllUsage();
+for (const [model, stats] of Object.entries(usage)) {
+  console.log(`${model}: $${stats.total_cost.toFixed(2)} for ${stats.request_count} requests`);
+}
+
+// Check quotas before making requests
+if (quotaTracker.canMakeRequest('gpt-4o', 'openai')) {
+  // Safe to proceed
+} else {
+  const resetTime = quotaTracker.getResetTime('openai');
+  console.log(`Quota exceeded. Resets at ${resetTime}`);
+}
+```
+
+### Stream Conversion & Chaining
 
 ```typescript
 import { convertStreamToMessages, chainRequests } from '@just-every/ensemble';
 
-// Convert a single stream to messages
-const stream = request('claude-3-5-sonnet-20241022', [
-  { type: 'message', role: 'user', content: 'Tell me a joke' }
+// Convert stream to conversation history
+const stream = request('claude-3.5-sonnet', [
+  { type: 'message', role: 'user', content: 'Write a haiku about coding' }
 ]);
 
 const result = await convertStreamToMessages(stream);
-console.log(result.messages); // Array of ResponseInput items
-console.log(result.fullResponse); // Complete response text
+console.log(result.messages);     // Full conversation history
+console.log(result.fullResponse); // Just the assistant's response
 
-// Chain multiple requests together
-const chainResult = await chainRequests([
+// Chain multiple models for multi-step tasks
+const analysis = await chainRequests([
   {
-    model: 'claude-3-5-sonnet-20241022',
-    systemPrompt: 'You are a helpful assistant that tells jokes.',
+    model: getModelFromClass('code'),
+    systemPrompt: 'Analyze this code for bugs and security issues',
   },
   {
-    model: 'gpt-4o',
-    systemPrompt: 'Rate the previous joke on a scale of 1-10.',
+    model: getModelFromClass('reasoning'),
+    systemPrompt: 'Prioritize the issues found and suggest fixes',
+  },
+  {
+    model: 'gpt-4o-mini',
+    systemPrompt: 'Summarize the analysis in 3 bullet points',
   }
 ], [
-  { type: 'message', role: 'user', content: 'Tell me a joke about programming' }
+  { type: 'message', role: 'user', content: codeToAnalyze }
 ]);
-
-// Custom tool processing during conversion
-const streamWithTools = request('gpt-4o', messages, {
-  tools: [weatherTool]
-});
-
-const toolResult = await convertStreamToMessages(streamWithTools, [], {
-  processToolCall: async (toolCalls) => {
-    // Process tool calls and return results
-    const results = await Promise.all(
-      toolCalls.map(call => processMyTool(call))
-    );
-    return results;
-  },
-  onThinking: (msg) => console.log('Thinking:', msg.content),
-  onResponse: (msg) => console.log('Response:', msg.content),
-});
 ```
 
-### Logging
+### Image Utilities
 
-The ensemble package includes a pluggable logging system for LLM requests and responses:
+```typescript
+import { resizeImageForModel, imageToText } from '@just-every/ensemble';
+
+// Auto-resize for specific model requirements
+const resized = await resizeImageForModel(
+  base64ImageData,
+  'gpt-4o', // Different models have different size limits
+  { maxDimension: 2048 }
+);
+
+// Extract text from images
+const extractedText = await imageToText(imageBuffer);
+console.log('Found text:', extractedText);
+```
+
+### Logging & Debugging
 
 ```typescript
 import { setEnsembleLogger, EnsembleLogger } from '@just-every/ensemble';
 
-// Implement custom logger
-class CustomLogger implements EnsembleLogger {
+// Production-ready logger example
+class ProductionLogger implements EnsembleLogger {
   log_llm_request(agentId: string, providerName: string, model: string, requestData: unknown, timestamp?: Date): string {
-    // Log request and return request ID for correlation
-    console.log(`Request: ${agentId} -> ${providerName}/${model}`);
-    return `req_${Date.now()}`;
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Log to your monitoring system
+    logger.info('LLM Request', {
+      requestId,
+      agentId,
+      provider: providerName,
+      model,
+      timestamp,
+      // Be careful not to log sensitive data
+      messageCount: (requestData as any).messages?.length,
+      hasTools: !!(requestData as any).tools?.length
+    });
+    
+    return requestId;
   }
 
   log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void {
-    // Log response using request ID
-    console.log(`Response for: ${requestId}`);
+    const response = responseData as any;
+    
+    logger.info('LLM Response', {
+      requestId,
+      timestamp,
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+      totalCost: response.usage?.total_cost,
+      cached: response.usage?.cache_creation_input_tokens > 0
+    });
   }
 
   log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void {
-    // Log error using request ID
-    console.log(`Error for: ${requestId}`);
+    logger.error('LLM Error', {
+      requestId,
+      timestamp,
+      error: errorData,
+      // Include retry information if available
+      retryAfter: (errorData as any).retryAfter
+    });
   }
 }
 
-// Enable logging
-setEnsembleLogger(new CustomLogger());
+// Enable logging globally
+setEnsembleLogger(new ProductionLogger());
 
-// All ensemble requests will now be logged
+// Debug mode for development
+if (process.env.NODE_ENV === 'development') {
+  setEnsembleLogger({
+    log_llm_request: (agent, provider, model, data) => {
+      console.log(`[${new Date().toISOString()}] → ${provider}/${model}`);
+      return Date.now().toString();
+    },
+    log_llm_response: (id, data) => {
+      const response = data as any;
+      console.log(`[${new Date().toISOString()}] ← ${response.usage?.total_tokens} tokens`);
+    },
+    log_llm_error: (id, error) => {
+      console.error(`[${new Date().toISOString()}] ✗ Error:`, error);
+    }
+  });
+}
+```
+
+## Advanced Topics
+
+### Custom Model Providers
+
+```typescript
+import { ModelProvider, registerExternalModel } from '@just-every/ensemble';
+
+// Register a custom model
+registerExternalModel({
+  id: 'my-custom-model',
+  provider: 'custom',
+  inputCost: 0.001,
+  outputCost: 0.002,
+  contextWindow: 8192,
+  maxOutput: 4096,
+  supportsTools: true,
+  supportsVision: false,
+  supportsStreaming: true
+});
+
+// Use your custom model
+const stream = request('my-custom-model', messages);
+```
+
+### Performance Optimization
+
+```typescript
+// Batch processing with concurrency control
+async function batchProcess(items: string[], concurrency = 3) {
+  const results = [];
+  const queue = [...items];
+  
+  async function worker() {
+    while (queue.length > 0) {
+      const item = queue.shift()!;
+      const stream = request('gpt-4o-mini', [
+        { type: 'message', role: 'user', content: `Process: ${item}` }
+      ]);
+      
+      const result = await convertStreamToMessages(stream);
+      results.push({ item, result: result.fullResponse });
+    }
+  }
+  
+  // Run workers concurrently
+  await Promise.all(Array(concurrency).fill(null).map(() => worker()));
+  return results;
+}
+
+// Stream multiple requests in parallel
+async function parallelStreaming(prompts: string[]) {
+  const streams = prompts.map(prompt => 
+    request('claude-3.5-haiku', [
+      { type: 'message', role: 'user', content: prompt }
+    ])
+  );
+  
+  // Process all streams concurrently
+  const results = await Promise.all(
+    streams.map(stream => convertStreamToMessages(stream))
+  );
+  
+  return results.map(r => r.fullResponse);
+}
 ```
 
 ## Environment Variables
