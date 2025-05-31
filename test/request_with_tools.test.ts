@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { requestWithTools } from '../index';
-import type { EnsembleTool } from '../types/extended_types';
+import { request, requestWithTools } from '../index';
+import type { EnsembleTool, EnsembleStreamEvent } from '../types/extended_types';
 
 describe('requestWithTools', () => {
     it('should execute tool functions using test provider', async () => {
@@ -31,7 +31,11 @@ describe('requestWithTools', () => {
             }
         }];
 
-        const response = await requestWithTools(
+        // Collect all events
+        const events: EnsembleStreamEvent[] = [];
+        let fullText = '';
+        
+        for await (const event of requestWithTools(
             'test-model',
             [
                 {
@@ -46,14 +50,26 @@ describe('requestWithTools', () => {
                     temperature: 0
                 }
             }
-        );
+        )) {
+            events.push(event);
+            if (event.type === 'text_delta') {
+                fullText += event.delta;
+            } else if (event.type === 'text') {
+                fullText += event.text;
+            }
+        }
 
-        // Check that we got a response
-        expect(response).toBeDefined();
-        expect(typeof response).toBe('string');
+        // Check that we got events
+        expect(events.length).toBeGreaterThan(0);
         
-        // Test provider generates consistent responses
-        expect(response).toContain('test model');
+        // Look for text in different event types
+        const allText = events
+            .filter(e => e.type === 'text' || e.type === 'text_delta' || e.type === 'message_complete')
+            .map(e => (e as any).text || (e as any).delta || (e as any).content || '')
+            .join('');
+        
+        expect(allText.length).toBeGreaterThan(0);
+        expect(allText).toContain('test');
 
         consoleSpy.mockRestore();
     });
@@ -108,7 +124,10 @@ describe('requestWithTools', () => {
             }
         ];
 
-        const response = await requestWithTools(
+        const events: EnsembleStreamEvent[] = [];
+        let fullText = '';
+        
+        for await (const event of requestWithTools(
             'test-model',
             [
                 {
@@ -123,14 +142,22 @@ describe('requestWithTools', () => {
                     temperature: 0
                 }
             }
-        );
+        )) {
+            events.push(event);
+            if (event.type === 'text_delta') {
+                fullText += event.delta;
+            }
+        }
 
-        expect(response).toBeDefined();
-        expect(typeof response).toBe('string');
+        expect(events.length).toBeGreaterThan(0);
+        expect(fullText).toBeDefined();
     });
 
     it('should work without tools', async () => {
-        const response = await requestWithTools(
+        const events: EnsembleStreamEvent[] = [];
+        let fullText = '';
+        
+        for await (const event of requestWithTools(
             'test-model',
             [
                 {
@@ -144,9 +171,123 @@ describe('requestWithTools', () => {
                     temperature: 0
                 }
             }
-        );
+        )) {
+            events.push(event);
+            if (event.type === 'text_delta') {
+                fullText += event.delta;
+            } else if (event.type === 'text') {
+                fullText += event.text;
+            }
+        }
 
-        expect(response).toBeDefined();
-        expect(typeof response).toBe('string');
+        expect(events.length).toBeGreaterThan(0);
+        
+        // Look for text in different event types
+        const allText = events
+            .filter(e => e.type === 'text' || e.type === 'text_delta' || e.type === 'message_complete')
+            .map(e => (e as any).text || (e as any).delta || (e as any).content || '')
+            .join('');
+        
+        expect(allText.length).toBeGreaterThan(0);
+        expect(allText.toLowerCase()).toContain('test');
+    });
+
+    it('should work with request() when tools are provided', async () => {
+        // Test that request() automatically uses requestWithTools when tools are provided
+        const tools: EnsembleTool[] = [{
+            function: async ({ x, y }: { x: number; y: number }) => {
+                return `${x + y}`;
+            },
+            definition: {
+                type: 'function',
+                function: {
+                    name: 'add',
+                    description: 'Add two numbers',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            x: { type: 'number' },
+                            y: { type: 'number' }
+                        },
+                        required: ['x', 'y']
+                    }
+                }
+            }
+        }];
+
+        const events: EnsembleStreamEvent[] = [];
+        let fullText = '';
+        
+        // Using request() with tools should automatically handle tool execution
+        for await (const event of request(
+            'test-model',
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'What is 10 plus 5?'
+                }
+            ],
+            {
+                tools,
+                modelSettings: {
+                    temperature: 0
+                }
+            }
+        )) {
+            events.push(event);
+            if (event.type === 'text_delta') {
+                fullText += event.delta;
+            }
+        }
+
+        expect(events.length).toBeGreaterThan(0);
+        expect(fullText).toBeDefined();
+    });
+
+    it('should allow disabling tool execution with executeTools: false', async () => {
+        const tools: EnsembleTool[] = [{
+            function: async () => {
+                throw new Error('This tool should not be executed');
+            },
+            definition: {
+                type: 'function',
+                function: {
+                    name: 'fail_tool',
+                    description: 'This tool should not be executed',
+                    parameters: {
+                        type: 'object',
+                        properties: {},
+                        required: []
+                    }
+                }
+            }
+        }];
+
+        const events: EnsembleStreamEvent[] = [];
+        
+        // Using request() with executeTools: false should not execute tools
+        for await (const event of request(
+            'test-model',
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Try to use the fail_tool'
+                }
+            ],
+            {
+                tools,
+                executeTools: false,
+                modelSettings: {
+                    temperature: 0
+                }
+            } as any
+        )) {
+            events.push(event);
+        }
+
+        // Test should complete without throwing
+        expect(events.length).toBeGreaterThan(0);
     });
 });

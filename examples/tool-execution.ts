@@ -1,8 +1,9 @@
 /**
- * Example demonstrating automatic tool execution with requestWithTools
+ * Example demonstrating automatic tool execution with streaming
  */
 
-import { requestWithTools } from '../index.js';
+import { request, requestWithTools } from '../index.js';
+import type { EnsembleStreamEvent } from '../types/extended_types.js';
 
 // Define some example tools
 const tools = [
@@ -74,12 +75,15 @@ const tools = [
 ];
 
 async function main() {
-    console.log('=== Tool Execution Example ===\n');
+    console.log('=== Tool Execution Example with Streaming ===\n');
     
     try {
-        // Example 1: Single tool call
-        console.log('Example 1: Weather query');
-        const response1 = await requestWithTools(
+        // Example 1: Single tool call with streaming
+        console.log('Example 1: Weather query (streaming)');
+        console.log('User: What\'s the weather like in Paris?');
+        console.log('Assistant: ', '');
+        
+        for await (const event of request(
             'gpt-4o-mini',
             [
                 {
@@ -89,13 +93,22 @@ async function main() {
                 }
             ],
             { tools }
-        );
-        console.log('Response:', response1);
-        console.log('\n---\n');
+        )) {
+            if (event.type === 'text_delta') {
+                process.stdout.write(event.delta);
+            } else if (event.type === 'tool_start') {
+                console.log('\n[Calling tool: ' + event.tool_calls?.[0]?.function.name + ']');
+            }
+        }
+        console.log('\n\n---\n');
         
         // Example 2: Multiple tool calls
         console.log('Example 2: Travel planning query');
-        const response2 = await requestWithTools(
+        console.log('User: I want to travel from New York to Tokyo. Can you check the weather in both cities and find me a flight?');
+        console.log('Assistant: ', '');
+        
+        const events: EnsembleStreamEvent[] = [];
+        for await (const event of request(
             'gpt-4o-mini',
             [
                 {
@@ -105,13 +118,23 @@ async function main() {
                 }
             ],
             { tools }
-        );
-        console.log('Response:', response2);
-        console.log('\n---\n');
+        )) {
+            events.push(event);
+            if (event.type === 'text_delta') {
+                process.stdout.write(event.delta);
+            } else if (event.type === 'tool_start') {
+                const toolNames = event.tool_calls?.map(tc => tc.function.name).join(', ');
+                console.log(`\n[Calling tools: ${toolNames}]`);
+            }
+        }
+        console.log('\n\n---\n');
         
-        // Example 3: Custom tool handler
+        // Example 3: Using requestWithTools directly with custom handler
         console.log('Example 3: Custom tool handler');
-        const response3 = await requestWithTools(
+        console.log('User: What\'s the weather in London?');
+        console.log('Assistant: ', '');
+        
+        for await (const event of requestWithTools(
             'gpt-4o-mini',
             [
                 {
@@ -123,22 +146,50 @@ async function main() {
             {
                 tools,
                 processToolCall: async (toolCalls) => {
-                    console.log('Custom handler called with:', toolCalls.map(tc => ({
-                        name: tc.function.name,
-                        args: tc.function.arguments
-                    })));
+                    console.log('\n[Custom handler processing tools]');
                     
                     // Custom processing logic
                     return toolCalls.map(tc => {
                         if (tc.function.name === 'get_weather') {
-                            return 'Weather data temporarily unavailable';
+                            return 'Weather data temporarily unavailable due to maintenance';
                         }
                         return 'Tool not handled by custom processor';
                     });
                 }
             }
-        );
-        console.log('Response:', response3);
+        )) {
+            if (event.type === 'text_delta') {
+                process.stdout.write(event.delta);
+            }
+        }
+        console.log('\n\n---\n');
+        
+        // Example 4: Disabling tool execution
+        console.log('Example 4: Tools provided but execution disabled');
+        console.log('User: What\'s the weather in Paris?');
+        console.log('Assistant: ', '');
+        
+        for await (const event of request(
+            'gpt-4o-mini',
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'What\'s the weather in Paris?'
+                }
+            ],
+            { 
+                tools,
+                executeTools: false // Tools are sent to model but not executed
+            } as any
+        )) {
+            if (event.type === 'text_delta') {
+                process.stdout.write(event.delta);
+            } else if (event.type === 'tool_start') {
+                console.log('\n[Tool requested but not executed: ' + event.tool_calls?.[0]?.function.name + ']');
+            }
+        }
+        console.log('\n');
         
     } catch (error) {
         console.error('Error:', error);

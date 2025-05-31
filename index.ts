@@ -48,55 +48,51 @@ export * from './model_providers/test_provider.js';
 
 // Export all utils
 export * from './utils/async_queue.js';
-export * from './utils/communication.js';
-export * from './utils/cost_tracker.js';
+export * from './utils/stream_converter.js';
 export * from './utils/delta_buffer.js';
-export * from './utils/image_to_text.js';
+export * from './utils/cost_tracker.js';
+export * from './utils/quota_tracker.js';
 export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
-export * from './utils/quota_tracker.js';
-export { convertStreamToMessages, chainRequests } from './utils/stream_converter.js';
-export type { ConversionOptions, ConversionResult } from './utils/stream_converter.js';
 
-import {
+// Re-export singleton instances
+import { costTracker as _costTracker } from './utils/cost_tracker.js';
+import { quotaTracker as _quotaTracker } from './utils/quota_tracker.js';
+export const costTracker = _costTracker;
+export const quotaTracker = _quotaTracker;
+
+// Core API
+import type {
+    RequestOptions,
+    ResponseInput,
     ModelSettings,
     ToolFunction,
-    ToolCall,
-    ResponseInput,
-    ResponseInputFunctionCall,
-    ResponseInputFunctionCallOutput,
-    EnsembleStreamEvent,
     ModelClassID,
     EnsembleAgent,
+    EnsembleStreamEvent,
+    ToolCall
 } from './types.js';
-import {
-    getModelProvider,
-} from './model_providers/model_provider.js';
+import { getModelProvider } from './model_providers/model_provider.js';
 
-/**
- * Options for making requests to LLM providers
- */
-export interface RequestOptions {
-    /** Unique identifier for the agent making the request */
-    agentId?: string;
-    /** Array of tools/functions available to the model */
-    tools?: ToolFunction[];
-    /** Model-specific settings like temperature, max_tokens, etc */
-    modelSettings?: ModelSettings;
-    /** Model class to use for automatic model selection */
-    modelClass?: ModelClassID;
+// Type guard for tool calls in events
+function hasToolCalls(event: any): event is { type: string; tool_calls: ToolCall[] } {
+    return event && Array.isArray(event.tool_calls) && event.tool_calls.length > 0;
 }
 
-/**
- * Options for requestWithTools that includes tool execution
+// Type guard for message complete events
+function isMessageComplete(event: any): event is { type: 'message_complete'; content: string } {
+    return event && event.type === 'message_complete' && typeof event.content === 'string';
+}
+
+/** 
+ * Extended options for requestWithTools 
+ * @deprecated Use RequestOptions with tools instead
  */
 export interface RequestWithToolsOptions extends RequestOptions {
-    /** Whether to automatically execute tools (default: true) */
+    /** Whether to execute tools automatically (default: true) */
     executeTools?: boolean;
-    
     /** Maximum number of tool call rounds (default: 10) */
     maxToolCalls?: number;
-    
     /** Handler for tool execution */
     processToolCall?: (toolCalls: ToolCall[]) => Promise<any>;
 }
@@ -156,8 +152,12 @@ class RequestAgent implements EnsembleAgent {
  *   }
  * }];
  * 
- * for await (const event of request('claude-3.5-sonnet', messages, { tools })) {
- *   // Handle events
+ * for await (const event of request('claude-3.5-sonnet', [
+ *   { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
+ * ], { tools })) {
+ *   if (event.type === 'text_delta') {
+ *     process.stdout.write(event.delta);
+ *   }
  * }
  * ```
  */
@@ -166,19 +166,29 @@ export async function* request(
     messages: ResponseInput,
     options: RequestOptions = {}
 ): AsyncGenerator<EnsembleStreamEvent> {
-    const provider = getModelProvider(model);
-    const agent = new RequestAgent(options);
+    // If tools are provided and executeTools is not explicitly false, handle tool execution
+    const shouldExecuteTools = options.tools && options.tools.length > 0 && 
+        (options as RequestWithToolsOptions).executeTools !== false;
+    
+    if (shouldExecuteTools) {
+        // Use requestWithTools for automatic tool execution
+        yield* requestWithTools(model, messages, options as RequestWithToolsOptions);
+    } else {
+        // Direct streaming without tool execution
+        const provider = getModelProvider(model);
+        const agent = new RequestAgent(options);
 
-    // Get the stream from the provider
-    const stream = provider.createResponseStream(model, messages, agent as any);
-    
-    // Yield all events from the stream
-    for await (const event of stream) {
-        yield event;
+        // Get the stream from the provider
+        const stream = provider.createResponseStream(model, messages, agent as any);
+        
+        // Yield all events from the stream
+        for await (const event of stream) {
+            yield event;
+        }
+        
+        // Emit stream_end event
+        yield { type: 'stream_end', timestamp: new Date().toISOString() } as EnsembleStreamEvent;
     }
-    
-    // Emit stream_end event
-    yield { type: 'stream_end', timestamp: new Date().toISOString() } as EnsembleStreamEvent;
 }
 
 /**
@@ -189,12 +199,12 @@ export async function* request(
  * @param model - The model identifier (e.g., 'gpt-4o', 'claude-3.5-sonnet')
  * @param messages - Array of messages in the conversation
  * @param options - Configuration including tools and execution options
- * @returns Promise resolving to the final response text
+ * @returns AsyncGenerator yielding streaming events
  * 
  * @example
  * ```typescript
  * const tools = [{
- *   function: async (city: string) => `Weather in ${city}: Sunny, 72°F`,
+ *   function: async ({ city }) => `Weather in ${city}: Sunny, 72°F`,
  *   definition: {
  *     type: 'function',
  *     function: {
@@ -211,18 +221,20 @@ export async function* request(
  *   }
  * }];
  * 
- * const response = await requestWithTools('claude-3.5-sonnet', [
+ * for await (const event of requestWithTools('claude-3.5-sonnet', [
  *   { type: 'message', role: 'user', content: 'What\'s the weather in Paris?' }
- * ], { tools });
- * 
- * console.log(response); // "Based on the current weather data, Paris is experiencing sunny weather with a temperature of 72°F..."
+ * ], { tools })) {
+ *   if (event.type === 'text_delta') {
+ *     process.stdout.write(event.delta);
+ *   }
+ * }
  * ```
  */
-export async function requestWithTools(
+export async function* requestWithTools(
     model: string,
     messages: ResponseInput,
     options: RequestWithToolsOptions = {}
-): Promise<string> {
+): AsyncGenerator<EnsembleStreamEvent> {
     const {
         executeTools = true,
         maxToolCalls = 10,
@@ -230,7 +242,6 @@ export async function requestWithTools(
         ...requestOptions
     } = options;
     
-    let fullResponse = '';
     let currentMessages = [...messages];
     let toolCallCount = 0;
     
@@ -239,24 +250,30 @@ export async function requestWithTools(
         const collectedToolCalls: ToolCall[] = [];
         const toolResults: Array<{ id: string; call_id: string; output: string }> = [];
         let hasMessage = false;
+        let messageContent = '';
+        
+        // Create provider and agent for this round
+        const provider = getModelProvider(model);
+        const agent = new RequestAgent(requestOptions);
         
         // Stream the response
-        const stream = request(model, currentMessages, requestOptions);
+        const stream = provider.createResponseStream(model, currentMessages, agent as any);
         
         for await (const event of stream) {
+            // Always yield events to maintain streaming behavior
+            yield event;
+            
             switch (event.type) {
                 case 'message_complete': {
-                    const messageEvent = event as any;
-                    
-                    if (messageEvent.content) {
-                        fullResponse = messageEvent.content;
+                    if (isMessageComplete(event)) {
+                        messageContent = event.content;
                         hasMessage = true;
                         
                         // Add assistant message to history
                         currentMessages.push({
                             type: 'message',
                             role: 'assistant',
-                            content: messageEvent.content,
+                            content: event.content,
                             status: 'completed',
                         });
                     }
@@ -266,67 +283,24 @@ export async function requestWithTools(
                 case 'tool_start': {
                     if (!executeTools) continue;
                     
-                    const toolEvent = event as any;
-                    if (!toolEvent.tool_calls || toolEvent.tool_calls.length === 0) {
-                        continue;
-                    }
-                    
-                    // Collect tool calls
-                    collectedToolCalls.push(...toolEvent.tool_calls);
-                    
-                    // Execute tools if handler provided
-                    if (processToolCall) {
-                        try {
-                            const results = await processToolCall(toolEvent.tool_calls);
-                            
-                            // Convert results to array format
-                            const resultsArray = Array.isArray(results) 
-                                ? results 
-                                : [results];
-                            
-                            // Store results
-                            for (let i = 0; i < toolEvent.tool_calls.length; i++) {
-                                const toolCall = toolEvent.tool_calls[i];
-                                const result = resultsArray[i] || resultsArray[0];
+                    if (hasToolCalls(event)) {
+                        // Collect tool calls
+                        collectedToolCalls.push(...event.tool_calls);
+                        
+                        // Execute tools if handler provided
+                        if (processToolCall) {
+                            try {
+                                const results = await processToolCall(event.tool_calls);
                                 
-                                toolResults.push({
-                                    id: toolCall.id,
-                                    call_id: toolCall.call_id || toolCall.id,
-                                    output: typeof result === 'string' 
-                                        ? result 
-                                        : JSON.stringify(result),
-                                });
-                            }
-                        } catch (error) {
-                            // Handle tool execution errors
-                            const errorResult = {
-                                error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
-                            };
-                            
-                            for (const toolCall of toolEvent.tool_calls) {
-                                toolResults.push({
-                                    id: toolCall.id,
-                                    call_id: toolCall.call_id || toolCall.id,
-                                    output: JSON.stringify(errorResult),
-                                });
-                            }
-                        }
-                    } else if (options.tools) {
-                        // Execute tools from the tools array
-                        for (const toolCall of toolEvent.tool_calls) {
-                            const tool = options.tools.find(
-                                t => t.definition.function.name === toolCall.function.name
-                            );
-                            
-                            if (tool) {
-                                try {
-                                    // Parse arguments
-                                    const args = toolCall.function.arguments 
-                                        ? JSON.parse(toolCall.function.arguments)
-                                        : {};
-                                    
-                                    // Execute the tool
-                                    const result = await tool.function(args);
+                                // Convert results to array format
+                                const resultsArray = Array.isArray(results) 
+                                    ? results 
+                                    : [results];
+                                
+                                // Store results
+                                for (let i = 0; i < event.tool_calls.length; i++) {
+                                    const toolCall = event.tool_calls[i];
+                                    const result = resultsArray[i] || resultsArray[0];
                                     
                                     toolResults.push({
                                         id: toolCall.id,
@@ -335,23 +309,63 @@ export async function requestWithTools(
                                             ? result 
                                             : JSON.stringify(result),
                                     });
-                                } catch (error) {
+                                }
+                            } catch (error) {
+                                // Handle tool execution errors
+                                const errorResult = {
+                                    error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                                };
+                                
+                                for (const toolCall of event.tool_calls) {
+                                    toolResults.push({
+                                        id: toolCall.id,
+                                        call_id: toolCall.call_id || toolCall.id,
+                                        output: JSON.stringify(errorResult),
+                                    });
+                                }
+                            }
+                        } else if (options.tools) {
+                            // Execute tools from the tools array
+                            for (const toolCall of event.tool_calls) {
+                                const tool = options.tools.find(
+                                    t => t.definition.function.name === toolCall.function.name
+                                );
+                                
+                                if (tool) {
+                                    try {
+                                        // Parse arguments
+                                        const args = toolCall.function.arguments 
+                                            ? JSON.parse(toolCall.function.arguments)
+                                            : {};
+                                        
+                                        // Execute the tool
+                                        const result = await tool.function(args);
+                                        
+                                        toolResults.push({
+                                            id: toolCall.id,
+                                            call_id: toolCall.call_id || toolCall.id,
+                                            output: typeof result === 'string'
+                                                ? result
+                                                : JSON.stringify(result),
+                                        });
+                                    } catch (error) {
+                                        toolResults.push({
+                                            id: toolCall.id,
+                                            call_id: toolCall.call_id || toolCall.id,
+                                            output: JSON.stringify({
+                                                error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                                            }),
+                                        });
+                                    }
+                                } else {
                                     toolResults.push({
                                         id: toolCall.id,
                                         call_id: toolCall.call_id || toolCall.id,
                                         output: JSON.stringify({
-                                            error: `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`,
+                                            error: `Tool ${toolCall.function.name} not found`,
                                         }),
                                     });
                                 }
-                            } else {
-                                toolResults.push({
-                                    id: toolCall.id,
-                                    call_id: toolCall.call_id || toolCall.id,
-                                    output: JSON.stringify({
-                                        error: `Tool ${toolCall.function.name} not found`,
-                                    }),
-                                });
                             }
                         }
                     }
@@ -362,37 +376,22 @@ export async function requestWithTools(
         
         // If no tool calls were made, we're done
         if (collectedToolCalls.length === 0 || !executeTools) {
+            yield { type: 'stream_end', timestamp: new Date().toISOString() } as EnsembleStreamEvent;
             break;
         }
         
         // Check if we've hit the max tool calls limit
         toolCallCount++;
         if (toolCallCount >= maxToolCalls) {
-            console.warn(`[requestWithTools] Reached maximum tool calls limit (${maxToolCalls})`);
-            
-            // Force a final response without tools
-            const finalOptions = {
-                ...requestOptions,
-                modelSettings: {
-                    ...requestOptions.modelSettings,
-                    tool_choice: 'none' as const,
-                },
-            };
-            
-            const finalStream = request(model, currentMessages, finalOptions);
-            
-            for await (const event of finalStream) {
-                if (event.type === 'message_complete') {
-                    const messageEvent = event as any;
-                    if (messageEvent.content) {
-                        fullResponse = messageEvent.content;
-                    }
-                }
-            }
+            yield { 
+                type: 'error', 
+                error: new Error(`Maximum tool calls (${maxToolCalls}) reached`),
+                timestamp: new Date().toISOString() 
+            } as EnsembleStreamEvent;
             break;
         }
         
-        // Add tool calls and results to the message history
+        // Add tool call messages to history
         for (const toolCall of collectedToolCalls) {
             // Add function call
             currentMessages.push({
@@ -422,7 +421,4 @@ export async function requestWithTools(
         // Continue the conversation with tool results
         // The loop will make another request with the updated message history
     }
-    
-    return fullResponse;
 }
-

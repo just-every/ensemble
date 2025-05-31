@@ -152,8 +152,9 @@ describe('Provider Integration Tests', () => {
       const events: EnsembleStreamEvent[] = [];
       const stream = request('test-model', messages, {
         tools: [weatherTool],
-        toolChoice: 'auto'
-      });
+        toolChoice: 'auto',
+        executeTools: false
+      } as any);
 
       for await (const event of stream) {
         events.push(event);
