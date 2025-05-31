@@ -5,9 +5,9 @@
  * This allows easy migration from OpenAI to ensemble's multi-provider support.
  */
 
-import OpenAICompat from '../openai-compat.js';
+import OpenAIEnsemble from '../openai-compat.js';
 // Or if you're replacing OpenAI SDK:
-// import OpenAI from '@just-every/ensemble/openai-compat';
+// import OpenAIEnsemble from '@just-every/ensemble';
 
 /**
  * Example 1: Direct replacement for OpenAI client
@@ -19,7 +19,7 @@ async function dropInReplacement() {
     // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
     // Use:
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     // Now use exactly like OpenAI SDK
     const completion = await openai.chat.completions.create({
@@ -42,7 +42,7 @@ async function dropInReplacement() {
 async function streamingExample() {
     console.log('\n\n=== Streaming Example ===\n');
     
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     const stream = await openai.chat.completions.create({
         model: 'claude-3.5-sonnet',  // Use any model!
@@ -68,7 +68,7 @@ async function streamingExample() {
 async function functionCallingExample() {
     console.log('\n\n=== Function Calling Example ===\n');
     
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     const response = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -113,7 +113,7 @@ async function functionCallingExample() {
 async function legacyCompletionsExample() {
     console.log('\n\n=== Legacy Completions API ===\n');
     
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     // Non-streaming completion
     const completion = await openai.completions.create({
@@ -147,7 +147,7 @@ async function legacyCompletionsExample() {
 async function multiModelExample() {
     console.log('\n\n=== Multi-Model Example ===\n');
     
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     const models = [
         'gpt-4o-mini',
@@ -180,7 +180,7 @@ async function multiModelExample() {
 async function advancedExample() {
     console.log('\n\n=== Advanced Features ===\n');
     
-    const openai = OpenAICompat;
+    const openai = OpenAIEnsemble;
     
     // JSON mode
     console.log('JSON mode response:');

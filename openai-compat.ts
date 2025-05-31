@@ -644,9 +644,11 @@ async function* createLegacyStreamingResponse(
 }
 
 /**
- * Default export mimicking OpenAI client structure
+ * OpenAIEnsemble - OpenAI-compatible client using ensemble's multi-provider support
  */
-export default {
+const OpenAIEnsemble = {
     chat,
     completions
 };
+
+export default OpenAIEnsemble;

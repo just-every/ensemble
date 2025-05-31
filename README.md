@@ -42,8 +42,8 @@ import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // After:
-import OpenAICompat from '@just-every/ensemble/openai-compat';
-const openai = OpenAICompat;
+import OpenAIEnsemble from '@just-every/ensemble/openai-compat';
+const openai = OpenAIEnsemble;
 
 // Your existing code works unchanged!
 const completion = await openai.chat.completions.create({ /* ... */ });
@@ -627,11 +627,11 @@ if (process.env.NODE_ENV === 'development') {
 Ensemble provides a drop-in replacement for the OpenAI SDK, allowing you to use any supported model with OpenAI's familiar API:
 
 ```typescript
-import OpenAICompat from '@just-every/ensemble/openai-compat';
+import OpenAIEnsemble from '@just-every/ensemble/openai-compat';
 // Or named imports: import { chat, completions } from '@just-every/ensemble';
 
 // Replace OpenAI client
-const openai = OpenAICompat;  // Instead of: new OpenAI({ apiKey: '...' })
+const openai = OpenAIEnsemble;  // Instead of: new OpenAI({ apiKey: '...' })
 
 // Use exactly like OpenAI SDK - but with any model!
 const completion = await openai.chat.completions.create({

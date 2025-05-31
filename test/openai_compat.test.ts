@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import OpenAICompat, { chat, completions } from '../openai-compat';
+import OpenAIEnsemble, { chat, completions } from '../openai-compat';
 import type { 
     ChatCompletionCreateParams, 
     ChatCompletionResponse,
@@ -227,17 +227,17 @@ describe('OpenAI Compatibility Layer', () => {
 
     describe('Default export structure', () => {
         it('should export OpenAI-compatible structure', () => {
-            expect(OpenAICompat).toBeDefined();
-            expect(OpenAICompat.chat).toBeDefined();
-            expect(OpenAICompat.chat.completions).toBeDefined();
-            expect(OpenAICompat.chat.completions.create).toBeInstanceOf(Function);
-            expect(OpenAICompat.completions).toBeDefined();
-            expect(OpenAICompat.completions.create).toBeInstanceOf(Function);
+            expect(OpenAIEnsemble).toBeDefined();
+            expect(OpenAIEnsemble.chat).toBeDefined();
+            expect(OpenAIEnsemble.chat.completions).toBeDefined();
+            expect(OpenAIEnsemble.chat.completions.create).toBeInstanceOf(Function);
+            expect(OpenAIEnsemble.completions).toBeDefined();
+            expect(OpenAIEnsemble.completions.create).toBeInstanceOf(Function);
         });
 
         it('should work as drop-in replacement', async () => {
             // This mimics how someone would use it as a drop-in replacement
-            const client = OpenAICompat;
+            const client = OpenAIEnsemble;
             
             // Modern API
             const chatResponse = await client.chat.completions.create({

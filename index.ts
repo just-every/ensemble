@@ -12,7 +12,7 @@ export {
 } from './model_providers/model_provider.js';
 
 // Export OpenAI compatibility layer
-export { chat, completions, default as OpenAICompat } from './openai-compat.js';
+export { chat, completions, default as OpenAIEnsemble } from './openai-compat.js';
 export type {
     OpenAIMessage,
     OpenAITool,
