@@ -339,6 +339,18 @@ export async function* request(
             break;
         }
         
+        // If we had tool calls but no message content, we need to add an assistant message
+        // to properly track that the assistant made these tool calls
+        if (collectedToolCalls.length > 0 && !hasMessage) {
+            // Add a minimal assistant message to indicate tool calls were made
+            currentMessages.push({
+                type: 'message',
+                role: 'assistant',
+                content: '',  // Empty content since the assistant only made tool calls
+                status: 'completed',
+            });
+        }
+        
         // Add tool call messages to history
         for (const toolCall of collectedToolCalls) {
             // Add function call
@@ -514,3 +526,11 @@ export async function image(
     return result;
 }
 
+
+
+// Export enhanced tool handling
+export { enhancedRequest } from './utils/enhanced_request.js';
+export * from './types/tool_types.js';
+
+// Export RequestAgent for enhanced request
+export { RequestAgent };
