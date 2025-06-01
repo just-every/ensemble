@@ -88,25 +88,58 @@ function convertParameterToGeminiFormat(param: any): any {
     const result: any = { type, description: param.description };
 
     if (type === Type.ARRAY) {
-        // Handle array items
+        // Handle array items - Gemini has limitations with complex array item schemas
         if (param.items) {
-            if (param.items.type === 'object') {
-                result.items = convertParameterToGeminiFormat(param.items);
-            } else {
-                result.items = { 
-                    type: param.items.type === 'string' ? Type.STRING :
-                          param.items.type === 'number' ? Type.NUMBER :
-                          param.items.type === 'boolean' ? Type.BOOLEAN : Type.STRING
-                };
-                if (param.items.enum) {
-                    result.items.enum = param.items.enum;
+            // Determine the item type
+            let itemType: string | undefined;
+            let itemEnum: any;
+            let itemProperties: any;
+            
+            // Check if items has a type property (could be either format)
+            if (typeof param.items === 'object') {
+                itemType = param.items.type;
+                itemEnum = param.items.enum;
+                // Check if it's a full ToolParameter with properties
+                if ('properties' in param.items) {
+                    itemProperties = param.items.properties;
                 }
             }
+            
+            if (itemType === 'object' || itemProperties) {
+                // Gemini doesn't support object types in array items
+                // Convert to string array with description about JSON encoding
+                result.items = { type: Type.STRING };
+                result.description = `${result.description || 'Array parameter'} (Each item should be a JSON-encoded object)`;
+                
+                // Add information about the expected object structure if available
+                if (itemProperties) {
+                    const propNames = Object.keys(itemProperties);
+                    result.description += `. Expected properties: ${propNames.join(', ')}`;
+                }
+            } else if (itemType) {
+                // Simple type conversion
+                result.items = { 
+                    type: itemType === 'string' ? Type.STRING :
+                          itemType === 'number' ? Type.NUMBER :
+                          itemType === 'boolean' ? Type.BOOLEAN :
+                          itemType === 'null' ? Type.STRING : Type.STRING
+                };
+                if (itemEnum) {
+                    // Handle enum - could be array or function
+                    if (typeof itemEnum === 'function') {
+                        // For now, we can't handle async enum functions in Gemini
+                        console.warn('Gemini provider does not support async enum functions in array items');
+                    } else {
+                        result.items.enum = itemEnum;
+                    }
+                }
+            } else {
+                // No type specified, default to string
+                result.items = { type: Type.STRING };
+            }
         } else {
+            // No items specified, default to string
             result.items = { type: Type.STRING };
-        }
-        if (param.enum) {
-            result.items.enum = param.enum;
         }
     } else if (type === Type.OBJECT) {
         // Gemini requires OBJECT types to have a properties field
@@ -121,8 +154,16 @@ function convertParameterToGeminiFormat(param: any): any {
             result.properties = {};
         }
     } else if (param.enum) {
-        result.format = 'enum';
-        result.enum = param.enum;
+        // Handle enum - could be array or function
+        if (typeof param.enum === 'function') {
+            // For now, we can't handle async enum functions in Gemini at conversion time
+            console.warn('Gemini provider does not support async enum functions. Enum will be omitted.');
+            // We could potentially call sync functions here, but that would break async functions
+            // For safety, we'll skip enum entirely when it's a function
+        } else {
+            result.format = 'enum';
+            result.enum = param.enum;
+        }
     }
 
     return result;
