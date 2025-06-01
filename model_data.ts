@@ -188,7 +188,12 @@ export const MODEL_CLASSES = {
     },
 
     image_generation: {
-        models: ['gpt-image-1'],
+        models: [
+            'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
+            'imagen-3.0-generate-002', // Google Imagen 3
+            'dall-e-3', // OpenAI DALL-E 3
+            'dall-e-2', // OpenAI DALL-E 2 (supports editing)
+        ],
     },
 
     embedding: {
@@ -1228,6 +1233,61 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 50,
         },
         description: 'Test model for unit testing purposes',
+    },
+    
+    // Image generation models
+    {
+        id: 'dall-e-3',
+        provider: 'openai',
+        cost: {
+            per_image: 0.04, // Standard quality 1024x1024
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: "OpenAI's DALL-E 3 model for high-quality image generation",
+    },
+    {
+        id: 'dall-e-2',
+        provider: 'openai',
+        cost: {
+            per_image: 0.02, // 1024x1024
+        },
+        features: {
+            input_modality: ['text', 'image'], // Supports image editing
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: "OpenAI's DALL-E 2 model, supports image editing and variations",
+    },
+    {
+        id: 'imagen-3.0-generate-002',
+        aliases: ['imagen-3'],
+        provider: 'google',
+        cost: {
+            per_image: 0.04,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: "Google's Imagen 3 model for high-quality image generation",
+    },
+    {
+        id: 'imagen-2',
+        provider: 'google',
+        cost: {
+            per_image: 0.02,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: "Google's Imagen 2 model for image generation",
     },
 ];
 

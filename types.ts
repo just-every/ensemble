@@ -592,6 +592,56 @@ export interface EmbedOpts {
 }
 
 // ================================================================
+// Image Generation Types
+// ================================================================
+
+/**
+ * Options for image generation
+ */
+export interface ImageGenerationOpts {
+    /** Number of images to generate (default: 1) */
+    n?: number;
+    
+    /** Size/aspect ratio of the generated image */
+    size?: 'square' | 'landscape' | 'portrait' | '1024x1024' | '1536x1024' | '1024x1536' | '1792x1024' | '1024x1792' | '512x512' | '256x256';
+    
+    /** Quality of the generated image */
+    quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high';
+    
+    /** Style of the generated image (OpenAI specific) */
+    style?: 'vivid' | 'natural';
+    
+    /** Response format */
+    response_format?: 'url' | 'b64_json';
+    
+    /** Model to use for generation (if not specified, will be auto-selected) */
+    model?: string;
+    
+    /** Source images for editing/variations (URLs or base64 data) */
+    source_images?: string | string[];
+    
+    /** Mask for inpainting (base64 data) - areas to edit should be transparent */
+    mask?: string;
+}
+
+/**
+ * Result from image generation
+ */
+export interface ImageGenerationResult {
+    /** Array of generated images (URLs or base64 data) */
+    images: string[];
+    
+    /** Model used for generation */
+    model: string;
+    
+    /** Usage/cost information */
+    usage?: {
+        prompt_tokens?: number;
+        total_cost?: number;
+    };
+}
+
+// ================================================================
 // Ensemble-specific interfaces
 // ================================================================
 

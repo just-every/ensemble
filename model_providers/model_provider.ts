@@ -5,12 +5,12 @@
  * to get the appropriate provider implementation.
  */
 
-import { ModelProvider as BaseModelProvider, EmbedOpts } from '../types.js';
+import { ModelProvider as BaseModelProvider, EmbedOpts, ImageGenerationOpts, ImageGenerationResult } from '../types.js';
 
 // Re-export for backward compatibility
 export type { EmbedOpts };
 
-// Extend the base ModelProvider interface to add embedding support
+// Extend the base ModelProvider interface to add embedding and image generation support
 export interface ModelProvider extends BaseModelProvider {
     /**
      * Creates embeddings for text input
@@ -24,6 +24,17 @@ export interface ModelProvider extends BaseModelProvider {
         input: string | string[],
         opts?: EmbedOpts
     ): Promise<number[] | number[][]>;
+    
+    /**
+     * Generates images from text prompts
+     * @param prompt Text description of the image to generate
+     * @param opts Optional parameters for image generation
+     * @returns Promise resolving to generated image data
+     */
+    generateImage?(
+        prompt: string,
+        opts?: ImageGenerationOpts
+    ): Promise<ImageGenerationResult>;
 }
 
 // Import external model functions
@@ -47,12 +58,15 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     o4: openaiProvider,
     'text-': openaiProvider,
     'computer-use-preview': openaiProvider,
+    'dall-e': openaiProvider,  // Image generation models
+    'gpt-image': openaiProvider,  // GPT-Image-1 model
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
 
     // Gemini/Google models
     'gemini-': geminiProvider,
+    'imagen-': geminiProvider,  // Image generation models
 
     // Grok/X.AI models
     'grok-': grokProvider,
@@ -124,12 +138,14 @@ export function getProviderFromModel(model: string): ModelProviderID {
         model.startsWith('o3') ||
         model.startsWith('o4') ||
         model.startsWith('text-') ||
-        model.startsWith('computer-use-preview')
+        model.startsWith('computer-use-preview') ||
+        model.startsWith('dall-e') ||
+        model.startsWith('gpt-image')
     ) {
         return 'openai';
     } else if (model.startsWith('claude-')) {
         return 'anthropic';
-    } else if (model.startsWith('gemini-')) {
+    } else if (model.startsWith('gemini-') || model.startsWith('imagen-')) {
         return 'google';
     } else if (model.startsWith('grok-')) {
         return 'xai';

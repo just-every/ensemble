@@ -14,7 +14,7 @@ npm install @just-every/ensemble
 ## Quick Start
 
 ```typescript
-import { request } from '@just-every/ensemble';
+import { request, embed, image } from '@just-every/ensemble';
 
 // Simple streaming request
 for await (const event of request('gpt-4o-mini', [
@@ -95,6 +95,43 @@ function cosineSimilarity(a: number[], b: number[]): number {
 const similarity = cosineSimilarity(embedding1, embedding2);
 ```
 
+### `image(prompt, options?)`
+
+Generate images from text prompts using DALL-E or Imagen models.
+
+```typescript
+// Simple image generation
+const result = await image('A beautiful sunset over mountains');
+console.log(`Generated ${result.images.length} image(s)`);
+
+// With specific options
+const result = await image('A robot holding a skateboard', {
+  model: 'dall-e-3',
+  size: 'landscape',
+  quality: 'hd',
+  n: 2
+});
+
+// Image editing (DALL-E 2 only)
+const result = await image('Add a red hat to the person', {
+  model: 'dall-e-2',
+  source_images: 'data:image/png;base64,...' // or URL
+});
+
+// Inpainting with mask
+const result = await image('Replace with a golden retriever', {
+  model: 'dall-e-2',
+  source_images: originalImage,
+  mask: maskImage // transparent areas will be edited
+});
+
+// Using Google Imagen
+const result = await image('A serene lake at dawn', {
+  model: 'imagen-3.0-generate-002',
+  size: 'portrait'
+});
+```
+
 ### `chainRequests(messages, requests)`
 
 Chain multiple LLM calls, using the output of one as input to the next.
@@ -164,6 +201,7 @@ OPENROUTER_API_KEY=your_key_here
 - **Automatic tool execution** with type-safe function calling
 - **Smart model rotation** based on availability and performance
 - **Built-in embeddings** with caching
+- **Image generation** with DALL-E and Imagen support
 - **OpenAI SDK compatibility** - drop-in replacement
 - **Cost tracking** and quota management
 
@@ -171,6 +209,7 @@ OPENROUTER_API_KEY=your_key_here
 
 - [Model Selection & Management](./docs/models.md)
 - [Advanced Usage](./docs/advanced-usage.md) - Tools, structured output, images
+- [Image Generation](./docs/image-generation.md) - DALL-E and Imagen support
 - [Error Handling](./docs/error-handling.md)
 - [OpenAI Compatibility](./docs/openai-compatibility.md)
 - [Utility Functions](./docs/utilities.md)

@@ -90,7 +90,9 @@ import type {
     ModelClassID,
     EnsembleAgent,
     EnsembleStreamEvent,
-    ToolCall
+    ToolCall,
+    ImageGenerationOpts,
+    ImageGenerationResult
 } from './types.js';
 import { getModelProvider, getModelFromClass, type EmbedOpts } from './model_providers/model_provider.js';
 
@@ -452,5 +454,63 @@ export async function embed(
     });
     
     return embedding;
+}
+
+/**
+ * Generate images from text prompts
+ * 
+ * @param prompt - Text description of the image to generate
+ * @param options - Optional configuration for image generation
+ * @returns Promise that resolves to an array of generated image data (base64 or URLs)
+ * 
+ * @example
+ * ```typescript
+ * // Simple image generation
+ * const result = await image('A beautiful sunset over mountains');
+ * console.log(`Generated ${result.images.length} image(s)`);
+ * 
+ * // With specific model and options
+ * const result = await image('A robot holding a skateboard', {
+ *   model: 'dall-e-3',
+ *   size: 'landscape',
+ *   quality: 'hd',
+ *   n: 2
+ * });
+ * 
+ * // Using Google Imagen
+ * const result = await image('A serene lake at dawn', {
+ *   model: 'imagen-3.0-generate-002',
+ *   size: 'portrait'
+ * });
+ * 
+ * // Get URLs instead of base64
+ * const result = await image('Abstract art', {
+ *   response_format: 'url'
+ * });
+ * ```
+ */
+export async function image(
+    prompt: string,
+    options: ImageGenerationOpts = {}
+): Promise<ImageGenerationResult> {
+    // Determine which model to use
+    const modelToUse = options.model || await getModelFromClass('image_generation');
+    
+    // Get the provider for this model
+    const provider = getModelProvider(modelToUse);
+    
+    if (!provider.generateImage) {
+        throw new Error(
+            `Provider for model ${modelToUse} does not support image generation`
+        );
+    }
+    
+    // Generate the image using the provider
+    const result = await provider.generateImage(prompt, {
+        ...options,
+        model: modelToUse
+    });
+    
+    return result;
 }
 

@@ -13,6 +13,8 @@ import {
     ToolCall,
     ResponseInput,
     EnsembleAgent,
+    ImageGenerationOpts,
+    ImageGenerationResult,
 } from '../types.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
@@ -432,23 +434,42 @@ export class OpenAIProvider implements ModelProvider {
      * Generate an image using OpenAI's GPT Image 1
      *
      * @param prompt - The text description of the image to generate
-     * @param model - The model to use (gpt-image-1 by default)
-     * @param size - The size of the image to generate
-     * @param quality - The quality of the image to generate
-     * @param source_images - Optional array of base64 image data or URLs to use as reference or input (for image variations)
-     * @param number_of_images - Number of images to generate (default: 1)
-     * @returns A promise that resolves to an array of base64 encoded image data URLs
+     * @param opts - Optional parameters for image generation
+     * @returns A promise that resolves to ImageGenerationResult
      */
     async generateImage(
         prompt: string,
-        model: string = 'gpt-image-1',
-        background: 'transparent' | 'opaque' | 'auto' = 'auto',
-        quality: 'low' | 'medium' | 'high' | 'auto' = 'auto',
-        size: '1024x1024' | '1536x1024' | '1024x1536' | 'auto' = 'auto',
-        source_images?: string | string[],
-        number_of_images: number = 1
-    ): Promise<string[]> {
+        opts?: ImageGenerationOpts
+    ): Promise<ImageGenerationResult> {
         try {
+            // Extract options with defaults, mapping to the original function parameters
+            const model = opts?.model || 'gpt-image-1';
+            const number_of_images = opts?.n || 1;
+            
+            // Map quality options
+            let quality: 'low' | 'medium' | 'high' | 'auto' = 'auto';
+            if (opts?.quality === 'standard') quality = 'medium';
+            else if (opts?.quality === 'hd') quality = 'high';
+            else if (opts?.quality === 'low' || opts?.quality === 'medium' || opts?.quality === 'high') {
+                quality = opts.quality;
+            }
+            
+            // Map size options
+            let size: '1024x1024' | '1536x1024' | '1024x1536' | 'auto' = 'auto';
+            if (opts?.size === 'square' || opts?.size === '1024x1024') {
+                size = '1024x1024';
+            } else if (opts?.size === 'landscape' || opts?.size === '1536x1024') {
+                size = '1536x1024';
+            } else if (opts?.size === 'portrait' || opts?.size === '1024x1536') {
+                size = '1024x1536';
+            }
+            
+            // Default background to 'auto'
+            const background: 'transparent' | 'opaque' | 'auto' = 'auto';
+            
+            // Get source images if provided
+            const source_images = opts?.source_images;
+            
             console.log(
                 `[OpenAI] Generating ${number_of_images} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
@@ -505,16 +526,38 @@ export class OpenAIProvider implements ModelProvider {
                     imageFiles.push(imageFile);
                 }
 
+                // Handle mask if provided (for inpainting)
+                let maskFile;
+                if (opts?.mask) {
+                    let maskBase64 = opts.mask;
+                    if (opts.mask.startsWith('data:')) {
+                        maskBase64 = opts.mask.split(',')[1];
+                    }
+                    const maskBinary = Buffer.from(maskBase64, 'base64');
+                    maskFile = await toFile(
+                        new Uint8Array(maskBinary),
+                        'mask.png',
+                        { type: 'image/png' }
+                    );
+                }
+
                 // Use the first image as the primary image and any additional ones as references
                 // OpenAI API currently uses only the first image for edit but may support multiple in the future
-                response = await this.client.images.edit({
+                const editParams: any = {
                     model,
                     prompt,
                     image: imageFiles,
                     n: number_of_images,
                     quality,
                     size,
-                });
+                };
+
+                // Add mask if provided
+                if (maskFile) {
+                    editParams.mask = maskFile;
+                }
+
+                response = await this.client.images.edit(editParams);
             } else {
                 // Use standard image generation
                 response = await this.client.images.generate({
@@ -526,14 +569,24 @@ export class OpenAIProvider implements ModelProvider {
                     size,
                     moderation: 'low',
                     output_format: 'png',
-                });
+                } as any);
             }
 
             // Track usage for cost calculation
+            let totalCost = 0;
             if (response.data && response.data.length > 0) {
+                const perImageCost = this.getImageCost(model, quality, size);
+                totalCost = perImageCost * response.data.length;
+                
                 costTracker.addUsage({
                     model,
                     image_count: response.data.length,
+                    metadata: {
+                        quality,
+                        size,
+                        cost_per_image: perImageCost,
+                        is_edit: !!source_images,
+                    }
                 });
             }
 
@@ -550,12 +603,38 @@ export class OpenAIProvider implements ModelProvider {
                 throw new Error('No images returned from OpenAI');
             }
 
-            // Return the array of base64 image data URLs
-            return imageDataUrls;
+            // Return standardized result
+            return {
+                images: imageDataUrls,
+                model,
+                usage: {
+                    prompt_tokens: Math.ceil(prompt.length / 4), // Rough estimate
+                    total_cost: totalCost,
+                }
+            };
         } catch (error) {
             console.error('[OpenAI] Error generating image:', error);
             throw error;
         }
+    }
+    
+    /**
+     * Get the cost of generating an image based on model and parameters
+     */
+    private getImageCost(model: string, quality: string, size: string): number {
+        // GPT Image 1 pricing
+        if (model === 'gpt-image-1') {
+            if (quality === 'high') {
+                return 0.08; // $0.080 per image for high quality
+            } else if (quality === 'medium' || quality === 'auto') {
+                return 0.04; // $0.040 per image for medium quality
+            } else if (quality === 'low') {
+                return 0.02; // $0.020 per image for low quality
+            }
+        }
+        
+        // Default/unknown pricing
+        return 0.04;
     }
 
     /**

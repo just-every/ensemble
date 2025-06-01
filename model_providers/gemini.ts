@@ -33,6 +33,8 @@ import {
     ToolCall, // Internal representation
     ResponseInput,
     EnsembleAgent,
+    ImageGenerationOpts,
+    ImageGenerationResult,
 } from '../types.js';
 import { costTracker } from '../cost_tracker.js';
 import {
@@ -1094,6 +1096,106 @@ export class GeminiProvider implements ModelProvider {
         } finally {
             log_llm_response(requestId, chunks);
         }
+    }
+
+    /**
+     * Generate images using Google's Imagen models
+     * @param prompt Text description of the image to generate
+     * @param opts Optional parameters for image generation
+     * @returns Promise resolving to generated image data
+     */
+    async generateImage(
+        prompt: string,
+        opts?: ImageGenerationOpts
+    ): Promise<ImageGenerationResult> {
+        try {
+            // Extract options with defaults
+            const model = opts?.model || 'imagen-3.0-generate-002';
+            const numberOfImages = opts?.n || 1;
+            
+            // Map quality to Imagen's aspectRatio if needed
+            let aspectRatio = '1:1'; // square by default
+            if (opts?.size === 'landscape') {
+                aspectRatio = '16:9';
+            } else if (opts?.size === 'portrait') {
+                aspectRatio = '9:16';
+            }
+            
+            console.log(
+                `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
+            );
+
+            // Use Gemini/Imagen API for image generation
+            const response = await this.client.models.generateImages({
+                model,
+                prompt,
+                config: {
+                    numberOfImages,
+                    aspectRatio,
+                    includeSafetyAttributes: false,
+                    // personGeneration: 'allow_all', // Comment out for now - may need proper enum value
+                },
+            });
+
+            // Process the response
+            const images: string[] = [];
+            let totalCost = 0;
+            
+            if (response.generatedImages && response.generatedImages.length > 0) {
+                for (const generatedImage of response.generatedImages) {
+                    if (generatedImage.image?.imageBytes) {
+                        // Convert to base64 data URL
+                        const base64Image = `data:image/png;base64,${generatedImage.image.imageBytes}`;
+                        images.push(base64Image);
+                    }
+                }
+                
+                // Calculate cost - Imagen pricing
+                const perImageCost = this.getImageCost(model);
+                totalCost = perImageCost * images.length;
+                
+                costTracker.addUsage({
+                    model,
+                    image_count: images.length,
+                    metadata: {
+                        aspect_ratio: aspectRatio,
+                        cost_per_image: perImageCost,
+                    }
+                });
+            }
+
+            if (images.length === 0) {
+                throw new Error('No images returned from Gemini/Imagen');
+            }
+
+            // Return standardized result
+            return {
+                images,
+                model,
+                usage: {
+                    prompt_tokens: Math.ceil(prompt.length / 4), // Rough estimate
+                    total_cost: totalCost,
+                }
+            };
+        } catch (error) {
+            console.error('[Gemini] Error generating image:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get the cost of generating an image with Imagen
+     */
+    private getImageCost(model: string): number {
+        // Imagen pricing (as of latest docs)
+        if (model.includes('imagen-3')) {
+            return 0.04; // $0.040 per image for Imagen 3
+        } else if (model.includes('imagen-2')) {
+            return 0.02; // $0.020 per image for Imagen 2
+        }
+        
+        // Default pricing
+        return 0.04;
     }
 
 }
