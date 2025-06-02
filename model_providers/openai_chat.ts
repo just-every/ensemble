@@ -105,19 +105,63 @@ function generateFootnotes(tracker: CitationTracker): string {
 
 // --- Helper Functions ---
 
+/** Resolves any async enum values in tool parameters */
+async function resolveAsyncEnums(params: any): Promise<any> {
+    if (!params || typeof params !== 'object') {
+        return params;
+    }
+    
+    const resolved = { ...params };
+    
+    // Process properties recursively
+    if (resolved.properties) {
+        const resolvedProps: any = {};
+        for (const [key, value] of Object.entries(resolved.properties)) {
+            if (value && typeof value === 'object') {
+                const propCopy = { ...value } as any;
+                
+                // Check if enum is a function (async or sync)
+                if (typeof propCopy.enum === 'function') {
+                    try {
+                        const enumValue = await propCopy.enum();
+                        // Only set if we got a valid array back
+                        if (Array.isArray(enumValue) && enumValue.length > 0) {
+                            propCopy.enum = enumValue;
+                        } else {
+                            // Remove empty enum to avoid OpenAI validation errors
+                            delete propCopy.enum;
+                        }
+                    } catch (e) {
+                        // If enum resolution fails, remove it
+                        delete propCopy.enum;
+                    }
+                }
+                
+                // Recursively process nested properties
+                resolvedProps[key] = await resolveAsyncEnums(propCopy);
+            } else {
+                resolvedProps[key] = value;
+            }
+        }
+        resolved.properties = resolvedProps;
+    }
+    
+    return resolved;
+}
+
 /** Converts internal ToolFunction definitions to OpenAI format. */
-function convertToOpenAITools(
+async function convertToOpenAITools(
     tools: ToolFunction[]
-): OpenAI.Chat.Completions.ChatCompletionTool[] {
-    // ... (implementation unchanged)
-    return tools.map((tool: ToolFunction) => ({
-        type: 'function',
+): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+    // Map tools and resolve async enums
+    return await Promise.all(tools.map(async (tool: ToolFunction) => ({
+        type: 'function' as const,
         function: {
             name: tool.definition.function.name,
             description: tool.definition.function.description,
-            parameters: { ...tool.definition.function.parameters },
+            parameters: await resolveAsyncEnums(tool.definition.function.parameters),
         },
-    }));
+    })));
 }
 
 /** Maps internal message history format to OpenAI's format. */
@@ -703,7 +747,7 @@ export class OpenAIChat implements ModelProvider {
                 };
             }
             if (tools && tools.length > 0)
-                requestParams.tools = convertToOpenAITools(tools);
+                requestParams.tools = await convertToOpenAITools(tools);
 
             const overrideParams = { ...this.commonParams };
 
