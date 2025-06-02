@@ -16,6 +16,13 @@ import { EnhancedRequestMock, createMockContext } from '@just-every/ensemble';
 import { EnhancedRequestMock, createMockContext } from '@just-every/ensemble/test';
 ```
 
+### Alternative Import for Legacy Module Resolution
+If you're using `"moduleResolution": "node"` in your tsconfig.json, you may need to use the direct import path:
+```typescript
+// For projects with legacy module resolution
+import { EnhancedRequestMock, createMockContext } from '@just-every/ensemble/dist/utils/test_utils.js';
+```
+
 ## Available Test Utilities
 
 ### EnhancedRequestMock
