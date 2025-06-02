@@ -2,7 +2,7 @@
  * Examples of enhanced tool handling for different use cases
  */
 
-import { enhancedRequest, RequestOptions } from '../utils/enhanced_request.js';
+import { request, RequestOptions } from '../index.js';
 import { 
     createRequestContext, 
     ToolCallAction,
@@ -16,7 +16,7 @@ import {
 export async function magiIntegration(agent: any, messages: any[], handlers: any) {
     const { sendComms, allowedEvents, processToolCall } = handlers;
     
-    const stream = enhancedRequest(agent.selectedModel, messages, {
+    const stream = request(agent.selectedModel, messages, {
         // Tool handler with agent context
         toolHandler: {
             context: agent,
@@ -269,7 +269,7 @@ export async function mechIntegration(model: string, messages: any[], config: an
         }
     ];
     
-    const stream = enhancedRequest(model, messages, {
+    const stream = request(model, messages, {
         // Add control tools to existing tools
         tools: [...controlTools, ...(config.tools || [])],
         
@@ -501,7 +501,7 @@ export async function simpleExample() {
         }
     ];
     
-    const stream = enhancedRequest('gpt-4o-mini', messages, {
+    const stream = request('gpt-4o-mini', messages, {
         tools,
         toolHandler: {
             onToolCall: async (toolCall) => {
