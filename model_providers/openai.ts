@@ -364,6 +364,7 @@ export class OpenAIProvider implements ModelProvider {
 
     /**
      * Lazily initialize the OpenAI client when first accessed
+     * This prevents module load errors when API keys are not set
      */
     private get client(): OpenAI {
         if (!this._client) {
