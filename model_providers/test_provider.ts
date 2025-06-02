@@ -114,6 +114,28 @@ export class TestProvider implements ModelProvider {
     }
 
     /**
+     * Check if this provider supports a given model
+     */
+    supportsModel(modelId: string): boolean {
+        return modelId === 'test-model' || modelId.startsWith('test-');
+    }
+
+    /**
+     * Create a request generator for the given model
+     */
+    async *createRequestGenerator(
+        modelId: string,
+        requestBody: ResponseInput,
+        agentInput?: EnsembleAgent
+    ): AsyncGenerator<EnsembleStreamEvent> {
+        const agent = agentInput || {
+            agent_id: 'test',
+            async getTools() { return []; }
+        };
+        yield* this.createResponseStream(modelId, requestBody, agent);
+    }
+
+    /**
      * Simulates a streaming response from a model
      */
     async *createResponseStream(
@@ -312,6 +334,41 @@ export class TestProvider implements ModelProvider {
             return "That's an interesting question. As a test model, I'm designed to provide simulated responses for testing purposes.";
         } else {
             return `I've received your message: "${input.slice(0, 50)}${input.length > 50 ? '...' : ''}". This is a simulated response from the test provider.`;
+        }
+    }
+
+    /**
+     * Creates embeddings for text input (for testing embedding functionality)
+     * @param modelId ID of the embedding model to use
+     * @param input Text to embed (string or array of strings)
+     * @param opts Optional parameters for embedding generation
+     * @returns Promise resolving to embedding vector(s)
+     */
+    async createEmbedding(
+        modelId: string,
+        input: string | string[],
+        opts?: any
+    ): Promise<number[] | number[][]> {
+        // Simulate embedding generation with deterministic values based on input
+        const generateVector = (text: string): number[] => {
+            const dimension = opts?.dimension || 384; // Default dimension
+            const vector = new Array(dimension);
+            
+            // Generate deterministic values based on text content
+            for (let i = 0; i < dimension; i++) {
+                // Use character codes and position to generate pseudo-random values
+                const charCode = text.charCodeAt(i % text.length) || 0;
+                const value = Math.sin(charCode * (i + 1) * 0.01) * 0.5 + 0.5;
+                vector[i] = value;
+            }
+            
+            return vector;
+        };
+        
+        if (Array.isArray(input)) {
+            return input.map(text => generateVector(text));
+        } else {
+            return generateVector(input);
         }
     }
 

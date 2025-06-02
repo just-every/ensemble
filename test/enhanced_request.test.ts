@@ -9,6 +9,7 @@ import {
     ToolCallAction,
     EnhancedToolFunction 
 } from '../types/tool_types.js';
+import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
 
 describe('Enhanced Request', () => {
     const mockMessages = [
@@ -40,7 +41,16 @@ describe('Enhanced Request', () => {
     });
     
     describe('Tool Execution Control', () => {
+        beforeEach(() => {
+            resetTestProviderConfig();
+        });
+        
         it('should execute tools with custom handler', async () => {
+            // Configure test provider to simulate tool calls
+            testProviderConfig.simulateToolCall = true;
+            testProviderConfig.toolName = 'test_tool';
+            testProviderConfig.toolArguments = { input: 'test input' };
+            
             const onToolCall = vi.fn().mockResolvedValue(ToolCallAction.EXECUTE);
             const onToolComplete = vi.fn();
             
@@ -58,11 +68,11 @@ describe('Enhanced Request', () => {
                 if (event.type === 'stream_end') break;
             }
             
-            // Verify lifecycle hooks were called
-            if (events.some(e => e.type === 'tool_start')) {
-                expect(onToolCall).toHaveBeenCalled();
-                expect(onToolComplete).toHaveBeenCalled();
-            }
+            // Now we can assert that tool calls definitely happened
+            const toolStartEvents = events.filter(e => e.type === 'tool_start');
+            expect(toolStartEvents.length).toBeGreaterThan(0);
+            expect(onToolCall).toHaveBeenCalled();
+            expect(onToolComplete).toHaveBeenCalled();
         });
         
         it('should skip tools when action is SKIP', async () => {
@@ -84,6 +94,11 @@ describe('Enhanced Request', () => {
         });
         
         it('should halt execution when action is HALT', async () => {
+            // Configure test provider to simulate tool calls
+            testProviderConfig.simulateToolCall = true;
+            testProviderConfig.toolName = 'test_tool';
+            testProviderConfig.toolArguments = { input: 'test input' };
+            
             const context = createRequestContext();
             const onToolCall = vi.fn().mockResolvedValue(ToolCallAction.HALT);
             
@@ -101,14 +116,11 @@ describe('Enhanced Request', () => {
                 }
             }
             
-            // If tools were called, context should be halted
-            const hasToolCalls = events.some(e => e.type === 'tool_start');
-            if (hasToolCalls) {
-                expect(context.isHalted).toBe(true);
-            } else {
-                // If no tool calls, test passes
-                expect(true).toBe(true);
-            }
+            // Now we can assert tool calls definitely happened and context was halted
+            const toolStartEvents = events.filter(e => e.type === 'tool_start');
+            expect(toolStartEvents.length).toBeGreaterThan(0);
+            expect(onToolCall).toHaveBeenCalled();
+            expect(context.isHalted).toBe(true);
         });
     });
     
@@ -232,6 +244,11 @@ describe('Enhanced Request', () => {
     
     describe('Result Transformation', () => {
         it('should transform tool results', async () => {
+            // Configure test provider to simulate tool calls
+            testProviderConfig.simulateToolCall = true;
+            testProviderConfig.toolName = 'test_tool';
+            testProviderConfig.toolArguments = { input: 'test input' };
+            
             const transform = vi.fn((name, result) => `TRANSFORMED: ${result}`);
             
             const stream = request('test-model', mockMessages, {
@@ -247,11 +264,13 @@ describe('Enhanced Request', () => {
                 if (event.type === 'stream_end') break;
             }
             
-            // Check if transform was called when tools were used
-            const hasToolCalls = events.some(e => e.type === 'tool_start');
-            if (hasToolCalls) {
-                expect(transform).toHaveBeenCalled();
-            }
+            // Reset test provider config
+            resetTestProviderConfig();
+            
+            // Now we can assert that transform was definitely called
+            const toolStartEvents = events.filter(e => e.type === 'tool_start');
+            expect(toolStartEvents.length).toBeGreaterThan(0);
+            expect(transform).toHaveBeenCalled();
         });
     });
     

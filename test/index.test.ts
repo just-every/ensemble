@@ -57,14 +57,25 @@ describe('Ensemble Package Exports', () => {
     });
 
     describe('Model Data Exports', () => {
-        it('should export MODEL_REGISTRY as an object', () => {
+        it('should export MODEL_REGISTRY as an array', () => {
             expect(MODEL_REGISTRY).toBeDefined();
-            expect(typeof MODEL_REGISTRY).toBe('object');
+            expect(Array.isArray(MODEL_REGISTRY)).toBe(true);
+            // Verify it contains actual model data
+            expect(MODEL_REGISTRY.length).toBeGreaterThan(0);
+            // Check a known model exists
+            const claudeModel = MODEL_REGISTRY.find(m => m.id === 'claude-3-5-haiku-latest');
+            expect(claudeModel).toBeDefined();
+            expect(claudeModel?.provider).toBe('claude');
         });
 
         it('should export MODEL_CLASSES as an object', () => {
             expect(MODEL_CLASSES).toBeDefined();
             expect(typeof MODEL_CLASSES).toBe('object');
+            // Verify it contains actual model classes
+            expect(MODEL_CLASSES.standard).toBeDefined();
+            expect(MODEL_CLASSES.standard.models).toBeDefined();
+            expect(Array.isArray(MODEL_CLASSES.standard.models)).toBe(true);
+            expect(MODEL_CLASSES.standard.models.length).toBeGreaterThan(0);
         });
 
         it('should export findModel function', () => {
@@ -77,11 +88,20 @@ describe('Ensemble Package Exports', () => {
             expect(costTracker).toBeDefined();
             expect(typeof costTracker.addUsage).toBe('function');
             expect(typeof costTracker.calculateCost).toBe('function');
+            // Verify it has the expected methods
+            expect(typeof costTracker.reset).toBe('function');
+            expect(typeof costTracker.getTotalCost).toBe('function');
+            expect(typeof costTracker.getCostsByModel).toBe('function');
+            expect(typeof costTracker.printSummary).toBe('function');
         });
 
         it('should export quotaTracker', () => {
             expect(quotaTracker).toBeDefined();
             expect(typeof quotaTracker).toBe('object');
+            // Verify it has expected methods
+            expect(typeof quotaTracker.trackUsage).toBe('function');
+            expect(typeof quotaTracker.hasQuota).toBe('function');
+            expect(typeof quotaTracker.getSummary).toBe('function');
         });
     });
 
@@ -89,11 +109,26 @@ describe('Ensemble Package Exports', () => {
         it('should export TestProvider class', () => {
             expect(TestProvider).toBeDefined();
             expect(typeof TestProvider).toBe('function');
+            // Verify it's a constructor
+            const provider = new TestProvider();
+            expect(provider).toBeDefined();
+            expect(typeof provider.supportsModel).toBe('function');
+            expect(typeof provider.createRequestGenerator).toBe('function');
         });
 
         it('should export test provider config utilities', () => {
             expect(testProviderConfig).toBeDefined();
+            expect(typeof testProviderConfig).toBe('object');
+            // Verify it has expected properties
+            expect(testProviderConfig).toHaveProperty('streamingDelay');
+            expect(testProviderConfig).toHaveProperty('shouldError');
+            expect(testProviderConfig).toHaveProperty('simulateToolCall');
+            
             expect(typeof resetTestProviderConfig).toBe('function');
+            // Verify reset works
+            testProviderConfig.shouldError = true;
+            resetTestProviderConfig();
+            expect(testProviderConfig.shouldError).toBe(false);
         });
     });
 
@@ -121,6 +156,12 @@ describe('Ensemble Package Exports', () => {
             // Should have message_start event
             const startEvent = events.find(e => e.type === 'message_start');
             expect(startEvent).toBeDefined();
+            expect(startEvent?.type).toBe('message_start');
+            if (startEvent?.type === 'message_start') {
+                expect(startEvent.message).toBeDefined();
+                expect(startEvent.message.id).toBeDefined();
+                expect(startEvent.message.role).toBe('assistant');
+            }
             
             // Should have message_complete event
             const completeEvent = events.find(e => e.type === 'message_complete');

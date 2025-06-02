@@ -1,103 +1,74 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { embed } from '../index.js';
-import { getModelProvider } from '../model_providers/model_provider.js';
-
-// Mock the model provider
-vi.mock('../model_providers/model_provider.js', () => ({
-    getModelProvider: vi.fn(),
-    getModelFromClass: vi.fn(() => 'test-embedding-model')
-}));
+import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
 
 describe('Embedding Functions', () => {
-    let mockProvider: any;
-
     beforeEach(() => {
-        // Clear mocks and cache
-        vi.clearAllMocks();
-        
-        // Create mock provider
-        mockProvider = {
-            createEmbedding: vi.fn()
-        };
-        
-        // Setup getModelProvider mock
-        (getModelProvider as any).mockReturnValue(mockProvider);
+        // Reset test provider config before each test
+        resetTestProviderConfig();
     });
 
     describe('embed', () => {
         it('should generate an embedding for text', async () => {
-            const mockEmbedding = new Array(384).fill(0).map(() => Math.random());
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+            const result = await embed('Hello, world!', { model: 'test-model' });
 
-            const result = await embed('Hello, world!');
-
-            expect(result).toEqual(mockEmbedding);
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(
-                'test-embedding-model',
-                'Hello, world!',
-                undefined
-            );
+            expect(result).toBeDefined();
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(384); // Default dimension
+            expect(result.every(val => typeof val === 'number')).toBe(true);
+            expect(result.every(val => val >= 0 && val <= 1)).toBe(true);
         });
 
-        it('should use specific model when provided', async () => {
-            const mockEmbedding = new Array(1536).fill(0).map(() => Math.random());
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+        it('should generate embeddings for multiple texts sequentially', async () => {
+            const texts = ['Hello', 'World', 'Test'];
+            const results = [];
+            
+            for (const text of texts) {
+                const embedding = await embed(text, { model: 'test-model' });
+                results.push(embedding);
+            }
 
-            const result = await embed('Test text', { model: 'text-embedding-3-small' });
-
-            expect(result).toEqual(mockEmbedding);
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(
-                'text-embedding-3-small',
-                'Test text',
-                undefined
-            );
+            expect(results).toBeDefined();
+            expect(Array.isArray(results)).toBe(true);
+            expect(results.length).toBe(3);
+            expect(results.every(embedding => Array.isArray(embedding))).toBe(true);
+            expect(results.every(embedding => embedding.length === 384)).toBe(true);
         });
 
-        it('should cache embeddings', async () => {
-            const mockEmbedding = new Array(384).fill(0).map(() => Math.random());
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+        it('should respect custom dimensions', async () => {
+            const result = await embed('Test text', { 
+                model: 'test-model', 
+                opts: { dimension: 1536 }
+            });
 
-            // First call
-            const result1 = await embed('Cached text');
-            // Second call (should use cache)
-            const result2 = await embed('Cached text');
+            expect(result).toBeDefined();
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(1536);
+        });
+
+        it('should produce deterministic embeddings for the same input', async () => {
+            const text = 'Deterministic test';
+            const result1 = await embed(text, { model: 'test-model' });
+            const result2 = await embed(text, { model: 'test-model' });
 
             expect(result1).toEqual(result2);
-            expect(mockProvider.createEmbedding).toHaveBeenCalledTimes(1);
         });
 
-        it('should handle array results from provider', async () => {
-            const mockEmbedding = new Array(384).fill(0).map(() => Math.random());
-            // Provider returns array of arrays
-            mockProvider.createEmbedding.mockResolvedValue([mockEmbedding]);
+        it('should produce different embeddings for different inputs', async () => {
+            const result1 = await embed('First text', { model: 'test-model' });
+            const result2 = await embed('Second text', { model: 'test-model' });
 
-            const result = await embed('Array result');
-
-            expect(result).toEqual(mockEmbedding);
+            expect(result1).not.toEqual(result2);
         });
 
-        it('should throw error if provider does not support embeddings', async () => {
-            // Remove createEmbedding method
-            delete mockProvider.createEmbedding;
+        it('should handle empty string input', async () => {
+            const result = await embed('', { model: 'test-model' });
 
-            await expect(embed('No support')).rejects.toThrow(
-                'Provider for model test-embedding-model does not support embeddings'
-            );
-        });
-
-        it('should pass through embedding options', async () => {
-            const mockEmbedding = new Array(768).fill(0).map(() => Math.random());
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
-
-            const opts = { taskType: 'SEMANTIC_SIMILARITY', dimensions: 768 };
-            await embed('With options', { opts });
-
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(
-                'test-embedding-model',
-                'With options',
-                opts
-            );
+            expect(result).toBeDefined();
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(384);
+            // Should still produce valid embeddings even for empty input
+            expect(result.every(val => typeof val === 'number')).toBe(true);
         });
     });
-
 });

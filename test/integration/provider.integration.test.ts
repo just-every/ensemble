@@ -56,15 +56,35 @@ describe('Provider Integration Tests', () => {
 
       const events: EnsembleStreamEvent[] = [];
       
+      // Test the error creation and validation
+      const error = new RateLimitError('openai', 60);
+      expect(error.retryAfter).toBe(60);
+      expect(error.provider).toBe('openai');
+      expect(isRateLimitError(error)).toBe(true);
+      expect(error.message).toContain('Rate limit');
+      
+      // Test with test provider configured to simulate rate limit
+      testProviderConfig.simulateRateLimit = true;
+      
       try {
-        // This would need actual rate limit triggering or mocking
-        // For now, we test the error creation
-        const error = new RateLimitError('openai', 60);
-        expect(error.retryAfter).toBe(60);
-        expect(error.provider).toBe('openai');
-        expect(isRateLimitError(error)).toBe(true);
+        const stream = request('test-model', messages);
+        const events: EnsembleStreamEvent[] = [];
+        
+        for await (const event of stream) {
+          events.push(event);
+        }
+        
+        // Should not reach here
+        expect.fail('Expected rate limit error to be thrown');
       } catch (error) {
-        // Expected
+        expect(error).toBeDefined();
+        expect(isRateLimitError(error)).toBe(true);
+        if (isRateLimitError(error)) {
+          expect(error.provider).toBe('test');
+          expect(error.retryAfter).toBeGreaterThan(0);
+        }
+      } finally {
+        resetTestProviderConfig();
       }
     });
 
