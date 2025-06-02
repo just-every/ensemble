@@ -430,20 +430,30 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
  * Gemini model provider implementation
  */
 export class GeminiProvider implements ModelProvider {
-    private client: GoogleGenAI;
+    private _client?: GoogleGenAI;
+    private apiKey?: string;
 
     constructor(apiKey?: string) {
-        const key = apiKey || process.env.GOOGLE_API_KEY;
-        if (!key) {
-            throw new Error(
-                'Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.'
-            );
+        // Store the API key for lazy initialization
+        this.apiKey = apiKey || process.env.GOOGLE_API_KEY;
+    }
+
+    /**
+     * Lazily initialize the Google GenAI client when first accessed
+     */
+    private get client(): GoogleGenAI {
+        if (!this._client) {
+            if (!this.apiKey) {
+                throw new Error(
+                    'Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.'
+                );
+            }
+            this._client = new GoogleGenAI({
+                apiKey: this.apiKey,
+                vertexai: false,
+            });
         }
-        // Create Gemini client with basic configuration
-        this.client = new GoogleGenAI({
-            apiKey: key,
-            vertexai: false,
-        });
+        return this._client;
     }
 
     /**

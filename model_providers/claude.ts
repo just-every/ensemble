@@ -362,18 +362,29 @@ async function convertToClaudeMessage(
  * Claude model provider implementation
  */
 export class ClaudeProvider implements ModelProvider {
-    private client: Anthropic;
+    private _client?: Anthropic;
+    private apiKey?: string;
 
     constructor(apiKey?: string) {
-        this.client = new Anthropic({
-            apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-        });
+        // Store the API key for lazy initialization
+        this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY;
+    }
 
-        if (!this.client) {
-            throw new Error(
-                'Failed to initialize Claude client. Make sure ANTHROPIC_API_KEY is set.'
-            );
+    /**
+     * Lazily initialize the Anthropic client when first accessed
+     */
+    private get client(): Anthropic {
+        if (!this._client) {
+            if (!this.apiKey) {
+                throw new Error(
+                    'Failed to initialize Claude client. Make sure ANTHROPIC_API_KEY is set.'
+                );
+            }
+            this._client = new Anthropic({
+                apiKey: this.apiKey,
+            });
         }
+        return this._client;
     }
 
     /**

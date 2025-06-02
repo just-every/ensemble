@@ -354,18 +354,29 @@ async function addImagesToInput(
  * OpenAI model provider implementation
  */
 export class OpenAIProvider implements ModelProvider {
-    private client: OpenAI;
+    private _client?: OpenAI;
+    private apiKey?: string;
 
     constructor(apiKey?: string) {
-        this.client = new OpenAI({
-            apiKey: apiKey || process.env.OPENAI_API_KEY,
-        });
+        // Store the API key for lazy initialization
+        this.apiKey = apiKey || process.env.OPENAI_API_KEY;
+    }
 
-        if (!this.client) {
-            throw new Error(
-                'Failed to initialize OpenAI client. Make sure OPENAI_API_KEY is set.'
-            );
+    /**
+     * Lazily initialize the OpenAI client when first accessed
+     */
+    private get client(): OpenAI {
+        if (!this._client) {
+            if (!this.apiKey) {
+                throw new Error(
+                    'Failed to initialize OpenAI client. Make sure OPENAI_API_KEY is set.'
+                );
+            }
+            this._client = new OpenAI({
+                apiKey: this.apiKey,
+            });
         }
+        return this._client;
     }
 
     /**

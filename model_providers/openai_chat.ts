@@ -364,10 +364,12 @@ type SimulatedToolCallParseResult = {
  * OpenAI model provider implementation.
  */
 export class OpenAIChat implements ModelProvider {
-    protected client: OpenAI;
+    protected _client?: OpenAI;
     protected provider: ModelProviderID;
     protected baseURL: string | undefined;
     protected commonParams: any = {};
+    protected apiKey?: string;
+    protected defaultHeaders?: Record<string, string | null | undefined>;
 
     constructor(
         provider?: ModelProviderID,
@@ -376,23 +378,33 @@ export class OpenAIChat implements ModelProvider {
         defaultHeaders?: Record<string, string | null | undefined>,
         commonParams?: any
     ) {
-        // ... (constructor unchanged)
+        // Store parameters for lazy initialization
         this.provider = provider || 'openai';
+        this.apiKey = apiKey || process.env.OPENAI_API_KEY;
         this.baseURL = baseURL;
         this.commonParams = commonParams || {};
-        this.client = new OpenAI({
-            apiKey: apiKey || process.env.OPENAI_API_KEY,
-            baseURL: this.baseURL,
-            defaultHeaders: defaultHeaders || {
-                'User-Agent': 'magi',
-            },
-        });
+        this.defaultHeaders = defaultHeaders || {
+            'User-Agent': 'magi',
+        };
+    }
 
-        if (!this.client.apiKey) {
-            throw new Error(
-                `Failed to initialize OpenAI client for ${this.provider}. API key is missing.`
-            );
+    /**
+     * Lazily initialize the OpenAI client when first accessed
+     */
+    protected get client(): OpenAI {
+        if (!this._client) {
+            if (!this.apiKey) {
+                throw new Error(
+                    `Failed to initialize OpenAI client for ${this.provider}. API key is missing.`
+                );
+            }
+            this._client = new OpenAI({
+                apiKey: this.apiKey,
+                baseURL: this.baseURL,
+                defaultHeaders: this.defaultHeaders,
+            });
         }
+        return this._client;
     }
 
     /** Base parameter preparation method. */
