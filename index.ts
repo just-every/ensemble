@@ -12,7 +12,7 @@ export {
 } from './model_providers/model_provider.js';
 
 // Export unified request function as the main request API
-export { unifiedRequest as request, RequestAgent, UnifiedRequestOptions } from './unified_request.js';
+export { request, RequestAgent, UnifiedRequestOptions } from './unified_request.js';
 
 // Export utility classes
 export { MessageHistory } from './utils/message_history.js';

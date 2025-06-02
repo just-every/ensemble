@@ -22,6 +22,9 @@ import { getModelProvider } from './model_providers/model_provider.js';
 import { MessageHistory } from './utils/message_history.js';
 import { EnsembleErrorHandler, ErrorCode } from './utils/error_handler.js';
 
+// Track if we're currently executing within a tool to detect recursive calls
+let isExecutingTool = false;
+
 // Request agent implementation
 class RequestAgent implements EnsembleAgent {
     agent_id: string;
@@ -46,12 +49,13 @@ interface UnifiedRequestOptions extends BaseRequestOptions, Partial<EnhancedRequ
     // Simplified options that work for both standard and enhanced modes
     useEnhancedMode?: boolean;  // Explicitly opt into enhanced features
     messageHistory?: MessageHistory;  // Use the new message history manager
+    preserveToolChoice?: boolean;  // Explicitly preserve tool_choice in recursive calls
 }
 
 /**
  * Unified request function that handles both standard and enhanced modes
  */
-export async function* unifiedRequest(
+export async function* request(
     model: string,
     messages: ResponseInput,
     options: UnifiedRequestOptions = {}
@@ -152,14 +156,17 @@ async function executeRound(
     // Create a copy of options to avoid mutating the original
     const roundOptions = { ...options };
     
-    // After the first iteration, clear any forced tool_choice to prevent loops
-    // unless we have a dynamic strategy
-    if (iteration > 0 && !options.toolChoiceStrategy) {
-        if (roundOptions.modelSettings?.tool_choice) {
-            // Create a new modelSettings object without tool_choice
-            roundOptions.modelSettings = { ...roundOptions.modelSettings };
-            delete roundOptions.modelSettings.tool_choice;
-        }
+    // Clear tool_choice in these scenarios to prevent infinite loops:
+    // 1. After the first iteration of a multi-turn conversation (iteration > 0)
+    // 2. When inside a tool execution (recursive call) unless explicitly preserved
+    // 3. Never clear if using a dynamic toolChoiceStrategy
+    const isRecursiveCall = isExecutingTool && !options.preserveToolChoice;
+    const shouldClearToolChoice = (iteration > 0 || isRecursiveCall) && !options.toolChoiceStrategy;
+    
+    if (shouldClearToolChoice && roundOptions.modelSettings?.tool_choice) {
+        // Create a new modelSettings object without tool_choice
+        roundOptions.modelSettings = { ...roundOptions.modelSettings };
+        delete roundOptions.modelSettings.tool_choice;
     }
     
     const agent = new RequestAgent(roundOptions as BaseRequestOptions);
@@ -285,18 +292,28 @@ async function processToolCalls(
             
             if (options.processToolCall) {
                 // Use legacy processToolCall
-                result = await options.processToolCall([toolCall]);
+                isExecutingTool = true;
+                try {
+                    result = await options.processToolCall([toolCall]);
+                } finally {
+                    isExecutingTool = false;
+                }
             } else if (options.toolHandler?.executor) {
                 // Use enhanced executor
                 const tool = options.tools?.find(
                     t => t.definition.function.name === toolCall.function.name
                 );
                 if (tool) {
-                    result = await options.toolHandler.executor(
-                        tool,
-                        JSON.parse(toolCall.function.arguments || '{}'),
-                        options.toolHandler.context || context
-                    );
+                    isExecutingTool = true;
+                    try {
+                        result = await options.toolHandler.executor(
+                            tool,
+                            JSON.parse(toolCall.function.arguments || '{}'),
+                            options.toolHandler.context || context
+                        );
+                    } finally {
+                        isExecutingTool = false;
+                    }
                 }
             } else if (options.tools) {
                 // Standard tool execution
