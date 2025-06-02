@@ -26,6 +26,7 @@
         "examples",
         "test",
         "scripts",
-        "**/*.test.ts"
+        "**/*.test.ts",
+        "vitest.config.ts"
     ]
 }

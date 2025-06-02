@@ -213,6 +213,7 @@ OPENROUTER_API_KEY=your_key_here
 - [Error Handling](./docs/error-handling.md)
 - [OpenAI Compatibility](./docs/openai-compatibility.md)
 - [Utility Functions](./docs/utilities.md)
+- [Test Utilities](./docs/test-utilities.md) - Testing helpers and mocks
 
 ## Examples
 

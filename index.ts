@@ -82,8 +82,6 @@ export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
 export { createToolFunction } from './utils/create_tool_function.js';
 export type { ToolParameter, ToolParameterMap, ToolParameterType } from './utils/create_tool_function.js';
-export { EnhancedRequestMock, createMockContext, StreamAssertions } from './utils/test_utils.js';
-export type { MockToolCall, MockResponse, MockStreamOptions } from './utils/test_utils.js';
 export { normalizeToolCall, normalizeToolCalls, createToolCall, getToolName, getToolArguments } from './utils/tool_utils.js';
 export type { SimpleToolCall } from './utils/tool_utils.js';
 export { StateManager, RequestContextWithState, createRequestContextWithState } from './utils/state_manager.js';
