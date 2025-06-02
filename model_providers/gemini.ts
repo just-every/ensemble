@@ -171,11 +171,57 @@ function convertParameterToGeminiFormat(param: any): any {
     return result;
 }
 
-function convertToGeminiFunctionDeclarations(
+/**
+ * Resolves any async enum values in tool parameters
+ */
+async function resolveAsyncEnums(params: any): Promise<any> {
+    if (!params || typeof params !== 'object') {
+        return params;
+    }
+    
+    const resolved = { ...params };
+    
+    // Process properties recursively
+    if (resolved.properties) {
+        const resolvedProps: any = {};
+        for (const [key, value] of Object.entries(resolved.properties)) {
+            if (value && typeof value === 'object') {
+                const propCopy = { ...value } as any;
+                
+                // Check if enum is a function (async or sync)
+                if (typeof propCopy.enum === 'function') {
+                    try {
+                        const enumValue = await propCopy.enum();
+                        // Only set if we got a valid array back
+                        if (Array.isArray(enumValue) && enumValue.length > 0) {
+                            propCopy.enum = enumValue;
+                        } else {
+                            // Remove empty enum to avoid validation errors
+                            delete propCopy.enum;
+                        }
+                    } catch (e) {
+                        // If enum resolution fails, remove it
+                        delete propCopy.enum;
+                    }
+                }
+                
+                // Recursively process nested properties
+                resolvedProps[key] = await resolveAsyncEnums(propCopy);
+            } else {
+                resolvedProps[key] = value;
+            }
+        }
+        resolved.properties = resolvedProps;
+    }
+    
+    return resolved;
+}
+
+async function convertToGeminiFunctionDeclarations(
     tools: ToolFunction[]
-): FunctionDeclaration[] {
-    return tools
-        .map(tool => {
+): Promise<FunctionDeclaration[]> {
+    const declarations = await Promise.all(tools
+        .map(async tool => {
             // Special handling for Google web search
             if (tool.definition.function.name === 'google_web_search' || tool.definition.function.name === 'web_search') {
                 console.log('[Gemini] Enabling Google Search grounding');
@@ -183,10 +229,11 @@ function convertToGeminiFunctionDeclarations(
                 return null;
             }
 
-            const properties: Record<string, any> = {};
-            const toolParams =
-                tool.definition?.function?.parameters?.properties;
+            // First resolve async enums
+            const resolvedParams = await resolveAsyncEnums(tool.definition?.function?.parameters);
+            const toolParams = resolvedParams?.properties;
 
+            const properties: Record<string, any> = {};
             if (toolParams) {
                 for (const [name, param] of Object.entries(toolParams)) {
                     properties[name] = convertParameterToGeminiFormat(param);
@@ -204,14 +251,14 @@ function convertToGeminiFunctionDeclarations(
                     type: Type.OBJECT,
                     properties,
                     required: Array.isArray(
-                        tool.definition?.function?.parameters?.required
+                        resolvedParams?.required
                     )
-                        ? tool.definition.function.parameters.required
+                        ? resolvedParams.required
                         : [],
                 },
             };
-        })
-        .filter(Boolean); // Filter out null entries from special tools
+        }));
+    return declarations.filter(Boolean) as FunctionDeclaration[]; // Filter out null entries from special tools
 }
 
 /**
@@ -818,7 +865,7 @@ export class GeminiProvider implements ModelProvider {
 
                 // Configure standard function calling tools
                 const functionDeclarations =
-                    convertToGeminiFunctionDeclarations(tools);
+                    await convertToGeminiFunctionDeclarations(tools);
                 let allowedFunctionNames: string[] = [];
 
                 if (functionDeclarations.length > 0) {

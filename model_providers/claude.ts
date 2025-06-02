@@ -116,9 +116,55 @@ import {
     flushBufferedDeltas,
 } from '../utils/delta_buffer.js';
 
+/**
+ * Resolves any async enum values in tool parameters
+ */
+async function resolveAsyncEnums(params: any): Promise<any> {
+    if (!params || typeof params !== 'object') {
+        return params;
+    }
+    
+    const resolved = { ...params };
+    
+    // Process properties recursively
+    if (resolved.properties) {
+        const resolvedProps: any = {};
+        for (const [key, value] of Object.entries(resolved.properties)) {
+            if (value && typeof value === 'object') {
+                const propCopy = { ...value } as any;
+                
+                // Check if enum is a function (async or sync)
+                if (typeof propCopy.enum === 'function') {
+                    try {
+                        const enumValue = await propCopy.enum();
+                        // Only set if we got a valid array back
+                        if (Array.isArray(enumValue) && enumValue.length > 0) {
+                            propCopy.enum = enumValue;
+                        } else {
+                            // Remove empty enum to avoid validation errors
+                            delete propCopy.enum;
+                        }
+                    } catch (e) {
+                        // If enum resolution fails, remove it
+                        delete propCopy.enum;
+                    }
+                }
+                
+                // Recursively process nested properties
+                resolvedProps[key] = await resolveAsyncEnums(propCopy);
+            } else {
+                resolvedProps[key] = value;
+            }
+        }
+        resolved.properties = resolvedProps;
+    }
+    
+    return resolved;
+}
+
 // Convert our tool definition to Claude's format
-function convertToClaudeTools(tools: ToolFunction[]): any[] {
-    return tools.map(tool => {
+async function convertToClaudeTools(tools: ToolFunction[]): Promise<any[]> {
+    return await Promise.all(tools.map(async tool => {
         // Special handling for web search tool
         if (tool.definition.function.name === 'claude_web_search' || tool.definition.function.name === 'web_search') {
             return {
@@ -132,10 +178,10 @@ function convertToClaudeTools(tools: ToolFunction[]): any[] {
             // Directly map the properties to the top level
             name: tool.definition.function.name,
             description: tool.definition.function.description,
-            // Map 'parameters' from your definition to 'input_schema' for Claude
-            input_schema: tool.definition.function.parameters,
+            // Resolve async enums and map 'parameters' to 'input_schema' for Claude
+            input_schema: await resolveAsyncEnums(tool.definition.function.parameters),
         };
-    });
+    }));
 }
 
 // Assuming ResponseInputItem is your internal message structure type
@@ -803,7 +849,7 @@ export class ClaudeProvider implements ModelProvider {
 
             // Add tools if provided, using the corrected conversion function
             if (tools && tools.length > 0) {
-                requestParams.tools = convertToClaudeTools(tools); // Uses the corrected function
+                requestParams.tools = await convertToClaudeTools(tools); // Uses the corrected function
             }
 
             // --- Pre-flight Check: Ensure messages are not empty, add default if needed ---

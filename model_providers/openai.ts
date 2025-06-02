@@ -229,13 +229,59 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
 }
 
 /**
+ * Resolves any async enum values in tool parameters
+ */
+async function resolveAsyncEnums(params: any): Promise<any> {
+    if (!params || typeof params !== 'object') {
+        return params;
+    }
+    
+    const resolved = { ...params };
+    
+    // Process properties recursively
+    if (resolved.properties) {
+        const resolvedProps: any = {};
+        for (const [key, value] of Object.entries(resolved.properties)) {
+            if (value && typeof value === 'object') {
+                const propCopy = { ...value } as any;
+                
+                // Check if enum is a function (async or sync)
+                if (typeof propCopy.enum === 'function') {
+                    try {
+                        const enumValue = await propCopy.enum();
+                        // Only set if we got a valid array back
+                        if (Array.isArray(enumValue) && enumValue.length > 0) {
+                            propCopy.enum = enumValue;
+                        } else {
+                            // Remove empty enum to avoid OpenAI validation errors
+                            delete propCopy.enum;
+                        }
+                    } catch (e) {
+                        // If enum resolution fails, remove it
+                        delete propCopy.enum;
+                    }
+                }
+                
+                // Recursively process nested properties
+                resolvedProps[key] = await resolveAsyncEnums(propCopy);
+            } else {
+                resolvedProps[key] = value;
+            }
+        }
+        resolved.properties = resolvedProps;
+    }
+    
+    return resolved;
+}
+
+/**
  * Convert our tool definition to OpenAI's format
  */
-function convertToOpenAITools(
+async function convertToOpenAITools(
     requestParams: any,
     tools?: ToolFunction[] | undefined
-): any {
-    requestParams.tools = tools.map((tool: ToolFunction) => {
+): Promise<any> {
+    requestParams.tools = await Promise.all(tools.map(async (tool: ToolFunction) => {
         if (tool.definition.function.name === 'openai_web_search' || tool.definition.function.name === 'web_search') {
             delete requestParams.reasoning;
             return {
@@ -244,11 +290,11 @@ function convertToOpenAITools(
             };
         }
 
-        // Process the parameter schema using our utility function
-        const originalToolProperties =
-            tool.definition.function.parameters.properties;
+        // First resolve async enums, then process the schema
+        const resolvedParams = await resolveAsyncEnums(tool.definition.function.parameters);
+        const originalToolProperties = resolvedParams.properties;
         const paramSchema = processSchemaForOpenAI(
-            tool.definition.function.parameters,
+            resolvedParams,
             originalToolProperties
         );
 
@@ -259,7 +305,7 @@ function convertToOpenAITools(
             parameters: paramSchema,
             strict: true, // Keep strict mode enabled
         };
-    });
+    }));
     if (requestParams.model === 'computer-use-preview') {
         requestParams.tools.push({
             type: 'computer_use_preview',
@@ -980,7 +1026,7 @@ export class OpenAIProvider implements ModelProvider {
             // Add tools if provided
             if (tools && tools.length > 0) {
                 // Convert our tools to OpenAI format
-                requestParams = convertToOpenAITools(requestParams, tools);
+                requestParams = await convertToOpenAITools(requestParams, tools);
             }
 
             // Log the request and save the requestId for later response logging
