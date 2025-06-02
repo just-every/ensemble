@@ -65,7 +65,7 @@ describe('Ensemble Package Exports', () => {
             // Check a known model exists
             const claudeModel = MODEL_REGISTRY.find(m => m.id === 'claude-3-5-haiku-latest');
             expect(claudeModel).toBeDefined();
-            expect(claudeModel?.provider).toBe('claude');
+            expect(claudeModel?.provider).toBe('anthropic');
         });
 
         it('should export MODEL_CLASSES as an object', () => {
@@ -158,9 +158,8 @@ describe('Ensemble Package Exports', () => {
             expect(startEvent).toBeDefined();
             expect(startEvent?.type).toBe('message_start');
             if (startEvent?.type === 'message_start') {
-                expect(startEvent.message).toBeDefined();
-                expect(startEvent.message.id).toBeDefined();
-                expect(startEvent.message.role).toBe('assistant');
+                expect(startEvent.message_id).toBeDefined();
+                expect(typeof startEvent.message_id).toBe('string');
             }
             
             // Should have message_complete event

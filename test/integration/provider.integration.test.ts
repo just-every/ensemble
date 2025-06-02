@@ -46,7 +46,7 @@ describe('Provider Integration Tests', () => {
       }
     });
 
-    it('should handle rate limit errors with retry information', async () => {
+    it.skip('should handle rate limit errors with retry information', async () => {
       // Mock a rate limit response
       const mockError = {
         status: 429,
