@@ -319,10 +319,25 @@ async function processToolCalls(
                 );
             }
             
+            // Auto-stringify tool results with proper handling
+            let output: string;
+            if (typeof result === 'string') {
+                output = result;
+            } else if (result === undefined) {
+                output = 'undefined';
+            } else if (result === null) {
+                output = 'null';
+            } else if (typeof result === 'object') {
+                // Pretty-print objects for readability
+                output = JSON.stringify(result, null, 2);
+            } else {
+                output = String(result);
+            }
+            
             results.push({
                 id: toolCall.id,
                 call_id: toolCall.call_id || toolCall.id,
-                output: typeof result === 'string' ? result : JSON.stringify(result)
+                output
             });
             
             // Call completion hook

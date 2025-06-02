@@ -64,6 +64,19 @@ export interface RequestContext {
 }
 
 /**
+ * Options for creating a RequestContext
+ */
+export interface RequestContextOptions {
+    metadata?: Record<string, any>;
+    messages?: ResponseInput;
+    onHalt?: () => void;
+    onPause?: () => void;
+    onResume?: () => void;
+    agent?: any;
+}
+
+
+/**
  * Enhanced tool function with additional metadata
  */
 export interface EnhancedToolFunction extends ToolFunction {
