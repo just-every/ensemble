@@ -21,6 +21,7 @@ import {
 import { getModelProvider } from './model_providers/model_provider.js';
 import { MessageHistory } from './utils/message_history.js';
 import { EnsembleErrorHandler, ErrorCode } from './utils/error_handler.js';
+import { mapNamedToPositionalArgs } from './utils/tool_parameter_utils.js';
 
 // Track if we're currently executing within a tool to detect recursive calls
 let isExecutingTool = false;
@@ -306,9 +307,13 @@ async function processToolCalls(
                 if (tool) {
                     isExecutingTool = true;
                     try {
+                        const args = JSON.parse(toolCall.function.arguments || '{}');
+                        
+                        // For enhanced executor, we pass the args object as-is
+                        // The executor is responsible for handling parameter mapping
                         result = await options.toolHandler.executor(
                             tool,
-                            JSON.parse(toolCall.function.arguments || '{}'),
+                            args,
                             options.toolHandler.context || context
                         );
                     } finally {
@@ -321,9 +326,23 @@ async function processToolCalls(
                     t => t.definition.function.name === toolCall.function.name
                 );
                 if (tool && 'function' in tool) {
-                    result = await tool.function(
-                        JSON.parse(toolCall.function.arguments || '{}')
-                    );
+                    const args = JSON.parse(toolCall.function.arguments || '{}');
+                    
+                    // Check if args is an object (named parameters from LLM)
+                    if (typeof args === 'object' && args !== null && !Array.isArray(args)) {
+                        // Map named parameters to positional arguments
+                        const agent = options.agentId || 'ensemble';
+                        const positionalArgs = mapNamedToPositionalArgs(
+                            args, 
+                            tool,
+                            agent,
+                            undefined // No abort signal in standard execution
+                        );
+                        result = await tool.function(...positionalArgs);
+                    } else {
+                        // Already positional or single argument
+                        result = await tool.function(args);
+                    }
                 }
             }
             
