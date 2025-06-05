@@ -112,7 +112,7 @@ These should run in parallel.`
     ];
 
     const agent = {
-        model: 'gpt-4o-mini',
+        model: 'o3-mini',
         agent_id: 'parallel-executor',
         tools
     };

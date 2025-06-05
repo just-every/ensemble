@@ -109,7 +109,7 @@ async function main() {
     console.log('=== TOOL LIFECYCLE DEMONSTRATION ===\n');
 
     const agent: AgentDefinition = {
-        model: 'gpt-4o-mini',
+        model: 'o3-mini',
         agent_id: 'lifecycle-demo',
         tools,
         

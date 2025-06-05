@@ -30,7 +30,7 @@ Tools are executed automatically when an LLM requests them:
 import { ensembleRequest } from '@just-every/ensemble';
 
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     agent_id: 'my-agent',
     tools: [{
         definition: {
@@ -72,7 +72,7 @@ import { FUNCTION_TIMEOUT_MS } from '@just-every/ensemble';
 // Default timeout is 30 seconds
 // Tools with status tracking will timeout and continue in background
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     tools: [
         // This tool enables status tracking for the agent
         {
@@ -121,7 +121,7 @@ Enable sequential tool execution to ensure tools run one at a time:
 
 ```typescript
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     modelSettings: {
         sequential_tools: true // Tools will execute one at a time
     },
@@ -209,7 +209,7 @@ export const TOOL_CONFIGS = {
 
 ```typescript
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     
     // Called before tool execution
     onToolCall: async (toolCall) => {

@@ -201,7 +201,7 @@ async function main() {
     ];
 
     const agent = {
-        model: 'gpt-4o-mini',
+        model: 'o3-mini',
         agent_id: 'result-processor',
         tools
     };

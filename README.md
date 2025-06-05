@@ -31,7 +31,7 @@ const messages = [
 ];
 
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     agent_id: 'assistant'
 };
 
@@ -56,7 +56,7 @@ Define tools that LLMs can call:
 
 ```typescript
 const agent = {
-    model: 'gpt-4',
+    model: 'o3',
     tools: [{
         definition: {
             type: 'function',
