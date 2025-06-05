@@ -21,6 +21,21 @@ A unified interface for interacting with multiple LLM providers (OpenAI, Anthrop
 npm install @just-every/ensemble
 ```
 
+## Environment Setup
+
+Set your provider API keys as environment variables before running examples or using the library:
+
+```bash
+export OPENAI_API_KEY=your-openai-key
+export ANTHROPIC_API_KEY=your-anthropic-key
+export GOOGLE_API_KEY=your-google-key
+export XAI_API_KEY=your-xai-key
+export DEEPSEEK_API_KEY=your-deepseek-key
+export OPENROUTER_API_KEY=your-openrouter-key
+```
+
+These variables enable access to the respective providers. Only the keys you need are required.
+
 ## Quick Start
 
 ```typescript
@@ -46,7 +61,8 @@ for await (const event of ensembleRequest(messages, agent)) {
 
 - [Tool Execution Guide](docs/tool-execution.md) - Advanced tool calling features
 - [Examples](examples/) - Complete working examples
-- [API Reference](docs/api.md) - Full API documentation
+- Generated [API Reference](docs/api) with `npm run docs`
+  Run `npm run docs` to regenerate the HTML documentation.
 
 ## Core Concepts
 
