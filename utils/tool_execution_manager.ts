@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { ToolCall, ToolFunction, AgentDefinition } from '../types/types.js';
 import { runningToolTracker } from './running_tool_tracker.js';
 import { runSequential } from './sequential_queue.js';
-import { mapNamedToPositionalArgs } from './tool_parameter_utils.js';
 import { coerceValue } from './tool_parameter_utils.js';
 import {
     FUNCTION_TIMEOUT_MS,
@@ -52,10 +51,10 @@ export async function executeToolWithLifecycle(
     const toolName = toolCall.function.name;
     const argsString = toolCall.function.arguments || '{}';
 
-    // Parse arguments
-    let args: any;
+    // Parse and prepare arguments using shared utility
+    let args: any[];
     try {
-        args = JSON.parse(argsString);
+        args = prepareToolArguments(argsString, tool);
     } catch (error) {
         throw new Error(`Invalid JSON in tool arguments: ${error}`);
     }
@@ -72,22 +71,16 @@ export async function executeToolWithLifecycle(
     const abortSignal = signal || runningTool.abortController?.signal;
 
     try {
-        // Execute the tool
-        let result: any;
-
-        if (typeof args === 'object' && args !== null && !Array.isArray(args)) {
-            // Map named parameters to positional arguments
-            const positionalArgs = mapNamedToPositionalArgs(
-                args,
-                tool,
-                agent.agent_id || 'ensemble',
-                abortSignal
-            );
-            result = await tool.function(...positionalArgs);
-        } else {
-            // Already positional or single argument
-            result = await tool.function(args);
+        // Inject agent specific parameters
+        if (tool.injectAgentId) {
+            args.unshift(agent.agent_id || 'ensemble');
         }
+        if (tool.injectAbortSignal && abortSignal) {
+            args.push(abortSignal);
+        }
+
+        // Execute the tool
+        const result = await tool.function(...args);
 
         // Mark as completed
         await runningToolTracker.completeRunningTool(
