@@ -77,6 +77,8 @@ export const MODEL_CLASSES = {
             'o4-mini-high', // OpenAI
             'o3-high', // OpenAI
             'claude-3-7-sonnet-latest', // Anthropic
+            'claude-opus-4-20250514', // Anthropic
+            'claude-sonnet-4-20250514', // Anthropic
             //'grok-3-mini-fast', // X.AI
         ],
         random: true,
@@ -99,6 +101,7 @@ export const MODEL_CLASSES = {
             'o4-mini-low', // OpenAI
             'o3-low', // OpenAI
             'claude-3-7-sonnet-latest', // Anthropic
+            'claude-sonnet-4-20250514', // Anthropic
             'grok-3-mini-fast', // X.AI
             //'deepseek-reasoner',      // DeepSeek
             //'meta-llama/llama-4-maverick', // Meta/OpenRouter
@@ -915,6 +918,58 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning', // Assuming Sonnet backend
         description:
             'Claude accessed via CLI (likely uses latest Sonnet or Haiku model)',
+    },
+
+    // Claude Opus 4
+    {
+        id: 'claude-opus-4-20250514',
+        aliases: ['claude-opus-4', 'claude-4-opus'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 15.0,
+            output_per_million: 75.0,
+            cached_input_per_million: 1.5, // Estimated at 10% of input cost
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 32000,
+            extended_thinking: true,
+        },
+        class: 'reasoning',
+        score: 95, // Highest tier model
+        description:
+            'Claude Opus 4 - Highest level of intelligence and capability with extended thinking',
+    },
+
+    // Claude Sonnet 4
+    {
+        id: 'claude-sonnet-4-20250514',
+        aliases: ['claude-sonnet-4', 'claude-4-sonnet'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 3.0,
+            output_per_million: 15.0,
+            cached_input_per_million: 0.3, // Estimated at 10% of input cost
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 64000,
+            extended_thinking: true,
+        },
+        class: 'reasoning',
+        score: 90, // High tier model
+        description:
+            'Claude Sonnet 4 - High intelligence and balanced performance with extended thinking',
     },
 
     //

@@ -793,7 +793,7 @@ export class ClaudeProvider implements ModelProvider {
                 case 'monologue':
                 case 'reasoning':
                 case 'code':
-                    if (model === 'claude-3-7-sonnet-latest') {
+                    if (['claude-3-7-sonnet-latest', 'claude-3-7-sonnet-20250219', 'claude-sonnet-4-20250514', 'claude-opus-4-20250514'].includes(model)) {
                         // Extended thinking
                         thinking = {
                             type: 'enabled',

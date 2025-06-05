@@ -125,10 +125,10 @@ export function cloneAgent(agent: Agent): AgentDefinition {
  * Agent class representing an LLM agent with tools
  */
 export class Agent implements AgentDefinition {
-    agent_id: string;
-    name: string;
-    description: string;
-    instructions: string;
+    agent_id?: string;
+    name?: string;
+    description?: string;
+    instructions?: string;
     parent_id?: string;
     workers?: WorkerFunction[];
     tools?: ToolFunction[];
@@ -136,11 +136,11 @@ export class Agent implements AgentDefinition {
     modelClass?: ModelClassID;
     modelSettings?: ModelSettings;
     intelligence?: 'low' | 'standard' | 'high'; // Used to select the model
-    maxToolCalls: number;
+    maxToolCalls?: number;
     maxToolCallRoundsPerTurn?: number; // Maximum number of tool call rounds per turn
     verifier?: AgentDefinition;
-    maxVerificationAttempts: number;
-    args: any;
+    maxVerificationAttempts?: number;
+    args?: any;
     jsonSchema?: ResponseJSONSchema; // JSON schema for structured output
     historyThread?: ResponseInput | undefined;
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
