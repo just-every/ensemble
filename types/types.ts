@@ -720,8 +720,8 @@ export interface AgentDefinition {
     modelClass?: ModelClassID;
     modelSettings?: ModelSettings;
     intelligence?: 'low' | 'standard' | 'high'; // Used to select the model
-    maxToolCalls?: number;
-    maxToolCallRoundsPerTurn?: number; // Maximum number of tool call rounds per turn
+    maxToolCalls?: number; // Maximum total number of tool calls allowed (default: 200)
+    maxToolCallRoundsPerTurn?: number; // Maximum number of sequential tool call rounds per turn. Each round can have multiple parallel tool calls. Default: Infinity (no limit)
     verifier?: AgentDefinition;
     maxVerificationAttempts?: number;
     args?: any;

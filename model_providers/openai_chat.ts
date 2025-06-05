@@ -724,10 +724,11 @@ export class OpenAIChat implements ModelProvider {
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
         // Get tools asynchronously (getTools now returns a Promise)
-        const toolsPromise = agent ? agent.getTools() : Promise.resolve([]);
+        const { getToolsFromAgent } = await import('../utils/agent.js');
+        const toolsPromise = agent ? getToolsFromAgent(agent) : Promise.resolve([]);
         const tools = await toolsPromise;
         const settings: ModelSettings | undefined = agent?.modelSettings;
-        let requestId: string;
+        let requestId: string | undefined;
 
         try {
             // --- Prepare Request ---

@@ -579,3 +579,21 @@ async function runAgentTool(
         return `Error in ${agent.name}: ${error}`;
     }
 }
+
+/**
+ * Helper function to safely get tools from an agent or agent definition
+ * Handles both Agent instances (with getTools method) and plain AgentDefinition objects
+ * 
+ * @param agent The agent or agent definition to get tools from
+ * @returns Promise resolving to an array of tools
+ */
+export async function getToolsFromAgent(agent: AgentDefinition | Agent): Promise<ToolFunction[]> {
+    // Check if it's an Agent instance with getTools method
+    if (agent && typeof (agent as Agent).getTools === 'function') {
+        return await (agent as Agent).getTools();
+    }
+    
+    // Otherwise, it's a plain AgentDefinition object
+    // Return the tools array or empty array if not defined
+    return agent?.tools || [];
+}

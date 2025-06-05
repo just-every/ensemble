@@ -9,17 +9,10 @@ export {
     getModelFromClass,
     isProviderKeyValid,
     ModelProvider, // This is the extended interface from model_provider.ts
-    EmbedOpts,
 } from './model_providers/model_provider.js';
 
 // Export utility classes and types
-export { 
-    MessageHistory,
-    MessageHistoryOptions,
-    PinnableMessage,
-    ExtractedInfo,
-    MicroLogEntry 
-} from './utils/message_history.js';
+export * from './utils/message_history.js';
 
 // Export external model registration functions
 export {

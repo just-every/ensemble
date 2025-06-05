@@ -712,11 +712,12 @@ export class OpenAIProvider implements ModelProvider {
         model: string,
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
+        const { getToolsFromAgent } = await import('../utils/agent.js');
         const tools: ToolFunction[] | undefined = agent
-            ? await agent.getTools()
+            ? await getToolsFromAgent(agent)
             : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
-        let requestId: string;
+        let requestId: string | undefined;
 
         try {
             // Use a more compatible approach with reduce to build the array

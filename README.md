@@ -105,9 +105,31 @@ All providers emit standardized events:
 - `cost_update` - Token usage and cost tracking
 - `error` - Error handling
 
+### Agent Configuration
+
+Configure agent behavior with these optional properties:
+
+```typescript
+const agent = {
+    model: 'claude-3-sonnet',
+    maxToolCalls: 200,              // Maximum total tool calls (default: 200)
+    maxToolCallRoundsPerTurn: 5,    // Maximum sequential rounds of tool calls (default: Infinity)
+    tools: [...],                   // Available tools for the agent
+    modelSettings: {                // Provider-specific settings
+        temperature: 0.7,
+        max_tokens: 4096
+    }
+};
+```
+
+Key configuration options:
+- `maxToolCalls` - Limits the total number of tool calls across all rounds
+- `maxToolCallRoundsPerTurn` - Limits sequential rounds where each round can have multiple parallel tool calls
+- `modelSettings` - Provider-specific parameters like temperature, max_tokens, etc.
+
 ### Advanced Features
 
-- **Parallel Tool Execution** - Tools run concurrently by default
+- **Parallel Tool Execution** - Tools run concurrently by default within each round
 - **Sequential Mode** - Enforce one-at-a-time execution
 - **Timeout Handling** - Automatic timeout with background tracking
 - **Result Summarization** - Long outputs are intelligently summarized

@@ -749,8 +749,9 @@ export class GeminiProvider implements ModelProvider {
         model: string,
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
-        const tools: ToolFunction[] | undefined = agent.getTools
-            ? await agent.getTools()
+        const { getToolsFromAgent } = await import('../utils/agent.js');
+        const tools: ToolFunction[] | undefined = agent
+            ? await getToolsFromAgent(agent)
             : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
 

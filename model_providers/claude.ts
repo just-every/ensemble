@@ -778,11 +778,12 @@ export class ClaudeProvider implements ModelProvider {
         let totalCacheReadInputTokens = 0;
         let streamCompletedSuccessfully = false; // Flag to track successful stream completion
         let messageCompleteYielded = false; // Flag to track if message_complete was yielded
-        let requestId: string;
+        let requestId: string | undefined;
 
         try {
+            const { getToolsFromAgent } = await import('../utils/agent.js');
             const tools: ToolFunction[] | undefined = agent
-                ? await agent.getTools()
+                ? await getToolsFromAgent(agent)
                 : [];
             const settings: ModelSettings | undefined = agent?.modelSettings;
             const modelClass: ModelClassID | undefined = agent?.modelClass;

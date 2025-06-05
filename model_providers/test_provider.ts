@@ -199,7 +199,8 @@ export class TestProvider implements ModelProvider {
 
         // Simulate a tool call if configured
         if (this.config.simulateToolCall && agent) {
-            const currentTools = agent.getTools();
+            const { getToolsFromAgent } = await import('../utils/agent.js');
+            const currentTools = getToolsFromAgent(agent);
             if (currentTools) {
                 const toolArray = await currentTools;
                 if (toolArray.length > 0) {
