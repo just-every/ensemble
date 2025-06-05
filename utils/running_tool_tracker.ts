@@ -2,7 +2,6 @@
  * Running Tool Tracker - Manages and tracks active tool executions
  */
 
-import { ToolCall } from '../types/types.js';
 import { AgentDefinition } from '../types/types.js';
 
 export interface RunningTool {
@@ -75,7 +74,7 @@ export class RunningToolTracker {
     async completeRunningTool(
         id: string,
         result: string,
-        agent?: AgentDefinition
+        _agent?: AgentDefinition // eslint-disable-line @typescript-eslint/no-unused-vars
     ): Promise<void> {
         const tool = this.runningTools.get(id);
         if (!tool) return;
@@ -110,7 +109,7 @@ export class RunningToolTracker {
     async failRunningTool(
         id: string,
         error: string,
-        agent?: AgentDefinition
+        _agent?: AgentDefinition // eslint-disable-line @typescript-eslint/no-unused-vars
     ): Promise<void> {
         const tool = this.runningTools.get(id);
         if (!tool) return;

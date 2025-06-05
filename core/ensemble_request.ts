@@ -19,7 +19,6 @@ import {
     getModelProvider,
 } from '../model_providers/model_provider.js';
 import { MessageHistory } from '../utils/message_history.js';
-import { mapNamedToPositionalArgs } from '../utils/tool_parameter_utils.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 
@@ -148,7 +147,7 @@ async function processToolCalls(
     context?: RequestContext
 ): Promise<ToolCallResult[]> {
     // Process all tool calls in parallel
-    const toolCallPromises = toolCalls.map(async (toolCall) => {
+    const toolCallPromises = toolCalls.map(async toolCall => {
         // Apply tool handler lifecycle if available
         if (agent.onToolCall) {
             const action = await agent.onToolCall(toolCall);
@@ -182,7 +181,10 @@ async function processToolCalls(
             const rawResult = await handleToolCall(toolCall, tool, agent);
 
             // Process the result (summarization, truncation, etc.)
-            const processedResult = await processToolResult(toolCall, rawResult);
+            const processedResult = await processToolResult(
+                toolCall,
+                rawResult
+            );
 
             const toolCallResult: ToolCallResult = {
                 toolCall,
@@ -199,9 +201,10 @@ async function processToolCalls(
             return toolCallResult;
         } catch (error) {
             // Handle tool error
-            const errorOutput = error instanceof Error 
-                ? `Tool execution failed: ${error.message}` 
-                : `Tool execution failed: ${String(error)}`;
+            const errorOutput =
+                error instanceof Error
+                    ? `Tool execution failed: ${error.message}`
+                    : `Tool execution failed: ${String(error)}`;
 
             const toolCallResult: ToolCallResult = {
                 toolCall,
@@ -222,5 +225,7 @@ async function processToolCalls(
     const results = await Promise.all(toolCallPromises);
 
     // Filter out null results (skipped tools)
-    return results.filter((result): result is ToolCallResult => result !== null);
+    return results.filter(
+        (result): result is ToolCallResult => result !== null
+    );
 }

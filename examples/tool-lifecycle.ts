@@ -3,13 +3,13 @@
  * Demonstrates tool lifecycle callbacks (onToolCall, onToolResult, onToolError)
  */
 
-import { 
-    ensembleRequest, 
-    ToolFunction, 
+import {
+    ensembleRequest,
+    ToolFunction,
     ToolCall,
     ToolCallResult,
     ToolCallAction,
-    AgentDefinition 
+    AgentDefinition,
 } from '../index.js';
 
 // Define tools with various behaviors
@@ -23,16 +23,16 @@ const tools: ToolFunction[] = [
                 parameters: {
                     type: 'object',
                     properties: {
-                        input: { type: 'string' }
+                        input: { type: 'string' },
                     },
-                    required: ['input']
-                }
-            }
+                    required: ['input'],
+                },
+            },
         },
         function: async (input: string) => {
             await new Promise(resolve => setTimeout(resolve, 1000));
             return `Processed: ${input.toUpperCase()}`;
-        }
+        },
     },
     {
         definition: {
@@ -43,11 +43,11 @@ const tools: ToolFunction[] = [
                 parameters: {
                     type: 'object',
                     properties: {
-                        shouldFail: { type: 'boolean' }
+                        shouldFail: { type: 'boolean' },
                     },
-                    required: ['shouldFail']
-                }
-            }
+                    required: ['shouldFail'],
+                },
+            },
         },
         function: async (shouldFail: boolean) => {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -55,7 +55,7 @@ const tools: ToolFunction[] = [
                 throw new Error('Risky operation failed as requested');
             }
             return 'Risky operation succeeded';
-        }
+        },
     },
     {
         definition: {
@@ -66,15 +66,15 @@ const tools: ToolFunction[] = [
                 parameters: {
                     type: 'object',
                     properties: {
-                        data: { type: 'string' }
+                        data: { type: 'string' },
                     },
-                    required: ['data']
-                }
-            }
+                    required: ['data'],
+                },
+            },
         },
         function: async (data: string) => {
             return `Restricted operation processed: ${data}`;
-        }
+        },
     },
     {
         definition: {
@@ -85,14 +85,14 @@ const tools: ToolFunction[] = [
                 parameters: {
                     type: 'object',
                     properties: {},
-                    required: []
-                }
-            }
+                    required: [],
+                },
+            },
         },
         function: async () => {
             return 'This should halt everything';
-        }
-    }
+        },
+    },
 ];
 
 // Track lifecycle events
@@ -112,11 +112,13 @@ async function main() {
         model: 'o4-mini',
         agent_id: 'lifecycle-demo',
         tools,
-        
+
         // Called before each tool execution
         onToolCall: async (toolCall: ToolCall) => {
-            log(`📞 onToolCall: ${toolCall.function.name}(${toolCall.function.arguments})`);
-            
+            log(
+                `📞 onToolCall: ${toolCall.function.name}(${toolCall.function.arguments})`
+            );
+
             // Skip restricted operations containing "secret"
             if (toolCall.function.name === 'restricted_operation') {
                 const args = JSON.parse(toolCall.function.arguments);
@@ -125,34 +127,38 @@ async function main() {
                     return ToolCallAction.SKIP;
                 }
             }
-            
+
             // Halt on halt_everything
             if (toolCall.function.name === 'halt_everything') {
                 log('  🛑 HALTING: All tool execution will stop');
                 return ToolCallAction.HALT;
             }
-            
+
             log('  ✅ CONTINUE: Tool will execute');
             return ToolCallAction.CONTINUE;
         },
-        
+
         // Called after successful tool execution
         onToolResult: async (result: ToolCallResult) => {
-            log(`✅ onToolResult: ${result.toolCall.function.name} => ${result.output}`);
-            
+            log(
+                `✅ onToolResult: ${result.toolCall.function.name} => ${result.output}`
+            );
+
             // You could log to a database, send metrics, etc.
             if (result.output.length > 50) {
                 log('  📊 Note: Large output detected');
             }
         },
-        
+
         // Called when a tool fails
         onToolError: async (result: ToolCallResult) => {
-            log(`❌ onToolError: ${result.toolCall.function.name} => ${result.output}`);
-            
+            log(
+                `❌ onToolError: ${result.toolCall.function.name} => ${result.output}`
+            );
+
             // You could implement retry logic, alerting, etc.
             log('  🔄 Could implement retry logic here');
-        }
+        },
     };
 
     const messages = [
@@ -166,8 +172,8 @@ async function main() {
 4. Run restricted_operation with data "public info"
 5. Run restricted_operation with data "secret data"
 6. Run halt_everything
-7. Run safe_operation with input "this won't run"`
-        }
+7. Run safe_operation with input "this won't run"`,
+        },
     ];
 
     console.log('User:', messages[0].content);
@@ -180,36 +186,41 @@ async function main() {
                 case 'message_delta':
                     // Don't output during lifecycle demo to keep it clean
                     break;
-                    
+
                 case 'tool_done':
                     // Add spacing between tool rounds
                     console.log('');
                     break;
             }
         }
-        
+
         console.log('\n' + '='.repeat(60) + '\n');
         console.log('SUMMARY OF LIFECYCLE EVENTS:\n');
-        
+
         // Analyze the lifecycle log
         const skipped = lifecycleLog.filter(l => l.includes('SKIPPING')).length;
         const halted = lifecycleLog.filter(l => l.includes('HALTING')).length;
-        const errors = lifecycleLog.filter(l => l.includes('onToolError')).length;
-        const successes = lifecycleLog.filter(l => l.includes('onToolResult')).length;
-        
+        const errors = lifecycleLog.filter(l =>
+            l.includes('onToolError')
+        ).length;
+        const successes = lifecycleLog.filter(l =>
+            l.includes('onToolResult')
+        ).length;
+
         console.log(`📊 Lifecycle Statistics:`);
-        console.log(`   - Tool calls initiated: ${lifecycleLog.filter(l => l.includes('onToolCall')).length}`);
+        console.log(
+            `   - Tool calls initiated: ${lifecycleLog.filter(l => l.includes('onToolCall')).length}`
+        );
         console.log(`   - Successful executions: ${successes}`);
         console.log(`   - Failed executions: ${errors}`);
         console.log(`   - Skipped tools: ${skipped}`);
         console.log(`   - Execution halted: ${halted > 0 ? 'Yes' : 'No'}`);
-        
+
         console.log('\n📝 Key Observations:');
         console.log('   - Lifecycle callbacks provide fine-grained control');
         console.log('   - Tools can be skipped based on content');
         console.log('   - Execution can be halted mid-stream');
         console.log('   - Errors are handled gracefully');
-        
     } catch (error) {
         console.error('Error:', error);
     }

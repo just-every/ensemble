@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { SequentialQueue, runSequential } from '../utils/sequential_queue.js';
 
 describe('SequentialQueue', () => {
@@ -11,7 +11,8 @@ describe('SequentialQueue', () => {
     describe('runSequential', () => {
         it('should execute functions sequentially', async () => {
             const results: number[] = [];
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
 
             const fn1 = async () => {
                 await delay(50);
@@ -74,7 +75,8 @@ describe('SequentialQueue', () => {
 
         it('should run different agents in parallel', async () => {
             const results: string[] = [];
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
 
             const fn1 = async () => {
                 await delay(50);
@@ -111,7 +113,8 @@ describe('SequentialQueue', () => {
 
     describe('getQueueSize', () => {
         it('should return correct queue size', async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
 
             const fn1 = () => delay(100);
             const fn2 = () => delay(50);
@@ -130,7 +133,8 @@ describe('SequentialQueue', () => {
 
     describe('isProcessing', () => {
         it('should indicate when queue is processing', async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
 
             expect(queue.isProcessing('agent1')).toBe(false);
 
@@ -144,7 +148,8 @@ describe('SequentialQueue', () => {
 
     describe('clearQueue', () => {
         it('should clear pending items and reject them', async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
             const results: string[] = [];
 
             const fn1 = async () => {
@@ -180,7 +185,8 @@ describe('SequentialQueue', () => {
 
     describe('clearAll', () => {
         it('should clear all queues', async () => {
-            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            const delay = (ms: number) =>
+                new Promise(resolve => setTimeout(resolve, ms));
 
             // Add items to multiple queues
             const fn1 = async () => {
@@ -207,7 +213,7 @@ describe('SequentialQueue', () => {
             // The currently running functions should complete
             await expect(promise1).resolves.toBe('agent1-result');
             await expect(promise2).resolves.toBe('agent2-result');
-            
+
             // The queued function should be rejected
             await expect(promise3).rejects.toThrow('Queue cleared');
 

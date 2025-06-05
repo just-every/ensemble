@@ -18,32 +18,34 @@ const tools: ToolFunction[] = [
                     properties: {
                         location: {
                             type: 'string',
-                            description: 'City and state, e.g. San Francisco, CA'
+                            description:
+                                'City and state, e.g. San Francisco, CA',
                         },
                         unit: {
                             type: 'string',
                             enum: ['celsius', 'fahrenheit'],
-                            description: 'Temperature unit'
-                        }
+                            description: 'Temperature unit',
+                        },
                     },
-                    required: ['location']
-                }
-            }
+                    required: ['location'],
+                },
+            },
         },
         function: async (location: string, unit: string = 'fahrenheit') => {
             // Simulate weather API call
             const temp = Math.floor(Math.random() * 30) + 50;
             const conditions = ['sunny', 'cloudy', 'rainy', 'partly cloudy'];
-            const condition = conditions[Math.floor(Math.random() * conditions.length)];
-            
+            const condition =
+                conditions[Math.floor(Math.random() * conditions.length)];
+
             return JSON.stringify({
                 location,
                 temperature: temp,
                 unit,
                 condition,
-                humidity: Math.floor(Math.random() * 40) + 40
+                humidity: Math.floor(Math.random() * 40) + 40,
             });
-        }
+        },
     },
     {
         definition: {
@@ -56,12 +58,12 @@ const tools: ToolFunction[] = [
                     properties: {
                         expression: {
                             type: 'string',
-                            description: 'Mathematical expression to evaluate'
-                        }
+                            description: 'Mathematical expression to evaluate',
+                        },
                     },
-                    required: ['expression']
-                }
-            }
+                    required: ['expression'],
+                },
+            },
         },
         function: async (expression: string) => {
             try {
@@ -71,8 +73,8 @@ const tools: ToolFunction[] = [
             } catch (error) {
                 return `Error evaluating expression: ${error}`;
             }
-        }
-    }
+        },
+    },
 ];
 
 async function main() {
@@ -80,14 +82,15 @@ async function main() {
         {
             type: 'message' as const,
             role: 'user' as const,
-            content: 'What\'s the weather like in New York? Also, what\'s 25 * 4?'
-        }
+            content:
+                "What's the weather like in New York? Also, what's 25 * 4?",
+        },
     ];
 
     const agent = {
         model: 'o4-mini',
         agent_id: 'assistant',
-        tools
+        tools,
     };
 
     console.log('User:', messages[0].content);
@@ -99,14 +102,16 @@ async function main() {
                 case 'message_delta':
                     process.stdout.write(event.content);
                     break;
-                    
+
                 case 'tool_start':
                     console.log('\n\n🔧 Tool calls:');
                     event.tool_calls.forEach(call => {
-                        console.log(`  - ${call.function.name}(${call.function.arguments})`);
+                        console.log(
+                            `  - ${call.function.name}(${call.function.arguments})`
+                        );
                     });
                     break;
-                    
+
                 case 'tool_done':
                     if (event.results) {
                         console.log('\n📊 Tool results:');

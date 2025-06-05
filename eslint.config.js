@@ -28,7 +28,7 @@ export default [
             sourceType: 'module',
             parserOptions: {
                 project: [
-                    './tsconfig.json',
+                    './tsconfig.eslint.json',
                 ],
             },
         },

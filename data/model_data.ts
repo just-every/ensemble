@@ -938,7 +938,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
             max_output_tokens: 32000,
-            extended_thinking: true,
+            reasoning_output: true,
         },
         class: 'reasoning',
         score: 95, // Highest tier model
@@ -964,7 +964,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
             max_output_tokens: 64000,
-            extended_thinking: true,
+            reasoning_output: true,
         },
         class: 'reasoning',
         score: 90, // High tier model

@@ -25,8 +25,9 @@ describe('Tool Result Processor', () => {
 
     describe('createSummary', () => {
         it('should create a summary using LLM', async () => {
-            const mockEnsembleRequest = ensembleRequestModule.ensembleRequest as Mock;
-            
+            const mockEnsembleRequest =
+                ensembleRequestModule.ensembleRequest as Mock;
+
             // Mock the async generator
             mockEnsembleRequest.mockImplementation(async function* () {
                 yield { type: 'message_delta', content: 'This is a summary' };
@@ -59,7 +60,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should fallback to truncation on error', async () => {
-            const mockEnsembleRequest = ensembleRequestModule.ensembleRequest as Mock;
+            const mockEnsembleRequest =
+                ensembleRequestModule.ensembleRequest as Mock;
             mockEnsembleRequest.mockRejectedValue(new Error('LLM error'));
 
             const longContent = 'x'.repeat(2000);
@@ -69,7 +71,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should handle empty response from LLM', async () => {
-            const mockEnsembleRequest = ensembleRequestModule.ensembleRequest as Mock;
+            const mockEnsembleRequest =
+                ensembleRequestModule.ensembleRequest as Mock;
             mockEnsembleRequest.mockImplementation(async function* () {
                 // Empty response
             });
@@ -102,7 +105,7 @@ describe('Tool Result Processor', () => {
 
             expect(result).toBe(
                 'x'.repeat(1000) +
-                '\n\n[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]'
+                    '\n\n[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]'
             );
         });
 
@@ -113,7 +116,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should summarize long results for non-skip tools', async () => {
-            const mockEnsembleRequest = ensembleRequestModule.ensembleRequest as Mock;
+            const mockEnsembleRequest =
+                ensembleRequestModule.ensembleRequest as Mock;
             mockEnsembleRequest.mockImplementation(async function* () {
                 yield { type: 'message_delta', content: 'Summarized content' };
             });
@@ -137,7 +141,9 @@ describe('Tool Result Processor', () => {
             const content = 'x'.repeat(1500);
             const result = await processToolResult(listFilesCall, content);
 
-            expect(result).toBe('x'.repeat(1000) + '... Output truncated to 1000 characters');
+            expect(result).toBe(
+                'x'.repeat(1000) + '... Output truncated to 1000 characters'
+            );
         });
     });
 

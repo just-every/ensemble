@@ -90,7 +90,11 @@ export async function executeToolWithLifecycle(
         }
 
         // Mark as completed
-        await runningToolTracker.completeRunningTool(fnId, String(result), agent);
+        await runningToolTracker.completeRunningTool(
+            fnId,
+            String(result),
+            agent
+        );
 
         return String(result);
     } catch (error) {
@@ -211,7 +215,9 @@ export function prepareToolArguments(
                 // Skip empty optional parameters
                 if (
                     (value === undefined || value === '') &&
-                    !tool.definition.function.parameters.required?.includes(param)
+                    !tool.definition.function.parameters.required?.includes(
+                        param
+                    )
                 ) {
                     return undefined;
                 }
@@ -225,7 +231,9 @@ export function prepareToolArguments(
 
                 if (
                     error &&
-                    tool.definition.function.parameters.required?.includes(param)
+                    tool.definition.function.parameters.required?.includes(
+                        param
+                    )
                 ) {
                     throw new Error(
                         JSON.stringify({
@@ -242,7 +250,9 @@ export function prepareToolArguments(
                         })
                     );
                 } else if (error) {
-                    console.warn(`Parameter coercion warning for ${param}: ${error}`);
+                    console.warn(
+                        `Parameter coercion warning for ${param}: ${error}`
+                    );
                 }
 
                 return coercedValue;

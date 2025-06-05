@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-    RunningToolTracker,
-    RunningTool,
-    ToolCompletionEvent,
-} from '../utils/running_tool_tracker.js';
+import { RunningToolTracker } from '../utils/running_tool_tracker.js';
 
 describe('RunningToolTracker', () => {
     let tracker: RunningToolTracker;
@@ -126,7 +122,12 @@ describe('RunningToolTracker', () => {
 
     describe('abortRunningTool', () => {
         it('should abort a running tool', () => {
-            const tool = tracker.addRunningTool('test-id', 'testTool', 'testAgent', '{}');
+            const tool = tracker.addRunningTool(
+                'test-id',
+                'testTool',
+                'testAgent',
+                '{}'
+            );
             const abortSpy = vi.spyOn(tool.abortController!, 'abort');
 
             tracker.abortRunningTool('test-id');
@@ -148,9 +149,9 @@ describe('RunningToolTracker', () => {
     describe('waitForTool', () => {
         it('should wait for tool completion', async () => {
             tracker.addRunningTool('test-id', 'testTool', 'testAgent', '{}');
-            
+
             const waitPromise = tracker.waitForTool('test-id');
-            
+
             // Complete the tool
             tracker.markTimedOut('test-id');
             await tracker.completeRunningTool('test-id', 'result');
@@ -178,9 +179,19 @@ describe('RunningToolTracker', () => {
 
     describe('clear', () => {
         it('should clear all running tools and abort them', () => {
-            const tool1 = tracker.addRunningTool('id1', 'tool1', 'agent1', '{}');
-            const tool2 = tracker.addRunningTool('id2', 'tool2', 'agent2', '{}');
-            
+            const tool1 = tracker.addRunningTool(
+                'id1',
+                'tool1',
+                'agent1',
+                '{}'
+            );
+            const tool2 = tracker.addRunningTool(
+                'id2',
+                'tool2',
+                'agent2',
+                '{}'
+            );
+
             const abort1Spy = vi.spyOn(tool1.abortController!, 'abort');
             const abort2Spy = vi.spyOn(tool2.abortController!, 'abort');
 

@@ -42,10 +42,14 @@ describe('Tool Execution Manager', () => {
                     {
                         definition: {
                             type: 'function',
-                            function: { 
+                            function: {
                                 name: 'get_running_tools',
                                 description: 'Get running tools',
-                                parameters: { type: 'object', properties: {}, required: [] }
+                                parameters: {
+                                    type: 'object',
+                                    properties: {},
+                                    required: [],
+                                },
                             },
                         },
                         function: async () => 'result',
@@ -62,10 +66,14 @@ describe('Tool Execution Manager', () => {
                     {
                         definition: {
                             type: 'function',
-                            function: { 
+                            function: {
                                 name: 'other_tool',
                                 description: 'Other tool',
-                                parameters: { type: 'object', properties: {}, required: [] }
+                                parameters: {
+                                    type: 'object',
+                                    properties: {},
+                                    required: [],
+                                },
                             },
                         },
                         function: async () => 'result',
@@ -224,7 +232,11 @@ describe('Tool Execution Manager', () => {
                             function: {
                                 name: 'get_running_tools',
                                 description: 'Get running tools',
-                                parameters: { type: 'object', properties: {}, required: [] },
+                                parameters: {
+                                    type: 'object',
+                                    properties: {},
+                                    required: [],
+                                },
                             },
                         },
                         function: async () => 'result',
@@ -234,7 +246,7 @@ describe('Tool Execution Manager', () => {
 
             // Mock timeout to happen quickly
             vi.useFakeTimers();
-            
+
             const resultPromise = handleToolCall(
                 mockToolCall,
                 slowTool,
@@ -245,9 +257,13 @@ describe('Tool Execution Manager', () => {
             vi.advanceTimersByTime(30001);
 
             const result = await resultPromise;
-            
-            expect(result).toBe('Tool test_tool is running in the background (RunningTool: test-id).');
-            expect(runningToolTracker.markTimedOut).toHaveBeenCalledWith('test-id');
+
+            expect(result).toBe(
+                'Tool test_tool is running in the background (RunningTool: test-id).'
+            );
+            expect(runningToolTracker.markTimedOut).toHaveBeenCalledWith(
+                'test-id'
+            );
 
             vi.useRealTimers();
         });
@@ -276,7 +292,11 @@ describe('Tool Execution Manager', () => {
                     function: {
                         name: 'wait_for_running_tool',
                         description: 'Wait for tool',
-                        parameters: { type: 'object', properties: {}, required: [] },
+                        parameters: {
+                            type: 'object',
+                            properties: {},
+                            required: [],
+                        },
                     },
                 },
                 function: vi.fn(async () => 'wait result'),
@@ -331,8 +351,10 @@ describe('Tool Execution Manager', () => {
         });
 
         it('should filter out unknown parameters', () => {
-            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            
+            const consoleSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
             const args = prepareToolArguments(
                 '{"param1": "value1", "param2": 42, "unknown": "value"}',
                 mockTool
@@ -352,14 +374,14 @@ describe('Tool Execution Manager', () => {
         });
 
         it('should handle invalid JSON', () => {
-            expect(() => prepareToolArguments('invalid json', mockTool)).toThrow(
-                'Invalid JSON in tool arguments'
-            );
+            expect(() =>
+                prepareToolArguments('invalid json', mockTool)
+            ).toThrow('Invalid JSON in tool arguments');
         });
 
         it('should handle positional arguments', () => {
             const args = prepareToolArguments('["value1", 42]', mockTool);
-            expect(args).toEqual([["value1", 42]]);
+            expect(args).toEqual([['value1', 42]]);
         });
     });
 });

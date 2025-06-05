@@ -18,10 +18,7 @@ export class SequentialQueue {
     /**
      * Execute a function sequentially for a given agent
      */
-    async runSequential<T>(
-        agentId: string,
-        fn: () => Promise<T>
-    ): Promise<T> {
+    async runSequential<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
         return new Promise((resolve, reject) => {
             // Get or create queue for this agent
             if (!this.queues.has(agentId)) {

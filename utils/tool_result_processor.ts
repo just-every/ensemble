@@ -19,7 +19,7 @@ export async function createSummary(
     try {
         // Lazy load to avoid circular dependency
         const { ensembleRequest } = await import('../core/ensemble_request.js');
-        
+
         // Use a small, fast model for summarization
         const messages: ResponseInput = [
             {
