@@ -3,11 +3,6 @@ name: Release
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - '.github/workflows/test.yml'
-      - 'examples/**'
-      - '**/*.test.ts'
-      - 'test/**'
 
 jobs:
   release:

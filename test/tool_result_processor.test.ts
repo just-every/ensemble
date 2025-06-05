@@ -52,7 +52,7 @@ describe('Tool Result Processor', () => {
                     },
                 ],
                 {
-                    model: 'gpt-4o-mini',
+                    model: 'o4-mini',
                     agent_id: 'summarizer',
                 }
             );
