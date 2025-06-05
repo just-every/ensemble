@@ -19,6 +19,15 @@ export const EXCLUDED_FROM_TIMEOUT_FUNCTIONS = new Set([
 ]);
 
 /**
+ * Tools that enable background status tracking for timeouts
+ */
+export const STATUS_TRACKING_TOOLS = new Set([
+    'get_running_tools',
+    'wait_for_running_tool',
+    'get_tool_status',
+]);
+
+/**
  * Maximum length for tool results before summarization
  */
 export const MAX_RESULT_LENGTH = 1000;
