@@ -169,15 +169,15 @@ describe('SequentialQueue', () => {
             };
 
             const promise1 = queue.runSequential('agent1', fn1);
-            const promise2 = queue.runSequential('agent1', fn2);
-            const promise3 = queue.runSequential('agent1', fn3);
+            const promise2 = queue.runSequential('agent1', fn2).catch(e => e);
+            const promise3 = queue.runSequential('agent1', fn3).catch(e => e);
 
             // Clear queue while fn1 is running
             setTimeout(() => queue.clearQueue('agent1'), 50);
 
             await expect(promise1).resolves.toBe('fn1');
-            await expect(promise2).rejects.toThrow('Queue cleared');
-            await expect(promise3).rejects.toThrow('Queue cleared');
+            await expect(promise2).resolves.toEqual(new Error('Queue cleared'));
+            await expect(promise3).resolves.toEqual(new Error('Queue cleared'));
 
             expect(results).toEqual(['fn1']);
         });
@@ -205,7 +205,7 @@ describe('SequentialQueue', () => {
 
             const promise1 = queue.runSequential('agent1', fn1);
             const promise2 = queue.runSequential('agent2', fn2);
-            const promise3 = queue.runSequential('agent1', fn3);
+            const promise3 = queue.runSequential('agent1', fn3).catch(e => e);
 
             // Clear all queues after a short delay
             setTimeout(() => queue.clearAll(), 50);
@@ -215,7 +215,7 @@ describe('SequentialQueue', () => {
             await expect(promise2).resolves.toBe('agent2-result');
 
             // The queued function should be rejected
-            await expect(promise3).rejects.toThrow('Queue cleared');
+            await expect(promise3).resolves.toEqual(new Error('Queue cleared'));
 
             // After clearing, new items should work
             const promise4 = queue.runSequential('agent1', () => 'test');
