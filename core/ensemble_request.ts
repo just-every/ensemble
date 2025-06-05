@@ -116,8 +116,9 @@ export async function* ensembleRequest(
             }
         }
         
-    } catch (error) {
+    } catch (err) {
         // Use unified error handler
+        const error = err as any;
         yield {
             type: 'error',
             error: error.message || 'Unknown error',

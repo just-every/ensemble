@@ -4,6 +4,9 @@ import {
     getModelProvider,
 } from '../model_providers/model_provider.js';
 
+const EMBEDDING_TTL_MS = 1000 * 60 * 60; // 1 hour
+const EMBEDDING_CACHE_MAX = 1000;
+
 // Cache to avoid repeated embedding calls for the same text
 const embeddingCache = new Map<
     string,
@@ -46,9 +49,12 @@ export async function ensembleEmbed(
     const cacheKey = `${agent.model || agent.modelClass}:${text}`;
 
     // Check if we have a cached embedding
-    if (embeddingCache.has(cacheKey)) {
-        const cached = embeddingCache.get(cacheKey)!;
-        return cached.embedding;
+    const cached = embeddingCache.get(cacheKey);
+    if (cached) {
+        if (Date.now() - cached.timestamp.getTime() < EMBEDDING_TTL_MS) {
+            return cached.embedding;
+        }
+        embeddingCache.delete(cacheKey);
     }
 
     // Determine which model to use
@@ -71,7 +77,11 @@ export async function ensembleEmbed(
         ? result[0]
         : (result as number[]);
 
-    // Cache the result
+    // Cache the result with simple LRU eviction
+    if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
+        const oldestKey = embeddingCache.keys().next().value;
+        if (oldestKey) embeddingCache.delete(oldestKey);
+    }
     embeddingCache.set(cacheKey, {
         embedding,
         timestamp: new Date(),
