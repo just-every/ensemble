@@ -8,6 +8,8 @@ import {
     ToolCall,
     ToolCallResult,
     AgentDefinition,
+    ResponseOutputMessage,
+    ResponseInputMessage,
 } from '../types/types.js';
 import {
     RequestContext,
@@ -277,12 +279,12 @@ async function* performVerification(
         
         const retryMessages: ResponseInput = [
             ...messages,
-            { type: 'message', role: 'assistant', content: output },
+            { type: 'message', role: 'assistant', content: output, status: 'completed' } as ResponseOutputMessage,
             { 
                 type: 'message', 
                 role: 'developer', 
                 content: `Verification failed: ${verification.reason}\n\nPlease correct your response.` 
-            }
+            } as ResponseInputMessage
         ];
         
         // Create a new agent for retry without verifier to avoid infinite recursion

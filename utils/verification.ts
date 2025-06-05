@@ -6,6 +6,8 @@ import {
     ResponseInput,
     AgentDefinition,
     ResponseJSONSchema,
+    ResponseOutputMessage,
+    ResponseInputMessage,
 } from '../types/types.js';
 import { ensembleRequest } from '../core/ensemble_request.js';
 import { convertStreamToMessages } from './stream_converter.js';
@@ -31,20 +33,24 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
 
     const verificationMessages: ResponseInput = [
         ...originalMessages,
-        { type: 'message', role: 'assistant', content: output },
-        { type: 'message', role: 'user', content: verificationPrompt },
+        { type: 'message', role: 'assistant', content: output, status: 'completed' } as ResponseOutputMessage,
+        { type: 'message', role: 'user', content: verificationPrompt } as ResponseInputMessage,
     ];
 
     // Create a verifier with JSON schema enforcement
     const verifierWithSchema: AgentDefinition = {
         ...verifier,
         jsonSchema: {
-            type: 'object',
-            properties: {
-                status: { type: 'string', enum: ['pass', 'fail'] },
-                reason: { type: 'string' },
+            type: 'json_schema',
+            name: 'verification_result',
+            schema: {
+                type: 'object',
+                properties: {
+                    status: { type: 'string', enum: ['pass', 'fail'] },
+                    reason: { type: 'string' },
+                },
+                required: ['status'],
             },
-            required: ['status'],
         } as ResponseJSONSchema,
     };
 
