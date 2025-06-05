@@ -2,12 +2,13 @@
  * Tool Result Processor - Handles summarization and truncation of tool results
  */
 
-import { ToolCall, ResponseInput } from '../types/types.js';
+import { ToolCall, ResponseInput, type AgentDefinition } from '../types/types.js';
 import {
     MAX_RESULT_LENGTH,
     SKIP_SUMMARIZATION_TOOLS,
     TOOL_CONFIGS,
 } from '../config/tool_execution.js';
+import type { Agent } from 'openai/_shims/node-types.mjs';
 
 /**
  * Create a summary of content using a small, fast model
@@ -34,9 +35,9 @@ export async function createSummary(
             },
         ];
 
-        const agent = {
-            model: 'o4-mini', // Fast, cheap model for summarization
-            agent_id: 'summarizer',
+        const agent: AgentDefinition = {
+            modelClass: 'summary',
+            name: 'SummaryAgent',
         };
 
         let summary = '';

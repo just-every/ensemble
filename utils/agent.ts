@@ -140,7 +140,6 @@ export class Agent implements AgentDefinition {
     maxToolCallRoundsPerTurn?: number; // Maximum number of tool call rounds per turn
     verifier?: AgentDefinition;
     maxVerificationAttempts?: number;
-    args?: any;
     jsonSchema?: ResponseJSONSchema; // JSON schema for structured output
     historyThread?: ResponseInput | undefined;
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)

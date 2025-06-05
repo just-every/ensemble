@@ -77,6 +77,23 @@ export {
 } from './utils/tool_result_processor.js';
 export * from './config/tool_execution.js';
 
+// Export verification utilities
+export {
+    verifyOutput,
+    VerificationResult,
+} from './utils/verification.js';
+
+// Export mergeHistoryThread utility
+export { mergeHistoryThread } from './core/ensemble_request.js';
+
+// Export Agent class and utilities
+export {
+    Agent,
+    cloneAgent,
+    getAgentSpecificTools,
+    agentToolCache,
+} from './utils/agent.js';
+
 // Re-export singleton instances
 import { costTracker as _costTracker } from './utils/cost_tracker.js';
 import { quotaTracker as _quotaTracker } from './utils/quota_tracker.js';

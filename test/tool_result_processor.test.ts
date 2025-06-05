@@ -53,8 +53,8 @@ describe('Tool Result Processor', () => {
                     },
                 ],
                 {
-                    model: 'o4-mini',
-                    agent_id: 'summarizer',
+                    modelClass: 'summary',
+                    name: 'SummaryAgent',
                 }
             );
         });
