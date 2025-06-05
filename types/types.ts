@@ -2,6 +2,8 @@
 // Types for the Ensemble package - Self-contained
 // ================================================================
 
+import type { ToolCallAction } from './tool_types.js';
+
 export type ToolParameterType =
     | 'string'
     | 'number'
@@ -17,7 +19,12 @@ export interface ToolParameter {
     type?: ToolParameterType;
     description?: string | (() => string);
     enum?: string[] | (() => Promise<string[]>);
-    items?: ToolParameter | { type: ToolParameterType; enum?: string[] | (() => Promise<string[]>) };
+    items?:
+        | ToolParameter
+        | {
+              type: ToolParameterType;
+              enum?: string[] | (() => Promise<string[]>);
+          };
     properties?: Record<string, ToolParameter>;
     required?: string[];
     optional?: boolean;
@@ -32,7 +39,9 @@ export interface ToolParameter {
     pattern?: string;
 }
 
-export type ExecutableFunction = (...args: unknown[]) => Promise<string> | string;
+export type ExecutableFunction = (
+    ...args: unknown[]
+) => Promise<string> | string;
 
 /**
  * Definition for a tool that can be used by an agent
@@ -61,37 +70,37 @@ export interface ToolDefinition {
 }
 
 export interface ResponseJSONSchema {
-  /**
-   * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
-   * and dashes, with a maximum length of 64.
-   */
-  name: string;
+    /**
+     * The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
+     * and dashes, with a maximum length of 64.
+     */
+    name: string;
 
-  /**
-   * The schema for the response format, described as a JSON Schema object. Learn how
-   * to build JSON schemas [here](https://json-schema.org/).
-   */
-  schema: Record<string, unknown>;
+    /**
+     * The schema for the response format, described as a JSON Schema object. Learn how
+     * to build JSON schemas [here](https://json-schema.org/).
+     */
+    schema: Record<string, unknown>;
 
-  /**
-   * The type of response format being defined. Always `json_schema`.
-   */
-  type: 'json_schema';
+    /**
+     * The type of response format being defined. Always `json_schema`.
+     */
+    type: 'json_schema';
 
-  /**
-   * A description of what the response format is for, used by the model to determine
-   * how to respond in the format.
-   */
-  description?: string;
+    /**
+     * A description of what the response format is for, used by the model to determine
+     * how to respond in the format.
+     */
+    description?: string;
 
-  /**
-   * Whether to enable strict schema adherence when generating the output. If set to
-   * true, the model will always follow the exact schema defined in the `schema`
-   * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
-   * learn more, read the
-   * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
-   */
-  strict?: boolean | null;
+    /**
+     * Whether to enable strict schema adherence when generating the output. If set to
+     * true, the model will always follow the exact schema defined in the `schema`
+     * field. Only a subset of JSON Schema is supported when `strict` is `true`. To
+     * learn more, read the
+     * [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
+     */
+    strict?: boolean | null;
 }
 
 /**
@@ -126,6 +135,17 @@ export interface ToolCall {
         name: string;
         arguments: string;
     };
+}
+
+/**
+ * Tool call data structure
+ */
+export interface ToolCallResult {
+    toolCall: ToolCall;
+    id: string;
+    call_id: string;
+    output: string;
+    error?: string;
 }
 
 export interface ResponseContentText {
@@ -288,7 +308,7 @@ export type StreamEventType =
 /**
  * Base streaming event interface
  */
-export interface StreamEvent {
+export interface StreamEventBase {
     type: StreamEventType;
     timestamp?: string; // Timestamp for the event, shared by all event types
 }
@@ -296,8 +316,8 @@ export interface StreamEvent {
 /**
  * Message streaming event
  */
-export interface MessageEventBase extends StreamEvent {
-    type: StreamEventType
+export interface MessageEventBase extends StreamEventBase {
+    type: StreamEventType;
     content: string;
     message_id: string; // Added message_id for tracking deltas and completes
     order?: number; // Optional order property for message sorting
@@ -315,7 +335,7 @@ export interface MessageEvent extends MessageEventBase {
 /**
  * Message streaming event
  */
-export interface FileEvent extends StreamEvent {
+export interface FileEvent extends StreamEventBase {
     type: 'file_start' | 'file_delta' | 'file_complete';
     message_id: string; // Added message_id for tracking deltas and completes
     mime_type?: string;
@@ -334,7 +354,7 @@ export interface TalkEvent extends MessageEventBase {
 /**
  * Tool call streaming event
  */
-export interface ToolEvent extends StreamEvent {
+export interface ToolEvent extends StreamEventBase {
     type: 'tool_start' | 'tool_delta' | 'tool_done';
     tool_calls: ToolCall[];
     results?: Array<{ call_id: string; output: string; error?: string }>;
@@ -343,7 +363,7 @@ export interface ToolEvent extends StreamEvent {
 /**
  * Error streaming event
  */
-export interface ErrorEvent extends StreamEvent {
+export interface ErrorEvent extends StreamEventBase {
     type: 'error';
     error: string;
 }
@@ -351,7 +371,7 @@ export interface ErrorEvent extends StreamEvent {
 /**
  * Cost update streaming event
  */
-export interface CostUpdateEvent extends StreamEvent {
+export interface CostUpdateEvent extends StreamEventBase {
     type: 'cost_update';
     usage: {
         input_tokens: number;
@@ -365,8 +385,8 @@ export interface CostUpdateEvent extends StreamEvent {
 /**
  * Union type for all ensemble streaming events
  */
-export type EnsembleStreamEvent =
-    | StreamEvent
+export type ProviderStreamEvent =
+    | StreamEventBase
     | MessageEvent
     | FileEvent
     | TalkEvent
@@ -379,10 +399,35 @@ export type EnsembleStreamEvent =
  */
 export interface ModelProvider {
     createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent>;
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent>;
+
+    /**
+     * Creates embeddings for text input
+     * @param modelId ID of the embedding model to use
+     * @param input Text to embed (string or array of strings)
+     * @param opts Optional parameters for embedding generation
+     * @returns Promise resolving to embedding vector(s)
+     */
+    createEmbedding?(
+        input: string | string[],
+        model: string,
+        opts?: EmbedOpts
+    ): Promise<number[] | number[][]>;
+
+    /**
+     * Generates images from text prompts
+     * @param prompt Text description of the image to generate
+     * @param opts Optional parameters for image generation
+     * @returns Promise resolving to generated image data
+     */
+    createImage?(
+        prompt: string,
+        model?: string,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]>;
 }
 
 /**
@@ -550,8 +595,16 @@ export interface EnsembleLogger {
         requestData: unknown,
         timestamp?: Date
     ): string;
-    log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void;
-    log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void;
+    log_llm_response(
+        requestId: string | undefined,
+        responseData: unknown,
+        timestamp?: Date
+    ): void;
+    log_llm_error(
+        requestId: string | undefined,
+        errorData: unknown,
+        timestamp?: Date
+    ): void;
 }
 
 // ================================================================
@@ -568,7 +621,6 @@ export interface ExtractBase64ImageResult {
     image_id: string | null; // ID of the first image found (for backwards compatibility)
     images: Record<string, string>; // Map of image IDs to their base64 data
 }
-
 
 // ================================================================
 // Embedding Types
@@ -601,74 +653,120 @@ export interface EmbedOpts {
 export interface ImageGenerationOpts {
     /** Number of images to generate (default: 1) */
     n?: number;
-    
+
     /** Size/aspect ratio of the generated image */
-    size?: 'square' | 'landscape' | 'portrait' | '1024x1024' | '1536x1024' | '1024x1536' | '1792x1024' | '1024x1792' | '512x512' | '256x256';
-    
+    size?:
+        | 'square'
+        | 'landscape'
+        | 'portrait'
+        | '1024x1024'
+        | '1536x1024'
+        | '1024x1536'
+        | '1792x1024'
+        | '1024x1792'
+        | '512x512'
+        | '256x256';
+
     /** Quality of the generated image */
     quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high';
-    
+
     /** Style of the generated image (OpenAI specific) */
     style?: 'vivid' | 'natural';
-    
+
     /** Response format */
     response_format?: 'url' | 'b64_json';
-    
-    /** Model to use for generation (if not specified, will be auto-selected) */
-    model?: string;
-    
+
     /** Source images for editing/variations (URLs or base64 data) */
     source_images?: string | string[];
-    
+
     /** Mask for inpainting (base64 data) - areas to edit should be transparent */
     mask?: string;
 }
 
+export type WorkerFunction = (...args: any[]) => AgentDefinition;
+
 /**
- * Result from image generation
+ * Definition-exportable version of the agent
  */
-export interface ImageGenerationResult {
-    /** Array of generated images (URLs or base64 data) */
-    images: string[];
-    
-    /** Model used for generation */
-    model: string;
-    
-    /** Usage/cost information */
-    usage?: {
-        prompt_tokens?: number;
-        total_cost?: number;
-    };
-}
-
-// ================================================================
-// Ensemble-specific interfaces
-// ================================================================
-
-export interface EnsembleAgent {
-    agent_id: string;
-    getTools(): Promise<ToolFunction[]>;
-    modelSettings?: ModelSettings;
-    modelClass?: ModelClassID;
+export interface AgentExportDefinition {
+    agent_id?: string;
+    name?: string;
+    parent_id?: string;
+    model?: string;
+    modelClass?: string;
+    cwd?: string; // Working directory for model providers that need a real shell context
 }
 
 /**
- * Options for making requests to LLM providers
+ * Definition of an agent with model and tool settings
  */
-export interface RequestOptions {
-    /** Agent ID for tracking */
-    agentId?: string;
-    /** Model-specific settings */
-    modelSettings?: ModelSettings;
-    /** Preferred model class */
-    modelClass?: ModelClassID;
-    /** Tools available to the model */
+export interface AgentDefinition {
+    agent_id?: string;
+    name?: string;
+    description?: string;
+    instructions?: string;
+    parent_id?: string;
+    workers?: WorkerFunction[];
     tools?: ToolFunction[];
-    /** Tool choice configuration */
-    toolChoice?: 'auto' | 'required' | 'none' | { type: 'function'; function: { name: string } };
-    /** Maximum number of tool call rounds (default: 10, set to 0 to disable tool execution) */
+    model?: string;
+    modelClass?: ModelClassID;
+    modelSettings?: ModelSettings;
+    intelligence?: 'low' | 'standard' | 'high'; // Used to select the model
     maxToolCalls?: number;
-    /** Handler for custom tool execution */
-    processToolCall?: (toolCalls: ToolCall[]) => Promise<any>;
+    maxToolCallRoundsPerTurn?: number; // Maximum number of tool call rounds per turn
+    verifier?: AgentDefinition;
+    maxVerificationAttempts?: number;
+    args?: any;
+    jsonSchema?: ResponseJSONSchema; // JSON schema for structured output
+    historyThread?: ResponseInput | undefined;
+    cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
+
+    /** Optional callback for processing tool calls */
+    getTools?: () => Promise<ToolFunction[]>;
+    onToolCall?: (toolCall: ToolCall) => Promise<ToolCallAction | void>;
+    processToolCall?: (toolCalls: ToolCall[]) => Promise<Record<string, any>>;
+    onToolResult?: (toolCallResult: ToolCallResult) => Promise<void>;
+    onToolError?: (toolCallResult: ToolCallResult) => Promise<void>;
+    onRequest?: (
+        agent: AgentDefinition, // Reverted back to AgentInterface
+        messages: ResponseInput
+    ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
+    onResponse?: (message: ResponseOutputMessage) => Promise<void>;
+    onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
+
+    params?: ToolParameterMap; // Map of parameter names to their definitions
+    processParams?: (
+        agent: AgentDefinition,
+        params: Record<string, any>
+    ) => Promise<{
+        prompt: string;
+        intelligence?: 'low' | 'standard' | 'high';
+    }>;
+
+    allowedEvents?: string[];
 }
 
+export interface ToolParameter {
+    type?: ToolParameterType;
+    description?: string | (() => string);
+    enum?: string[] | (() => Promise<string[]>);
+    items?:
+        | ToolParameter
+        | {
+              type: ToolParameterType;
+              enum?: string[] | (() => Promise<string[]>);
+          };
+    properties?: Record<string, ToolParameter>;
+    required?: string[];
+    optional?: boolean;
+    minItems?: number;
+    additionalProperties?: boolean;
+    default?: unknown;
+    minimum?: number;
+    maximum?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+}
+
+export type ToolParameterMap = Record<string, string | ToolParameter>;

@@ -19,11 +19,11 @@ import {
     ModelFeatures,
     ModelEntry,
     ModelUsage,
-    ModelClass
-} from './types.js';
+    ModelClass,
+} from '../types/types.js';
 
 // Import external model functions
-import { getExternalModel } from './external_models.js';
+import { getExternalModel } from '../utils/external_models.js';
 
 // Re-export for backward compatibility
 export type {
@@ -35,7 +35,7 @@ export type {
     ModelFeatures,
     ModelEntry,
     ModelUsage,
-    ModelClass
+    ModelClass,
 };
 
 // --- MODEL_CLASSES remains largely the same, but ensure model IDs match the registry ---
@@ -1234,7 +1234,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         description: 'Test model for unit testing purposes',
     },
-    
+
     // Image generation models
     {
         id: 'dall-e-3',
@@ -1247,7 +1247,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description: "OpenAI's DALL-E 3 model for high-quality image generation",
+        description:
+            "OpenAI's DALL-E 3 model for high-quality image generation",
     },
     {
         id: 'dall-e-2',
@@ -1260,7 +1261,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description: "OpenAI's DALL-E 2 model, supports image editing and variations",
+        description:
+            "OpenAI's DALL-E 2 model, supports image editing and variations",
     },
     {
         id: 'imagen-3.0-generate-002',
@@ -1274,7 +1276,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description: "Google's Imagen 3 model for high-quality image generation",
+        description:
+            "Google's Imagen 3 model for high-quality image generation",
     },
     {
         id: 'imagen-2',
@@ -1301,7 +1304,7 @@ export function findModel(modelId: string): ModelEntry | undefined {
     // First check external models
     const externalModel = getExternalModel(modelId);
     if (externalModel) return externalModel;
-    
+
     // Direct match on ID
     const directMatch = MODEL_REGISTRY.find(model => model.id === modelId);
     if (directMatch) return directMatch;

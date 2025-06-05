@@ -2,7 +2,7 @@
  * Test utilities for ensemble - Enhanced mocking and testing helpers
  */
 
-import { EnsembleStreamEvent, ToolCall } from '../types.js';
+import { ProviderStreamEvent, ToolCall } from '../types/types.js';
 import { vi } from 'vitest';
 
 export interface MockToolCall {
@@ -29,11 +29,11 @@ export interface MockStreamOptions {
 export class EnhancedRequestMock {
     private responses: MockResponse[];
     private callIndex = 0;
-    
+
     constructor(responses: MockResponse | MockResponse[]) {
         this.responses = Array.isArray(responses) ? responses : [responses];
     }
-    
+
     /**
      * Get a mock function that simulates the request behavior
      */
@@ -42,95 +42,102 @@ export class EnhancedRequestMock {
             return this.createAsyncGenerator(options);
         };
     }
-    
+
     /**
      * Create async generator that yields events
      */
-    private async *createAsyncGenerator(options?: MockStreamOptions): AsyncGenerator<EnsembleStreamEvent> {
+    private async *createAsyncGenerator(
+        options?: MockStreamOptions
+    ): AsyncGenerator<ProviderStreamEvent> {
         for (const response of this.responses) {
             // Handle delay
             if (response.delay) {
-                await new Promise(resolve => setTimeout(resolve, response.delay));
+                await new Promise(resolve =>
+                    setTimeout(resolve, response.delay)
+                );
             }
-            
+
             // Handle error
             if (response.error) {
-                const error = typeof response.error === 'string' 
-                    ? new Error(response.error) 
-                    : response.error;
+                const error =
+                    typeof response.error === 'string'
+                        ? new Error(response.error)
+                        : response.error;
                 yield {
                     type: 'error',
                     error: error.message,
-                    timestamp: new Date().toISOString()
-                } as EnsembleStreamEvent;
+                    timestamp: new Date().toISOString(),
+                } as ProviderStreamEvent;
                 return;
             }
-            
+
             // Stream thinking if provided
             if (response.thinking && options?.includeThinking) {
                 yield {
                     type: 'thinking_start',
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 } as any;
-                
+
                 // Stream thinking in chunks
                 const chunks = response.thinking.match(/.{1,10}/g) || [];
                 for (const chunk of chunks) {
                     yield {
                         type: 'thinking_delta',
                         delta: chunk,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                     } as any;
                 }
-                
+
                 yield {
                     type: 'thinking_complete',
                     content: response.thinking,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 } as any;
             }
-            
+
             // Stream message
             if (response.message) {
                 yield {
                     type: 'message_start',
-                    timestamp: new Date().toISOString()
-                } as EnsembleStreamEvent;
-                
+                    timestamp: new Date().toISOString(),
+                } as ProviderStreamEvent;
+
                 // Stream message in chunks
                 const chunks = response.message.match(/.{1,5}/g) || [];
                 for (const chunk of chunks) {
                     yield {
                         type: 'text_delta',
                         delta: chunk,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                     } as any;
                 }
-                
+
                 yield {
                     type: 'message_complete',
                     content: response.message,
-                    timestamp: new Date().toISOString()
-                } as EnsembleStreamEvent;
+                    timestamp: new Date().toISOString(),
+                } as ProviderStreamEvent;
             }
-            
+
             // Handle tool calls
             if (response.toolCalls && response.toolCalls.length > 0) {
-                const toolCallEvents: ToolCall[] = response.toolCalls.map((call, index) => ({
-                    id: `call_${Date.now()}_${index}`,
-                    type: 'function' as const,
-                    function: {
-                        name: call.name,
-                        arguments: JSON.stringify(call.arguments)
-                    }
-                }));
-                
+                const toolCallEvents: ToolCall[] = response.toolCalls.map(
+                    (call, index) => ({
+                        id: `call_${Date.now()}_${index}`,
+                        type: 'function' as const,
+                        function: {
+                            name: call.name,
+                            arguments: JSON.stringify(call.arguments),
+                        },
+                    })
+                );
+
                 yield {
                     type: 'tool_start',
                     tool_calls: toolCallEvents,
-                    timestamp: new Date().toISOString()
-                } as EnsembleStreamEvent;
-                
+                    timestamp: new Date().toISOString(),
+                } as ProviderStreamEvent;
+
                 // Notify callback if provided
                 if (options?.onToolCall) {
                     for (const call of toolCallEvents) {
@@ -139,49 +146,49 @@ export class EnhancedRequestMock {
                 }
             }
         }
-        
+
         // End stream
         yield {
             type: 'stream_end',
-            timestamp: new Date().toISOString()
-        } as EnsembleStreamEvent;
+            timestamp: new Date().toISOString(),
+        } as ProviderStreamEvent;
     }
-    
+
     // Chainable API for common patterns
     static success(message = 'Success', result = 'Task completed') {
         return new EnhancedRequestMock({
             message,
-            toolCalls: [{ name: 'task_complete', arguments: { result } }]
+            toolCalls: [{ name: 'task_complete', arguments: { result } }],
         });
     }
-    
+
     static error(message = 'Error occurred', error = 'Task failed') {
         return new EnhancedRequestMock({
             message,
-            toolCalls: [{ name: 'task_fatal_error', arguments: { error } }]
+            toolCalls: [{ name: 'task_fatal_error', arguments: { error } }],
         });
     }
-    
+
     static throws(error: Error | string) {
         return new EnhancedRequestMock({
-            error: typeof error === 'string' ? new Error(error) : error
+            error: typeof error === 'string' ? new Error(error) : error,
         });
     }
-    
+
     static thinking(thinking: string, message: string) {
         return new EnhancedRequestMock({
             thinking,
-            message
+            message,
         });
     }
-    
+
     static toolCalls(...calls: MockToolCall[]) {
         return new EnhancedRequestMock({
             message: '',
-            toolCalls: calls
+            toolCalls: calls,
         });
     }
-    
+
     static sequence(...responses: MockResponse[]) {
         return new EnhancedRequestMock(responses);
     }
@@ -200,37 +207,37 @@ export function createMockContext(overrides: Partial<any> = {}) {
         messages: [],
         isPaused: false,
         isHalted: false,
-        
-        halt: vi.fn(function() {
+
+        halt: vi.fn(function () {
             this.shouldContinue = false;
             this.isHalted = true;
         }),
-        
-        pause: vi.fn(function() {
+
+        pause: vi.fn(function () {
             this.isPaused = true;
         }),
-        
-        resume: vi.fn(function() {
+
+        resume: vi.fn(function () {
             this.isPaused = false;
         }),
-        
-        setMetadata: vi.fn(function(key: string, value: any) {
+
+        setMetadata: vi.fn(function (key: string, value: any) {
             this.metadata[key] = value;
         }),
-        
-        getMetadata: vi.fn(function(key: string) {
+
+        getMetadata: vi.fn(function (key: string) {
             return this.metadata[key];
         }),
-        
-        addMessage: vi.fn(function(message: any) {
+
+        addMessage: vi.fn(function (message: any) {
             this.messages.push(message);
         }),
-        
-        getHistory: vi.fn(function() {
+
+        getHistory: vi.fn(function () {
             return this.messages;
         }),
-        
-        ...overrides
+
+        ...overrides,
     };
 }
 
@@ -238,9 +245,9 @@ export function createMockContext(overrides: Partial<any> = {}) {
  * Assertion helpers for ensemble stream events
  */
 export class StreamAssertions {
-    private events: EnsembleStreamEvent[] = [];
-    
-    constructor(eventGenerator: AsyncGenerator<EnsembleStreamEvent>) {
+    private events: ProviderStreamEvent[] = [];
+
+    constructor(eventGenerator: AsyncGenerator<ProviderStreamEvent>) {
         // Collect all events
         (async () => {
             for await (const event of eventGenerator) {
@@ -248,7 +255,7 @@ export class StreamAssertions {
             }
         })();
     }
-    
+
     /**
      * Wait for events to be collected
      */
@@ -256,21 +263,21 @@ export class StreamAssertions {
         // Wait a bit for async collection
         await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
+
     /**
      * Assert a specific event type was emitted
      */
     hasEvent(type: string): boolean {
         return this.events.some(e => e.type === type);
     }
-    
+
     /**
      * Get all events of a specific type
      */
-    getEvents(type: string): EnsembleStreamEvent[] {
+    getEvents(type: string): ProviderStreamEvent[] {
         return this.events.filter(e => e.type === type);
     }
-    
+
     /**
      * Assert tool was called
      */
@@ -278,12 +285,14 @@ export class StreamAssertions {
         const toolEvents = this.getEvents('tool_start');
         return toolEvents.some(event => {
             if ('tool_calls' in event && event.tool_calls) {
-                return event.tool_calls.some(call => call.function.name === name);
+                return event.tool_calls.some(
+                    call => call.function.name === name
+                );
             }
             return false;
         });
     }
-    
+
     /**
      * Get final message content
      */
@@ -295,14 +304,14 @@ export class StreamAssertions {
         }
         return undefined;
     }
-    
+
     /**
      * Check if stream ended with error
      */
     hasError(): boolean {
         return this.hasEvent('error');
     }
-    
+
     /**
      * Get error message if any
      */

@@ -14,9 +14,9 @@ export class OpenRouterProvider extends OpenAIChat {
             process.env.OPENROUTER_API_KEY,
             'https://openrouter.ai/api/v1',
             {
-                'User-Agent': 'magi',
-                'HTTP-Referer': 'https://withmagi.com/',
-                'X-Title': 'magi',
+                'User-Agent': 'JustEvery_',
+                'HTTP-Referer': 'https://justevery.com/',
+                'X-Title': 'JustEvery_',
             },
             {
                 provider: {
@@ -27,7 +27,6 @@ export class OpenRouterProvider extends OpenAIChat {
             }
         );
     }
-
 }
 
 /**

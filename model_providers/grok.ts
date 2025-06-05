@@ -22,9 +22,9 @@ export class GrokProvider extends OpenAIChat {
             const index = requestParams.tools.findIndex(
                 t =>
                     (t.type === 'function' &&
-                    (t as any).function?.name === 'web_search') ||
+                        (t as any).function?.name === 'web_search') ||
                     (t.type === 'function' &&
-                    (t as any).function?.name === 'grok_web_search')
+                        (t as any).function?.name === 'grok_web_search')
             );
             if (index !== -1) {
                 requestParams.tools.splice(index, 1);
@@ -36,7 +36,6 @@ export class GrokProvider extends OpenAIChat {
         }
         return super.prepareParameters(requestParams);
     }
-
 }
 
 // Export an instance of the provider

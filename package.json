@@ -8,9 +8,7 @@
     "files": [
         "dist",
         "package.json",
-        "README.md",
-        "test.js",
-        "test.d.ts"
+        "README.md"
     ],
     "repository": {
         "type": "git",
@@ -40,10 +38,8 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "release": "./scripts/release.sh",
-        "release:patch": "./scripts/release.sh patch",
-        "release:minor": "./scripts/release.sh minor",
-        "release:major": "./scripts/release.sh major"
+        "lint": "eslint '**/*.{ts,tsx}'",
+        "lint:fix": "eslint '**/*.{ts,tsx}' --fix"
     },
     "exports": {
         ".": {
@@ -80,11 +76,16 @@
         "zod": "^3.25.42"
     },
     "devDependencies": {
+        "@eslint/js": "^8.56.0",
         "@types/node": "^22.14.0",
         "@vitest/coverage-v8": "^3.1.4",
         "rimraf": "^5.0.0",
-        "typescript": "^5.8.2",
-        "vitest": "^3.1.4"
+        "typescript": "^5.8.3",
+        "typescript-eslint": "^7.18.0",
+        "vitest": "^3.1.4",
+        "eslint": "^8.57.1",
+        "eslint-config-prettier": "^10.1.5",
+        "eslint-plugin-prettier": "^5.4.1"
     },
     "optionalDependencies": {
         "@rollup/rollup-linux-x64-gnu": "4.9.5"

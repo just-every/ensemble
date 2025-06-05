@@ -10,7 +10,7 @@ import {
     ModelUsage,
     TieredPrice,
     TimeBasedPrice,
-} from '../model_data.js';
+} from '../data/model_data.js';
 
 /**
  * Simplified cost tracker for the ensemble package

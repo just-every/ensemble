@@ -5,40 +5,25 @@
  * to get the appropriate provider implementation.
  */
 
-import { ModelProvider as BaseModelProvider, EmbedOpts, ImageGenerationOpts, ImageGenerationResult } from '../types.js';
+import {
+    ModelProvider as BaseModelProvider,
+    EmbedOpts,
+    AgentDefinition,
+} from '../types/types.js';
 
 // Re-export for backward compatibility
 export type { EmbedOpts };
 
 // Extend the base ModelProvider interface to add embedding and image generation support
-export interface ModelProvider extends BaseModelProvider {
-    /**
-     * Creates embeddings for text input
-     * @param modelId ID of the embedding model to use
-     * @param input Text to embed (string or array of strings)
-     * @param opts Optional parameters for embedding generation
-     * @returns Promise resolving to embedding vector(s)
-     */
-    createEmbedding?(
-        modelId: string,
-        input: string | string[],
-        opts?: EmbedOpts
-    ): Promise<number[] | number[][]>;
-    
-    /**
-     * Generates images from text prompts
-     * @param prompt Text description of the image to generate
-     * @param opts Optional parameters for image generation
-     * @returns Promise resolving to generated image data
-     */
-    generateImage?(
-        prompt: string,
-        opts?: ImageGenerationOpts
-    ): Promise<ImageGenerationResult>;
-}
+export interface ModelProvider extends BaseModelProvider {}
 
 // Import external model functions
-import { isExternalModel, getExternalModel, getExternalProvider, getModelClassOverride } from '../external_models.js';
+import {
+    isExternalModel,
+    getExternalModel,
+    getExternalProvider,
+    getModelClassOverride,
+} from '../utils/external_models.js';
 
 import { openaiProvider } from './openai.js';
 import { claudeProvider } from './claude.js';
@@ -47,7 +32,11 @@ import { grokProvider } from './grok.js';
 import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
-import { MODEL_CLASSES, ModelClassID, ModelProviderID } from '../model_data.js';
+import {
+    MODEL_CLASSES,
+    ModelClassID,
+    ModelProviderID,
+} from '../data/model_data.js';
 
 // Provider mapping by model prefix
 const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
@@ -58,15 +47,15 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     o4: openaiProvider,
     'text-': openaiProvider,
     'computer-use-preview': openaiProvider,
-    'dall-e': openaiProvider,  // Image generation models
-    'gpt-image': openaiProvider,  // GPT-Image-1 model
+    'dall-e': openaiProvider, // Image generation models
+    'gpt-image': openaiProvider, // GPT-Image-1 model
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
 
     // Gemini/Google models
     'gemini-': geminiProvider,
-    'imagen-': geminiProvider,  // Image generation models
+    'imagen-': geminiProvider, // Image generation models
 
     // Grok/X.AI models
     'grok-': grokProvider,
@@ -110,13 +99,14 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return !!process.env.OPENROUTER_API_KEY;
         case 'test':
             return true; // Test provider is always valid
-        default:
+        default: {
             // Check if it's an external provider
             const externalProvider = getExternalProvider(provider);
             if (externalProvider) {
                 return true; // External providers are assumed to be valid
             }
             return false;
+        }
     }
 }
 
@@ -131,7 +121,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
             return externalModel.provider;
         }
     }
-    
+
     if (
         model.startsWith('gpt-') ||
         model.startsWith('o1') ||
@@ -157,6 +147,16 @@ export function getProviderFromModel(model: string): ModelProviderID {
     return 'openrouter'; // Default to OpenRouter if no specific provider found
 }
 
+export async function getModelFromAgent(
+    agent: AgentDefinition,
+    defaultClass?: ModelClassID
+): Promise<string> {
+    return (
+        agent.model ||
+        (await getModelFromClass(agent.modelClass || defaultClass))
+    );
+}
+
 /**
  * Get a suitable model from a model class, with fallback
  */
@@ -179,20 +179,23 @@ export async function getModelFromClass(
     if (modelGroup in MODEL_CLASSES) {
         // Check for class override first
         const override = getModelClassOverride(modelGroup);
-        let modelClassConfig = MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES];
-        
+        let modelClassConfig =
+            MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES];
+
         // Apply override if it exists
         if (override) {
             modelClassConfig = {
                 ...modelClassConfig,
-                ...override
+                ...override,
             } as typeof modelClassConfig;
         }
-        
+
         let models = [...(override?.models || modelClassConfig.models)];
 
         // Only access the random property if it exists
-        const shouldRandomize = override?.random ?? ('random' in modelClassConfig && modelClassConfig.random);
+        const shouldRandomize =
+            override?.random ??
+            ('random' in modelClassConfig && modelClassConfig.random);
         if (shouldRandomize) {
             models = models.sort(() => Math.random() - 0.5);
         }
@@ -288,13 +291,15 @@ export function getModelProvider(model?: string): ModelProvider {
         if (isExternalModel(model)) {
             const externalModel = getExternalModel(model);
             if (externalModel) {
-                const externalProvider = getExternalProvider(externalModel.provider);
+                const externalProvider = getExternalProvider(
+                    externalModel.provider
+                );
                 if (externalProvider) {
                     return externalProvider;
                 }
             }
         }
-        
+
         for (const [prefix, provider] of Object.entries(MODEL_PROVIDER_MAP)) {
             if (
                 model.startsWith(prefix) &&

@@ -1,28 +1,18 @@
-import { ToolFunction } from '../types.js';
+import {
+    ToolFunction,
+    ToolParameter,
+    ToolParameterType,
+    ToolParameterMap,
+} from '../types/types.js';
 
-export type ToolParameterType = 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null';
-
-export interface ToolParameter {
-    type?: ToolParameterType;
-    description?: string | (() => string);
-    enum?: string[] | (() => Promise<string[]>);
-    items?: ToolParameter | { type: ToolParameterType; enum?: string[] | (() => Promise<string[]>) };
-    properties?: Record<string, ToolParameter>;
-    required?: string[];
-    optional?: boolean;
-    minItems?: number;
-    additionalProperties?: boolean;
-    default?: unknown;
-    minimum?: number;
-    maximum?: number;
-    minLength?: number;
-    maxLength?: number;
-    pattern?: string;
-}
-
-export type ToolParameterMap = Record<string, string | ToolParameter>;
-
-const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boolean', 'array', 'object', 'null'];
+const validToolParameterTypes: ToolParameterType[] = [
+    'string',
+    'number',
+    'boolean',
+    'array',
+    'object',
+    'null',
+];
 
 /**
  * Create a tool definition from a function
@@ -33,7 +23,7 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  * @param returns - Optional description of what the function returns
  * @param functionName - Optional custom function name (defaults to function.name)
  * @returns Tool definition object
- * 
+ *
  * @example
  * // Simple function with inferred parameters
  * const weatherTool = createToolFunction(
@@ -42,7 +32,7 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  *   },
  *   'Get current weather for a city'
  * );
- * 
+ *
  * @example
  * // Function with parameter descriptions
  * const searchTool = createToolFunction(
@@ -60,7 +50,7 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  *     }
  *   }
  * );
- * 
+ *
  * @example
  * // Function with enum parameters
  * const formatTool = createToolFunction(
@@ -77,7 +67,7 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  *     }
  *   }
  * );
- * 
+ *
  * @example
  * // Function with special parameters (inject_agent_id, abort_signal)
  * const agentTool = createToolFunction(
@@ -99,7 +89,11 @@ export function createToolFunction(
     functionName?: string
 ): ToolFunction {
     const funcStr = func.toString();
-    const funcName = (functionName || '').replaceAll(' ', '_') || func.name || 'anonymous_function';
+    const funcName = (functionName || '').replaceAll(' ', '_') || func.name;
+
+    if (!funcName) {
+        throw new Error('[createToolFunction] Function name is required');
+    }
 
     let toolDescription = description || `Tool for ${funcName}`;
     if (returns) {
@@ -110,7 +104,7 @@ export function createToolFunction(
     const cleanFuncStr = funcStr.replaceAll(/\n\s*/g, ' ');
     const paramMatch = cleanFuncStr.match(/\(([^)]*)\)/);
 
-    const properties: Record<string, any> = {};
+    const properties: Record<string, ToolParameter> = {};
     const required: string[] = [];
 
     let injectAgentId = false;
@@ -152,12 +146,12 @@ export function createToolFunction(
         // Handle special parameters
         if (cleanParamName === 'inject_agent_id') {
             injectAgentId = true;
-            continue;  // Skip adding to parameters
+            continue; // Skip adding to parameters
         }
 
         if (cleanParamName === 'abort_signal') {
             injectAbortSignal = true;
-            continue;  // Skip adding to parameters
+            continue; // Skip adding to parameters
         }
 
         // Check if we have custom mapping for this parameter
@@ -209,7 +203,8 @@ export function createToolFunction(
         }
 
         // Use description from paramInfo if available, otherwise default
-        const finalDescription = paramInfoDesc || `The ${cleanParamName} parameter`;
+        const finalDescription =
+            paramInfoDesc || `The ${cleanParamName} parameter`;
 
         // Create parameter definition
         const paramDef: any = {
@@ -245,9 +240,11 @@ export function createToolFunction(
                 // Check if it's an async function by looking at its constructor
                 const enumFn = paramInfoObj.enum;
                 const fnStr = enumFn.toString();
-                const isAsync = fnStr.includes('__awaiter') || fnStr.startsWith('async ') || 
-                               enumFn.constructor.name === 'AsyncFunction';
-                
+                const isAsync =
+                    fnStr.includes('__awaiter') ||
+                    fnStr.startsWith('async ') ||
+                    enumFn.constructor.name === 'AsyncFunction';
+
                 if (isAsync) {
                     // For async functions, pass the function through
                     // The provider will need to handle async enum resolution

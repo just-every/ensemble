@@ -9,16 +9,15 @@ import {
     ModelProvider,
     ToolFunction,
     ModelSettings,
-    EnsembleStreamEvent,
+    ProviderStreamEvent,
     ToolCall,
     ResponseInput,
-    EnsembleAgent,
+    AgentDefinition,
     ImageGenerationOpts,
-    ImageGenerationResult,
-} from '../types.js';
+} from '../types/types.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
-import { costTracker } from '../cost_tracker.js';
+import { costTracker } from '../index.js';
 import {
     log_llm_request,
     log_llm_response,
@@ -39,7 +38,6 @@ import type { ReasoningEffort } from 'openai/resources/shared.js';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
-
 
 /**
  * Citation tracking for footnotes
@@ -235,16 +233,16 @@ async function resolveAsyncEnums(params: any): Promise<any> {
     if (!params || typeof params !== 'object') {
         return params;
     }
-    
+
     const resolved = { ...params };
-    
+
     // Process properties recursively
     if (resolved.properties) {
         const resolvedProps: any = {};
         for (const [key, value] of Object.entries(resolved.properties)) {
             if (value && typeof value === 'object') {
                 const propCopy = { ...value } as any;
-                
+
                 // Check if enum is a function (async or sync)
                 if (typeof propCopy.enum === 'function') {
                     try {
@@ -261,7 +259,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                         delete propCopy.enum;
                     }
                 }
-                
+
                 // Recursively process nested properties
                 resolvedProps[key] = await resolveAsyncEnums(propCopy);
             } else {
@@ -270,7 +268,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
         }
         resolved.properties = resolvedProps;
     }
-    
+
     return resolved;
 }
 
@@ -281,31 +279,38 @@ async function convertToOpenAITools(
     requestParams: any,
     tools?: ToolFunction[] | undefined
 ): Promise<any> {
-    requestParams.tools = await Promise.all(tools.map(async (tool: ToolFunction) => {
-        if (tool.definition.function.name === 'openai_web_search' || tool.definition.function.name === 'web_search') {
-            delete requestParams.reasoning;
+    requestParams.tools = await Promise.all(
+        tools.map(async (tool: ToolFunction) => {
+            if (
+                tool.definition.function.name === 'openai_web_search' ||
+                tool.definition.function.name === 'web_search'
+            ) {
+                delete requestParams.reasoning;
+                return {
+                    type: 'web_search_preview',
+                    search_context_size: 'high',
+                };
+            }
+
+            // First resolve async enums, then process the schema
+            const resolvedParams = await resolveAsyncEnums(
+                tool.definition.function.parameters
+            );
+            const originalToolProperties = resolvedParams.properties;
+            const paramSchema = processSchemaForOpenAI(
+                resolvedParams,
+                originalToolProperties
+            );
+
             return {
-                type: 'web_search_preview',
-                search_context_size: 'high',
+                type: 'function',
+                name: tool.definition.function.name,
+                description: tool.definition.function.description,
+                parameters: paramSchema,
+                strict: true, // Keep strict mode enabled
             };
-        }
-
-        // First resolve async enums, then process the schema
-        const resolvedParams = await resolveAsyncEnums(tool.definition.function.parameters);
-        const originalToolProperties = resolvedParams.properties;
-        const paramSchema = processSchemaForOpenAI(
-            resolvedParams,
-            originalToolProperties
-        );
-
-        return {
-            type: 'function',
-            name: tool.definition.function.name,
-            description: tool.definition.function.description,
-            parameters: paramSchema,
-            strict: true, // Keep strict mode enabled
-        };
-    }));
+        })
+    );
     if (requestParams.model === 'computer-use-preview') {
         requestParams.tools.push({
             type: 'computer_use_preview',
@@ -434,14 +439,14 @@ export class OpenAIProvider implements ModelProvider {
      * @returns Promise resolving to embedding vector(s)
      */
     async createEmbedding(
-        modelId: string,
         input: string | string[],
+        model: string,
         opts?: { dimensions?: number; normalize?: boolean }
     ): Promise<number[] | number[][]> {
         try {
             // Prepare options
             const options: any = {
-                model: modelId,
+                model,
                 input: input,
                 encoding_format: 'float',
             };
@@ -449,7 +454,7 @@ export class OpenAIProvider implements ModelProvider {
             // Use 3072 dimensions to match our database schema with halfvec type
             options.dimensions = opts?.dimensions || 3072;
 
-            console.log(`[OpenAI] Generating embedding with model ${modelId}`);
+            console.log(`[OpenAI] Generating embedding with model ${model}`);
 
             // Call the OpenAI API
             const response = await this.client.embeddings.create(options);
@@ -465,7 +470,7 @@ export class OpenAIProvider implements ModelProvider {
                       ));
 
             costTracker.addUsage({
-                model: modelId,
+                model,
                 input_tokens: inputTokens,
                 output_tokens: 0, // No output tokens for embeddings
                 metadata: {
@@ -493,41 +498,52 @@ export class OpenAIProvider implements ModelProvider {
      *
      * @param prompt - The text description of the image to generate
      * @param opts - Optional parameters for image generation
-     * @returns A promise that resolves to ImageGenerationResult
+     * @returns A promise that resolves to
      */
-    async generateImage(
+    async createImage(
         prompt: string,
+        model?: string,
         opts?: ImageGenerationOpts
-    ): Promise<ImageGenerationResult> {
+    ): Promise<string[]> {
         try {
             // Extract options with defaults, mapping to the original function parameters
-            const model = opts?.model || 'gpt-image-1';
+            model = model || 'gpt-image-1';
             const number_of_images = opts?.n || 1;
-            
+
             // Map quality options
             let quality: 'low' | 'medium' | 'high' | 'auto' = 'auto';
             if (opts?.quality === 'standard') quality = 'medium';
             else if (opts?.quality === 'hd') quality = 'high';
-            else if (opts?.quality === 'low' || opts?.quality === 'medium' || opts?.quality === 'high') {
+            else if (
+                opts?.quality === 'low' ||
+                opts?.quality === 'medium' ||
+                opts?.quality === 'high'
+            ) {
                 quality = opts.quality;
             }
-            
+
             // Map size options
             let size: '1024x1024' | '1536x1024' | '1024x1536' | 'auto' = 'auto';
             if (opts?.size === 'square' || opts?.size === '1024x1024') {
                 size = '1024x1024';
-            } else if (opts?.size === 'landscape' || opts?.size === '1536x1024') {
+            } else if (
+                opts?.size === 'landscape' ||
+                opts?.size === '1536x1024'
+            ) {
                 size = '1536x1024';
-            } else if (opts?.size === 'portrait' || opts?.size === '1024x1536') {
+            } else if (
+                opts?.size === 'portrait' ||
+                opts?.size === '1024x1536'
+            ) {
                 size = '1024x1536';
             }
-            
+
             // Default background to 'auto'
             const background: 'transparent' | 'opaque' | 'auto' = 'auto';
-            
+
             // Get source images if provided
             const source_images = opts?.source_images;
-            
+
             console.log(
                 `[OpenAI] Generating ${number_of_images} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
@@ -595,7 +611,9 @@ export class OpenAIProvider implements ModelProvider {
                     maskFile = await toFile(
                         new Uint8Array(maskBinary),
                         'mask.png',
-                        { type: 'image/png' }
+                        {
+                            type: 'image/png',
+                        }
                     );
                 }
 
@@ -631,11 +649,9 @@ export class OpenAIProvider implements ModelProvider {
             }
 
             // Track usage for cost calculation
-            let totalCost = 0;
             if (response.data && response.data.length > 0) {
-                const perImageCost = this.getImageCost(model, quality, size);
-                totalCost = perImageCost * response.data.length;
-                
+                const perImageCost = this.getImageCost(model, quality);
+
                 costTracker.addUsage({
                     model,
                     image_count: response.data.length,
@@ -644,7 +660,7 @@ export class OpenAIProvider implements ModelProvider {
                         size,
                         cost_per_image: perImageCost,
                         is_edit: !!source_images,
-                    }
+                    },
                 });
             }
 
@@ -662,24 +678,17 @@ export class OpenAIProvider implements ModelProvider {
             }
 
             // Return standardized result
-            return {
-                images: imageDataUrls,
-                model,
-                usage: {
-                    prompt_tokens: Math.ceil(prompt.length / 4), // Rough estimate
-                    total_cost: totalCost,
-                }
-            };
+            return imageDataUrls;
         } catch (error) {
             console.error('[OpenAI] Error generating image:', error);
             throw error;
         }
     }
-    
+
     /**
      * Get the cost of generating an image based on model and parameters
      */
-    private getImageCost(model: string, quality: string, size: string): number {
+    private getImageCost(model: string, quality: string): number {
         // GPT Image 1 pricing
         if (model === 'gpt-image-1') {
             if (quality === 'high') {
@@ -690,7 +699,7 @@ export class OpenAIProvider implements ModelProvider {
                 return 0.02; // $0.020 per image for low quality
             }
         }
-        
+
         // Default/unknown pricing
         return 0.04;
     }
@@ -699,10 +708,10 @@ export class OpenAIProvider implements ModelProvider {
      * Create a streaming completion using OpenAI's API
      */
     async *createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent> {
         const tools: ToolFunction[] | undefined = agent
             ? await agent.getTools()
             : [];
@@ -1026,7 +1035,10 @@ export class OpenAIProvider implements ModelProvider {
             // Add tools if provided
             if (tools && tools.length > 0) {
                 // Convert our tools to OpenAI format
-                requestParams = await convertToOpenAITools(requestParams, tools);
+                requestParams = await convertToOpenAITools(
+                    requestParams,
+                    tools
+                );
             }
 
             // Log the request and save the requestId for later response logging
@@ -1051,7 +1063,7 @@ export class OpenAIProvider implements ModelProvider {
 
             const toolCallStates = new Map<string, ToolCall>();
 
-            const events: EnsembleStreamEvent[] = [];
+            const events: ProviderStreamEvent[] = [];
             try {
                 for await (const event of stream) {
                     events.push(event as any);
@@ -1212,7 +1224,7 @@ export class OpenAIProvider implements ModelProvider {
                                     content,
                                     message_id: itemId,
                                     order: position++,
-                                }) as EnsembleStreamEvent
+                                }) as ProviderStreamEvent
                         )) {
                             yield ev;
                         }
@@ -1247,7 +1259,10 @@ export class OpenAIProvider implements ModelProvider {
                             messagePositions.set(eventData.item_id, position);
                         } else {
                             // Log other types of annotations
-                            console.log('Annotation added:', eventData.annotation);
+                            console.log(
+                                'Annotation added:',
+                                eventData.annotation
+                            );
                         }
                     } else if (
                         event.type === 'response.output_text.done' &&
@@ -1515,7 +1530,7 @@ export class OpenAIProvider implements ModelProvider {
                             content,
                             message_id: id,
                             order: messagePositions.get(id) ?? 0,
-                        }) as EnsembleStreamEvent
+                        }) as ProviderStreamEvent
                 )) {
                     yield ev;
                 }
@@ -1536,7 +1551,6 @@ export class OpenAIProvider implements ModelProvider {
             };
         }
     }
-
 }
 
 // Export an instance of the provider

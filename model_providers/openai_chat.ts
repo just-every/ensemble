@@ -10,20 +10,20 @@ import {
     ModelProvider,
     ToolFunction,
     ModelSettings,
-    EnsembleStreamEvent,
+    ProviderStreamEvent,
     ToolCall,
     ResponseInput,
-    EnsembleAgent,
-} from '../types.js';
+    AgentDefinition,
+} from '../types/types.js';
 import OpenAI, { APIError } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
-import { costTracker } from '../cost_tracker.js';
+import { costTracker } from '../index.js';
 import {
     log_llm_error,
     log_llm_request,
     log_llm_response,
 } from '../utils/llm_logger.js';
-import { ModelProviderID } from '../model_data.js'; // Adjust path as needed
+import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
 import { extractBase64Image } from '../utils/image_utils.js';
 import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import {
@@ -110,16 +110,16 @@ async function resolveAsyncEnums(params: any): Promise<any> {
     if (!params || typeof params !== 'object') {
         return params;
     }
-    
+
     const resolved = { ...params };
-    
+
     // Process properties recursively
     if (resolved.properties) {
         const resolvedProps: any = {};
         for (const [key, value] of Object.entries(resolved.properties)) {
             if (value && typeof value === 'object') {
                 const propCopy = { ...value } as any;
-                
+
                 // Check if enum is a function (async or sync)
                 if (typeof propCopy.enum === 'function') {
                     try {
@@ -136,7 +136,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                         delete propCopy.enum;
                     }
                 }
-                
+
                 // Recursively process nested properties
                 resolvedProps[key] = await resolveAsyncEnums(propCopy);
             } else {
@@ -145,7 +145,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
         }
         resolved.properties = resolvedProps;
     }
-    
+
     return resolved;
 }
 
@@ -154,14 +154,18 @@ async function convertToOpenAITools(
     tools: ToolFunction[]
 ): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
     // Map tools and resolve async enums
-    return await Promise.all(tools.map(async (tool: ToolFunction) => ({
-        type: 'function' as const,
-        function: {
-            name: tool.definition.function.name,
-            description: tool.definition.function.description,
-            parameters: await resolveAsyncEnums(tool.definition.function.parameters),
-        },
-    })));
+    return await Promise.all(
+        tools.map(async (tool: ToolFunction) => ({
+            type: 'function' as const,
+            function: {
+                name: tool.definition.function.name,
+                description: tool.definition.function.description,
+                parameters: await resolveAsyncEnums(
+                    tool.definition.function.parameters
+                ),
+            },
+        }))
+    );
 }
 
 /** Maps internal message history format to OpenAI's format. */
@@ -400,7 +404,7 @@ async function mapMessagesToOpenAI(
 /** Type definition for the result of parsing simulated tool calls. */
 type SimulatedToolCallParseResult = {
     handled: boolean;
-    eventsToYield?: EnsembleStreamEvent[];
+    eventsToYield?: ProviderStreamEvent[];
     cleanedContent?: string; // Used if handled is false
 };
 
@@ -674,7 +678,7 @@ export class OpenAIChat implements ModelProvider {
                         CLEANUP_PLACEHOLDER
                     );
 
-                    const eventsToYield: EnsembleStreamEvent[] = [];
+                    const eventsToYield: ProviderStreamEvent[] = [];
                     if (textBeforeToolCall) {
                         eventsToYield.push({
                             type: 'message_complete', // Or 'message_delta' depending on your streaming logic
@@ -715,10 +719,10 @@ export class OpenAIChat implements ModelProvider {
 
     /** Creates a streaming response using OpenAI's chat.completions.create API. */
     async *createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent> {
         // Get tools asynchronously (getTools now returns a Promise)
         const toolsPromise = agent ? agent.getTools() : Promise.resolve([]);
         const tools = await toolsPromise;
@@ -822,7 +826,7 @@ export class OpenAIChat implements ModelProvider {
                                     content,
                                     message_id: messageId,
                                     order: messageIndex++,
-                                }) as EnsembleStreamEvent
+                                }) as ProviderStreamEvent
                         )) {
                             yield ev;
                         }
@@ -842,7 +846,7 @@ export class OpenAIChat implements ModelProvider {
                                     content,
                                     message_id: messageId,
                                     order: messageIndex++,
-                                }) as EnsembleStreamEvent
+                                }) as ProviderStreamEvent
                         )) {
                             yield ev;
                         }
@@ -1019,7 +1023,7 @@ export class OpenAIChat implements ModelProvider {
                             content,
                             message_id: id,
                             order: messageIndex++,
-                        }) as EnsembleStreamEvent
+                        }) as ProviderStreamEvent
                 )) {
                     yield ev;
                 }
@@ -1189,5 +1193,4 @@ export class OpenAIChat implements ModelProvider {
             };
         }
     }
-
 }

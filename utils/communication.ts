@@ -1,5 +1,5 @@
 // Global variable to track system pause state
-let isSystemPaused = false;
+const isSystemPaused = false;
 
 /**
  * Check if the system is currently paused
@@ -7,12 +7,4 @@ let isSystemPaused = false;
  */
 export function isPaused(): boolean {
     return isSystemPaused;
-}
-
-/**
- * Sleep for a specified number of milliseconds
- * Used for pause/resume functionality
- */
-export function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }

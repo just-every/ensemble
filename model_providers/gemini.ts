@@ -29,14 +29,13 @@ import {
     ModelProvider,
     ToolFunction,
     ModelSettings,
-    EnsembleStreamEvent,
+    ProviderStreamEvent,
     ToolCall, // Internal representation
     ResponseInput,
-    EnsembleAgent,
+    AgentDefinition,
     ImageGenerationOpts,
-    ImageGenerationResult,
-} from '../types.js';
-import { costTracker } from '../cost_tracker.js';
+} from '../types/types.js';
+import { costTracker } from '../index.js';
 import {
     log_llm_error,
     log_llm_request,
@@ -78,7 +77,7 @@ function convertParameterToGeminiFormat(param: any): any {
             break;
         case 'null':
             type = Type.STRING;
-            console.warn(`Mapping 'null' type to STRING`);
+            console.warn("Mapping 'null' type to STRING");
             break;
         default:
             console.warn(
@@ -96,7 +95,7 @@ function convertParameterToGeminiFormat(param: any): any {
             let itemType: string | undefined;
             let itemEnum: any;
             let itemProperties: any;
-            
+
             // Check if items has a type property (could be either format)
             if (typeof param.items === 'object') {
                 itemType = param.items.type;
@@ -106,13 +105,13 @@ function convertParameterToGeminiFormat(param: any): any {
                     itemProperties = param.items.properties;
                 }
             }
-            
+
             if (itemType === 'object' || itemProperties) {
                 // Gemini doesn't support object types in array items
                 // Convert to string array with description about JSON encoding
                 result.items = { type: Type.STRING };
                 result.description = `${result.description || 'Array parameter'} (Each item should be a JSON-encoded object)`;
-                
+
                 // Add information about the expected object structure if available
                 if (itemProperties) {
                     const propNames = Object.keys(itemProperties);
@@ -120,17 +119,25 @@ function convertParameterToGeminiFormat(param: any): any {
                 }
             } else if (itemType) {
                 // Simple type conversion
-                result.items = { 
-                    type: itemType === 'string' ? Type.STRING :
-                          itemType === 'number' ? Type.NUMBER :
-                          itemType === 'boolean' ? Type.BOOLEAN :
-                          itemType === 'null' ? Type.STRING : Type.STRING
+                result.items = {
+                    type:
+                        itemType === 'string'
+                            ? Type.STRING
+                            : itemType === 'number'
+                              ? Type.NUMBER
+                              : itemType === 'boolean'
+                                ? Type.BOOLEAN
+                                : itemType === 'null'
+                                  ? Type.STRING
+                                  : Type.STRING,
                 };
                 if (itemEnum) {
                     // Handle enum - could be array or function
                     if (typeof itemEnum === 'function') {
                         // For now, we can't handle async enum functions in Gemini
-                        console.warn('Gemini provider does not support async enum functions in array items');
+                        console.warn(
+                            'Gemini provider does not support async enum functions in array items'
+                        );
                     } else {
                         result.items.enum = itemEnum;
                     }
@@ -148,8 +155,11 @@ function convertParameterToGeminiFormat(param: any): any {
         if (param.properties && typeof param.properties === 'object') {
             // Recursively convert nested properties
             result.properties = {};
-            for (const [propName, propSchema] of Object.entries(param.properties)) {
-                result.properties[propName] = convertParameterToGeminiFormat(propSchema);
+            for (const [propName, propSchema] of Object.entries(
+                param.properties
+            )) {
+                result.properties[propName] =
+                    convertParameterToGeminiFormat(propSchema);
             }
         } else {
             // No properties specified, add empty object
@@ -159,7 +169,9 @@ function convertParameterToGeminiFormat(param: any): any {
         // Handle enum - could be array or function
         if (typeof param.enum === 'function') {
             // For now, we can't handle async enum functions in Gemini at conversion time
-            console.warn('Gemini provider does not support async enum functions. Enum will be omitted.');
+            console.warn(
+                'Gemini provider does not support async enum functions. Enum will be omitted.'
+            );
             // We could potentially call sync functions here, but that would break async functions
             // For safety, we'll skip enum entirely when it's a function
         } else {
@@ -178,16 +190,16 @@ async function resolveAsyncEnums(params: any): Promise<any> {
     if (!params || typeof params !== 'object') {
         return params;
     }
-    
+
     const resolved = { ...params };
-    
+
     // Process properties recursively
     if (resolved.properties) {
         const resolvedProps: any = {};
         for (const [key, value] of Object.entries(resolved.properties)) {
             if (value && typeof value === 'object') {
                 const propCopy = { ...value } as any;
-                
+
                 // Check if enum is a function (async or sync)
                 if (typeof propCopy.enum === 'function') {
                     try {
@@ -204,7 +216,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                         delete propCopy.enum;
                     }
                 }
-                
+
                 // Recursively process nested properties
                 resolvedProps[key] = await resolveAsyncEnums(propCopy);
             } else {
@@ -213,24 +225,29 @@ async function resolveAsyncEnums(params: any): Promise<any> {
         }
         resolved.properties = resolvedProps;
     }
-    
+
     return resolved;
 }
 
 async function convertToGeminiFunctionDeclarations(
     tools: ToolFunction[]
 ): Promise<FunctionDeclaration[]> {
-    const declarations = await Promise.all(tools
-        .map(async tool => {
+    const declarations = await Promise.all(
+        tools.map(async tool => {
             // Special handling for Google web search
-            if (tool.definition.function.name === 'google_web_search' || tool.definition.function.name === 'web_search') {
+            if (
+                tool.definition.function.name === 'google_web_search' ||
+                tool.definition.function.name === 'web_search'
+            ) {
                 console.log('[Gemini] Enabling Google Search grounding');
                 // Return null for this special tool - we'll handle it separately in the config
                 return null;
             }
 
             // First resolve async enums
-            const resolvedParams = await resolveAsyncEnums(tool.definition?.function?.parameters);
+            const resolvedParams = await resolveAsyncEnums(
+                tool.definition?.function?.parameters
+            );
             const toolParams = resolvedParams?.properties;
 
             const properties: Record<string, any> = {};
@@ -250,14 +267,13 @@ async function convertToGeminiFunctionDeclarations(
                 parameters: {
                     type: Type.OBJECT,
                     properties,
-                    required: Array.isArray(
-                        resolvedParams?.required
-                    )
+                    required: Array.isArray(resolvedParams?.required)
                         ? resolvedParams.required
                         : [],
                 },
             };
-        }));
+        })
+    );
     return declarations.filter(Boolean) as FunctionDeclaration[]; // Filter out null entries from special tools
 }
 
@@ -505,21 +521,21 @@ export class GeminiProvider implements ModelProvider {
 
     /**
      * Creates embeddings for text input using Gemini embedding models
-     * @param modelId ID of the embedding model to use (e.g., 'gemini/gemini-embedding-exp-03-07')
      * @param input Text to embed (string or array of strings)
+     * @param model ID of the embedding model to use (e.g., 'gemini/gemini-embedding-exp-03-07')
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
     async createEmbedding(
-        modelId: string,
         input: string | string[],
+        model: string,
         opts?: EmbedOpts
     ): Promise<number[] | number[][]> {
         try {
             // Handle 'gemini/' prefix if present
-            let actualModelId = modelId.startsWith('gemini/')
-                ? modelId.substring(7)
-                : modelId;
+            let actualModelId = model.startsWith('gemini/')
+                ? model.substring(7)
+                : model;
 
             // Check for suffix and remove it from actual model ID while setting thinking config
             let thinkingConfig: { thinkingBudget: number } | null = null;
@@ -619,7 +635,7 @@ export class GeminiProvider implements ModelProvider {
             }
 
             costTracker.addUsage({
-                model: modelId,
+                model: actualModelId,
                 input_tokens: estimatedTokens,
                 output_tokens: 0,
                 metadata: {
@@ -729,11 +745,11 @@ export class GeminiProvider implements ModelProvider {
     }
 
     async *createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
-        const tools: ToolFunction[] | undefined = agent
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent> {
+        const tools: ToolFunction[] | undefined = agent.getTools
             ? await agent.getTools()
             : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
@@ -860,7 +876,8 @@ export class GeminiProvider implements ModelProvider {
                 // Check for Google web search tool
                 hasGoogleWebSearch = tools.some(
                     tool =>
-                        tool.definition.function.name === 'google_web_search' || tool.definition.function.name === 'web_search'
+                        tool.definition.function.name === 'google_web_search' ||
+                        tool.definition.function.name === 'web_search'
                 );
 
                 // Configure standard function calling tools
@@ -1006,7 +1023,7 @@ export class GeminiProvider implements ModelProvider {
                                 content,
                                 message_id: messageId,
                                 order: eventOrder++,
-                            }) as EnsembleStreamEvent
+                            }) as ProviderStreamEvent
                     )) {
                         yield ev;
                     }
@@ -1065,7 +1082,7 @@ export class GeminiProvider implements ModelProvider {
                         content,
                         message_id: messageId,
                         order: eventOrder++,
-                    }) as EnsembleStreamEvent
+                    }) as ProviderStreamEvent
             )) {
                 yield ev;
             }
@@ -1161,15 +1178,16 @@ export class GeminiProvider implements ModelProvider {
      * @param opts Optional parameters for image generation
      * @returns Promise resolving to generated image data
      */
-    async generateImage(
+    async createImage(
         prompt: string,
+        model?: string,
         opts?: ImageGenerationOpts
-    ): Promise<ImageGenerationResult> {
+    ): Promise<string[]> {
         try {
             // Extract options with defaults
-            const model = opts?.model || 'imagen-3.0-generate-002';
+            model = model || 'imagen-3.0-generate-002';
             const numberOfImages = opts?.n || 1;
-            
+
             // Map quality to Imagen's aspectRatio if needed
             let aspectRatio = '1:1'; // square by default
             if (opts?.size === 'landscape') {
@@ -1177,7 +1195,7 @@ export class GeminiProvider implements ModelProvider {
             } else if (opts?.size === 'portrait') {
                 aspectRatio = '9:16';
             }
-            
+
             console.log(
                 `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
@@ -1196,9 +1214,11 @@ export class GeminiProvider implements ModelProvider {
 
             // Process the response
             const images: string[] = [];
-            let totalCost = 0;
-            
-            if (response.generatedImages && response.generatedImages.length > 0) {
+
+            if (
+                response.generatedImages &&
+                response.generatedImages.length > 0
+            ) {
                 for (const generatedImage of response.generatedImages) {
                     if (generatedImage.image?.imageBytes) {
                         // Convert to base64 data URL
@@ -1206,18 +1226,17 @@ export class GeminiProvider implements ModelProvider {
                         images.push(base64Image);
                     }
                 }
-                
+
                 // Calculate cost - Imagen pricing
                 const perImageCost = this.getImageCost(model);
-                totalCost = perImageCost * images.length;
-                
+
                 costTracker.addUsage({
                     model,
                     image_count: images.length,
                     metadata: {
                         aspect_ratio: aspectRatio,
                         cost_per_image: perImageCost,
-                    }
+                    },
                 });
             }
 
@@ -1226,20 +1245,13 @@ export class GeminiProvider implements ModelProvider {
             }
 
             // Return standardized result
-            return {
-                images,
-                model,
-                usage: {
-                    prompt_tokens: Math.ceil(prompt.length / 4), // Rough estimate
-                    total_cost: totalCost,
-                }
-            };
+            return images;
         } catch (error) {
             console.error('[Gemini] Error generating image:', error);
             throw error;
         }
     }
-    
+
     /**
      * Get the cost of generating an image with Imagen
      */
@@ -1250,11 +1262,10 @@ export class GeminiProvider implements ModelProvider {
         } else if (model.includes('imagen-2')) {
             return 0.02; // $0.020 per image for Imagen 2
         }
-        
+
         // Default pricing
         return 0.04;
     }
-
 }
 
 // Export an instance of the provider

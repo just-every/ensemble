@@ -230,7 +230,6 @@ export class DeepSeekProvider extends OpenAIChat {
         // Return the modified parameters
         return requestParams;
     }
-
 }
 
 // Export a singleton instance of the provider

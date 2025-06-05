@@ -88,23 +88,23 @@ import {
     ModelProvider,
     ToolFunction,
     ModelSettings,
-    EnsembleStreamEvent,
+    ProviderStreamEvent,
     ToolCall,
     ResponseInput,
     ResponseInputItem,
     ResponseInputMessage,
     ResponseThinkingMessage,
     ResponseOutputMessage,
-    EnsembleAgent,
-} from '../types.js';
-import { costTracker } from '../cost_tracker.js';
+    AgentDefinition,
+} from '../types/types.js';
+import { costTracker } from '../index.js';
 import {
     log_llm_error,
     log_llm_request,
     log_llm_response,
 } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/communication.js';
-import { ModelClassID } from '../model_data.js';
+import { ModelClassID } from '../data/model_data.js';
 import {
     extractBase64Image,
     resizeAndTruncateForClaude,
@@ -123,16 +123,16 @@ async function resolveAsyncEnums(params: any): Promise<any> {
     if (!params || typeof params !== 'object') {
         return params;
     }
-    
+
     const resolved = { ...params };
-    
+
     // Process properties recursively
     if (resolved.properties) {
         const resolvedProps: any = {};
         for (const [key, value] of Object.entries(resolved.properties)) {
             if (value && typeof value === 'object') {
                 const propCopy = { ...value } as any;
-                
+
                 // Check if enum is a function (async or sync)
                 if (typeof propCopy.enum === 'function') {
                     try {
@@ -149,7 +149,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                         delete propCopy.enum;
                     }
                 }
-                
+
                 // Recursively process nested properties
                 resolvedProps[key] = await resolveAsyncEnums(propCopy);
             } else {
@@ -158,30 +158,37 @@ async function resolveAsyncEnums(params: any): Promise<any> {
         }
         resolved.properties = resolvedProps;
     }
-    
+
     return resolved;
 }
 
 // Convert our tool definition to Claude's format
 async function convertToClaudeTools(tools: ToolFunction[]): Promise<any[]> {
-    return await Promise.all(tools.map(async tool => {
-        // Special handling for web search tool
-        if (tool.definition.function.name === 'claude_web_search' || tool.definition.function.name === 'web_search') {
-            return {
-                type: 'web_search_20250305',
-                name: 'web_search',
-            };
-        }
+    return await Promise.all(
+        tools.map(async tool => {
+            // Special handling for web search tool
+            if (
+                tool.definition.function.name === 'claude_web_search' ||
+                tool.definition.function.name === 'web_search'
+            ) {
+                return {
+                    type: 'web_search_20250305',
+                    name: 'web_search',
+                };
+            }
 
-        // Standard tool handling for other tools
-        return {
-            // Directly map the properties to the top level
-            name: tool.definition.function.name,
-            description: tool.definition.function.description,
-            // Resolve async enums and map 'parameters' to 'input_schema' for Claude
-            input_schema: await resolveAsyncEnums(tool.definition.function.parameters),
-        };
-    }));
+            // Standard tool handling for other tools
+            return {
+                // Directly map the properties to the top level
+                name: tool.definition.function.name,
+                description: tool.definition.function.description,
+                // Resolve async enums and map 'parameters' to 'input_schema' for Claude
+                input_schema: await resolveAsyncEnums(
+                    tool.definition.function.parameters
+                ),
+            };
+        })
+    );
 }
 
 // Assuming ResponseInputItem is your internal message structure type
@@ -760,10 +767,10 @@ export class ClaudeProvider implements ModelProvider {
      * Create a streaming completion using Claude's API
      */
     async *createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent> {
         // --- Usage Accumulators ---
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
@@ -893,7 +900,7 @@ export class ClaudeProvider implements ModelProvider {
             // Make the API call
             const stream = await this.client.messages.create(requestParams);
 
-            const events: EnsembleStreamEvent[] = [];
+            const events: ProviderStreamEvent[] = [];
             try {
                 // @ts-expect-error - Claude's stream is AsyncIterable but TypeScript might not recognize it properly
                 for await (const event of stream) {
@@ -975,7 +982,7 @@ export class ClaudeProvider implements ModelProvider {
                                         content,
                                         message_id: messageId,
                                         order: deltaPosition++,
-                                    }) as EnsembleStreamEvent
+                                    }) as ProviderStreamEvent
                             )) {
                                 yield ev;
                             }
@@ -1054,7 +1061,7 @@ export class ClaudeProvider implements ModelProvider {
                                         content,
                                         message_id: messageId,
                                         order: deltaPosition++,
-                                    }) as EnsembleStreamEvent
+                                    }) as ProviderStreamEvent
                             )) {
                                 yield ev;
                             }
@@ -1194,7 +1201,7 @@ export class ClaudeProvider implements ModelProvider {
                                     content,
                                     message_id: messageId,
                                     order: deltaPosition++,
-                                }) as EnsembleStreamEvent
+                                }) as ProviderStreamEvent
                         )) {
                             yield ev;
                         }
@@ -1257,7 +1264,7 @@ export class ClaudeProvider implements ModelProvider {
                                 content,
                                 message_id: messageId,
                                 order: deltaPosition++,
-                            }) as EnsembleStreamEvent
+                            }) as ProviderStreamEvent
                     )) {
                         yield ev;
                     }
@@ -1313,7 +1320,6 @@ export class ClaudeProvider implements ModelProvider {
             }
         }
     }
-
 }
 
 // Export an instance of the provider

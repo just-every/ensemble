@@ -18,7 +18,7 @@ export const CLAUDE_MAX_HEIGHT = 1120;
 export const GEMINI_MAX_WIDTH = 1024;
 export const GEMINI_MAX_HEIGHT = 1536;
 
-import { ExtractBase64ImageResult } from '../types.js';
+import { ExtractBase64ImageResult } from '../types/types.js';
 
 // Re-export for backward compatibility
 export type { ExtractBase64ImageResult };
@@ -75,36 +75,6 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
         image_id: firstImageId,
         images: images,
     };
-}
-
-/**
- * Create an image buffer from base64 data
- *
- * @param base64Data - Base64 encoded image data
- * @returns Buffer containing the image data
- */
-export async function createImageFromBase64(
-    base64Data: string
-): Promise<Buffer> {
-    // Remove data URL prefix if present
-    const base64Image = base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-    // Convert base64 to buffer
-    return Buffer.from(base64Image, 'base64');
-}
-
-/**
- * Convert an image buffer to base64 data URL format
- *
- * @param imageBuffer - Buffer containing the image data
- * @returns Base64 encoded data URL string in the format 'data:image/png;base64,...'
- */
-export function createBase64FromImage(imageBuffer: Buffer): string {
-    // Convert buffer to base64
-    const base64Image = imageBuffer.toString('base64');
-
-    // Return with data URL prefix
-    return `data:image/png;base64,${base64Image}`;
 }
 
 /**

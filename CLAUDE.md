@@ -2,75 +2,66 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Important Development Rules
-
-**ALWAYS run these commands before committing or pushing code:**
-1. `npm run build` - Ensure TypeScript compiles without errors
-2. `npm test` - Ensure all tests pass
-
-If either command fails, fix the issues before proceeding with commits.
-
 ## Commands
 
-### Development
-- `npm run build` - Compile TypeScript to JavaScript (REQUIRED before commit)
-- `npm run clean` - Remove dist directory
-- `npm test` - Run all tests once (REQUIRED before commit)
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:coverage` - Run tests with coverage report
+### Build and Development
+```bash
+npm run build         # Compile TypeScript to JavaScript (dist/)
+npm run clean         # Remove dist directory
+npm run prepare       # Auto-build on install
+```
 
 ### Testing
-- Run a single test file: `npm test test/filename.test.ts`
-- Run tests matching a pattern: `npm test -- -t "pattern"`
+```bash
+npm run test          # Run tests once with Vitest
+npm run test:watch    # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
+```
 
-### Release
-- `npm run release` - Interactive release (prompts for version)
-- `npm run release:patch` - Release patch version
-- `npm run release:minor` - Release minor version
-- `npm run release:major` - Release major version
+### Linting
+```bash
+npm run lint          # Check for lint errors in TypeScript files
+npm run lint:fix      # Auto-fix lint issues
+```
 
-## Architecture
+## Architecture Overview
 
-This is a TypeScript library that provides a unified interface for multiple LLM providers (Claude, OpenAI, Gemini, DeepSeek, Grok, OpenRouter).
+**@just-every/ensemble** is an LLM provider abstraction layer that provides a unified streaming interface for multiple AI providers (OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter).
 
-### Core Design Pattern
-The library uses a **provider abstraction pattern** where all LLM providers implement the `ModelProvider` interface. The main entry point `request()` function in `index.ts` automatically selects the appropriate provider based on the model name.
+### Core Components
 
-### Key Components
+1. **Provider System** (`/model_providers/`)
+   - All providers extend `BaseModelProvider` abstract class
+   - Each provider implements `request()`, `embed()`, and optionally `image()` methods
+   - Provider selection is automatic based on the model name
 
-1. **Model Providers** (`model_providers/`): Each provider implements the `ModelProvider` interface with:
-   - `supportsModel()`: Check if provider handles a specific model
-   - `createRequestGenerator()`: Return an AsyncGenerator for streaming responses
-   - Message format conversion (internal → provider-specific)
-   - Tool/function calling adaptation
-   - Image processing integration
+2. **Request Flow** (`/core/ensemble_request.ts`)
+   - Handles unified streaming for all providers
+   - Manages tool calling with automatic parameter mapping
+   - Uses `MessageHistory` for conversation management
+   - Supports recursive tool execution
 
-2. **Model Registry** (`model_data.ts`): 
-   - `MODEL_REGISTRY`: Maps model names to their configurations (provider, input/output costs)
-   - `MODEL_CLASSES`: Groups models by capability (standard, reasoning, code, vision)
-   - Model scoring system for automatic selection
+3. **Type System** (`/types/`)
+   - `types.ts`: Core types for agents, models, streams, and tools
+   - `api_types.ts`: Provider-specific API types
+   - `tool_types.ts`: Tool calling and function definitions
 
-3. **Streaming Architecture**: 
-   - Uses AsyncGenerators throughout for efficient streaming
-   - `EnsembleStreamEvent` types handle all streaming events uniformly
-   - Delta buffering for text accumulation
+4. **Model Registry** (`/data/model_data.ts`)
+   - Contains all supported models with pricing information
+   - Models are categorized by class (small, large, etc.)
+   - External models can be registered dynamically
 
-4. **Utilities** (`utils/`):
-   - `AsyncQueue`: Bridges callback APIs to async iteration
-   - `StreamConverter`: Converts stream events to conversation history
-   - `ImageUtils`: Handles image resizing and conversion
-   - `QuotaTracker`: Manages API rate limits
-   - `CostTracker`: Tracks token usage and costs
+### Key Patterns
 
-### Adding New Features
+- **Streaming Events**: All providers emit standardized events (`start`, `text`, `tool_use`, `finish`, etc.)
+- **Tool Calling**: Tools are defined with Zod schemas and automatically handle parameter mapping between providers
+- **Message History**: Automatic compaction and management of conversation history
+- **Cost Tracking**: Built-in tracking of token usage and API costs
+- **State Management**: Support for stateful requests with `StateManager`
 
-When adding a new provider:
-1. Create provider file in `model_providers/` implementing `ModelProvider`
-2. Add model entries to `MODEL_REGISTRY` in `model_data.ts`
-3. Update `getModelProvider()` in `model_providers/model_provider.ts`
-4. Add tests in `test/`
+### TypeScript Configuration
 
-When modifying streaming behavior:
-- The streaming pipeline flows through: Provider → AsyncGenerator → Delta Buffer → Client
-- All providers must emit standardized `EnsembleStreamEvent` types
-- Image handling is done through `ImageUtils` before sending to providers
+- ES modules with NodeNext module resolution
+- Strict mode is disabled (`"strict": false`)
+- Outputs to `./dist/` with source maps and declarations
+- All imports must use `.js` extension (even for `.ts` files)

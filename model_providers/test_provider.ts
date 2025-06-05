@@ -9,14 +9,14 @@
 import {
     ModelProvider,
     ResponseInput,
-    EnsembleStreamEvent,
+    ProviderStreamEvent,
     ToolCall,
     ResponseInputItem,
-    EnsembleAgent,
-} from '../types.js';
+    AgentDefinition,
+} from '../types/types.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
-import { costTracker } from '../cost_tracker.js';
+import { costTracker } from '../index.js';
 
 /**
  * Configuration for the test provider behavior
@@ -114,35 +114,13 @@ export class TestProvider implements ModelProvider {
     }
 
     /**
-     * Check if this provider supports a given model
-     */
-    supportsModel(modelId: string): boolean {
-        return modelId === 'test-model' || modelId.startsWith('test-');
-    }
-
-    /**
-     * Create a request generator for the given model
-     */
-    async *createRequestGenerator(
-        modelId: string,
-        requestBody: ResponseInput,
-        agentInput?: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
-        const agent = agentInput || {
-            agent_id: 'test',
-            async getTools() { return []; }
-        };
-        yield* this.createResponseStream(modelId, requestBody, agent);
-    }
-
-    /**
      * Simulates a streaming response from a model
      */
     async *createResponseStream(
-        model: string,
         messages: ResponseInput,
-        agent: EnsembleAgent
-    ): AsyncGenerator<EnsembleStreamEvent> {
+        model: string,
+        agent: AgentDefinition
+    ): AsyncGenerator<ProviderStreamEvent> {
         console.log(
             `[TestProvider] Creating response stream for model: ${model}`
         );
@@ -290,14 +268,16 @@ export class TestProvider implements ModelProvider {
         };
 
         // Emit usage/cost event
-        const outputTokenCount = this.config.tokenUsage?.outputTokens || Math.ceil(response.length / 4);
+        const outputTokenCount =
+            this.config.tokenUsage?.outputTokens ||
+            Math.ceil(response.length / 4);
         yield {
             type: 'cost_update',
             usage: {
                 input_tokens: inputTokenCount,
                 output_tokens: outputTokenCount,
-                total_tokens: inputTokenCount + outputTokenCount
-            }
+                total_tokens: inputTokenCount + outputTokenCount,
+            },
         };
 
         // Track token usage for cost calculation
@@ -324,7 +304,10 @@ export class TestProvider implements ModelProvider {
             lowercaseInput.includes('problem')
         ) {
             return "I understand you're experiencing an issue. Let me help troubleshoot the problem.";
-        } else if (lowercaseInput.includes('json') || lowercaseInput.includes('person')) {
+        } else if (
+            lowercaseInput.includes('json') ||
+            lowercaseInput.includes('person')
+        ) {
             return '{"name": "John Doe", "age": 30}';
         } else if (lowercaseInput.includes('test')) {
             return 'This is a test response. The test provider is working correctly!';
@@ -339,21 +322,21 @@ export class TestProvider implements ModelProvider {
 
     /**
      * Creates embeddings for text input (for testing embedding functionality)
-     * @param modelId ID of the embedding model to use
+     * @param model ID of the embedding model to use
      * @param input Text to embed (string or array of strings)
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
     async createEmbedding(
-        modelId: string,
         input: string | string[],
+        model: string,
         opts?: any
     ): Promise<number[] | number[][]> {
         // Simulate embedding generation with deterministic values based on input
         const generateVector = (text: string): number[] => {
             const dimension = opts?.dimension || 384; // Default dimension
             const vector = new Array(dimension);
-            
+
             // Generate deterministic values based on text content
             for (let i = 0; i < dimension; i++) {
                 // Use character codes and position to generate pseudo-random values
@@ -361,17 +344,16 @@ export class TestProvider implements ModelProvider {
                 const value = Math.sin(charCode * (i + 1) * 0.01) * 0.5 + 0.5;
                 vector[i] = value;
             }
-            
+
             return vector;
         };
-        
+
         if (Array.isArray(input)) {
             return input.map(text => generateVector(text));
         } else {
             return generateVector(input);
         }
     }
-
 }
 
 // Export an instance of the provider

@@ -4,7 +4,11 @@
  * This module tracks quota usage across different model providers and their free/paid tiers
  */
 
-import { ModelProviderID, ModelSpecificQuota, ProviderQuota } from '../types.js';
+import {
+    ModelProviderID,
+    ModelSpecificQuota,
+    ProviderQuota,
+} from '../types/types.js';
 
 // Re-export for backward compatibility
 export type { ModelSpecificQuota, ProviderQuota };
@@ -43,7 +47,7 @@ export type QuotaUpdateCallback = (quotaSummary: Record<string, any>) => void;
 export class QuotaTracker {
     // Main storage structure: provider -> model -> quota
     private quotas: Record<string, ProviderQuota> = {};
-    
+
     // Optional callback for quota updates (used for UI integration)
     private updateCallback?: QuotaUpdateCallback;
 
