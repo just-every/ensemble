@@ -11,6 +11,7 @@ import { coerceValue } from './tool_parameter_utils.js';
 import {
     FUNCTION_TIMEOUT_MS,
     EXCLUDED_FROM_TIMEOUT_FUNCTIONS,
+    STATUS_TRACKING_TOOLS,
 } from '../config/tool_execution.js';
 
 /**
@@ -28,14 +29,8 @@ export function timeoutPromise(ms: number): Promise<'TIMEOUT'> {
 export function agentHasStatusTracking(agent: AgentDefinition): boolean {
     if (!agent.tools) return false;
 
-    const statusTrackingTools = [
-        'get_running_tools',
-        'wait_for_running_tool',
-        'get_tool_status',
-    ];
-
     return agent.tools.some(tool =>
-        statusTrackingTools.includes(tool.definition.function.name)
+        STATUS_TRACKING_TOOLS.has(tool.definition.function.name)
     );
 }
 

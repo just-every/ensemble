@@ -188,6 +188,12 @@ export const EXCLUDED_FROM_TIMEOUT_FUNCTIONS = new Set([
     // Add your tools here
 ]);
 
+export const STATUS_TRACKING_TOOLS = new Set([
+    'get_running_tools',
+    'wait_for_running_tool',
+    'get_tool_status',
+]);
+
 export const SKIP_SUMMARIZATION_TOOLS = new Set([
     'read_source',
     'get_page_content',
@@ -333,7 +339,7 @@ const result3 = await runSequential('agent-2', async () => {
 
 ## Best Practices
 
-1. **Enable Status Tracking**: Include status tracking tools (`get_running_tools`, `wait_for_running_tool`) to enable timeout handling.
+1. **Enable Status Tracking**: Include any tool listed in `STATUS_TRACKING_TOOLS` to enable timeout handling.
 
 2. **Use Sequential Execution Carefully**: Only enable sequential execution when tools have dependencies or shared state.
 
