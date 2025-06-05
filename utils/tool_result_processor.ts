@@ -8,7 +8,6 @@ import {
     SKIP_SUMMARIZATION_TOOLS,
     TOOL_CONFIGS,
 } from '../config/tool_execution.js';
-import type { Agent } from 'openai/_shims/node-types.mjs';
 
 /**
  * Create a summary of content using a small, fast model
