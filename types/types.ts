@@ -148,6 +148,14 @@ export interface ToolCallResult {
     error?: string;
 }
 
+/**
+ * Handler interface for tool calls
+ */
+export interface ToolCallHandler {
+    onToolCall?: (toolCall: ToolCall) => void;
+    onToolResult?: (toolCall: ToolCall, result: string) => void;
+}
+
 export interface ResponseContentText {
     type: 'input_text';
     text: string;

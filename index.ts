@@ -50,6 +50,33 @@ export {
     createRequestContextWithState,
 } from './utils/state_manager.js';
 
+// Export new tool execution utilities
+export {
+    runningToolTracker,
+    RunningToolTracker,
+    RunningTool,
+    ToolCompletionEvent,
+} from './utils/running_tool_tracker.js';
+export {
+    sequentialQueue,
+    SequentialQueue,
+    runSequential,
+} from './utils/sequential_queue.js';
+export {
+    executeToolWithLifecycle,
+    handleToolCall,
+    timeoutPromise,
+    agentHasStatusTracking,
+    prepareToolArguments,
+} from './utils/tool_execution_manager.js';
+export {
+    createSummary,
+    processToolResult,
+    shouldSummarizeResult,
+    getTruncationMessage,
+} from './utils/tool_result_processor.js';
+export * from './config/tool_execution.js';
+
 // Re-export singleton instances
 import { costTracker as _costTracker } from './utils/cost_tracker.js';
 import { quotaTracker as _quotaTracker } from './utils/quota_tracker.js';

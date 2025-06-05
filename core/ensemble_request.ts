@@ -20,6 +20,8 @@ import {
 } from '../model_providers/model_provider.js';
 import { MessageHistory } from '../utils/message_history.js';
 import { mapNamedToPositionalArgs } from '../utils/tool_parameter_utils.js';
+import { handleToolCall } from '../utils/tool_execution_manager.js';
+import { processToolResult } from '../utils/tool_result_processor.js';
 
 /**
  * Unified request function that handles both standard and enhanced modes
@@ -145,98 +147,80 @@ async function processToolCalls(
     agent: AgentDefinition,
     context?: RequestContext
 ): Promise<ToolCallResult[]> {
-    const results: ToolCallResult[] = [];
-
-    for (const toolCall of toolCalls) {
+    // Process all tool calls in parallel
+    const toolCallPromises = toolCalls.map(async (toolCall) => {
         // Apply tool handler lifecycle if available
         if (agent.onToolCall) {
             const action = await agent.onToolCall(toolCall);
 
             if (action && action === ToolCallAction.SKIP) {
-                continue;
+                return null; // Skip this tool call
             }
 
             if (action === ToolCallAction.HALT && context) {
                 context.halt();
-                break;
+                return null; // Halt processing
             }
         }
 
         // Execute tool
         try {
-            let result: any;
-
-            if (agent.tools) {
-                // Standard tool execution
-                const tool = agent.tools.find(
-                    t => t.definition.function.name === toolCall.function.name
-                );
-                if (tool && 'function' in tool) {
-                    const args = JSON.parse(
-                        toolCall.function.arguments || '{}'
-                    );
-
-                    // Check if args is an object (named parameters from LLM)
-                    if (
-                        typeof args === 'object' &&
-                        args !== null &&
-                        !Array.isArray(args)
-                    ) {
-                        // Map named parameters to positional arguments
-                        const agent_id = agent.agent_id || 'ensemble';
-                        const positionalArgs = mapNamedToPositionalArgs(
-                            args,
-                            tool,
-                            agent_id,
-                            undefined // No abort signal in standard execution
-                        );
-                        result = await tool.function(...positionalArgs);
-                    } else {
-                        // Already positional or single argument
-                        result = await tool.function(args);
-                    }
-                }
+            if (!agent.tools) {
+                throw new Error('No tools available for agent');
             }
 
-            // Auto-stringify tool results with proper handling
-            let output: string;
-            if (typeof result === 'string') {
-                output = result;
-            } else if (result === undefined) {
-                output = 'undefined';
-            } else if (result === null) {
-                output = 'null';
-            } else if (typeof result === 'object') {
-                // Pretty-print objects for readability
-                output = JSON.stringify(result, null, 2);
-            } else {
-                output = String(result);
+            // Find the tool
+            const tool = agent.tools.find(
+                t => t.definition.function.name === toolCall.function.name
+            );
+
+            if (!tool || !('function' in tool)) {
+                throw new Error(`Tool ${toolCall.function.name} not found`);
             }
+
+            // Execute with enhanced lifecycle management
+            const rawResult = await handleToolCall(toolCall, tool, agent);
+
+            // Process the result (summarization, truncation, etc.)
+            const processedResult = await processToolResult(toolCall, rawResult);
 
             const toolCallResult: ToolCallResult = {
                 toolCall,
                 id: toolCall.id,
                 call_id: toolCall.call_id || toolCall.id,
-                output,
+                output: processedResult,
             };
+
+            // Call onToolResult callback
             if (agent.onToolResult) {
                 await agent.onToolResult(toolCallResult);
             }
-            results.push(toolCallResult);
+
+            return toolCallResult;
         } catch (error) {
             // Handle tool error
+            const errorOutput = error instanceof Error 
+                ? `Tool execution failed: ${error.message}` 
+                : `Tool execution failed: ${String(error)}`;
+
             const toolCallResult: ToolCallResult = {
                 toolCall,
                 id: toolCall.id,
                 call_id: toolCall.call_id || toolCall.id,
-                output: `Tool execution failed: ${error}`,
+                output: errorOutput,
             };
+
             if (agent.onToolError) {
                 await agent.onToolError(toolCallResult);
             }
-            results.push(toolCallResult);
-        }
-    }
 
-    return results;
+            return toolCallResult;
+        }
+    });
+
+    // Wait for all tool calls to complete
+    const results = await Promise.all(toolCallPromises);
+
+    // Filter out null results (skipped tools)
+    return results.filter((result): result is ToolCallResult => result !== null);
 }
