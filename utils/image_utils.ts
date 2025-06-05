@@ -6,7 +6,7 @@
 
 import { Buffer } from 'buffer';
 import sharp from 'sharp';
-import { randomUUID } from 'node:crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 // Constants for image processing
 export const MAX_IMAGE_HEIGHT = 2000;
@@ -54,7 +54,7 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
 
     // Replace all images with placeholders and collect them in the images map
     const replaceContent = content.replace(imgRegex, match => {
-        const id = randomUUID();
+        const id = uuidv4();
         // Remove any whitespace from the base64 data for clean storage
         images[id] = match.replace(/\s+/g, '');
         return `[image #${id}]`;

@@ -2,7 +2,7 @@
  * Tool Execution Manager - Handles tool execution with timeout, tracking, and lifecycle
  */
 
-import { randomUUID } from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { ToolCall, ToolFunction, AgentDefinition } from '../types/types.js';
 import { runningToolTracker } from './running_tool_tracker.js';
 import { runSequential } from './sequential_queue.js';
@@ -48,7 +48,7 @@ export async function executeToolWithLifecycle(
     agent: AgentDefinition,
     signal?: AbortSignal
 ): Promise<string> {
-    const fnId = toolCall.id || randomUUID();
+    const fnId = toolCall.id || uuidv4();
     const toolName = toolCall.function.name;
     const argsString = toolCall.function.arguments || '{}';
 
@@ -108,7 +108,7 @@ export async function handleToolCall(
     tool: ToolFunction,
     agent: AgentDefinition
 ): Promise<string> {
-    const fnId = toolCall.id || randomUUID();
+    const fnId = toolCall.id || uuidv4();
     const toolName = toolCall.function.name;
 
     // Create the execution function

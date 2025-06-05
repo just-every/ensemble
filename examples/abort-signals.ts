@@ -162,7 +162,7 @@ async function main() {
     ];
 
     const agent = {
-        model: 'o3-mini',
+        model: 'o4-mini',
         agent_id: 'abort-demo',
         tools,
         modelSettings: {

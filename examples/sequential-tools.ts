@@ -125,7 +125,7 @@ async function main() {
 
 async function runExample(messages: any[], sequential: boolean) {
     const agent = {
-        model: 'o3-mini',
+        model: 'o4-mini',
         agent_id: 'file-manager',
         tools,
         modelSettings: {

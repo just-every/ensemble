@@ -35,7 +35,7 @@ export async function createSummary(
         ];
 
         const agent = {
-            model: 'o3-mini', // Fast, cheap model for summarization
+            model: 'o4-mini', // Fast, cheap model for summarization
             agent_id: 'summarizer',
         };
 

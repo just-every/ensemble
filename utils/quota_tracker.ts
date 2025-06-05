@@ -17,7 +17,7 @@ export type { ModelSpecificQuota, ProviderQuota };
  * Helper for tracking OpenAI free daily usage quotas.
  *
  * - Up to 1 million tokens per day across: gpt-4.5-preview, gpt-4.1, gpt-4o, o1, o3
- * - Up to 10 million tokens per day across: gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o1-mini, o3-mini, o4-mini
+ * - Up to 10 million tokens per day across: gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o1-mini, o4-mini
  */
 interface OpenAIFreeQuota {
     // 1M tokens/day for main models
@@ -69,7 +69,6 @@ export class QuotaTracker {
             'gpt-4.1-nano',
             'gpt-4o-mini',
             'o1-mini',
-            'o3-mini',
             'o4-mini',
         ],
     };
