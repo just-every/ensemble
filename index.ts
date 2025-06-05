@@ -12,8 +12,14 @@ export {
     EmbedOpts,
 } from './model_providers/model_provider.js';
 
-// Export utility classes
-export { MessageHistory } from './utils/message_history.js';
+// Export utility classes and types
+export { 
+    MessageHistory,
+    MessageHistoryOptions,
+    PinnableMessage,
+    ExtractedInfo,
+    MicroLogEntry 
+} from './utils/message_history.js';
 
 // Export external model registration functions
 export {

@@ -13,7 +13,8 @@ A unified interface for interacting with multiple LLM providers (OpenAI, Anthrop
 - 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 - 🔌 **Multi-Provider Support** - OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter
 - 🖼️ **Multi-Modal** - Support for text, images, and embeddings
-- 📝 **Message History** - Automatic conversation management with compaction
+- 📝 **Automatic History Compaction** - Handle unlimited conversation length with intelligent summarization
+- 🤖 **Agent Framework** - Advanced agent capabilities with verification and tool management
 
 ## Installation
 

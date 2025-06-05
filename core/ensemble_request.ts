@@ -35,10 +35,15 @@ export async function* ensembleRequest(
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
     
-    // Use message history manager
+    // Get the model ID for context-aware compaction
+    const modelId = agent?.model || (await getModelFromAgent(agent));
+    
+    // Use message history manager with automatic compaction
     const history = new MessageHistory(conversationHistory, {
         compactToolCalls: true,
         preserveSystemMessages: true,
+        modelId: modelId,
+        compactionThreshold: 0.7, // Compact when reaching 70% of context
     });
 
     // Create context if using enhanced mode
@@ -218,7 +223,7 @@ async function executeRound(
 
     // Update message history
     if (messageContent.length > 0 || toolResults.length > 0) {
-        history.addAssistantResponse(messageContent, toolResults);
+        await history.addAssistantResponse(messageContent, toolResults);
     }
 
     // Update context if available
