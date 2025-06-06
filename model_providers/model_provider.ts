@@ -147,13 +147,57 @@ export function getProviderFromModel(model: string): ModelProviderID {
     return 'openrouter'; // Default to OpenRouter if no specific provider found
 }
 
+/**
+ * Filter models excluding specified models, with fallback to first excluded model if all are filtered out
+ */
+function filterModelsWithFallback(
+    models: string[],
+    excludeModels?: string[]
+): string[] {
+    if (!excludeModels || excludeModels.length === 0) {
+        return models;
+    }
+
+    const originalModels = [...models];
+    const filteredModels = models.filter(
+        model => !excludeModels.includes(model)
+    );
+
+    // If we ended up with no models after filtering, determine the next model in the cycle
+    if (filteredModels.length === 0) {
+        // Find the last used model from excludeModels that exists in originalModels
+        const lastUsedModel = [...excludeModels]
+            .reverse()
+            .find(excludedModel => originalModels.includes(excludedModel));
+
+        if (lastUsedModel) {
+            // Find the next model in the cycle
+            const lastUsedIndex = originalModels.indexOf(lastUsedModel);
+            const nextIndex = (lastUsedIndex + 1) % originalModels.length;
+            const nextModel = originalModels[nextIndex];
+            return [nextModel];
+        }
+
+        // If no valid last used model found, fall back to the first original model
+        if (originalModels.length > 0) {
+            return [originalModels[0]];
+        }
+    }
+
+    return filteredModels;
+}
+
 export async function getModelFromAgent(
     agent: AgentDefinition,
-    defaultClass?: ModelClassID
+    defaultClass?: ModelClassID,
+    excludeModels?: string[]
 ): Promise<string> {
     return (
         agent.model ||
-        (await getModelFromClass(agent.modelClass || defaultClass))
+        (await getModelFromClass(
+            agent.modelClass || defaultClass,
+            excludeModels
+        ))
     );
 }
 
@@ -161,7 +205,8 @@ export async function getModelFromAgent(
  * Get a suitable model from a model class, with fallback
  */
 export async function getModelFromClass(
-    modelClass?: ModelClassID
+    modelClass?: ModelClassID,
+    excludeModels?: string[]
 ): Promise<string> {
     // Simple quota tracker stub
     const { quotaTracker } = await import('../utils/quota_tracker.js');
@@ -191,6 +236,9 @@ export async function getModelFromClass(
         }
 
         let models = [...(override?.models || modelClassConfig.models)];
+
+        // Filter out excluded models if provided
+        models = filterModelsWithFallback(models, excludeModels);
 
         // Only access the random property if it exists
         const shouldRandomize =
@@ -232,8 +280,14 @@ export async function getModelFromClass(
     // If we couldn't find a valid model in the specified class, try the standard class
     if (modelGroup !== 'standard' && 'standard' in MODEL_CLASSES) {
         // Use type assertion to tell TypeScript that 'standard' is a valid key
-        const standardModels =
+        let standardModels =
             MODEL_CLASSES['standard' as keyof typeof MODEL_CLASSES].models;
+
+        // Filter out excluded models if provided
+        standardModels = filterModelsWithFallback(
+            standardModels,
+            excludeModels
+        );
 
         // First check for models with both API key and quota
         for (const model of standardModels) {

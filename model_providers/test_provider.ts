@@ -229,7 +229,7 @@ export class TestProvider implements ModelProvider {
                         // Emit tool call event
                         yield {
                             type: 'tool_start',
-                            tool_calls: [toolCall],
+                            tool_call: toolCall,
                         };
 
                         // Let the tool processing happen elsewhere - we don't emit a result

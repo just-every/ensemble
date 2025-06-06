@@ -134,7 +134,7 @@ export class EnhancedRequestMock {
 
                 yield {
                     type: 'tool_start',
-                    tool_calls: toolCallEvents,
+                    tool_call: toolCallEvents,
                     timestamp: new Date().toISOString(),
                 } as ProviderStreamEvent;
 
@@ -284,10 +284,8 @@ export class StreamAssertions {
     hasToolCall(name: string): boolean {
         const toolEvents = this.getEvents('tool_start');
         return toolEvents.some(event => {
-            if ('tool_calls' in event && event.tool_calls) {
-                return event.tool_calls.some(
-                    call => call.function.name === name
-                );
+            if ('tool_call' in event && event.tool_call) {
+                return event.tool_call.function.name === name;
             }
             return false;
         });

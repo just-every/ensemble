@@ -10,7 +10,6 @@ import {
     ResponseInputMessage,
 } from '../types/types.js';
 import { ensembleRequest } from '../core/ensemble_request.js';
-import { convertStreamToMessages } from './stream_converter.js';
 
 export interface VerificationResult {
     status: 'pass' | 'fail';
@@ -56,14 +55,16 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
 
     try {
         const stream = ensembleRequest(verificationMessages, verifierWithSchema);
-        const result = await convertStreamToMessages(
-            stream,
-            verificationMessages,
-            verifierWithSchema
-        );
+        let fullResponse = '';
+        
+        for await (const event of stream) {
+            if (event.type === 'message_complete' && 'content' in event) {
+                fullResponse = event.content;
+            }
+        }
 
         // Parse the JSON response
-        const jsonResponse = JSON.parse(result.fullResponse);
+        const jsonResponse = JSON.parse(fullResponse);
         return jsonResponse;
     } catch (error) {
         console.error('Verification failed:', error);

@@ -16,7 +16,6 @@ export interface MessageHistoryOptions {
     maxTokens?: number;
     preserveSystemMessages?: boolean;
     compactToolCalls?: boolean;
-    modelId?: string; // Model ID for context-aware compaction
     compactionThreshold?: number; // Percentage of context to trigger compaction (default 0.7)
 }
 
@@ -62,16 +61,15 @@ export class MessageHistory {
             maxTokens: options.maxTokens,
             preserveSystemMessages: options.preserveSystemMessages ?? true,
             compactToolCalls: options.compactToolCalls ?? true,
-            modelId: options.modelId,
             compactionThreshold: options.compactionThreshold ?? 0.7,
         };
-        
+
         // Pin the first system message by default
         const firstSystemMsg = this.messages.find(m => m.type === 'message' && m.role === 'system');
         if (firstSystemMsg) {
             (firstSystemMsg as PinnableMessage).pinned = true;
         }
-        
+
         this.updateTokenEstimate();
     }
 
@@ -81,37 +79,21 @@ export class MessageHistory {
     async add(message: ResponseInputItem | PinnableMessage): Promise<void> {
         const pinnableMsg = message as PinnableMessage;
         this.messages.push(pinnableMsg);
-        
+
         // Add to micro-log
         this.addToMicroLog(pinnableMsg);
-        
+
         // Extract information from message
         this.extractInformation(pinnableMsg);
-        
-        this.updateTokenEstimate();
-        this.trim();
-        await this.checkAndCompact();
-    }
 
-    /**
-     * Add multiple messages
-     */
-    async addMany(messages: ResponseInput): Promise<void> {
-        for (const msg of messages) {
-            const pinnableMsg = msg as PinnableMessage;
-            this.messages.push(pinnableMsg);
-            this.addToMicroLog(pinnableMsg);
-            this.extractInformation(pinnableMsg);
-        }
         this.updateTokenEstimate();
         this.trim();
-        await this.checkAndCompact();
     }
 
     /**
      * Add an assistant message with optional tool calls
      */
-    async addAssistantResponse(
+    /*async addAssistantResponse(
         content: string,
         toolCallResults?: ToolCallResult[]
     ): Promise<void> {
@@ -146,15 +128,16 @@ export class MessageHistory {
                 });
             }
         }
-    }
+    }*/
 
     /**
      * Get current messages
      */
-    getMessages(): ResponseInput {
+    async getMessages(model?: string): Promise<ResponseInput> {
+        await this.checkAndCompact(model);
         return [...this.messages];
     }
-    
+
     /**
      * Pin a message to prevent it from being compacted
      */
@@ -163,14 +146,14 @@ export class MessageHistory {
             this.messages[index].pinned = true;
         }
     }
-    
+
     /**
      * Get the micro-log of the conversation
      */
     getMicroLog(): MicroLogEntry[] {
         return [...this.microLog];
     }
-    
+
     /**
      * Get extracted information
      */
@@ -182,7 +165,7 @@ export class MessageHistory {
             tools: [...this.extractedInfo.tools],
         };
     }
-    
+
     /**
      * Add entry to micro-log
      */
@@ -203,7 +186,7 @@ export class MessageHistory {
             });
         }
     }
-    
+
     /**
      * Create a one-line summary for micro-log
      */
@@ -211,24 +194,24 @@ export class MessageHistory {
         // Extract first meaningful line or truncate
         const firstLine = content.split('\n')[0].trim();
         const maxLength = 80;
-        
+
         if (firstLine.length <= maxLength) {
             return firstLine;
         }
-        
+
         return firstLine.substring(0, maxLength - 3) + '...';
     }
-    
+
     /**
      * Extract key information from messages
      */
     private extractInformation(msg: PinnableMessage): void {
         if (msg.type === 'message') {
             const content = this.getMessageContent(msg);
-            
+
             // Extract entities (names, URLs, file paths, etc.)
             this.extractEntities(content);
-            
+
             // Extract decisions and todos
             if (msg.role === 'assistant') {
                 this.extractDecisions(content);
@@ -245,7 +228,7 @@ export class MessageHistory {
             }
         }
     }
-    
+
     /**
      * Extract entities from content
      */
@@ -254,12 +237,12 @@ export class MessageHistory {
         const filePathRegex = /(?:\/[\w.-]+)+(?:\.\w+)?/g;
         const filePaths = content.match(filePathRegex) || [];
         filePaths.forEach(path => this.extractedInfo.entities.add(path));
-        
+
         // Extract URLs
         const urlRegex = /https?:\/\/[^\s]+/g;
         const urls = content.match(urlRegex) || [];
         urls.forEach(url => this.extractedInfo.entities.add(url));
-        
+
         // Extract quoted strings (potential important terms)
         const quotedRegex = /["']([^"']+)["']/g;
         let match;
@@ -269,7 +252,7 @@ export class MessageHistory {
             }
         }
     }
-    
+
     /**
      * Extract decisions from assistant messages
      */
@@ -279,7 +262,7 @@ export class MessageHistory {
             /(?:Decided|Choosing|Selected) to ([^.!?]+)[.!?]/gi,
             /The (?:solution|approach|strategy) is to ([^.!?]+)[.!?]/gi,
         ];
-        
+
         for (const pattern of decisionPatterns) {
             pattern.lastIndex = 0; // Reset regex state
             let match;
@@ -291,7 +274,7 @@ export class MessageHistory {
             }
         }
     }
-    
+
     /**
      * Extract todos from content
      */
@@ -301,7 +284,7 @@ export class MessageHistory {
             /(?:Need to|Should|Must) ([^.!?]+)[.!?]/g,
             /(?:Next step|Then).*?(?:is to|will be) ([^.!?]+)[.!?]/g,
         ];
-        
+
         for (const pattern of todoPatterns) {
             let match;
             while ((match = pattern.exec(content)) !== null) {
@@ -312,14 +295,14 @@ export class MessageHistory {
             }
         }
     }
-    
+
     /**
      * Infer the purpose of a tool based on its name and arguments
      */
     private inferToolPurpose(toolName: string, args: string): string {
         try {
             const parsedArgs = JSON.parse(args);
-            
+
             // Common patterns
             if (toolName.includes('read') || toolName.includes('get')) {
                 return 'Information retrieval';
@@ -330,13 +313,13 @@ export class MessageHistory {
             } else if (toolName.includes('execute') || toolName.includes('run')) {
                 return 'Code execution';
             }
-            
+
             return 'General operation';
         } catch {
             return 'General operation';
         }
     }
-    
+
     /**
      * Get message content as string
      */
@@ -516,7 +499,7 @@ export class MessageHistory {
      */
     private estimateMessageTokens(msg: ResponseInputItem): number {
         let charCount = 0;
-        
+
         if (msg.type === 'message' && 'content' in msg) {
             if (typeof msg.content === 'string') {
                 charCount += msg.content.length;
@@ -533,7 +516,7 @@ export class MessageHistory {
         } else if (msg.type === 'function_call_output') {
             charCount += msg.output.length;
         }
-        
+
         // Rough estimation: 4 characters per token
         return Math.ceil(charCount / 4);
     }
@@ -551,15 +534,15 @@ export class MessageHistory {
     /**
      * Check if automatic compaction is needed based on model context
      */
-    private async checkAndCompact(): Promise<void> {
-        if (!this.options.modelId || this.options.compactionThreshold === 0) {
+    private async checkAndCompact(modelId?: string): Promise<void> {
+        if (!modelId || this.options.compactionThreshold === 0) {
             return;
         }
 
         // Get model context length
         const { findModel } = await import('../data/model_data.js');
-        const model = findModel(this.options.modelId);
-        
+        const model = findModel(modelId);
+
         if (!model || !model.features.context_length) {
             return;
         }
@@ -579,7 +562,7 @@ export class MessageHistory {
     private async performCompaction(contextLength: number): Promise<void> {
         await this.compactHistoryHybrid(contextLength);
     }
-    
+
     /**
      * New hybrid compaction approach
      */
@@ -587,27 +570,27 @@ export class MessageHistory {
         // 1. Separate pinned and unpinned messages
         const pinnedMessages = this.messages.filter(m => m.pinned);
         const unpinnedMessages = this.messages.filter(m => !m.pinned);
-        
+
         if (unpinnedMessages.length < 4) {
             // Not enough messages to compact
             return;
         }
-        
+
         // 2. Calculate token budget
         const targetTokens = contextLength * 0.7; // Target 70% usage after compaction
         let currentTokens = 0;
-        
+
         // Account for pinned messages
         for (const msg of pinnedMessages) {
             currentTokens += this.estimateMessageTokens(msg);
         }
-        
+
         // 3. Determine recent tail size (30% of remaining budget)
         const remainingBudget = targetTokens - currentTokens;
         const tailBudget = remainingBudget * 0.3;
         let tailTokens = 0;
         let tailStartIndex = unpinnedMessages.length;
-        
+
         // Work backwards to find tail messages
         for (let i = unpinnedMessages.length - 1; i >= 0; i--) {
             const msgTokens = this.estimateMessageTokens(unpinnedMessages[i]);
@@ -617,20 +600,20 @@ export class MessageHistory {
             }
             tailTokens += msgTokens;
         }
-        
+
         // Ensure we keep at least 2 recent messages
         tailStartIndex = Math.max(0, Math.min(tailStartIndex, unpinnedMessages.length - 2));
-        
+
         const messagesToCompact = unpinnedMessages.slice(0, tailStartIndex);
         const tailMessages = unpinnedMessages.slice(tailStartIndex);
-        
+
         if (messagesToCompact.length === 0) {
             return;
         }
-        
+
         // 4. Create hybrid summary
         const hybridSummary = await this.createHybridSummary(messagesToCompact);
-        
+
         // 5. Create summary message
         const summaryMessage: PinnableMessage = {
             type: 'message',
@@ -638,48 +621,48 @@ export class MessageHistory {
             content: hybridSummary,
             pinned: false,
         };
-        
+
         // 6. Reconstruct message history
         this.messages = [...pinnedMessages, summaryMessage, ...tailMessages];
-        
+
         // 7. Update micro-log to only include recent entries
         const recentTimestamp = tailMessages[0]?.timestamp || Date.now() - 3600000;
-        this.microLog = this.microLog.filter(entry => 
+        this.microLog = this.microLog.filter(entry =>
             (entry.timestamp || 0) >= recentTimestamp
         );
-        
+
         this.updateTokenEstimate();
-        
+
         console.log(`MessageHistory: Compacted ${messagesToCompact.length} messages using hybrid approach. New token estimate: ${this.estimatedTokens}`);
     }
-    
+
     /**
      * Create a hybrid summary combining micro-log and structured info
      */
     private async createHybridSummary(messages: PinnableMessage[]): Promise<string> {
         const sections: string[] = [];
-        
+
         // 1. Chronological micro-log section
         const microLogText = this.createMicroLogSection(messages);
         if (microLogText) {
             sections.push(`## Conversation Flow\n${microLogText}`);
         }
-        
+
         // 2. Structured information section
         const structuredInfo = this.createStructuredInfoSection();
         if (structuredInfo) {
             sections.push(`## Key Information\n${structuredInfo}`);
         }
-        
+
         // 3. If we have detailed content, use AI to create additional summary
         const detailedSummary = await this.createDetailedSummary(messages);
         if (detailedSummary) {
             sections.push(`## Detailed Summary\n${detailedSummary}`);
         }
-        
+
         return `[Previous Conversation Summary]\n\n${sections.join('\n\n')}`;
     }
-    
+
     /**
      * Create micro-log section for summary
      */
@@ -687,53 +670,53 @@ export class MessageHistory {
         // Get timestamps from messages to filter micro-log
         const startTime = messages[0]?.timestamp || 0;
         const endTime = messages[messages.length - 1]?.timestamp || Date.now();
-        
+
         const relevantLogs = this.microLog.filter(entry => {
             const timestamp = entry.timestamp || 0;
             return timestamp >= startTime && timestamp <= endTime;
         });
-        
+
         if (relevantLogs.length === 0) {
             return '';
         }
-        
+
         return relevantLogs
             .map(entry => `- ${entry.role}: ${entry.summary}`)
             .join('\n');
     }
-    
+
     /**
      * Create structured information section
      */
     private createStructuredInfoSection(): string {
         const parts: string[] = [];
-        
+
         // Entities
         if (this.extractedInfo.entities.size > 0) {
             const entities = Array.from(this.extractedInfo.entities).slice(-20); // Keep last 20
             parts.push(`### Entities\n${entities.map(e => `- ${e}`).join('\n')}`);
         }
-        
+
         // Recent decisions
         if (this.extractedInfo.decisions.length > 0) {
             const decisions = this.extractedInfo.decisions.slice(-10); // Keep last 10
             parts.push(`### Decisions\n${decisions.map(d => `- ${d}`).join('\n')}`);
         }
-        
+
         // Pending todos
         if (this.extractedInfo.todos.length > 0) {
             const todos = this.extractedInfo.todos.slice(-10); // Keep last 10
             parts.push(`### Pending Tasks\n${todos.map(t => `- ${t}`).join('\n')}`);
         }
-        
+
         // Tools used
         if (this.extractedInfo.tools.length > 0) {
             parts.push(`### Tools Used\n${this.extractedInfo.tools.map(t => `- ${t.name}: ${t.purpose}`).join('\n')}`);
         }
-        
+
         return parts.join('\n\n');
     }
-    
+
     /**
      * Create detailed summary using AI
      */
@@ -742,18 +725,18 @@ export class MessageHistory {
         let conversationText = '';
         let tokenCount = 0;
         const maxTokensForSummary = 2000; // Limit input to AI
-        
+
         for (const msg of messages) {
             if (msg.type === 'message') {
                 const content = this.getMessageContent(msg);
                 const preview = content.substring(0, 500);
                 const msgText = `${msg.role.toUpperCase()}: ${preview}${content.length > 500 ? '...' : ''}\n\n`;
                 const msgTokens = this.estimateTextTokens(msgText);
-                
+
                 if (tokenCount + msgTokens > maxTokensForSummary) {
                     break;
                 }
-                
+
                 conversationText += msgText;
                 tokenCount += msgTokens;
             } else if (msg.type === 'function_call') {
@@ -762,11 +745,11 @@ export class MessageHistory {
                 tokenCount += this.estimateTextTokens(msgText);
             }
         }
-        
+
         if (!conversationText.trim()) {
             return '';
         }
-        
+
         try {
             const { createSummary } = await import('./tool_result_processor.js');
             const summaryPrompt = `Create a concise summary of this conversation, focusing on:
@@ -776,14 +759,14 @@ export class MessageHistory {
 4. Any unresolved issues or next steps
 
 Keep the summary focused and relevant for continuing the conversation.`;
-            
+
             return await createSummary(conversationText, summaryPrompt);
         } catch (error) {
             console.error('Error creating AI summary:', error);
             return '';
         }
     }
-    
+
     /**
      * Estimate tokens for a text string
      */

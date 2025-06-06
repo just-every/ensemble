@@ -6,7 +6,7 @@
  * - verifier for output validation
  */
 
-import { Agent, ensembleRequest, convertStreamToMessages } from '../index.js';
+import { Agent, ensembleRequest } from '../index.js';
 import type { ResponseInput } from '../types/types.js';
 
 // Mock file system tool

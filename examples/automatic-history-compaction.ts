@@ -1,6 +1,6 @@
 /**
  * Example: Automatic History Compaction
- * 
+ *
  * This example demonstrates how ensemble automatically manages long conversation
  * histories by compacting older messages into summaries when approaching the
  * model's context limit.
@@ -9,7 +9,6 @@
 import {
     Agent,
     ensembleRequest,
-    convertStreamToMessages,
     ResponseInput,
 } from '../index.js';
 
@@ -60,7 +59,7 @@ async function runLongConversation() {
         if ((i + 1) % 10 === 0) {
             console.log(`✓ Completed ${i + 1} Q&A exchanges`);
             console.log(`  Current history size: ${conversationHistory.length} messages`);
-            
+
             // Estimate tokens (rough approximation)
             const totalChars = conversationHistory.reduce((sum, msg) => {
                 if ('content' in msg && typeof msg.content === 'string') {
@@ -127,13 +126,13 @@ async function main() {
     try {
         await runLongConversation();
         await demonstrateCompactionBehavior();
-        
+
         console.log('\n✅ Automatic history compaction ensures:');
         console.log('- Conversations can continue indefinitely');
         console.log('- Context limits are respected');
         console.log('- Important information is preserved');
         console.log('- Performance remains optimal');
-        
+
     } catch (error) {
         console.error('Error:', error);
     }

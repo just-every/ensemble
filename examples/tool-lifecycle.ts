@@ -8,7 +8,6 @@ import {
     ToolFunction,
     ToolCall,
     ToolCallResult,
-    ToolCallAction,
     AgentDefinition,
 } from '../index.js';
 
@@ -118,24 +117,6 @@ async function main() {
             log(
                 `📞 onToolCall: ${toolCall.function.name}(${toolCall.function.arguments})`
             );
-
-            // Skip restricted operations containing "secret"
-            if (toolCall.function.name === 'restricted_operation') {
-                const args = JSON.parse(toolCall.function.arguments);
-                if (args.data && args.data.includes('secret')) {
-                    log('  ⚠️  SKIPPING: Contains restricted content');
-                    return ToolCallAction.SKIP;
-                }
-            }
-
-            // Halt on halt_everything
-            if (toolCall.function.name === 'halt_everything') {
-                log('  🛑 HALTING: All tool execution will stop');
-                return ToolCallAction.HALT;
-            }
-
-            log('  ✅ CONTINUE: Tool will execute');
-            return ToolCallAction.CONTINUE;
         },
 
         // Called after successful tool execution

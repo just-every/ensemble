@@ -23,13 +23,10 @@ import {
 import {
     createToolFunction,
     ensembleRequest,
-    convertStreamToMessages,
 } from '../index.js';
 
 import { v4 as uuid } from 'uuid';
 // Import removed to fix lint error
-
-import type { ToolCallAction } from '../types/tool_types.js';
 
 // Per-agent cache of custom tools
 // Keys are agent_ids, values are arrays of custom tool functions
@@ -155,7 +152,7 @@ export class Agent implements AgentDefinition {
     }>;
 
     // Event handlers for tool calls and results
-    onToolCall?: (toolCall: ToolCall) => Promise<ToolCallAction | void>;
+    onToolCall?: (toolCall: ToolCall) => Promise<void>;
     onToolResult?: (toolCallResult: ToolCallResult) => Promise<void>;
 
     // Event handlers for request and response
@@ -565,15 +562,16 @@ async function runAgentTool(
 
     try {
         const stream = ensembleRequest(messages, agent);
+        let fullResponse = '';
 
-        // Convert the stream to messages
-        const conversion = await convertStreamToMessages(
-            stream,
-            messages,
-            agent
-        );
+        // Process the stream to get the full response
+        for await (const event of stream) {
+            if (event.type === 'message_complete' && 'content' in event) {
+                fullResponse = event.content;
+            }
+        }
 
-        return conversion.fullResponse;
+        return fullResponse;
     } catch (error) {
         console.error(`Error in ${agent.name}: ${error}`);
         return `Error in ${agent.name}: ${error}`;
@@ -583,7 +581,7 @@ async function runAgentTool(
 /**
  * Helper function to safely get tools from an agent or agent definition
  * Handles both Agent instances (with getTools method) and plain AgentDefinition objects
- * 
+ *
  * @param agent The agent or agent definition to get tools from
  * @returns Promise resolving to an array of tools
  */
@@ -592,7 +590,7 @@ export async function getToolsFromAgent(agent: AgentDefinition | Agent): Promise
     if (agent && typeof (agent as Agent).getTools === 'function') {
         return await (agent as Agent).getTools();
     }
-    
+
     // Otherwise, it's a plain AgentDefinition object
     // Return the tools array or empty array if not defined
     return agent?.tools || [];

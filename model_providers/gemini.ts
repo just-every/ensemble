@@ -984,29 +984,23 @@ export class GeminiProvider implements ModelProvider {
 
                 // Handle function calls (if present)
                 if (chunk.functionCalls && chunk.functionCalls.length > 0) {
-                    const toolCallsToEmit: ToolCall[] = [];
-
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
                             const callId = `call_${uuidv4()}`;
-                            toolCallsToEmit.push({
-                                id: callId,
-                                type: 'function',
-                                function: {
-                                    name: fc.name,
-                                    arguments: JSON.stringify(fc.args || {}),
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: callId,
+                                    type: 'function',
+                                    function: {
+                                        name: fc.name,
+                                        arguments: JSON.stringify(
+                                            fc.args || {}
+                                        ),
+                                    },
                                 },
-                            });
+                            };
                         }
-                    }
-
-                    if (toolCallsToEmit.length > 0 && !hasYieldedToolStart) {
-                        yield {
-                            type: 'tool_start',
-                            tool_calls: toolCallsToEmit,
-                        };
-                        hasYieldedToolStart = true;
-                        continue; // Skip other processing when emitting tool calls
                     }
                 }
 

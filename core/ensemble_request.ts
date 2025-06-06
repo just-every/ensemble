@@ -10,12 +10,12 @@ import {
     AgentDefinition,
     ResponseOutputMessage,
     ResponseInputMessage,
+    MessageEventBase,
+    type ResponseThinkingMessage,
+    type ResponseInputFunctionCall,
+    type ResponseInputFunctionCallOutput,
+    type ToolEvent,
 } from '../types/types.js';
-import {
-    RequestContext,
-    createRequestContext,
-    ToolCallAction,
-} from '../types/tool_types.js';
 import {
     getModelFromAgent,
     getModelProvider,
@@ -23,7 +23,9 @@ import {
 import { MessageHistory } from '../utils/message_history.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
-import { verifyOutput, VerificationResult } from '../utils/verification.js';
+import { verifyOutput } from '../utils/verification.js';
+
+const MAX_ERROR_ATTEMPTS = 5;
 
 /**
  * Unified request function that handles both standard and enhanced modes
@@ -35,63 +37,91 @@ export async function* ensembleRequest(
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
 
-    // Get the model ID for context-aware compaction
-    const modelId = agent?.model || (await getModelFromAgent(agent));
-
     // Use message history manager with automatic compaction
     const history = new MessageHistory(conversationHistory, {
         compactToolCalls: true,
         preserveSystemMessages: true,
-        modelId: modelId,
         compactionThreshold: 0.7, // Compact when reaching 70% of context
-    });
-
-    // Create context if using enhanced mode
-    const context = createRequestContext({
-        messages: history.getMessages(),
     });
 
     try {
         // Track tool calls and rounds
         let totalToolCalls = 0;
         let toolCallRounds = 0;
+        let errorRounds = 0;
         const maxToolCalls = agent?.maxToolCalls ?? 200;
         const maxRounds = agent?.maxToolCallRoundsPerTurn ?? Infinity;
 
         // Execute rounds while we have tool calls and haven't hit limits
-        let hasToolCalls = true;
+        let hasToolCalls = false;
+        let hasError = false;
         let lastMessageContent = '';
+        const modelHistory: string[] = [];
 
         // Always execute at least one round to get initial response
         do {
             hasToolCalls = false;
+            hasError = false;
+
+            const model = await getModelFromAgent(
+                agent,
+                'reasoning_mini',
+                modelHistory // Change models if using classes
+            );
+            modelHistory.push(model);
 
             // Execute one round
-            const roundResult = await executeRound(
+            const stream = executeRound(
+                model,
                 agent,
-                context,
                 history,
                 totalToolCalls,
                 maxToolCalls
             );
 
             // Yield all events from this round
-            for await (const event of roundResult.stream) {
+            for await (const event of stream) {
                 yield event;
+
+                switch (event.type) {
+                    case 'message_complete': {
+                        const messageEvent = event as MessageEventBase;
+                        if (messageEvent.content) {
+                            lastMessageContent = messageEvent.content;
+                        }
+                        break;
+                    }
+
+                    case 'tool_start': {
+                        hasToolCalls = true;
+                        ++totalToolCalls;
+                        break;
+                    }
+
+                    case 'error': {
+                        hasError = true;
+                        break;
+                    }
+                }
             }
 
-            // Update counters
-            if (roundResult.toolCount > 0) {
-                hasToolCalls = true;
-                totalToolCalls += roundResult.toolCount;
-                toolCallRounds++;
-            }
+            if (hasToolCalls) {
+                ++toolCallRounds;
 
-            // Store the last message content for verification
-            if (roundResult.messageContent) {
-                lastMessageContent = roundResult.messageContent;
+                if (agent.modelSettings?.tool_choice) {
+                    // Ensure that we don't loop the same tool calls
+                    delete agent.modelSettings.tool_choice;
+                }
             }
-        } while (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls);
+            if (hasError) {
+                ++errorRounds;
+            }
+        } while (
+            (hasError && errorRounds < MAX_ERROR_ATTEMPTS) ||
+            (hasToolCalls &&
+                toolCallRounds < maxRounds &&
+                totalToolCalls < maxToolCalls)
+        );
 
         // If we hit limits, add a notification
         if (hasToolCalls && toolCallRounds >= maxRounds) {
@@ -105,7 +135,7 @@ export async function* ensembleRequest(
             const verificationResult = await performVerification(
                 agent,
                 lastMessageContent,
-                history.getMessages()
+                await history.getMessages()
             );
 
             if (verificationResult) {
@@ -115,7 +145,6 @@ export async function* ensembleRequest(
                 }
             }
         }
-
     } catch (err) {
         // Use unified error handler
         const error = err as any;
@@ -136,37 +165,31 @@ export async function* ensembleRequest(
     }
 }
 
-interface RoundResult {
-    stream: AsyncGenerator<ProviderStreamEvent>;
-    toolCount: number;
-    messageContent: string;
-}
-
 /**
  * Execute one round of request/response
  */
-async function executeRound(
+async function* executeRound(
+    model: string,
     agent: AgentDefinition,
-    context: RequestContext | undefined,
     history: MessageHistory,
     currentToolCalls: number,
     maxToolCalls: number
-): Promise<RoundResult> {
-    const events: ProviderStreamEvent[] = [];
-    let messageContent = '';
-    let toolCount = 0;
-
+): AsyncGenerator<ProviderStreamEvent> {
     // Get current messages
-    const messages = history.getMessages();
+    let messages = await history.getMessages(model);
+
+    // Allow agent onRequest hook
+    if (agent.onRequest) {
+        [agent, messages] = await agent.onRequest(agent, messages);
+    }
 
     // Create provider and agent with fresh settings
-    const model = await getModelFromAgent(agent);
-    const provider = await getModelProvider(model);
+    const provider = getModelProvider(model);
 
     // Stream the response
     const stream = provider.createResponseStream(messages, model, agent);
 
-    const toolPromises: Promise<ToolCallResult[]>[] = [];
+    const toolPromises: Promise<ToolCallResult>[] = [];
 
     for await (const event of stream) {
         // Apply event filtering
@@ -174,72 +197,138 @@ async function executeRound(
             continue;
         }
 
-        events.push(event);
+        yield event;
 
         // Handle different event types
         switch (event.type) {
-            case 'message_complete':
-                if ('content' in event) {
-                    messageContent = event.content;
-                }
-                break;
+            case 'message_complete': {
+                const messageEvent = event as MessageEventBase;
+                if (messageEvent.thinking_content) {
+                    const thinkingMessage: ResponseThinkingMessage = {
+                        type: 'thinking',
+                        role: 'assistant',
+                        content:
+                            messageEvent.thinking_content &&
+                            messageEvent.thinking_content !== '{empty}'
+                                ? messageEvent.thinking_content
+                                : '',
+                        signature: messageEvent.thinking_signature || '',
+                        thinking_id: messageEvent.message_id || '',
+                        status: 'completed',
+                        model,
+                    };
 
-            case 'tool_start':
-                if ('tool_calls' in event && event.tool_calls) {
-                    // Check if we'll exceed the limit
-                    const remainingCalls = maxToolCalls - currentToolCalls;
-                    if (remainingCalls <= 0) {
-                        console.warn(`Tool call limit reached (${maxToolCalls}). Skipping tool calls.`);
-                        // Don't count this as having tool calls if we're at the limit
-                        break;
+                    if (agent.onThinking) {
+                        await agent.onThinking(thinkingMessage);
                     }
 
-                    // Limit the number of tool calls to process
-                    const toolCallsToProcess = event.tool_calls.slice(0, remainingCalls);
-                    toolCount += toolCallsToProcess.length;
+                    history.add(thinkingMessage);
+                    yield {
+                        type: 'response_input',
+                        response: thinkingMessage,
+                    };
+                }
+                if (messageEvent.content) {
+                    const contentMessage: ResponseOutputMessage = {
+                        id: messageEvent.message_id,
+                        type: 'message',
+                        role: 'assistant',
+                        content: messageEvent.content,
+                        status: 'completed',
+                        model,
+                    };
 
-                    // Process tool calls with enhanced features if available
-                    toolPromises.push(
-                        processToolCalls(toolCallsToProcess, agent, context)
+                    if (agent.onResponse) {
+                        await agent.onResponse(contentMessage);
+                    }
+
+                    history.add(contentMessage);
+                    yield {
+                        type: 'response_input',
+                        response: contentMessage,
+                    };
+                }
+                break;
+            }
+
+            case 'tool_start': {
+                const toolEvent = event as ToolEvent;
+                if (!toolEvent.tool_call) {
+                    break;
+                }
+
+                // Check if we'll exceed the limit
+                const remainingCalls = maxToolCalls - currentToolCalls;
+                if (remainingCalls <= 0) {
+                    console.warn(
+                        `Tool call limit reached (${maxToolCalls}). Skipping tool calls.`
                     );
+                    // Don't count this as having tool calls if we're at the limit
+                    break;
                 }
-                break;
 
-            case 'error':
-                if (context) {
-                    context.halt();
-                }
+                const toolCall = toolEvent.tool_call;
+
+                // Add function call
+                const functionCall: ResponseInputFunctionCall = {
+                    type: 'function_call',
+                    id: toolCall.id,
+                    call_id: toolCall.call_id || toolCall.id,
+                    name: toolCall.function.name,
+                    arguments: toolCall.function.arguments,
+                    model,
+                };
+
+                // Run tools in parallel
+                toolPromises.push(processToolCall(toolCall, agent));
+
+                history.add(functionCall);
+                yield {
+                    type: 'response_input',
+                    response: functionCall,
+                };
                 break;
+            }
+
+            case 'error': {
+                // Log errors but don't add them to messages
+                console.error(
+                    '[executeRound] Error event:',
+                    (event as any).error
+                );
+                break;
+            }
         }
     }
 
-    const toolResults: ToolCallResult[] = (
-        await Promise.all(toolPromises)
-    ).flat();
+    // Complete then process any tool calls
+    const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
+    for (const toolResult of toolResults) {
+        yield {
+            type: 'tool_done',
+            tool_call: toolResult.toolCall,
+            result: {
+                call_id: toolResult.call_id || toolResult.id,
+                output: toolResult.output,
+                error: toolResult.error,
+            },
+        };
 
-    // Update message history
-    if (messageContent.length > 0 || toolResults.length > 0) {
-        await history.addAssistantResponse(messageContent, toolResults);
+        const functionOutput: ResponseInputFunctionCallOutput = {
+            type: 'function_call_output',
+            id: toolResult.id,
+            call_id: toolResult.call_id || toolResult.id,
+            name: toolResult.toolCall.function.name,
+            output: toolResult.output + (toolResult.error || ''),
+            model,
+        };
+
+        history.add(functionOutput);
+        yield {
+            type: 'response_input',
+            response: functionOutput,
+        };
     }
-
-    // Update context if available
-    if (context) {
-        context.messages = history.getMessages();
-        context.toolCallCount += toolResults.length;
-    }
-
-    // Create a generator that yields the collected events
-    async function* eventGenerator(): AsyncGenerator<ProviderStreamEvent> {
-        for (const event of events) {
-            yield event;
-        }
-    }
-
-    return {
-        stream: eventGenerator(),
-        toolCount,
-        messageContent,
-    };
 }
 
 /**
@@ -256,11 +345,7 @@ async function* performVerification(
     const maxAttempts = agent.maxVerificationAttempts || 2;
 
     // Perform verification
-    const verification = await verifyOutput(
-        agent.verifier,
-        output,
-        messages
-    );
+    const verification = await verifyOutput(agent.verifier, output, messages);
 
     if (verification.status === 'pass') {
         // Verification passed
@@ -323,93 +408,74 @@ async function* performVerification(
 /**
  * Process tool calls with enhanced features
  */
-async function processToolCalls(
-    toolCalls: ToolCall[],
-    agent: AgentDefinition,
-    context?: RequestContext
-): Promise<ToolCallResult[]> {
+async function processToolCall(
+    toolCall: ToolCall,
+    agent: AgentDefinition
+): Promise<ToolCallResult> {
     // Process all tool calls in parallel
-    const toolCallPromises = toolCalls.map(async toolCall => {
-        // Apply tool handler lifecycle if available
-        if (agent.onToolCall) {
-            const action = await agent.onToolCall(toolCall);
 
-            if (action && action === ToolCallAction.SKIP) {
-                return null; // Skip this tool call
-            }
+    // Apply tool handler lifecycle if available
+    if (agent.onToolCall) {
+        await agent.onToolCall(toolCall);
+    }
 
-            if (action === ToolCallAction.HALT && context) {
-                context.halt();
-                return null; // Halt processing
-            }
+    // Execute tool
+    try {
+        if (!agent.tools) {
+            throw new Error('No tools available for agent');
         }
 
-        // Execute tool
-        try {
-            if (!agent.tools) {
-                throw new Error('No tools available for agent');
-            }
+        // Find the tool
+        const tool = agent.tools.find(
+            t => t.definition.function.name === toolCall.function.name
+        );
 
-            // Find the tool
-            const tool = agent.tools.find(
-                t => t.definition.function.name === toolCall.function.name
-            );
-
-            if (!tool || !('function' in tool)) {
-                throw new Error(`Tool ${toolCall.function.name} not found`);
-            }
-
-            // Execute with enhanced lifecycle management
-            const rawResult = await handleToolCall(toolCall, tool, agent);
-
-            // Process the result (summarization, truncation, etc.)
-            const processedResult = await processToolResult(
-                toolCall,
-                rawResult
-            );
-
-            const toolCallResult: ToolCallResult = {
-                toolCall,
-                id: toolCall.id,
-                call_id: toolCall.call_id || toolCall.id,
-                output: processedResult,
-            };
-
-            // Call onToolResult callback
-            if (agent.onToolResult) {
-                await agent.onToolResult(toolCallResult);
-            }
-
-            return toolCallResult;
-        } catch (error) {
-            // Handle tool error
-            const errorOutput =
-                error instanceof Error
-                    ? `Tool execution failed: ${error.message}`
-                    : `Tool execution failed: ${String(error)}`;
-
-            const toolCallResult: ToolCallResult = {
-                toolCall,
-                id: toolCall.id,
-                call_id: toolCall.call_id || toolCall.id,
-                output: errorOutput,
-            };
-
-            if (agent.onToolError) {
-                await agent.onToolError(toolCallResult);
-            }
-
-            return toolCallResult;
+        if (!tool || !('function' in tool)) {
+            throw new Error(`Tool ${toolCall.function.name} not found`);
         }
-    });
 
-    // Wait for all tool calls to complete
-    const results = await Promise.all(toolCallPromises);
+        // Execute with enhanced lifecycle management
+        const rawResult = await handleToolCall(toolCall, tool, agent);
 
-    // Filter out null results (skipped tools)
-    return results.filter(
-        (result): result is ToolCallResult => result !== null
-    );
+        // Process the result (summarization, truncation, etc.)
+        const processedResult = await processToolResult(
+            toolCall,
+            rawResult
+        );
+
+        const toolCallResult: ToolCallResult = {
+            toolCall,
+            id: toolCall.id,
+            call_id: toolCall.call_id || toolCall.id,
+            output: processedResult,
+        };
+
+        // Call onToolResult callback
+        if (agent.onToolResult) {
+            await agent.onToolResult(toolCallResult);
+        }
+
+        return toolCallResult;
+    } catch (error) {
+        // Handle tool error
+        const errorOutput =
+            error instanceof Error
+                ? `Tool execution failed: ${error.message}`
+                : `Tool execution failed: ${String(error)}`;
+
+        const toolCallResult: ToolCallResult = {
+            toolCall,
+            id: toolCall.id,
+            call_id: toolCall.call_id || toolCall.id,
+            output: errorOutput,
+        };
+
+        if (agent.onToolError) {
+            await agent.onToolError(toolCallResult);
+        }
+
+        return toolCallResult;
+    }
 }
 
 /**

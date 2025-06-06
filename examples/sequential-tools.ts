@@ -150,12 +150,7 @@ async function runExample(messages: any[], sequential: boolean) {
                     console.log(
                         `\n🔧 Starting tool execution (${sequential ? 'SEQUENTIAL' : 'PARALLEL'} mode):`
                     );
-                    event.tool_calls.forEach((call, i) => {
-                        console.log(
-                            `   ${i + 1}. ${call.function.name}(${call.function.arguments})`
-                        );
-                    });
-                    console.log('');
+                    console.log(event.tool_call);
                     break;
 
                 case 'tool_done': {

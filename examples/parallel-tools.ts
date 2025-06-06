@@ -154,11 +154,8 @@ These should run in parallel.`,
                         '   (Note: Tools ran in parallel, not sequentially)\n'
                     );
 
-                    if (event.results) {
-                        console.log('📊 Results:');
-                        event.results.forEach((result, i) => {
-                            console.log(`   ${i + 1}. ${result.output}`);
-                        });
+                    if (event.result) {
+                        console.log('📊 Results:', event.result);
                     }
                     console.log('\n' + '='.repeat(60) + '\n');
                     console.log('Assistant continues:\n');

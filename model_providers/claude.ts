@@ -1024,7 +1024,7 @@ export class ClaudeProvider implements ModelProvider {
                                 // Yielding tool_start repeatedly might be noisy; consider yielding tool_delta if needed
                                 yield {
                                     type: 'tool_delta',
-                                    tool_calls: [currentToolCall as ToolCall],
+                                    tool_call: currentToolCall as ToolCall,
                                 };
                             } catch (err) {
                                 console.error(
@@ -1148,7 +1148,7 @@ export class ClaudeProvider implements ModelProvider {
                             }
                             yield {
                                 type: 'tool_start',
-                                tool_calls: [currentToolCall as ToolCall],
+                                tool_call: currentToolCall as ToolCall,
                             };
                         } catch (err) {
                             console.error(
@@ -1195,7 +1195,7 @@ export class ClaudeProvider implements ModelProvider {
                             // Emit tool_start immediately when the block starts
                             yield {
                                 type: 'tool_start',
-                                tool_calls: [currentToolCall as ToolCall],
+                                tool_call: currentToolCall as ToolCall,
                             };
                             currentToolCall = null; // Reset anyway
                         }

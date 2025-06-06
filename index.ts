@@ -35,19 +35,12 @@ export {
 } from './data/model_data.js';
 
 // Export all utils
-export { convertStreamToMessages } from './utils/stream_converter.js';
 export * from './utils/delta_buffer.js';
 export * from './utils/cost_tracker.js';
 export * from './utils/quota_tracker.js';
 export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
-export * from './types/tool_types.js';
 export { createToolFunction } from './utils/create_tool_function.js';
-export {
-    StateManager,
-    RequestContextWithState,
-    createRequestContextWithState,
-} from './utils/state_manager.js';
 
 // Export new tool execution utilities
 export {

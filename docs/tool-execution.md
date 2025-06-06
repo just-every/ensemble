@@ -220,10 +220,6 @@ const agent = {
     // Called before tool execution
     onToolCall: async (toolCall) => {
         console.log(`Executing tool: ${toolCall.function.name}`);
-        
-        // Return SKIP to skip this tool
-        // Return HALT to stop all tool execution
-        return ToolCallAction.CONTINUE;
     },
     
     // Called after successful execution

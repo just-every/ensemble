@@ -2,8 +2,6 @@
 // Types for the Ensemble package - Self-contained
 // ================================================================
 
-import type { ToolCallAction } from './tool_types.js';
-
 export type ToolParameterType =
     | 'string'
     | 'number'
@@ -300,6 +298,7 @@ export type StreamEventType =
     | 'design_grid'
     | 'console'
     | 'error'
+    | 'response_input'
     // New types for waiting on tools
     | 'tool_wait_start'
     | 'tool_waiting'
@@ -364,8 +363,8 @@ export interface TalkEvent extends MessageEventBase {
  */
 export interface ToolEvent extends StreamEventBase {
     type: 'tool_start' | 'tool_delta' | 'tool_done';
-    tool_calls: ToolCall[];
-    results?: Array<{ call_id: string; output: string; error?: string }>;
+    tool_call: ToolCall;
+    result?: { call_id: string; output: string; error?: string };
 }
 
 /**
@@ -391,6 +390,14 @@ export interface CostUpdateEvent extends StreamEventBase {
 }
 
 /**
+ * Error streaming event
+ */
+export interface ResponseInputEvent extends StreamEventBase {
+    type: 'response_input';
+    response: ResponseInputItem;
+}
+
+/**
  * Union type for all ensemble streaming events
  */
 export type ProviderStreamEvent =
@@ -400,7 +407,8 @@ export type ProviderStreamEvent =
     | TalkEvent
     | ToolEvent
     | ErrorEvent
-    | CostUpdateEvent;
+    | CostUpdateEvent
+    | ResponseInputEvent;
 
 /**
  * Model provider interface
@@ -731,7 +739,7 @@ export interface AgentDefinition {
 
     /** Optional callback for processing tool calls */
     getTools?: () => Promise<ToolFunction[]>;
-    onToolCall?: (toolCall: ToolCall) => Promise<ToolCallAction | void>;
+    onToolCall?: (toolCall: ToolCall) => Promise<void>;
     processToolCall?: (toolCalls: ToolCall[]) => Promise<Record<string, any>>;
     onToolResult?: (toolCallResult: ToolCallResult) => Promise<void>;
     onToolError?: (toolCallResult: ToolCallResult) => Promise<void>;

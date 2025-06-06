@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, ensembleRequest, convertStreamToMessages, createToolFunction } from '../index.js';
+import { Agent, ensembleRequest, createToolFunction } from '../index.js';
 import type { ResponseInput } from '../types/types.js';
 import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
 
@@ -60,7 +60,11 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
         // Mock the test provider to always suggest tool use
         const stream = ensembleRequest(messages, agent);
-        await convertStreamToMessages(stream, messages, agent);
+        
+        // Process the stream
+        for await (const event of stream) {
+            // Just consume the stream
+        }
         
         // Should have called the tool exactly 3 times (one per round)
         expect(callCount).toBeLessThanOrEqual(3);
@@ -114,7 +118,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
         for await (const event of stream) {
             if (event.type === 'tool_start') {
-                totalToolCalls += event.tool_calls.length;
+                totalToolCalls += 1; // Each tool_start event is one tool call
             }
         }
 
@@ -164,7 +168,11 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        await convertStreamToMessages(stream, messages, agent);
+        
+        // Process the stream
+        for await (const event of stream) {
+            // Just consume the stream
+        }
 
         // Should have processed up to 6 IDs (maxToolCalls)
         expect(callLog.length).toBeLessThanOrEqual(6);
@@ -207,7 +215,11 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        await convertStreamToMessages(stream, messages, agent);
+        
+        // Process the stream
+        for await (const event of stream) {
+            // Just consume the stream
+        }
 
         // Should not have made any tool calls
         expect(callCount).toBe(0);
@@ -250,7 +262,11 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        await convertStreamToMessages(stream, messages, agent);
+        
+        // Process the stream
+        for await (const event of stream) {
+            // Just consume the stream
+        }
 
         // Should have made exactly 1 tool call (first round only)
         // Even though the tool suggests calling again, no additional rounds are allowed
@@ -293,14 +309,9 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        let hasLimitMessage = false;
         
         for await (const event of stream) {
-            if (event.type === 'message_delta' && 'content' in event) {
-                if (event.content.includes('[Tool call rounds limit reached]')) {
-                    hasLimitMessage = true;
-                }
-            }
+            // Just consume the stream
         }
 
         // Should have called the tool once (test provider only does one tool call per turn)

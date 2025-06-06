@@ -104,12 +104,8 @@ async function main() {
                     break;
 
                 case 'tool_start':
-                    console.log('\n\n🔧 Tool calls:');
-                    event.tool_calls.forEach(call => {
-                        console.log(
-                            `  - ${call.function.name}(${call.function.arguments})`
-                        );
-                    });
+                    console.log('\n\n🔧 Tool call:');
+                    console.log(event.tool_call);
                     break;
 
                 case 'tool_done':

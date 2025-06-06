@@ -84,9 +84,6 @@ for (let i = 0; i < 100; i++) {
         { type: 'message', role: 'user', content: userMessage }
     ], agent);
     
-    const result = await convertStreamToMessages(stream, messages, agent);
-    conversationHistory.push(...result.messages);
-    
     // Compaction happens automatically when needed
     // Older exchanges are summarized, recent ones preserved
 }

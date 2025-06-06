@@ -1351,7 +1351,7 @@ export class OpenAIProvider implements ModelProvider {
                             currentCall.function.arguments = event.arguments; // Assign final arguments
                             yield {
                                 type: 'tool_start',
-                                tool_calls: [currentCall as ToolCall], // Yield the completed call
+                                tool_call: currentCall as ToolCall, // Yield the completed call
                             };
                             toolCallStates.delete(event.item_id); // Clean up state for this completed call
                             // console.log(`Function call arguments done for item ${event.item_id}. Yielded tool_start.`);
@@ -1517,7 +1517,7 @@ export class OpenAIProvider implements ModelProvider {
                             // Check if it was minimally valid
                             yield {
                                 type: 'tool_start', // Or maybe 'tool_incomplete'?
-                                tool_calls: [toolCall as ToolCall],
+                                tool_call: toolCall as ToolCall,
                             };
                         }
                     }

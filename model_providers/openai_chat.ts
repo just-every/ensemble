@@ -691,10 +691,12 @@ export class OpenAIChat implements ModelProvider {
                         });
                     }
                     // Yield a single tool_start event containing the array of calls
-                    eventsToYield.push({
-                        type: 'tool_start',
-                        tool_calls: validSimulatedCalls,
-                    });
+                    for (const validSimulatedCall of validSimulatedCalls) {
+                        eventsToYield.push({
+                            type: 'tool_start',
+                            tool_call: validSimulatedCall,
+                        });
+                    }
 
                     return { handled: true, eventsToYield };
                 } else {
@@ -1059,10 +1061,12 @@ export class OpenAIChat implements ModelProvider {
                         partialToolCallsByIndex.values()
                     ).filter(call => call.id && call.function.name);
                     if (completedToolCalls.length > 0) {
-                        yield {
-                            type: 'tool_start',
-                            tool_calls: completedToolCalls,
-                        };
+                        for (const completedToolCall of completedToolCalls) {
+                            yield {
+                                type: 'tool_start',
+                                tool_call: completedToolCall,
+                            };
+                        }
                     } else {
                         log_llm_error(
                             requestId,

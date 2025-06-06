@@ -164,7 +164,7 @@ async function main() {
             role: 'user' as const,
             content: `Please demonstrate abort signals:
 1. Start a download with 10 chunks
-2. Start an analysis with 8 iterations  
+2. Start an analysis with 8 iterations
 3. After 3 seconds, list running tools
 4. Abort the download (use the tool ID from the list)
 5. Let the analysis complete
@@ -197,11 +197,8 @@ async function main() {
                     break;
 
                 case 'tool_done':
-                    if (event.results) {
-                        console.log('\n\n📊 Tool Results:');
-                        event.results.forEach((result, i) => {
-                            console.log(`${i + 1}. ${result.output}`);
-                        });
+                    if (event.result) {
+                        console.log('\n\n📊 Tool Results:', event.result);
                         console.log('\nAssistant continues:\n');
                     }
                     break;
