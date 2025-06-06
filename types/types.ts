@@ -307,6 +307,8 @@ export type StreamEventType =
     | 'task_wait_start'
     | 'task_waiting'
     | 'task_wait_complete'
+    | 'task_complete'
+    | 'task_fatal_error'
     // Git-related events
     | 'git_pull_request'
     // Stream termination event
@@ -373,6 +375,14 @@ export interface ToolEvent extends StreamEventBase {
 export interface ErrorEvent extends StreamEventBase {
     type: 'error';
     error: string;
+}
+
+/**
+ * Error streaming event
+ */
+export interface TaskEvent extends StreamEventBase {
+    type: 'task_complete' | 'task_fatal_error';
+    result?: string;
 }
 
 /**
