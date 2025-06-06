@@ -133,6 +133,8 @@ export interface ToolCall {
         name: string;
         arguments: string;
     };
+    // Allow additional fields like runningToolId to be preserved during streaming
+    [key: string]: any;
 }
 
 /**
