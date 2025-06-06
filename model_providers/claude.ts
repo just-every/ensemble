@@ -239,13 +239,38 @@ async function convertToClaudeMessage(
         let inputArgs: Record<string, unknown> = {};
         try {
             // Claude expects 'input' as an object
-            inputArgs = JSON.parse(msg.arguments || '{}');
+            const argsString = msg.arguments || '{}';
+            
+            // Handle concatenated JSON objects (malformed arguments)
+            if (argsString.includes('}{')) {
+                console.warn(
+                    `Malformed concatenated JSON arguments for ${msg.name}: ${argsString}`
+                );
+                // Try to extract the first valid JSON object
+                const firstBraceIndex = argsString.indexOf('{');
+                const firstCloseBraceIndex = argsString.indexOf('}') + 1;
+                if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
+                    const firstJsonStr = argsString.substring(firstBraceIndex, firstCloseBraceIndex);
+                    try {
+                        inputArgs = JSON.parse(firstJsonStr);
+                        console.log(`Successfully extracted first JSON object: ${firstJsonStr}`);
+                    } catch (innerE) {
+                        console.error(`Failed to parse extracted JSON: ${firstJsonStr}`, innerE);
+                        inputArgs = {};
+                    }
+                } else {
+                    inputArgs = {};
+                }
+            } else {
+                inputArgs = JSON.parse(argsString);
+            }
         } catch (e) {
             console.error(
                 `Error parsing function call arguments for ${msg.name}: ${msg.arguments}`,
                 e
             );
-            return null;
+            // Try to provide a meaningful fallback based on the content
+            inputArgs = {};
         }
 
         const toolUseBlock = {
@@ -592,6 +617,7 @@ export class ClaudeProvider implements ModelProvider {
         modelId: string
     ): Promise<ClaudeMessage[]> {
         const result: ClaudeMessage[] = [];
+        const seenToolUseIds = new Set<string>(); // Track tool_use IDs to prevent duplicates
 
         for (const originalMsg of messages) {
             let msg: ResponseInputItem = originalMsg;
@@ -723,7 +749,27 @@ export class ClaudeProvider implements ModelProvider {
                 result
             );
             if (structuredMsg) {
-                result.push(structuredMsg);
+                // Check for duplicate tool_use IDs before adding
+                if (structuredMsg.role === 'assistant' && Array.isArray(structuredMsg.content)) {
+                    let hasDuplicateToolUse = false;
+                    for (const contentBlock of structuredMsg.content) {
+                        if (contentBlock.type === 'tool_use') {
+                            if (seenToolUseIds.has(contentBlock.id)) {
+                                console.warn(`Skipping duplicate tool_use ID: ${contentBlock.id}`);
+                                hasDuplicateToolUse = true;
+                                break;
+                            } else {
+                                seenToolUseIds.add(contentBlock.id);
+                            }
+                        }
+                    }
+                    // Only add the message if it doesn't contain duplicate tool_use IDs
+                    if (!hasDuplicateToolUse) {
+                        result.push(structuredMsg);
+                    }
+                } else {
+                    result.push(structuredMsg);
+                }
             }
             /* ---------- End Claude message build ---------- */
         }
@@ -1002,13 +1048,7 @@ export class ClaudeProvider implements ModelProvider {
                             event.delta.partial_json
                         ) {
                             try {
-                                // Append the partial JSON string to the arguments
-                                // Note: This assumes arguments are always JSON stringified.
-                                // If arguments could be simple strings, this needs adjustment.
-                                // We might need a more robust way to reconstruct the JSON.
-                                // For now, appending might work for many cases but could break complex JSON.
-                                // A safer approach might be to accumulate the partial_json and parse at the end.
-                                // Let's try accumulating first.
+                                // Accumulate partial JSON for proper reconstruction
                                 if (
                                     !currentToolCall.function._partialArguments
                                 ) {
@@ -1018,14 +1058,21 @@ export class ClaudeProvider implements ModelProvider {
                                 currentToolCall.function._partialArguments +=
                                     event.delta.partial_json;
 
-                                // Update the main arguments field for intermediate UI updates (best effort)
-                                currentToolCall.function.arguments =
-                                    currentToolCall.function._partialArguments;
-
+                                // Only update arguments if we can validate it's proper JSON
+                                // Don't update the main arguments field until we have complete JSON
+                                // This prevents malformed concatenated JSON from being created
+                                
                                 // Yielding tool_start repeatedly might be noisy; consider yielding tool_delta if needed
                                 yield {
                                     type: 'tool_delta',
-                                    tool_call: currentToolCall as ToolCall,
+                                    tool_call: {
+                                        ...currentToolCall,
+                                        function: {
+                                            ...currentToolCall.function,
+                                            // Don't expose partial arguments that might be malformed
+                                            arguments: '{}' // Placeholder until complete
+                                        }
+                                    } as ToolCall,
                                 };
                             } catch (err) {
                                 console.error(
@@ -1117,7 +1164,7 @@ export class ClaudeProvider implements ModelProvider {
                         event.content_block?.type === 'tool_use'
                     ) {
                         const toolUse = event.content_block;
-                        const toolId = toolUse.id || `call_${Date.now()}`;
+                        const toolId = toolUse.id || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                         const toolName = toolUse.name;
                         const toolInput =
                             toolUse.input !== undefined ? toolUse.input : {};
@@ -1143,10 +1190,38 @@ export class ClaudeProvider implements ModelProvider {
                         try {
                             // Finalize arguments if they were streamed partially
                             if (currentToolCall.function._partialArguments) {
-                                currentToolCall.function.arguments =
-                                    currentToolCall.function._partialArguments;
-                                delete currentToolCall.function
-                                    ._partialArguments; // Clean up temporary field
+                                // Validate that we have proper JSON before finalizing
+                                const partialArgs = currentToolCall.function._partialArguments;
+                                try {
+                                    JSON.parse(partialArgs); // Validate JSON
+                                    currentToolCall.function.arguments = partialArgs;
+                                } catch (jsonError) {
+                                    console.warn(
+                                        `Invalid JSON in partial arguments for ${currentToolCall.function.name}: ${partialArgs}`,
+                                        jsonError
+                                    );
+                                    // Try to extract the first valid JSON object if it's concatenated
+                                    if (partialArgs.includes('}{')) {
+                                        const firstBraceIndex = partialArgs.indexOf('{');
+                                        const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
+                                        if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
+                                            const firstJsonStr = partialArgs.substring(firstBraceIndex, firstCloseBraceIndex);
+                                            try {
+                                                JSON.parse(firstJsonStr); // Validate extracted JSON
+                                                currentToolCall.function.arguments = firstJsonStr;
+                                                console.log(`Extracted valid JSON from partial arguments: ${firstJsonStr}`);
+                                            } catch (extractError) {
+                                                console.error(`Failed to extract valid JSON: ${firstJsonStr}`, extractError);
+                                                currentToolCall.function.arguments = '{}';
+                                            }
+                                        } else {
+                                            currentToolCall.function.arguments = '{}';
+                                        }
+                                    } else {
+                                        currentToolCall.function.arguments = '{}';
+                                    }
+                                }
+                                delete currentToolCall.function._partialArguments; // Clean up temporary field
                             }
                             yield {
                                 type: 'tool_start',
@@ -1162,7 +1237,8 @@ export class ClaudeProvider implements ModelProvider {
                         } finally {
                             // Reset currentToolCall *after* potential final processing
                             currentToolCall = null;
-                            toolCallStarted = false; // Reset flag when tool call is done
+                            // Do not reset toolCallStarted here - it needs to remain true
+                            // to prevent duplicate tool_start emission at message_stop
                         }
                     }
                     // Handle message stop
@@ -1197,10 +1273,38 @@ export class ClaudeProvider implements ModelProvider {
 
                             // Only emit tool_start if we haven't already emitted it
                             if (!toolCallStarted) {
-                                // Finalize arguments if they were streamed partially
+                                // Finalize arguments if they were streamed partially with proper JSON validation
                                 if (currentToolCall.function._partialArguments) {
-                                    currentToolCall.function.arguments =
-                                        currentToolCall.function._partialArguments;
+                                    const partialArgs = currentToolCall.function._partialArguments;
+                                    try {
+                                        JSON.parse(partialArgs); // Validate JSON
+                                        currentToolCall.function.arguments = partialArgs;
+                                    } catch (jsonError) {
+                                        console.warn(
+                                            `Invalid JSON in partial arguments at message_stop for ${currentToolCall.function.name}: ${partialArgs}`,
+                                            jsonError
+                                        );
+                                        // Try to extract the first valid JSON object if it's concatenated
+                                        if (partialArgs.includes('}{')) {
+                                            const firstBraceIndex = partialArgs.indexOf('{');
+                                            const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
+                                            if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
+                                                const firstJsonStr = partialArgs.substring(firstBraceIndex, firstCloseBraceIndex);
+                                                try {
+                                                    JSON.parse(firstJsonStr); // Validate extracted JSON
+                                                    currentToolCall.function.arguments = firstJsonStr;
+                                                    console.log(`Extracted valid JSON at message_stop: ${firstJsonStr}`);
+                                                } catch (extractError) {
+                                                    console.error(`Failed to extract valid JSON at message_stop: ${firstJsonStr}`, extractError);
+                                                    currentToolCall.function.arguments = '{}';
+                                                }
+                                            } else {
+                                                currentToolCall.function.arguments = '{}';
+                                            }
+                                        } else {
+                                            currentToolCall.function.arguments = '{}';
+                                        }
+                                    }
                                     delete currentToolCall.function._partialArguments;
                                 }
                                 
