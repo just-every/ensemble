@@ -731,8 +731,9 @@ export class OpenAIProvider implements ModelProvider {
                 const originalModel: string | undefined = (message as any)
                     .model;
 
-                delete message.timestamp;
-                delete message.model;
+                delete (message as any).timestamp;
+                delete (message as any).model;
+                delete (message as any).pinned;
 
                 // Handle thinking messages
                 if (message.type === 'thinking') {

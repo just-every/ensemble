@@ -176,7 +176,11 @@ async function mapMessagesToOpenAI(
     // Use flatMap to allow returning multiple messages when needed (e.g., for image extraction)
     const result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
-    for (const message of messages) {
+    for (const msg of messages) {
+        // Create a clean copy without non-standard properties
+        const message = { ...msg };
+        // Remove properties that OpenAI doesn't recognize
+        delete (message as any).pinned;
         // Handle function call output messages
         if (message.type === 'function_call_output') {
             // Check if output contains a base64 image
