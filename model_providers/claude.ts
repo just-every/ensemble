@@ -895,6 +895,7 @@ export class ClaudeProvider implements ModelProvider {
 
             // Track current tool call info
             let currentToolCall: any = null;
+            let toolCallStarted = false; // Track if tool_start was emitted
             let accumulatedSignature = '';
             let accumulatedThinking = '';
             let accumulatedContent = ''; // To collect all content for final message_complete
@@ -1131,6 +1132,7 @@ export class ClaudeProvider implements ModelProvider {
                                         : JSON.stringify(toolInput),
                             },
                         };
+                        toolCallStarted = false; // Reset flag for new tool
                     }
                     // Handle tool use stop
                     else if (
@@ -1150,6 +1152,7 @@ export class ClaudeProvider implements ModelProvider {
                                 type: 'tool_start',
                                 tool_call: currentToolCall as ToolCall,
                             };
+                            toolCallStarted = true; // Mark that tool_start was emitted
                         } catch (err) {
                             console.error(
                                 'Error finalizing tool call:',
@@ -1159,6 +1162,7 @@ export class ClaudeProvider implements ModelProvider {
                         } finally {
                             // Reset currentToolCall *after* potential final processing
                             currentToolCall = null;
+                            toolCallStarted = false; // Reset flag when tool call is done
                         }
                     }
                     // Handle message stop
@@ -1186,17 +1190,27 @@ export class ClaudeProvider implements ModelProvider {
                         // Complete any pending tool call (should ideally be handled by content_block_stop)
                         if (currentToolCall) {
                             // If a tool call is still active here, it means content_block_stop might not have fired correctly.
-                            // Log a warning and potentially try to finalize/yield it.
                             console.warn(
                                 'Tool call was still active at message_stop:',
                                 currentToolCall
                             );
 
-                            // Emit tool_start immediately when the block starts
-                            yield {
-                                type: 'tool_start',
-                                tool_call: currentToolCall as ToolCall,
-                            };
+                            // Only emit tool_start if we haven't already emitted it
+                            if (!toolCallStarted) {
+                                // Finalize arguments if they were streamed partially
+                                if (currentToolCall.function._partialArguments) {
+                                    currentToolCall.function.arguments =
+                                        currentToolCall.function._partialArguments;
+                                    delete currentToolCall.function._partialArguments;
+                                }
+                                
+                                yield {
+                                    type: 'tool_start',
+                                    tool_call: currentToolCall as ToolCall,
+                                };
+                            }
+                            // If tool_start was already emitted, we don't need to do anything
+                            // The tool execution will be handled by ensemble_request.ts
                             currentToolCall = null; // Reset anyway
                         }
 
