@@ -34,10 +34,10 @@ export async function* ensembleRequest(
 ): AsyncGenerator<ProviderStreamEvent> {
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
-    
+
     // Get the model ID for context-aware compaction
     const modelId = agent?.model || (await getModelFromAgent(agent));
-    
+
     // Use message history manager with automatic compaction
     const history = new MessageHistory(conversationHistory, {
         compactToolCalls: true,
@@ -55,56 +55,51 @@ export async function* ensembleRequest(
         // Track tool calls and rounds
         let totalToolCalls = 0;
         let toolCallRounds = 0;
-        const maxToolCalls = agent?.maxToolCalls || 200;
-        const maxRounds = agent?.maxToolCallRoundsPerTurn || Infinity;
-        
+        const maxToolCalls = agent?.maxToolCalls ?? 200;
+        const maxRounds = agent?.maxToolCallRoundsPerTurn ?? Infinity;
+
         // Execute rounds while we have tool calls and haven't hit limits
         let hasToolCalls = true;
         let lastMessageContent = '';
-        
-        while (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls) {
+
+        // Always execute at least one round to get initial response
+        do {
             hasToolCalls = false;
-            
+
             // Execute one round
             const roundResult = await executeRound(
-                agent, 
-                context, 
+                agent,
+                context,
                 history,
                 totalToolCalls,
                 maxToolCalls
             );
-            
+
             // Yield all events from this round
             for await (const event of roundResult.stream) {
                 yield event;
             }
-            
+
             // Update counters
             if (roundResult.toolCount > 0) {
                 hasToolCalls = true;
                 totalToolCalls += roundResult.toolCount;
                 toolCallRounds++;
             }
-            
+
             // Store the last message content for verification
             if (roundResult.messageContent) {
                 lastMessageContent = roundResult.messageContent;
             }
-        }
-        
+        } while (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls);
+
         // If we hit limits, add a notification
         if (hasToolCalls && toolCallRounds >= maxRounds) {
-            yield {
-                type: 'message_delta',
-                content: '\n\n[Tool call rounds limit reached]',
-            } as ProviderStreamEvent;
+            console.log('[ensembleRequest] Tool call rounds limit reached');
         } else if (hasToolCalls && totalToolCalls >= maxToolCalls) {
-            yield {
-                type: 'message_delta',
-                content: '\n\n[Total tool calls limit reached]',
-            } as ProviderStreamEvent;
+            console.log('[ensembleRequest] Total tool calls limit reached');
         }
-        
+
         // Perform verification if configured
         if (agent?.verifier && lastMessageContent) {
             const verificationResult = await performVerification(
@@ -112,7 +107,7 @@ export async function* ensembleRequest(
                 lastMessageContent,
                 history.getMessages()
             );
-            
+
             if (verificationResult) {
                 // Yield the verification result
                 for await (const event of verificationResult) {
@@ -120,7 +115,7 @@ export async function* ensembleRequest(
                 }
             }
         }
-        
+
     } catch (err) {
         // Use unified error handler
         const error = err as any;
@@ -195,13 +190,14 @@ async function executeRound(
                     const remainingCalls = maxToolCalls - currentToolCalls;
                     if (remainingCalls <= 0) {
                         console.warn(`Tool call limit reached (${maxToolCalls}). Skipping tool calls.`);
+                        // Don't count this as having tool calls if we're at the limit
                         break;
                     }
-                    
+
                     // Limit the number of tool calls to process
                     const toolCallsToProcess = event.tool_calls.slice(0, remainingCalls);
                     toolCount += toolCallsToProcess.length;
-                    
+
                     // Process tool calls with enhanced features if available
                     toolPromises.push(
                         processToolCalls(toolCallsToProcess, agent, context)
@@ -256,16 +252,16 @@ async function* performVerification(
     attempt: number = 0
 ): AsyncGenerator<ProviderStreamEvent> {
     if (!agent.verifier) return;
-    
+
     const maxAttempts = agent.maxVerificationAttempts || 2;
-    
+
     // Perform verification
     const verification = await verifyOutput(
         agent.verifier,
         output,
         messages
     );
-    
+
     if (verification.status === 'pass') {
         // Verification passed
         yield {
@@ -274,7 +270,7 @@ async function* performVerification(
         } as ProviderStreamEvent;
         return;
     }
-    
+
     // Verification failed
     if (attempt < maxAttempts - 1) {
         // Retry with feedback
@@ -282,35 +278,35 @@ async function* performVerification(
             type: 'message_delta',
             content: `\n\n⚠️ Verification failed: ${verification.reason}\n\nRetrying...`,
         } as ProviderStreamEvent;
-        
+
         const retryMessages: ResponseInput = [
             ...messages,
             { type: 'message', role: 'assistant', content: output, status: 'completed' } as ResponseOutputMessage,
-            { 
-                type: 'message', 
-                role: 'developer', 
-                content: `Verification failed: ${verification.reason}\n\nPlease correct your response.` 
+            {
+                type: 'message',
+                role: 'developer',
+                content: `Verification failed: ${verification.reason}\n\nPlease correct your response.`
             } as ResponseInputMessage
         ];
-        
+
         // Create a new agent for retry without verifier to avoid infinite recursion
         const retryAgent: AgentDefinition = {
             ...agent,
             verifier: undefined,
             historyThread: retryMessages,
         };
-        
+
         const retryStream = ensembleRequest(retryMessages, retryAgent);
         let retryOutput = '';
-        
+
         for await (const event of retryStream) {
             yield event;
-            
+
             if (event.type === 'message_complete' && 'content' in event) {
                 retryOutput = event.content;
             }
         }
-        
+
         // Verify the retry
         if (retryOutput) {
             yield* performVerification(agent, retryOutput, messages, attempt + 1);

@@ -186,7 +186,7 @@ export class Agent implements AgentDefinition {
         this.jsonSchema = definition.jsonSchema;
         this.params = definition.params;
         this.modelSettings = definition.modelSettings || {};
-        this.maxToolCalls = definition.maxToolCalls || 200; // Default to 10 if not specified
+        this.maxToolCalls = definition.maxToolCalls ?? 200; // Default to 200 if not specified
         this.maxToolCallRoundsPerTurn = definition.maxToolCallRoundsPerTurn; // No default, undefined means no limit
         this.maxVerificationAttempts = definition.maxVerificationAttempts ?? 2;
         this.processParams = definition.processParams;

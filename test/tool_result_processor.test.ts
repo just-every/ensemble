@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     createSummary,
     processToolResult,
@@ -6,12 +6,9 @@ import {
     getTruncationMessage,
 } from '../utils/tool_result_processor.js';
 import { ToolCall } from '../types/types.js';
-import * as ensembleRequestModule from '../core/ensemble_request.js';
 
-// Mock ensemble request
-vi.mock('../core/ensemble_request.js', () => ({
-    ensembleRequest: vi.fn(),
-}));
+// Mock the module before any imports that might use it
+vi.mock('../core/ensemble_request.js');
 
 describe('Tool Result Processor', () => {
     const mockToolCall: ToolCall = {
@@ -23,10 +20,15 @@ describe('Tool Result Processor', () => {
         },
     };
 
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     describe('createSummary', () => {
         it('should create a summary using LLM', async () => {
-            const mockEnsembleRequest =
-                ensembleRequestModule.ensembleRequest as Mock;
+            // Import the mocked function
+            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const mockEnsembleRequest = ensembleRequest as any;
 
             // Mock the async generator
             mockEnsembleRequest.mockImplementation(async function* () {
@@ -60,8 +62,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should fallback to truncation on error', async () => {
-            const mockEnsembleRequest =
-                ensembleRequestModule.ensembleRequest as Mock;
+            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockRejectedValue(new Error('LLM error'));
 
             const longContent = 'x'.repeat(2000);
@@ -71,8 +73,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should handle empty response from LLM', async () => {
-            const mockEnsembleRequest =
-                ensembleRequestModule.ensembleRequest as Mock;
+            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 // Empty response
             });
@@ -116,8 +118,8 @@ describe('Tool Result Processor', () => {
         });
 
         it('should summarize long results for non-skip tools', async () => {
-            const mockEnsembleRequest =
-                ensembleRequestModule.ensembleRequest as Mock;
+            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 yield { type: 'message_delta', content: 'Summarized content' };
             });
