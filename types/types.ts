@@ -711,6 +711,8 @@ export interface AgentExportDefinition {
     model?: string;
     modelClass?: string;
     cwd?: string; // Working directory for model providers that need a real shell context
+    modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
+    disabledModels?: string[]; // Models to exclude from selection
 }
 
 /**
@@ -736,6 +738,8 @@ export interface AgentDefinition {
     jsonSchema?: ResponseJSONSchema; // JSON schema for structured output
     historyThread?: ResponseInput | undefined;
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
+    modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
+    disabledModels?: string[]; // Models to exclude from selection
 
     /** Optional callback for processing tool calls */
     getTools?: () => Promise<ToolFunction[]>;

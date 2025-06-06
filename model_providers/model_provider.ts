@@ -152,39 +152,101 @@ export function getProviderFromModel(model: string): ModelProviderID {
  */
 function filterModelsWithFallback(
     models: string[],
-    excludeModels?: string[]
+    excludeModels?: string[],
+    disabledModels?: string[]
 ): string[] {
-    if (!excludeModels || excludeModels.length === 0) {
+    // Combine exclude and disabled models
+    const allExcluded = [...(excludeModels || []), ...(disabledModels || [])];
+    
+    if (allExcluded.length === 0) {
         return models;
     }
 
     const originalModels = [...models];
     const filteredModels = models.filter(
-        model => !excludeModels.includes(model)
+        model => !allExcluded.includes(model)
     );
 
     // If we ended up with no models after filtering, determine the next model in the cycle
     if (filteredModels.length === 0) {
         // Find the last used model from excludeModels that exists in originalModels
-        const lastUsedModel = [...excludeModels]
+        const lastUsedModel = [...(excludeModels || [])]
             .reverse()
             .find(excludedModel => originalModels.includes(excludedModel));
 
         if (lastUsedModel) {
-            // Find the next model in the cycle
-            const lastUsedIndex = originalModels.indexOf(lastUsedModel);
-            const nextIndex = (lastUsedIndex + 1) % originalModels.length;
-            const nextModel = originalModels[nextIndex];
-            return [nextModel];
+            // Find the next model in the cycle, skipping disabled models if possible
+            let nextIndex = (originalModels.indexOf(lastUsedModel) + 1) % originalModels.length;
+            let attempts = 0;
+            while (attempts < originalModels.length) {
+                const nextModel = originalModels[nextIndex];
+                if (!disabledModels?.includes(nextModel)) {
+                    return [nextModel];
+                }
+                nextIndex = (nextIndex + 1) % originalModels.length;
+                attempts++;
+            }
         }
 
-        // If no valid last used model found, fall back to the first original model
+        // If no valid last used model found, fall back to the first non-disabled model
+        const firstNonDisabled = originalModels.find(m => !disabledModels?.includes(m));
+        if (firstNonDisabled) {
+            return [firstNonDisabled];
+        }
+        
+        // Last resort: return first model even if disabled
         if (originalModels.length > 0) {
             return [originalModels[0]];
         }
     }
 
     return filteredModels;
+}
+
+/**
+ * Select a model using weighted randomization based on scores
+ */
+function selectWeightedModel(
+    models: string[],
+    scores?: Record<string, number>
+): string {
+    if (!scores || models.length === 0) {
+        // No scores provided, fall back to random selection
+        return models[Math.floor(Math.random() * models.length)];
+    }
+
+    // Calculate weights for each model, filtering out 0-weight models
+    const modelWeights = models
+        .map(model => ({
+            model,
+            weight: scores[model] !== undefined ? scores[model] : 50 // Default score of 50 if not specified
+        }))
+        .filter(m => m.weight > 0); // Filter out models with 0 or negative weights
+
+    if (modelWeights.length === 0) {
+        // All models have 0 weight, fall back to random selection from original list
+        return models[Math.floor(Math.random() * models.length)];
+    }
+
+    // Calculate total weight
+    const totalWeight = modelWeights.reduce((sum, m) => sum + m.weight, 0);
+    
+    if (totalWeight === 0) {
+        // Shouldn't happen after filtering, but just in case
+        return modelWeights[0].model;
+    }
+
+    // Select based on weighted random
+    let random = Math.random() * totalWeight;
+    for (const { model, weight } of modelWeights) {
+        random -= weight;
+        if (random <= 0) {
+            return model;
+        }
+    }
+
+    // Fallback (shouldn't happen)
+    return modelWeights[0].model;
 }
 
 export async function getModelFromAgent(
@@ -196,7 +258,9 @@ export async function getModelFromAgent(
         agent.model ||
         (await getModelFromClass(
             agent.modelClass || defaultClass,
-            excludeModels
+            excludeModels,
+            agent.disabledModels,
+            agent.modelScores
         ))
     );
 }
@@ -206,7 +270,9 @@ export async function getModelFromAgent(
  */
 export async function getModelFromClass(
     modelClass?: ModelClassID,
-    excludeModels?: string[]
+    excludeModels?: string[],
+    disabledModels?: string[],
+    modelScores?: Record<string, number>
 ): Promise<string> {
     // Simple quota tracker stub
     const { quotaTracker } = await import('../utils/quota_tracker.js');
@@ -237,43 +303,48 @@ export async function getModelFromClass(
 
         let models = [...(override?.models || modelClassConfig.models)];
 
-        // Filter out excluded models if provided
-        models = filterModelsWithFallback(models, excludeModels);
+        // Filter out excluded and disabled models
+        models = filterModelsWithFallback(models, excludeModels, disabledModels);
 
         // Only access the random property if it exists
         const shouldRandomize =
             override?.random ??
             ('random' in modelClassConfig && modelClassConfig.random);
-        if (shouldRandomize) {
-            models = models.sort(() => Math.random() - 0.5);
-        }
+        
+        // Store the original order for weighted selection
+        const validModels = [...models];
 
         // First pass: Try all models checking both API key and quota
-        for (const model of models) {
+        const modelsWithKeyAndQuota = validModels.filter(model => {
             const provider = getProviderFromModel(model);
-
-            // Check if we have a valid API key and available quota
-            if (
-                isProviderKeyValid(provider) &&
-                quotaTracker.hasQuota(provider, model)
-            ) {
-                console.log(
-                    `Using model ${model} from class ${modelGroup} (has API key and quota)`
-                );
-                return model;
-            }
+            return isProviderKeyValid(provider) && quotaTracker.hasQuota(provider, model);
+        });
+        
+        if (modelsWithKeyAndQuota.length > 0) {
+            const selectedModel = shouldRandomize && !modelScores
+                ? modelsWithKeyAndQuota[Math.floor(Math.random() * modelsWithKeyAndQuota.length)]
+                : selectWeightedModel(modelsWithKeyAndQuota, modelScores);
+            console.log(
+                `Using model ${selectedModel} from class ${modelGroup} (has API key and quota)`
+            );
+            return selectedModel;
         }
 
         // Second pass: If we couldn't find a model with quota, just check for API key
         // (This allows exceeding quota when necessary)
-        for (const model of models) {
+        const modelsWithKey = validModels.filter(model => {
             const provider = getProviderFromModel(model);
-            if (isProviderKeyValid(provider)) {
-                console.log(
-                    `Using model ${model} from class ${modelGroup} (has API key but may exceed quota)`
-                );
-                return model;
-            }
+            return isProviderKeyValid(provider);
+        });
+        
+        if (modelsWithKey.length > 0) {
+            const selectedModel = shouldRandomize && !modelScores
+                ? modelsWithKey[Math.floor(Math.random() * modelsWithKey.length)]
+                : selectWeightedModel(modelsWithKey, modelScores);
+            console.log(
+                `Using model ${selectedModel} from class ${modelGroup} (has API key but may exceed quota)`
+            );
+            return selectedModel;
         }
     }
 
@@ -283,35 +354,40 @@ export async function getModelFromClass(
         let standardModels =
             MODEL_CLASSES['standard' as keyof typeof MODEL_CLASSES].models;
 
-        // Filter out excluded models if provided
+        // Filter out excluded and disabled models
         standardModels = filterModelsWithFallback(
             standardModels,
-            excludeModels
+            excludeModels,
+            disabledModels
         );
 
         // First check for models with both API key and quota
-        for (const model of standardModels) {
+        const standardModelsWithKeyAndQuota = standardModels.filter(model => {
             const provider = getProviderFromModel(model);
-            if (
-                isProviderKeyValid(provider) &&
-                quotaTracker.hasQuota(provider, model)
-            ) {
-                console.log(
-                    `Falling back to standard class model ${model} (has API key and quota)`
-                );
-                return model;
-            }
+            return isProviderKeyValid(provider) && quotaTracker.hasQuota(provider, model);
+        });
+        
+        if (standardModelsWithKeyAndQuota.length > 0) {
+            // Use weighted selection for fallback too
+            const selectedModel = selectWeightedModel(standardModelsWithKeyAndQuota, modelScores);
+            console.log(
+                `Falling back to standard class model ${selectedModel} (has API key and quota)`
+            );
+            return selectedModel;
         }
 
         // Then just check for API key
-        for (const model of standardModels) {
+        const standardModelsWithKey = standardModels.filter(model => {
             const provider = getProviderFromModel(model);
-            if (isProviderKeyValid(provider)) {
-                console.log(
-                    `Falling back to standard class model ${model} (has API key but may exceed quota)`
-                );
-                return model;
-            }
+            return isProviderKeyValid(provider);
+        });
+        
+        if (standardModelsWithKey.length > 0) {
+            const selectedModel = selectWeightedModel(standardModelsWithKey, modelScores);
+            console.log(
+                `Falling back to standard class model ${selectedModel} (has API key but may exceed quota)`
+            );
+            return selectedModel;
         }
     }
 
