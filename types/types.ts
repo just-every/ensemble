@@ -298,7 +298,7 @@ export type StreamEventType =
     | 'design_grid'
     | 'console'
     | 'error'
-    | 'response_input'
+    | 'response_output'
     // New types for waiting on tools
     | 'tool_wait_start'
     | 'tool_waiting'
@@ -392,9 +392,9 @@ export interface CostUpdateEvent extends StreamEventBase {
 /**
  * Error streaming event
  */
-export interface ResponseInputEvent extends StreamEventBase {
-    type: 'response_input';
-    response: ResponseInputItem;
+export interface ResponseOutputEvent extends StreamEventBase {
+    type: 'response_output';
+    message: ResponseInputItem;
 }
 
 /**
@@ -408,7 +408,7 @@ export type ProviderStreamEvent =
     | ToolEvent
     | ErrorEvent
     | CostUpdateEvent
-    | ResponseInputEvent;
+    | ResponseOutputEvent;
 
 /**
  * Model provider interface

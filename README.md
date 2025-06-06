@@ -3,18 +3,19 @@
 [![npm version](https://badge.fury.io/js/@just-every%2Fensemble.svg)](https://www.npmjs.com/package/@just-every/ensemble)
 [![GitHub Actions](https://github.com/just-every/ensemble/workflows/Release/badge.svg)](https://github.com/just-every/ensemble/actions)
 
-A unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Google, etc.) with streaming support, tool calling, and embeddings.
+A simple interface for interacting with multiple LLM providers during a single conversation.
 
 ## Features
 
-- 🔄 **Unified Streaming Interface** - Consistent event-based streaming across all providers
+- 🤝 **Unified Streaming Interface** - Consistent event-based streaming across all providers
+- 🔄 **Model/Provider Rotation** - Automatic model selection and rotation
 - 🛠️ **Advanced Tool Calling** - Parallel/sequential execution, timeouts, and background tracking
-- 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
-- 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
+- 📝 **Automatic History Compaction** - Handle unlimited conversation length with intelligent summarization
+- 🤖 **Agent Orientated** - Advanced agent capabilities with verification and tool management
 - 🔌 **Multi-Provider Support** - OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter
 - 🖼️ **Multi-Modal** - Support for text, images, and embeddings
-- 📝 **Automatic History Compaction** - Handle unlimited conversation length with intelligent summarization
-- 🤖 **Agent Framework** - Advanced agent capabilities with verification and tool management
+- 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
+- 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 
 ## Installation
 
@@ -43,17 +44,30 @@ These variables enable access to the respective providers. Only the keys you nee
 import { ensembleRequest } from '@just-every/ensemble';
 
 const messages = [
-    { type: 'message', role: 'user', content: 'Hello, how are you?' }
+    { type: 'message', role: 'user', content: 'How many of the letter "e" is there in "Ensemble"?' }
 ];
 
-const agent = {
-    model: 'o3',
-    agent_id: 'assistant'
-};
+// Perform initial request
+for await (const event of ensembleRequest(messages)) {
+    if (event.type === 'message_complete') {
+        // Write response
+        console.log(event.content);
+    }
+    else if (event.type === 'response_output') {
+        // Save out to continue conversation
+        messages.push(event.message);
+    }
+}
 
-for await (const event of ensembleRequest(messages, agent)) {
-    if (event.type === 'message_delta') {
-        process.stdout.write(event.content);
+// Create a validator agent
+const validatorAgent = {
+    instructions: 'Please validate that the previous response is correct',
+    modelClass: 'code',
+};
+// Continue conversation with new agent
+for await (const event of ensembleRequest(messages, validatorAgent)) {
+    if (event.type === 'message_complete') {
+        console.log(event.content);
     }
 }
 ```
@@ -111,7 +125,7 @@ Configure agent behavior with these optional properties:
 
 ```typescript
 const agent = {
-    model: 'claude-3-sonnet',
+    model: 'claude-4-sonnet',
     maxToolCalls: 200,              // Maximum total tool calls (default: 200)
     maxToolCallRoundsPerTurn: 5,    // Maximum sequential rounds of tool calls (default: Infinity)
     tools: [...],                   // Available tools for the agent

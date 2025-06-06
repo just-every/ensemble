@@ -32,7 +32,7 @@ const MAX_ERROR_ATTEMPTS = 5;
  */
 export async function* ensembleRequest(
     messages: ResponseInput,
-    agent: AgentDefinition
+    agent: AgentDefinition = {}
 ): AsyncGenerator<ProviderStreamEvent> {
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
@@ -224,8 +224,8 @@ async function* executeRound(
 
                     history.add(thinkingMessage);
                     yield {
-                        type: 'response_input',
-                        response: thinkingMessage,
+                        type: 'response_output',
+                        message: thinkingMessage,
                     };
                 }
                 if (messageEvent.content) {
@@ -244,8 +244,8 @@ async function* executeRound(
 
                     history.add(contentMessage);
                     yield {
-                        type: 'response_input',
-                        response: contentMessage,
+                        type: 'response_output',
+                        message: contentMessage,
                     };
                 }
                 break;
@@ -284,8 +284,8 @@ async function* executeRound(
 
                 history.add(functionCall);
                 yield {
-                    type: 'response_input',
-                    response: functionCall,
+                    type: 'response_output',
+                    message: functionCall,
                 };
                 break;
             }
@@ -325,8 +325,8 @@ async function* executeRound(
 
         history.add(functionOutput);
         yield {
-            type: 'response_input',
-            response: functionOutput,
+            type: 'response_output',
+            message: functionOutput,
         };
     }
 }
