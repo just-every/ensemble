@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { findModel } from '../index.js';
+import { ensembleRequest, findModel } from '../index.js';
 
 // Define the types we need based on the Anthropic SDK structure
 type TextBlock = {
@@ -82,80 +82,35 @@ export async function convertImageToText(
 
     // Use Claude to describe the image
     try {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            throw new Error('ANTHROPIC_API_KEY not set');
-        }
-
-        const anthropic = new Anthropic({
-            apiKey,
-        });
-
-        // Use a simplified approach to directly ask Claude to describe the image
-        const prompt =
-            'Please describe this image in a few sentences. Focus on the main visual elements and key details that someone would need to understand what is shown in the image.';
-
-        // Get the media type from the image data
-        const mediaType = (
-            imageData.includes('data:image/jpeg')
-                ? 'image/jpeg'
-                : imageData.includes('data:image/png')
-                  ? 'image/png'
-                  : imageData.includes('data:image/gif')
-                    ? 'image/gif'
-                    : imageData.includes('data:image/webp')
-                      ? 'image/webp'
-                      : 'image/jpeg'
-        ) as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-
-        // Create properly typed content blocks
-        const textBlock: TextBlock = {
-            type: 'text',
-            text: prompt,
-        };
-
-        const imageBlock: ImageBlock = {
-            type: 'image',
-            source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: imageData.replace(/^data:image\/[a-z]+;base64,/, ''),
-            },
-        };
-
-        // Create a properly typed message
-        const messages: Message[] = [
+        const stream = ensembleRequest(
+            [
+                {
+                    type: 'message',
+                    role: 'system',
+                    content:
+                        'Please describe the following image in a couple of sentences. Focus on the main visual elements and key details that someone would need to understand what is shown in the image.',
+                },
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: imageData,
+                },
+            ],
             {
-                role: 'user',
-                content: [textBlock, imageBlock],
-            },
-        ];
+                modelClass: 'vision_mini',
+            }
+        );
 
-        // Use claude-3-5-haiku-latest as our image-to-text model for efficiency
-        // Cast to any to bypass type checking since we know the structure is correct
-        const response = await anthropic.messages.create({
-            model: 'claude-3-5-haiku-latest',
-            messages: messages as any,
-            max_tokens: 1000,
-        });
-
-        // Get the description from the response
-        const firstContent = response.content?.[0];
-        const description =
-            firstContent && 'text' in firstContent ? firstContent.text : '';
-
-        // Format the result
-        const formattedDescription = `[Image description: ${description.trim()}]`;
-
-        // Cache the result
-        imageDescriptionCache[imageHash] = formattedDescription;
-
-        console.log('Generated new image description and cached it');
-        return formattedDescription;
+        for await (const event of stream) {
+            if (event.type === 'message_complete' && 'content' in event) {
+                imageDescriptionCache[imageHash] = event.content.trim();
+                return imageDescriptionCache[imageHash];
+            }
+        }
     } catch (error) {
         console.error('Error generating image description:', error);
-        return '[Image could not be processed]';
     }
+    return 'Image found, but could not be converted to text';
 }
 
 /**
@@ -169,10 +124,10 @@ export async function convertImageToText(
 export async function convertImageToTextIfNeeded(
     imageData: string,
     modelId?: string
-): Promise<string> {
+): Promise<string | boolean> {
     // Skip if not an image
     if (!imageData.startsWith('data:image/')) {
-        return imageData;
+        return false;
     }
 
     // Check if model supports image input (if modelId provided)
@@ -181,7 +136,7 @@ export async function convertImageToTextIfNeeded(
         findModel(modelId)?.features?.input_modality?.includes('image')
     ) {
         // Model supports images, return original
-        return imageData;
+        return false;
     }
 
     // Convert to text description

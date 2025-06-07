@@ -1,7 +1,7 @@
 /**
  * Adaptive buffer that coalesces small text chunks into larger ones.
  *
- *  • Starts with an initial threshold (default 10 chars)
+ *  • Starts with an initial threshold
  *  • After each flush, grows by `step` up to `max`
  *  • `add(chunk)` returns <string|null> – the string you should emit when it’s time
  *  • `flush()` forces out whatever’s left

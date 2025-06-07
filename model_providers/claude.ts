@@ -92,9 +92,6 @@ import {
     ToolCall,
     ResponseInput,
     ResponseInputItem,
-    ResponseInputMessage,
-    ResponseThinkingMessage,
-    ResponseOutputMessage,
     AgentDefinition,
 } from '../types/types.js';
 import { costTracker } from '../index.js';
@@ -106,10 +103,9 @@ import {
 import { isPaused } from '../utils/communication.js';
 import { ModelClassID } from '../data/model_data.js';
 import {
-    extractBase64Image,
+    appendMessageWithImage,
     resizeAndTruncateForClaude,
 } from '../utils/image_utils.js';
-import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import {
     DeltaBuffer,
     bufferDelta,
@@ -217,6 +213,40 @@ function cleanBase64Data(imageData: string): string {
     return imageData.replace(/^data:image\/[a-z]+;base64,/, '');
 }
 
+
+/**
+ * Processes images and adds them to the input array for OpenAI
+ * Resizes images to max 1024px width and splits into sections if height > 768px
+ *
+ * @param input - The input array to add images to
+ * @param images - Record of image IDs to base64 image data
+ * @param source - Description of where the images came from
+ * @returns Updated input array with processed images
+ */
+async function addImagesToInput(
+    input: any[],
+    images: Record<string, string>
+): Promise<any[]> {
+    // Add developer messages for each image
+    for (const [, imageData] of Object.entries(images)) {
+        // Resize and split the image if needed
+        const processedImageData = await resizeAndTruncateForClaude(imageData);
+        const mediaType = getImageMediaType(processedImageData);
+        const cleanedImageData = cleanBase64Data(processedImageData);
+
+        // Add image block
+        input.push({
+            type: 'image',
+            source: {
+                type: 'base64',
+                media_type: mediaType,
+                data: cleanedImageData,
+            },
+        });
+    }
+    return input;
+}
+
 /**
  * Converts a custom ResponseInputItem into Anthropic Claude's message format.
  * Handles text messages, tool use requests (function calls), and tool results (function outputs).
@@ -227,6 +257,7 @@ function cleanBase64Data(imageData: string): string {
  * @returns A Claude message object or null if conversion is not applicable (e.g., system message, empty content).
  */
 async function convertToClaudeMessage(
+    model: string,
     role: string,
     content: string,
     msg: ResponseInputItem,
@@ -240,7 +271,7 @@ async function convertToClaudeMessage(
         try {
             // Claude expects 'input' as an object
             const argsString = msg.arguments || '{}';
-            
+
             // Handle concatenated JSON objects (malformed arguments)
             if (argsString.includes('}{')) {
                 console.warn(
@@ -283,62 +314,6 @@ async function convertToClaudeMessage(
         return { role: 'assistant', content: [toolUseBlock] };
     } else if (msg.type === 'function_call_output') {
         // Check if output contains a base64 image
-        if (typeof msg.output === 'string') {
-            const extracted = extractBase64Image(msg.output);
-
-            if (extracted.found && extracted.image_id !== null) {
-                // Use the image ID from the extracted result
-                const image_id = extracted.image_id;
-
-                try {
-                    // Get the first image data and resize/truncate for Claude
-                    const originalImageData = extracted.images[image_id];
-                    const processedImageData =
-                        await resizeAndTruncateForClaude(originalImageData);
-                    const mediaType = getImageMediaType(processedImageData);
-                    const cleanedImageData =
-                        cleanBase64Data(processedImageData);
-
-                    const toolResultBlock = {
-                        type: 'tool_result',
-                        tool_use_id: msg.call_id,
-                        content: extracted.replaceContent.trim() || '', // Text with image placeholders
-                        ...(msg.status === 'incomplete'
-                            ? { is_error: true }
-                            : {}),
-                    };
-
-                    // Content blocks for Claude message
-                    const contentBlocks = [
-                        toolResultBlock,
-                        // Add image after the tool result
-                        {
-                            type: 'image',
-                            source: {
-                                type: 'base64',
-                                media_type: mediaType,
-                                data: cleanedImageData,
-                            },
-                        },
-                        // Add a text description for the image
-                        {
-                            type: 'text',
-                            text: `This is [image #${image_id}] from the function call output of ${msg.name}`,
-                        },
-                    ];
-
-                    return { role: 'user', content: contentBlocks };
-                } catch (error) {
-                    console.error(
-                        'Error processing image in function call output:',
-                        error
-                    );
-                    // If there's an error, continue with just the text content
-                }
-            }
-        }
-
-        // Standard tool result handling (no image)
         const toolResultBlock = {
             type: 'tool_result',
             tool_use_id: msg.call_id, // ID must match the corresponding tool_use block
@@ -346,8 +321,17 @@ async function convertToClaudeMessage(
             ...(msg.status === 'incomplete' ? { is_error: true } : {}),
         };
 
+        let contentBlocks = [];
+        contentBlocks = await appendMessageWithImage(
+            model,
+            contentBlocks,
+            toolResultBlock,
+            'content',
+            addImagesToInput
+        );
+
         // Anthropic expects role: 'user' for tool_result
-        return { role: 'user', content: [toolResultBlock] };
+        return { role: 'user', content: contentBlocks };
     } else if (msg.type === 'thinking') {
         if (!content) {
             return null; // Can't process thinking without content
@@ -373,65 +357,27 @@ async function convertToClaudeMessage(
             return null; // Skip messages with no text content
         }
 
-        let messageRole: 'user' | 'system' | 'assistant' =
+        const messageRole: 'user' | 'system' | 'assistant' =
             role === 'assistant'
                 ? 'assistant'
                 : (role === 'system' || role === 'developer') && !result?.length
                   ? 'system'
                   : 'user';
 
-        if (messageRole !== 'system') {
-            // Check if content contains a base64 image
-            const extracted = extractBase64Image(content);
-            if (extracted.found && extracted.image_id !== null) {
-                messageRole = 'user'; // System messages are not supported for images
-
-                try {
-                    // Get the first image and resize/truncate for Claude
-                    const image_id = extracted.image_id;
-                    const originalImageData = extracted.images[image_id];
-                    const processedImageData =
-                        await resizeAndTruncateForClaude(originalImageData);
-                    const mediaType = getImageMediaType(processedImageData);
-                    const cleanedImageData =
-                        cleanBase64Data(processedImageData);
-
-                    // Build content array with text and image
-                    const contentBlocks = [];
-
-                    // Add image block
-                    contentBlocks.push({
-                        type: 'image',
-                        source: {
-                            type: 'base64',
-                            media_type: mediaType,
-                            data: cleanedImageData,
-                        },
-                    });
-
-                    // Add text block with text (now using replaceContent)
-                    if (extracted.replaceContent.trim()) {
-                        contentBlocks.push({
-                            type: 'text',
-                            text: extracted.replaceContent.trim(),
-                        });
-                    }
-
-                    return {
-                        role: messageRole,
-                        content: contentBlocks,
-                    };
-                } catch (error) {
-                    console.error('Error processing image in message:', error);
-                    // If there's an error, continue with just the text content
-                }
-            }
-        }
-
-        // Standard text message handling (no image)
+        let contentBlocks = [];
+        contentBlocks = await appendMessageWithImage(
+            model,
+            contentBlocks,
+            {
+                type: 'text',
+                text: content,
+            },
+            'text',
+            addImagesToInput
+        );
         return {
             role: messageRole,
-            content: content.trim(),
+            content: contentBlocks,
         };
     }
 }
@@ -466,147 +412,7 @@ export class ClaudeProvider implements ModelProvider {
     }
 
     /**
-     * Preprocess messages to convert images to text descriptions for models
-     * that don't support image input
-     *
-     * @param messages - The original messages
-     * @param modelId - The model ID
-     * @returns Processed messages with images converted to text when needed
-     */
-    private async preprocessMessagesForImageSupport(
-        messages: ResponseInput,
-        modelId: string
-    ): Promise<ResponseInput> {
-        // Clone the messages
-        const processedMessages = [...messages];
-
-        // Process each message
-        for (let i = 0; i < processedMessages.length; i++) {
-            const msg = processedMessages[i];
-
-            // Check if this is a message type that has a content property (using type guard)
-            if (!this.isMessageWithStringContent(msg)) {
-                continue;
-            }
-
-            // Handle content based on its type
-            if (typeof msg.content === 'string') {
-                // Direct string content - check if it contains an image
-                const extracted = extractBase64Image(msg.content as string);
-                if (extracted.found && extracted.image_id !== null) {
-                    try {
-                        // Get the first image
-                        const image_id = extracted.image_id;
-                        const imageData = extracted.images[image_id];
-
-                        // Convert image to text if needed
-                        const processedImageData =
-                            await convertImageToTextIfNeeded(
-                                imageData,
-                                modelId
-                            );
-
-                        // If the image was converted to text (not still an image data URL)
-                        if (!processedImageData.startsWith('data:image/')) {
-                            // Create new content with the text description
-                            const newContent = extracted.replaceContent.trim()
-                                ? extracted.replaceContent.trim() +
-                                  ' ' +
-                                  processedImageData
-                                : processedImageData;
-
-                            // Replace the image in the original message with the text description (preserving message type)
-                            processedMessages[i] = {
-                                ...msg,
-                                content: newContent,
-                            } as ResponseInputItem;
-
-                            console.log(
-                                `Converted image to text description for model ${modelId}`
-                            );
-                        }
-                    } catch (error) {
-                        console.error('Error converting image to text:', error);
-                    }
-                }
-            } else if (Array.isArray(msg.content)) {
-                // Array content - process each text item that might contain an image
-                let hasChanges = false;
-                const newContentItems = [...msg.content];
-
-                for (let j = 0; j < newContentItems.length; j++) {
-                    const item = newContentItems[j];
-                    if (
-                        item.type === 'input_text' &&
-                        typeof item.text === 'string'
-                    ) {
-                        const extracted = extractBase64Image(item.text);
-                        if (extracted.found && extracted.image_id !== null) {
-                            try {
-                                // Get the first image
-                                const image_id = extracted.image_id;
-                                const imageData = extracted.images[image_id];
-
-                                // Convert image to text if needed
-                                const processedImageData =
-                                    await convertImageToTextIfNeeded(
-                                        imageData,
-                                        modelId
-                                    );
-
-                                // If the image was converted to text (not still an image data URL)
-                                if (
-                                    !processedImageData.startsWith(
-                                        'data:image/'
-                                    )
-                                ) {
-                                    // Create new content with the text description
-                                    const newText =
-                                        extracted.replaceContent.trim()
-                                            ? extracted.replaceContent.trim() +
-                                              ' ' +
-                                              processedImageData
-                                            : processedImageData;
-
-                                    // Update this item
-                                    newContentItems[j] = {
-                                        ...item,
-                                        text: newText,
-                                    };
-                                    hasChanges = true;
-
-                                    console.log(
-                                        `Converted image to text description in array content for model ${modelId}`
-                                    );
-                                }
-                            } catch (error) {
-                                console.error(
-                                    'Error converting image to text in array content:',
-                                    error
-                                );
-                            }
-                        }
-                    }
-                }
-
-                // Only update the message if we made changes
-                if (hasChanges) {
-                    processedMessages[i] = {
-                        ...msg,
-                        content: newContentItems,
-                    } as ResponseInputItem;
-                }
-            }
-        }
-
-        return processedMessages;
-    }
-
-    /**
      * Combined preprocessing (image conversion) and Claude-specific mapping in a single pass.
-     * This merges the responsibilities of `preprocessMessagesForImageSupport`,
-     * `convertHistoryFormat`, and `convertToClaudeMessage` to avoid multiple
-     * iterations over the message history.
      *
      * @param messages The original conversation history.
      * @param modelId  The Claude model identifier (used to decide image handling).
@@ -619,114 +425,7 @@ export class ClaudeProvider implements ModelProvider {
         const result: ClaudeMessage[] = [];
         const seenToolUseIds = new Set<string>(); // Track tool_use IDs to prevent duplicates
 
-        for (const originalMsg of messages) {
-            let msg: ResponseInputItem = originalMsg;
-
-            /* ---------- Inline image preprocessing (from preprocessMessagesForImageSupport) ---------- */
-            if (this.isMessageWithStringContent(msg)) {
-                // --- String content ---
-                if (typeof msg.content === 'string') {
-                    const extracted = extractBase64Image(msg.content as string);
-                    if (extracted.found && extracted.image_id !== null) {
-                        try {
-                            const image_id = extracted.image_id;
-                            const imageData = extracted.images[image_id];
-                            const processedImageData =
-                                await convertImageToTextIfNeeded(
-                                    imageData,
-                                    modelId
-                                );
-
-                            if (
-                                processedImageData &&
-                                !processedImageData.startsWith('data:image/')
-                            ) {
-                                const newContent =
-                                    extracted.replaceContent.trim()
-                                        ? extracted.replaceContent.trim() +
-                                          ' ' +
-                                          processedImageData
-                                        : processedImageData;
-
-                                msg = {
-                                    ...msg,
-                                    content: newContent,
-                                } as ResponseInputItem;
-                            }
-                        } catch (error) {
-                            console.error(
-                                'Error converting image to text:',
-                                error
-                            );
-                        }
-                    }
-                }
-                // --- Array content ---
-                else if (Array.isArray(msg.content)) {
-                    let hasChanges = false;
-                    const newContentItems = [...msg.content];
-
-                    for (let j = 0; j < newContentItems.length; j++) {
-                        const item = newContentItems[j];
-                        if (
-                            item.type === 'input_text' &&
-                            typeof item.text === 'string'
-                        ) {
-                            const extracted = extractBase64Image(item.text);
-                            if (
-                                extracted.found &&
-                                extracted.image_id !== null
-                            ) {
-                                try {
-                                    const image_id = extracted.image_id;
-                                    const imageData =
-                                        extracted.images[image_id];
-                                    const processedImageData =
-                                        await convertImageToTextIfNeeded(
-                                            imageData,
-                                            modelId
-                                        );
-
-                                    if (
-                                        processedImageData &&
-                                        !processedImageData.startsWith(
-                                            'data:image/'
-                                        )
-                                    ) {
-                                        const newText =
-                                            extracted.replaceContent.trim()
-                                                ? extracted.replaceContent.trim() +
-                                                  ' ' +
-                                                  processedImageData
-                                                : processedImageData;
-
-                                        newContentItems[j] = {
-                                            ...item,
-                                            text: newText,
-                                        };
-                                        hasChanges = true;
-                                    }
-                                } catch (error) {
-                                    console.error(
-                                        'Error converting image to text in array content:',
-                                        error
-                                    );
-                                }
-                            }
-                        }
-                    }
-
-                    if (hasChanges) {
-                        msg = {
-                            ...msg,
-                            content: newContentItems,
-                        } as ResponseInputItem;
-                    }
-                }
-            }
-            /* ---------- End image preprocessing ---------- */
-
-            /* ---------- Build Claude message (logic similar to convertHistoryFormat + convertToClaudeMessage) ---------- */
+        for (const msg of messages) {
             const role =
                 'role' in msg && msg.role !== 'developer' ? msg.role : 'system';
 
@@ -743,6 +442,7 @@ export class ClaudeProvider implements ModelProvider {
             }
 
             const structuredMsg = await convertToClaudeMessage(
+                modelId,
                 role,
                 content,
                 msg,
@@ -750,12 +450,17 @@ export class ClaudeProvider implements ModelProvider {
             );
             if (structuredMsg) {
                 // Check for duplicate tool_use IDs before adding
-                if (structuredMsg.role === 'assistant' && Array.isArray(structuredMsg.content)) {
+                if (
+                    structuredMsg.role === 'assistant' &&
+                    Array.isArray(structuredMsg.content)
+                ) {
                     let hasDuplicateToolUse = false;
                     for (const contentBlock of structuredMsg.content) {
                         if (contentBlock.type === 'tool_use') {
                             if (seenToolUseIds.has(contentBlock.id)) {
-                                console.warn(`Skipping duplicate tool_use ID: ${contentBlock.id}`);
+                                console.warn(
+                                    `Skipping duplicate tool_use ID: ${contentBlock.id}`
+                                );
                                 hasDuplicateToolUse = true;
                                 break;
                             } else {
@@ -775,38 +480,6 @@ export class ClaudeProvider implements ModelProvider {
         }
 
         return result;
-    }
-
-    /**
-     * Type guard to check if a message has content property with image data
-     */
-    private isMessageWithStringContent(
-        msg: ResponseInputItem
-    ): msg is
-        | ResponseInputMessage
-        | ResponseThinkingMessage
-        | ResponseOutputMessage {
-        if (!('content' in msg)) return false;
-        if (!msg.content) return false;
-        if (
-            msg.type &&
-            ['function_call', 'function_call_output'].includes(msg.type)
-        )
-            return false;
-
-        // Handle both string content and array content
-        if (typeof msg.content === 'string') {
-            return true;
-        } else if (Array.isArray(msg.content)) {
-            // For array content, check if any of the items contain image data
-            // We're only looking for text content for now, as that could contain base64 images
-            return msg.content.some(
-                item =>
-                    item.type === 'input_text' && typeof item.text === 'string'
-            );
-        }
-
-        return false;
     }
 
     /**
@@ -1061,7 +734,7 @@ export class ClaudeProvider implements ModelProvider {
                                 // Only update arguments if we can validate it's proper JSON
                                 // Don't update the main arguments field until we have complete JSON
                                 // This prevents malformed concatenated JSON from being created
-                                
+
                                 // Yielding tool_start repeatedly might be noisy; consider yielding tool_delta if needed
                                 yield {
                                     type: 'tool_delta',
@@ -1307,7 +980,7 @@ export class ClaudeProvider implements ModelProvider {
                                     }
                                     delete currentToolCall.function._partialArguments;
                                 }
-                                
+
                                 yield {
                                     type: 'tool_start',
                                     tool_call: currentToolCall as ToolCall,

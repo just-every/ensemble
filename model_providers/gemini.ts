@@ -30,10 +30,10 @@ import {
     ToolFunction,
     ModelSettings,
     ProviderStreamEvent,
-    ToolCall, // Internal representation
     ResponseInput,
     AgentDefinition,
     ImageGenerationOpts,
+    type MessageEvent,
 } from '../types/types.js';
 import { costTracker } from '../index.js';
 import {
@@ -43,14 +43,9 @@ import {
 } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/communication.js';
 import {
-    extractBase64Image,
+    appendMessageWithImage,
     resizeAndTruncateForGemini,
 } from '../utils/image_utils.js';
-import {
-    DeltaBuffer,
-    bufferDelta,
-    flushBufferedDeltas,
-} from '../utils/delta_buffer.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -280,7 +275,7 @@ async function convertToGeminiFunctionDeclarations(
 /**
  * Helper function to determine image MIME type from base64 data
  */
-function getImageMimeType(imageData: string): string {
+export function getImageMimeType(imageData: string): string {
     if (imageData.includes('data:image/jpeg')) return 'image/jpeg';
     if (imageData.includes('data:image/png')) return 'image/png';
     if (imageData.includes('data:image/gif')) return 'image/gif';
@@ -292,7 +287,7 @@ function getImageMimeType(imageData: string): string {
 /**
  * Helper function to clean base64 data by removing the prefix
  */
-function cleanBase64Data(imageData: string): string {
+export function cleanBase64Data(imageData: string): string {
     return imageData.replace(/^data:image\/[a-z]+;base64,/, '');
 }
 
@@ -306,11 +301,51 @@ function formatGroundingChunks(chunks: any[]): string {
         .join('\n');
 }
 
+/**
+ * Processes images and adds them to the input array for OpenAI
+ * Resizes images to max 1024px width and splits into sections if height > 768px
+ *
+ * @param input - The input array to add images to
+ * @param images - Record of image IDs to base64 image data
+ * @param source - Description of where the images came from
+ * @returns Updated input array with processed images
+ */
+async function addImagesToInput(
+    input: Content[],
+    images: Record<string, string>,
+    source: string
+): Promise<Content[]> {
+    // Add developer messages for each image
+    for (const [image_id, imageData] of Object.entries(images)) {
+        // Resize and split the image if needed
+        const processedImageData = await resizeAndTruncateForGemini(imageData);
+        const mimeType = getImageMimeType(processedImageData);
+        const cleanedImageData = cleanBase64Data(processedImageData);
+
+        input.push({
+            role: 'user',
+            parts: [
+                {
+                    text: `This is [image #${image_id}] from the ${source}`,
+                },
+                {
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: cleanedImageData,
+                    },
+                },
+            ],
+        });
+    }
+    return input;
+}
+
 // Convert message history to Gemini's content format
 async function convertToGeminiContents(
+    model: string,
     messages: ResponseInput
 ): Promise<Content[]> {
-    const contents: Content[] = [];
+    let contents: Content[] = [];
 
     for (const msg of messages) {
         if (msg.type === 'function_call') {
@@ -346,135 +381,78 @@ async function convertToGeminiContents(
                 ],
             });
         } else if (msg.type === 'function_call_output') {
-            // Function output should be included as user message with function response
+            let textOutput = '';
             if (typeof msg.output === 'string') {
-                const extracted = extractBase64Image(msg.output);
+                textOutput = msg.output;
+            } else {
+                textOutput = JSON.stringify(msg.output);
+            }
 
-                if (extracted.found && extracted.image_id !== null) {
-                    // Extract image data and remaining text
-                    const image_id = extracted.image_id;
-                    // Get the image data for the first image and resize/truncate if needed
-                    const originalImageData = extracted.images[image_id];
-                    const processedImageData =
-                        await resizeAndTruncateForGemini(originalImageData);
-                    const mimeType = getImageMimeType(processedImageData);
-                    const cleanedImageData =
-                        cleanBase64Data(processedImageData);
-
-                    const parts: Part[] = [];
-
-                    // Add the function response first
-                    parts.push({
+            const message: Content = {
+                role: 'user',
+                parts: [
+                    {
                         functionResponse: {
                             name: msg.name,
-                            response: {
-                                content:
-                                    extracted.replaceContent.trim() ||
-                                    `[image #${image_id}]`,
-                            },
+                            response: { content: textOutput || '' },
                         },
-                    });
+                    },
+                ],
+            };
 
-                    // Add the image
-                    parts.push({
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: cleanedImageData,
-                        },
-                    });
-
-                    contents.push({
-                        role: 'user',
-                        parts: parts,
-                    });
-                } else {
-                    // No image, standard function output
-                    contents.push({
-                        role: 'user',
-                        parts: [
-                            {
-                                functionResponse: {
-                                    name: msg.name,
-                                    response: { content: msg.output || '' },
-                                },
-                            },
-                        ],
-                    });
-                }
-            } else {
-                // Not a string output
-                contents.push({
-                    role: 'user',
-                    parts: [
-                        {
-                            functionResponse: {
-                                name: msg.name,
-                                response: { content: msg.output || '' },
-                            },
-                        },
-                    ],
-                });
-            }
+            contents = await appendMessageWithImage(
+                model,
+                contents,
+                message,
+                {
+                    read: () => textOutput,
+                    write: value => {
+                        message.parts[0].functionResponse.response.content =
+                            value;
+                        return message;
+                    },
+                },
+                addImagesToInput
+            );
         } else {
             // Regular message
-            const role = msg.role === 'assistant' ? 'model' : 'user';
             let textContent = '';
-
             if (typeof msg.content === 'string') {
-                // Check if the content contains a base64 image
-                const extracted = extractBase64Image(msg.content);
-
-                if (extracted.found && extracted.image_id !== null) {
-                    // Process the image and any surrounding text
-                    const image_id = extracted.image_id;
-                    const originalImageData = extracted.images[image_id];
-                    const processedImageData =
-                        await resizeAndTruncateForGemini(originalImageData);
-                    const mimeType = getImageMimeType(processedImageData);
-                    const cleanedImageData =
-                        cleanBase64Data(processedImageData);
-                    const parts: Part[] = [];
-
-                    // Add remaining text if any
-                    if (extracted.replaceContent.trim()) {
-                        parts.push({
-                            text: extracted.replaceContent.trim(),
-                        });
-                    }
-
-                    // Add the image
-                    parts.push({
-                        inlineData: {
-                            mimeType: mimeType,
-                            data: cleanedImageData,
-                        },
-                    });
-
-                    contents.push({
-                        role,
-                        parts: parts,
-                    });
-                    continue; // Skip the standard text processing below
-                } else {
-                    textContent = msg.content;
-                }
+                textContent = msg.content;
             } else if (
                 msg.content &&
                 typeof msg.content === 'object' &&
                 'text' in msg.content
             ) {
                 textContent = msg.content.text as string;
+            } else {
+                textContent = JSON.stringify(msg.content);
             }
 
-            if (textContent && textContent.trim() !== '') {
-                if (msg.type === 'thinking') {
-                    textContent = 'Thinking: ' + textContent;
-                }
-                contents.push({
-                    role,
-                    parts: [{ text: textContent.trim() }],
-                });
-            }
+            const role = msg.role === 'assistant' ? 'model' : 'user';
+            const message: Content = {
+                role,
+                parts: [
+                    {
+                        thought: msg.type === 'thinking',
+                        text: textContent.trim(),
+                    },
+                ],
+            };
+
+            contents = await appendMessageWithImage(
+                model,
+                contents,
+                message,
+                {
+                    read: () => textContent,
+                    write: value => {
+                        message.parts[0].text = value;
+                        return message;
+                    },
+                },
+                addImagesToInput
+            );
         }
     }
 
@@ -755,12 +733,10 @@ export class GeminiProvider implements ModelProvider {
             : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
 
+        let messageId = uuidv4();
         let contentBuffer = '';
-        const messageId = uuidv4();
+        let thoughtBuffer = '';
         let eventOrder = 0;
-        // Buffer map for throttling message_delta emissions
-        const deltaBuffers = new Map<string, DeltaBuffer>();
-        let hasYieldedToolStart = false;
         // Track shown grounding URLs to avoid duplicates
         const shownGrounding = new Set<string>();
 
@@ -768,7 +744,7 @@ export class GeminiProvider implements ModelProvider {
         const chunks: GenerateContentResponse[] = [];
         try {
             // --- Prepare Request ---
-            const contents = await convertToGeminiContents(messages);
+            const contents = await convertToGeminiContents(model, messages);
 
             // Safety check for empty contents
             if (contents.length === 0) {
@@ -965,6 +941,10 @@ export class GeminiProvider implements ModelProvider {
             for await (const chunk of response) {
                 chunks.push(chunk);
 
+                if (chunk.responseId) {
+                    messageId = chunk.responseId;
+                }
+
                 // Log raw chunks for debugging if needed
                 // console.debug('[Gemini] Raw chunk:', JSON.stringify(chunk));
                 // Check if the system was paused during the stream
@@ -986,11 +966,10 @@ export class GeminiProvider implements ModelProvider {
                 if (chunk.functionCalls && chunk.functionCalls.length > 0) {
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
-                            const callId = `call_${uuidv4()}`;
                             yield {
                                 type: 'tool_start',
                                 tool_call: {
-                                    id: callId,
+                                    id: fc.id || `call_${uuidv4()}`,
                                     type: 'function',
                                     function: {
                                         name: fc.name,
@@ -1004,50 +983,40 @@ export class GeminiProvider implements ModelProvider {
                     }
                 }
 
-                // Handle text content (buffered)
-                if (chunk.text) {
-                    contentBuffer += chunk.text;
-
-                    for (const ev of bufferDelta(
-                        deltaBuffers,
-                        messageId,
-                        chunk.text,
-                        content =>
-                            ({
+                for (const candidate of chunk.candidates) {
+                    for (const part of candidate.content.parts) {
+                        let text = '';
+                        if (part.text) {
+                            text += part.text;
+                        }
+                        if (part.executableCode) {
+                            if (text) {
+                                text += '\n\n';
+                            }
+                            text += part.executableCode;
+                        }
+                        if (part.videoMetadata) {
+                            if (text) {
+                                text += '\n\n';
+                            }
+                            text += JSON.stringify(part.videoMetadata);
+                        }
+                        if (text.length > 0) {
+                            const ev: MessageEvent = {
                                 type: 'message_delta',
-                                content,
+                                content: '',
                                 message_id: messageId,
                                 order: eventOrder++,
-                            }) as ProviderStreamEvent
-                    )) {
-                        yield ev;
-                    }
-                }
-
-                // Handle search grounding results
-                const gChunks =
-                    chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
-                if (Array.isArray(gChunks)) {
-                    const newChunks = gChunks.filter(
-                        c => c?.web?.uri && !shownGrounding.has(c.web.uri)
-                    );
-                    if (newChunks.length) {
-                        newChunks.forEach(c => shownGrounding.add(c.web.uri));
-                        const formatted = formatGroundingChunks(newChunks);
-                        yield {
-                            type: 'message_delta',
-                            content: '\n\nSearch Results:\n' + formatted + '\n',
-                            message_id: messageId,
-                            order: eventOrder++,
-                        };
-                        contentBuffer +=
-                            '\n\nSearch Results:\n' + formatted + '\n';
-                    }
-                }
-
-                // Handle images or other modalities
-                if (chunk.candidates?.[0]?.content?.parts) {
-                    for (const part of chunk.candidates[0].content.parts) {
+                            };
+                            if (part.thought) {
+                                thoughtBuffer += text;
+                                ev.thinking_content = text;
+                            } else {
+                                contentBuffer += text;
+                                ev.content = text;
+                            }
+                            yield ev as MessageEvent;
+                        }
                         if (part.inlineData?.data) {
                             yield {
                                 type: 'file_complete',
@@ -1060,26 +1029,33 @@ export class GeminiProvider implements ModelProvider {
                             };
                         }
                     }
+                    const gChunks =
+                        candidate.groundingMetadata?.groundingChunks;
+                    if (Array.isArray(gChunks)) {
+                        const newChunks = gChunks.filter(
+                            c => c?.web?.uri && !shownGrounding.has(c.web.uri)
+                        );
+                        if (newChunks.length) {
+                            newChunks.forEach(c =>
+                                shownGrounding.add(c.web.uri)
+                            );
+                            const formatted = formatGroundingChunks(newChunks);
+                            yield {
+                                type: 'message_delta',
+                                content:
+                                    '\n\nSearch Results:\n' + formatted + '\n',
+                                message_id: messageId,
+                                order: eventOrder++,
+                            };
+                            contentBuffer +=
+                                '\n\nSearch Results:\n' + formatted + '\n';
+                        }
+                    }
                 }
-
                 if (chunk.usageMetadata) {
-                    // Always use the latest usage metadata?
+                    // Always use the latest usage metadata
                     usageMetadata = chunk.usageMetadata;
                 }
-            }
-
-            // Flush any buffered deltas that didn't meet the threshold
-            for (const ev of flushBufferedDeltas(
-                deltaBuffers,
-                (_id, content) =>
-                    ({
-                        type: 'message_delta',
-                        content,
-                        message_id: messageId,
-                        order: eventOrder++,
-                    }) as ProviderStreamEvent
-            )) {
-                yield ev;
             }
 
             if (usageMetadata) {
@@ -1096,7 +1072,7 @@ export class GeminiProvider implements ModelProvider {
                 });
             } else {
                 console.error(
-                    'No usage metadata found in the response. This may affect token tracking.'
+                    '[Gemini] No usage metadata found in the response. This may affect token tracking.'
                 );
                 costTracker.addUsage({
                     model,
@@ -1111,10 +1087,11 @@ export class GeminiProvider implements ModelProvider {
             }
 
             // --- Stream Finished, Emit Final Events ---
-            if (!hasYieldedToolStart && contentBuffer) {
+            if (contentBuffer || thoughtBuffer) {
                 yield {
                     type: 'message_complete',
                     content: contentBuffer,
+                    thinking_content: thoughtBuffer,
                     message_id: messageId,
                 };
             }
@@ -1155,10 +1132,11 @@ export class GeminiProvider implements ModelProvider {
             };
 
             // Emit any partial content if we haven't yielded a tool call
-            if (!hasYieldedToolStart && contentBuffer) {
+            if (contentBuffer || thoughtBuffer) {
                 yield {
                     type: 'message_complete',
                     content: contentBuffer,
+                    thinking_content: thoughtBuffer,
                     message_id: messageId,
                 };
             }

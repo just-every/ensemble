@@ -25,7 +25,7 @@ import {
 } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/communication.js';
 import {
-    extractBase64Image,
+    appendMessageWithImage,
     resizeAndSplitForOpenAI,
 } from '../utils/image_utils.js';
 import {
@@ -852,31 +852,14 @@ export class OpenAIProvider implements ModelProvider {
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     const { name, id, ...messageToAdd } = message; // Original code removes name
 
-                    if (typeof message.output === 'string') {
-                        const extracted = extractBase64Image(message.output);
-
-                        if (extracted.found) {
-                            // If the output contains an image, we need to convert it to a file
-                            // Add the modified message with placeholder - preserve all original properties
-                            input.push({
-                                ...messageToAdd, // Use the potentially modified message
-                                output: extracted.replaceContent, // Already contains [image ID] placeholders
-                            });
-
-                            // Process the images and wait for the result
-                            input = await addImagesToInput(
-                                input,
-                                extracted.images,
-                                `function call output of ${message.name}` // Still use original message.name here
-                            );
-                        } else {
-                            // Add the message (potentially without id)
-                            input.push(messageToAdd);
-                        }
-                    } else {
-                        // Add the message (potentially without id)
-                        input.push(messageToAdd);
-                    }
+                    input = await appendMessageWithImage(
+                        model,
+                        input,
+                        messageToAdd,
+                        'output',
+                        addImagesToInput,
+                        `function call output of ${message.name}`
+                    );
                     continue;
                 }
 
@@ -901,52 +884,13 @@ export class OpenAIProvider implements ModelProvider {
                         );
                     }
 
-                    // Check if the message content contains an image
-                    if (typeof message.content === 'string') {
-                        const extracted = extractBase64Image(message.content);
-
-                        if (extracted.found) {
-                            // Add modified message with placeholder
-                            input.push({
-                                ...message,
-                                type: 'message', // Ensure type property is set
-                                content: extracted.replaceContent, // Already contains [image ID] placeholders
-                            });
-
-                            // Process the images and wait for the result
-                            input = await addImagesToInput(
-                                input,
-                                extracted.images,
-                                `${message.role} message`
-                            );
-                        } else {
-                            // Add the original message (ensure type is set only if it's a valid message)
-                            if (
-                                message.type === undefined &&
-                                'role' in message &&
-                                'content' in message
-                            ) {
-                                // Only add type:'message' to objects that have content and role properties
-                                input.push({ ...message, type: 'message' });
-                            } else {
-                                // Otherwise keep original
-                                input.push(message);
-                            }
-                        }
-                    } else {
-                        // Add the original message (ensure type is set only if it's a valid message)
-                        if (
-                            message.type === undefined &&
-                            'role' in message &&
-                            'content' in message
-                        ) {
-                            // Only add type:'message' to objects that have content and role properties
-                            input.push({ ...message, type: 'message' });
-                        } else {
-                            // Otherwise keep original
-                            input.push(message);
-                        }
-                    }
+                    input = await appendMessageWithImage(
+                        model,
+                        input,
+                        { ...message, type: 'message' },
+                        'content',
+                        addImagesToInput
+                    );
                     continue;
                 }
             }
@@ -1185,7 +1129,7 @@ export class OpenAIProvider implements ModelProvider {
                                 type: 'message_complete',
                                 content: '',
                                 message_id: event.item.id + '-0',
-                                thinking_content: '{empty}',
+                                thinking_content: '',
                             };
                         }
                     }

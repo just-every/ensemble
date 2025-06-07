@@ -203,15 +203,14 @@ async function* executeRound(
         switch (event.type) {
             case 'message_complete': {
                 const messageEvent = event as MessageEventBase;
-                if (messageEvent.thinking_content) {
+                if (
+                    messageEvent.thinking_content ||
+                    (!messageEvent.content && messageEvent.message_id) // Note that some providers require empty thinking nodes to be included in the conversation history
+                ) {
                     const thinkingMessage: ResponseThinkingMessage = {
                         type: 'thinking',
                         role: 'assistant',
-                        content:
-                            messageEvent.thinking_content &&
-                            messageEvent.thinking_content !== '{empty}'
-                                ? messageEvent.thinking_content
-                                : '',
+                        content: messageEvent.thinking_content || '',
                         signature: messageEvent.thinking_signature || '',
                         thinking_id: messageEvent.message_id || '',
                         status: 'completed',

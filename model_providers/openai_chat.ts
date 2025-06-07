@@ -24,7 +24,10 @@ import {
     log_llm_response,
 } from '../utils/llm_logger.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
-import { extractBase64Image } from '../utils/image_utils.js';
+import {
+    appendMessageWithImage,
+    resizeAndSplitForOpenAI,
+} from '../utils/image_utils.js';
 import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import {
     DeltaBuffer,
@@ -168,13 +171,89 @@ async function convertToOpenAITools(
     );
 }
 
+/**
+ * Processes images and adds them to the input array for OpenAI
+ * Resizes images to max 1024px width and splits into sections if height > 768px
+ *
+ * @param input - The input array to add images to
+ * @param images - Record of image IDs to base64 image data
+ * @param source - Description of where the images came from
+ * @returns Updated input array with processed images
+ */
+export async function addImagesToInput(
+    input: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    images: Record<string, string>,
+    source: string
+): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
+    // Add developer messages for each image
+    for (const [image_id, imageData] of Object.entries(images)) {
+        try {
+            // Resize and split the image if needed
+            const processedImages = await resizeAndSplitForOpenAI(imageData);
+
+            // Create a content array for the message
+            const messageContent = [];
+
+            // Add description text first
+            if (processedImages.length === 1) {
+                // Single image (no splitting needed)
+                messageContent.push({
+                    type: 'text',
+                    text: `This is [image #${image_id}] from the ${source}`,
+                });
+            } else {
+                // Multiple segments - explain the splitting
+                messageContent.push({
+                    type: 'text',
+                    text: `This is [image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
+                });
+            }
+
+            // Add all image segments to the same message
+            for (const imageSegment of processedImages) {
+                messageContent.push({
+                    type: 'image_url',
+                    image_url: {
+                        url: imageSegment,
+                    },
+                });
+            }
+
+            // Add the complete message with all segments
+            input.push({
+                role: 'user',
+                content: messageContent,
+            });
+        } catch (error) {
+            console.error(`Error processing image ${image_id}:`, error);
+            // If image processing fails, add the original image as a fallback
+            input.push({
+                role: 'user',
+                content: [
+                    {
+                        type: 'text',
+                        text: `This is [image #${image_id}] from the ${source} (raw image)`,
+                    },
+                    {
+                        type: 'image_url',
+                        image_url: {
+                            url: imageData,
+                        },
+                    },
+                ],
+            });
+        }
+    }
+    return input;
+}
+
 /** Maps internal message history format to OpenAI's format. */
 async function mapMessagesToOpenAI(
     messages: ResponseInput,
     model: string
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
     // Use flatMap to allow returning multiple messages when needed (e.g., for image extraction)
-    const result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+    let result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
     for (const msg of messages) {
         // Create a clean copy without non-standard properties
@@ -183,86 +262,18 @@ async function mapMessagesToOpenAI(
         delete (message as any).pinned;
         // Handle function call output messages
         if (message.type === 'function_call_output') {
-            // Check if output contains a base64 image
-            if (typeof message.output === 'string') {
-                const extracted = extractBase64Image(message.output);
-
-                if (extracted.found && extracted.image_id !== null) {
-                    // Get the first image data
-                    const imageId = extracted.image_id;
-                    const imageData = extracted.images[imageId];
-
-                    // Process the image - might convert to text for models that don't support images
-                    const processedImageData = await convertImageToTextIfNeeded(
-                        imageData,
-                        model
-                    );
-
-                    // If the image was converted to text (not still an image data URL)
-                    if (!processedImageData.startsWith('data:image/')) {
-                        // Create new content with the text description
-                        const newContent = extracted.replaceContent.trim()
-                            ? extracted.replaceContent.trim() +
-                              ' ' +
-                              processedImageData
-                            : processedImageData;
-
-                        // Add a single message with the text description replacing the image
-                        result.push({
-                            role: 'tool',
-                            tool_call_id: message.call_id,
-                            content: newContent,
-                        } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam);
-                    } else {
-                        // Model supports images, use the original image handling logic
-                        // Use the existing image ID from extraction
-                        const image_id = imageId;
-
-                        // First, add the original message with image replaced by a placeholder
-                        const placeholderOutput =
-                            extracted.replaceContent.trim()
-                                ? `${extracted.replaceContent} [image #${image_id}]`
-                                : `[image #${image_id}]`;
-
-                        result.push({
-                            role: 'tool',
-                            tool_call_id: message.call_id,
-                            content: placeholderOutput,
-                        } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam);
-
-                        // Then add a user message with the image in OpenAI's multimodal format
-                        result.push({
-                            role: 'system',
-                            content: [
-                                {
-                                    type: 'text',
-                                    text: `This is [image #${image_id}] from function call output`,
-                                },
-                                {
-                                    type: 'image_url',
-                                    image_url: {
-                                        url: processedImageData,
-                                    },
-                                },
-                            ],
-                        } as OpenAI.Chat.Completions.ChatCompletionSystemMessageParam);
-                    }
-                } else {
-                    // No image, just add the normal message
-                    result.push({
-                        role: 'tool',
-                        tool_call_id: message.call_id,
-                        content: message.output || '',
-                    } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam);
-                }
-            } else {
-                // Not a string output, just add the normal message
-                result.push({
-                    role: 'tool',
-                    tool_call_id: message.call_id,
-                    content: message.output || '',
-                } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam);
-            }
+            const toolMessage = {
+                role: 'tool',
+                tool_call_id: message.call_id,
+                content: message.output || '',
+            } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
+            result = await appendMessageWithImage(
+                model,
+                result,
+                toolMessage,
+                'content',
+                addImagesToInput
+            );
         }
         // Handle function call messages
         else if (message.type === 'function_call') {
@@ -293,110 +304,20 @@ async function mapMessagesToOpenAI(
             message.type === 'message' ||
             message.type === 'thinking'
         ) {
-            let content:
-                | string
-                | OpenAI.Chat.Completions.ChatCompletionContentPart[] = '';
-
             // Extract content from the message
             if ('content' in message) {
-                if (typeof message.content === 'string') {
-                    // Check if content contains a base64 image
-                    const extracted = extractBase64Image(message.content);
-
-                    if (extracted.found && extracted.image_id !== null) {
-                        // Get the first image
-                        const imageId = extracted.image_id;
-                        const imageData = extracted.images[imageId];
-
-                        // Process the image - might convert to text for models that don't support images
-                        const processedImageData =
-                            await convertImageToTextIfNeeded(imageData, model);
-
-                        // Map role to appropriate OpenAI role
-                        let role = message.role || 'user';
-                        if (role === 'developer') role = 'system';
-                        if (
-                            role !== 'system' &&
-                            role !== 'user' &&
-                            role !== 'assistant'
-                        )
-                            role = 'user';
-
-                        // If the image was converted to text (not still an image data URL)
-                        if (!processedImageData.startsWith('data:image/')) {
-                            // Create new content with the text description
-                            const newContent = extracted.replaceContent.trim()
-                                ? extracted.replaceContent.trim() +
-                                  ' ' +
-                                  processedImageData
-                                : processedImageData;
-
-                            // Add a single message with the text description replacing the image
-                            result.push({
-                                role: role as 'system' | 'user' | 'assistant',
-                                content: newContent,
-                            });
-                        } else {
-                            // Model supports images, use the original image handling logic
-                            // Use the existing image ID from extraction
-                            const image_id = imageId;
-
-                            // Create placeholder with remaining text + image placeholder
-                            const placeholderContent =
-                                extracted.replaceContent.trim()
-                                    ? `${extracted.replaceContent} [image #${image_id}]`
-                                    : `[image #${image_id}]`;
-
-                            // First, add the original message with image replaced by a placeholder
-                            result.push({
-                                role: role as 'system' | 'user' | 'assistant',
-                                content: placeholderContent,
-                            });
-
-                            // Then add a user message with the image in OpenAI's multimodal format
-                            result.push({
-                                role: 'system',
-                                content: [
-                                    {
-                                        type: 'text',
-                                        text: `This is [image #${image_id}] from the ${role} message`,
-                                    },
-                                    {
-                                        type: 'image_url',
-                                        image_url: {
-                                            url: processedImageData,
-                                        },
-                                    },
-                                ],
-                            } as OpenAI.Chat.Completions.ChatCompletionSystemMessageParam);
-                        }
-
-                        // Skip the default message addition at the end
-                        continue;
-                    } else {
-                        content = message.content;
-                    }
-                } else if (
-                    message.content &&
-                    typeof message.content === 'object' &&
-                    'text' in message.content &&
-                    typeof message.content.text === 'string'
-                ) {
-                    content = message.content.text;
+                if (message.role === 'developer') message.role = 'system';
+                if (!['system', 'user', 'assistant'].includes(message.role)) {
+                    message.role = 'user';
                 }
+                result = await appendMessageWithImage(
+                    model,
+                    result,
+                    message,
+                    'content',
+                    addImagesToInput
+                );
             }
-
-            // Map role to appropriate OpenAI role
-            let role = message.role || 'user';
-            if (role === 'developer') role = 'system';
-            if (role !== 'system' && role !== 'user' && role !== 'assistant')
-                role = 'user';
-
-            // Add the standard message
-            result.push({
-                role: role as 'system' | 'user' | 'assistant',
-                content: content,
-            });
         }
     }
 

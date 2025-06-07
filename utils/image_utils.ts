@@ -19,9 +19,78 @@ export const GEMINI_MAX_WIDTH = 1024;
 export const GEMINI_MAX_HEIGHT = 1536;
 
 import { ExtractBase64ImageResult } from '../types/types.js';
+import { convertImageToTextIfNeeded } from './image_to_text.js';
 
-// Re-export for backward compatibility
-export type { ExtractBase64ImageResult };
+/**
+ * Extract base64 images from a message and appends formatted images
+ *
+ * @param message - String that may contain base64 encoded images
+ * @returns Object with extraction results including image mapping
+ */
+export async function appendMessageWithImage(
+    model: string,
+    input: any[],
+    message: any,
+    param:
+        | string
+        | {
+              read: () => string;
+              write: (value: string) => any;
+          },
+    addImagesToInput: (
+        input: any[],
+        images: Record<string, string>,
+        source: string
+    ) => Promise<any[]>,
+    source?: string
+): Promise<any> {
+    const content =
+        typeof param === 'string'
+            ? typeof message[param] === 'string'
+                ? message[param]
+                : JSON.stringify(message[param])
+            : param.read();
+
+    // Extract any images from the content
+    const extracted = extractBase64Image(content);
+    if (!extracted.found) {
+        // Nothing found - just append
+        input.push(message);
+        return input;
+    }
+
+    let imagesConverted = false;
+    for (const [image_id, imageData] of Object.entries(extracted.images)) {
+        const imageToText = await convertImageToTextIfNeeded(imageData, model);
+        if (imageToText && typeof imageToText === 'string') {
+            extracted.replaceContent.replaceAll(
+                `[image #${image_id}]`,
+                `[image #${image_id}: ${imageToText}]`
+            );
+            imagesConverted = true;
+        }
+    }
+
+    // Add modified message with placeholder
+    if (typeof param === 'string') {
+        const newMessage = { ...message };
+        newMessage[param] = extracted.replaceContent;
+        input.push(newMessage);
+    } else {
+        input.push(param.write(extracted.replaceContent));
+    }
+
+    if (!imagesConverted) {
+        // Process the images and wait for the result
+        input = await addImagesToInput(
+            input,
+            extracted.images,
+            source || `${message.role} message`
+        );
+    }
+
+    return input;
+}
 
 /**
  * Extract base64 images from a string, preserving non-image content
