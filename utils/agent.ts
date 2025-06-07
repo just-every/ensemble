@@ -133,35 +133,39 @@ export class Agent implements AgentDefinition {
     modelClass?: ModelClassID;
     modelSettings?: ModelSettings;
     intelligence?: 'low' | 'standard' | 'high'; // Used to select the model
-    maxToolCalls?: number;
-    maxToolCallRoundsPerTurn?: number; // Maximum number of tool call rounds per turn
+    maxToolCalls?: number; // Maximum total number of tool calls allowed (default: 200)
+    maxToolCallRoundsPerTurn?: number; // Maximum number of sequential tool call rounds per turn. Each round can have multiple parallel tool calls. Default: Infinity (no limit)
     verifier?: AgentDefinition;
     maxVerificationAttempts?: number;
+    args?: any;
     jsonSchema?: ResponseJSONSchema; // JSON schema for structured output
     historyThread?: ResponseInput | undefined;
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
+    modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
+    disabledModels?: string[]; // Models to exclude from selection
 
-    // Optional callback to preprocess parameters before runAgentTool
+    /** Optional callback for processing tool calls */
+    onToolCall?: (toolCall: ToolCall) => Promise<void>;
+    processToolCall?: (toolCalls: ToolCall[]) => Promise<Record<string, any>>;
+    onToolResult?: (toolCallResult: ToolCallResult) => Promise<void>;
+    onToolError?: (toolCallResult: ToolCallResult) => Promise<void>;
+    onRequest?: (
+        agent: AgentDefinition, // Reverted back to AgentInterface
+        messages: ResponseInput
+    ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
+    onResponse?: (message: ResponseOutputMessage) => Promise<void>;
+    onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
+
     params?: ToolParameterMap; // Map of parameter names to their definitions
     processParams?: (
-        agent: Agent,
+        agent: AgentDefinition,
         params: Record<string, any>
     ) => Promise<{
         prompt: string;
         intelligence?: 'low' | 'standard' | 'high';
     }>;
 
-    // Event handlers for tool calls and results
-    onToolCall?: (toolCall: ToolCall) => Promise<void>;
-    onToolResult?: (toolCallResult: ToolCallResult) => Promise<void>;
-
-    // Event handlers for request and response
-    onRequest?: (
-        agent: Agent,
-        messages: ResponseInput
-    ) => Promise<[Agent, ResponseInput]>;
-    onResponse?: (message: ResponseOutputMessage) => Promise<void>;
-    onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
+    allowedEvents?: string[];
 
     constructor(definition: AgentDefinition) {
         // Validate that we received a proper AgentDefinition
