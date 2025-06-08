@@ -616,7 +616,13 @@ async function runAgentTool(
         for await (const event of stream) {
             if (agent.onEvent) {
                 try {
-                    await agent.onEvent(event);
+                    // Add agent context to all events
+                    const eventWithContext = {
+                        ...event,
+                        agent: agentExport,
+                        parent_id: agent.parent_id,
+                    };
+                    await agent.onEvent(eventWithContext);
                 } catch (error) {
                     console.warn(`Error in onEvent handler: ${error}`);
                 }

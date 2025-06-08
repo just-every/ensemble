@@ -324,6 +324,8 @@ export type StreamEventType =
 export interface StreamEventBase {
     type: StreamEventType;
     timestamp?: string; // Timestamp for the event, shared by all event types
+    agent?: AgentExportDefinition; // Optional agent context
+    parent_id?: string; // Optional parent reference
 }
 
 /**
