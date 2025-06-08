@@ -195,6 +195,25 @@ async function* executeRound(
 
     const toolPromises: Promise<ToolCallResult>[] = [];
 
+    // Buffer for events emitted during tool execution
+    const toolEventBuffer: ProviderStreamEvent[] = [];
+
+    // Wrap onEvent to both collect events and call original handler immediately
+    const originalOnEvent = agent.onEvent;
+    agent.onEvent = async (event: ProviderStreamEvent) => {
+        // Buffer for the main stream
+        toolEventBuffer.push(event);
+
+        // Call original handler immediately for real-time transmission
+        if (originalOnEvent) {
+            try {
+                await originalOnEvent(event);
+            } catch (error) {
+                console.warn(`Error in onEvent handler: ${error}`);
+            }
+        }
+    };
+
     for await (const event of stream) {
         // Apply event filtering
         if (agent.allowedEvents && !agent.allowedEvents.includes(event.type)) {
@@ -307,6 +326,15 @@ async function* executeRound(
 
     // Complete then process any tool calls
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
+
+    // Restore original onEvent handler
+    agent.onEvent = originalOnEvent;
+
+    // Yield any events that were buffered during tool execution
+    for (const bufferedEvent of toolEventBuffer) {
+        yield bufferedEvent;
+    }
+
     for (const toolResult of toolResults) {
         yield {
             type: 'tool_done',

@@ -540,7 +540,7 @@ export class Agent implements AgentDefinition {
 }
 
 /**
- * Run an agent and capture its streamed response, including any confidence signals
+ * Run an agent and capture its response, emitting events through onEvent if available
  */
 async function runAgentTool(
     agent: AgentDefinition,
@@ -580,30 +580,29 @@ async function runAgentTool(
         content: prompt,
     });
 
-    // Emit agent_start event if onEvent handler is available
+    // Create agent export info
+    const agentExport =
+        typeof (agent as any).export === 'function'
+            ? (agent as any).export()
+            : {
+                  agent_id: agent.agent_id,
+                  name: agent.name,
+                  model: agent.model,
+                  modelClass: agent.modelClass,
+                  parent_id: agent.parent_id,
+                  cwd: agent.cwd,
+              };
+
+    // Emit agent_start event
     if (agent.onEvent) {
-        const agentExport =
-            typeof (agent as any).export === 'function'
-                ? (agent as any).export()
-                : {
-                      agent_id: agent.agent_id,
-                      name: agent.name,
-                      model: agent.model,
-                      modelClass: agent.modelClass,
-                      parent_id: agent.parent_id,
-                      cwd: agent.cwd,
-                  };
-
-        const startEvent: ProviderStreamEvent = {
-            type: 'agent_start',
-            agent: agentExport,
-            input: prompt,
-            parent_id: agent.parent_id,
-            timestamp: new Date().toISOString(),
-        };
-
         try {
-            await agent.onEvent(startEvent);
+            await agent.onEvent({
+                type: 'agent_start',
+                agent: agentExport,
+                input: prompt,
+                parent_id: agent.parent_id,
+                timestamp: new Date().toISOString(),
+            });
         } catch (error) {
             console.warn(`Error in onEvent handler for agent_start: ${error}`);
         }
@@ -613,9 +612,8 @@ async function runAgentTool(
         const stream = ensembleRequest(messages, agent);
         let fullResponse = '';
 
-        // Process the stream and forward all events
+        // Forward all events from the sub-agent
         for await (const event of stream) {
-            // Forward all events to the onEvent handler if available
             if (agent.onEvent) {
                 try {
                     await agent.onEvent(event);
@@ -629,31 +627,17 @@ async function runAgentTool(
             }
         }
 
-        // Emit agent_done event if onEvent handler is available
+        // Emit agent_done event
         if (agent.onEvent) {
-            const agentExport =
-                typeof (agent as any).export === 'function'
-                    ? (agent as any).export()
-                    : {
-                          agent_id: agent.agent_id,
-                          name: agent.name,
-                          model: agent.model,
-                          modelClass: agent.modelClass,
-                          parent_id: agent.parent_id,
-                          cwd: agent.cwd,
-                      };
-
-            const doneEvent: ProviderStreamEvent = {
-                type: 'agent_done',
-                agent: agentExport,
-                input: prompt,
-                output: fullResponse,
-                parent_id: agent.parent_id,
-                timestamp: new Date().toISOString(),
-            };
-
             try {
-                await agent.onEvent(doneEvent);
+                await agent.onEvent({
+                    type: 'agent_done',
+                    agent: agentExport,
+                    input: prompt,
+                    output: fullResponse,
+                    parent_id: agent.parent_id,
+                    timestamp: new Date().toISOString(),
+                });
             } catch (error) {
                 console.warn(
                     `Error in onEvent handler for agent_done: ${error}`
@@ -665,35 +649,21 @@ async function runAgentTool(
     } catch (error) {
         console.error(`Error in ${agent.name}: ${error}`);
 
-        // Emit agent_done with error if onEvent handler is available
+        // Emit agent_done with error
         if (agent.onEvent) {
-            const agentExport =
-                typeof (agent as any).export === 'function'
-                    ? (agent as any).export()
-                    : {
-                          agent_id: agent.agent_id,
-                          name: agent.name,
-                          model: agent.model,
-                          modelClass: agent.modelClass,
-                          parent_id: agent.parent_id,
-                          cwd: agent.cwd,
-                      };
-
-            const errorEvent: ProviderStreamEvent = {
-                type: 'agent_done',
-                agent: agentExport,
-                input: prompt,
-                output: `Error in ${agent.name}: ${error}`,
-                status: 'error',
-                parent_id: agent.parent_id,
-                timestamp: new Date().toISOString(),
-            };
-
             try {
-                await agent.onEvent(errorEvent);
-            } catch (eventError) {
+                await agent.onEvent({
+                    type: 'agent_done',
+                    agent: agentExport,
+                    input: prompt,
+                    output: `Error in ${agent.name}: ${error}`,
+                    status: 'error',
+                    parent_id: agent.parent_id,
+                    timestamp: new Date().toISOString(),
+                });
+            } catch (error) {
                 console.warn(
-                    `Error in onEvent handler for agent_done: ${eventError}`
+                    `Error in onEvent handler for agent_done: ${error}`
                 );
             }
         }
