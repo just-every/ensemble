@@ -35,6 +35,12 @@ import {
     bufferDelta,
     flushBufferedDeltas,
 } from '../utils/delta_buffer.js';
+import {
+    createCitationTracker,
+    formatCitation,
+    generateFootnotes,
+    type CitationTracker,
+} from '../utils/citation_tracker.js';
 
 // Extended types for Perplexity/OpenRouter response formats
 interface ExtendedDelta
@@ -62,50 +68,6 @@ const TOOL_CALL_CLEANUP_REGEX =
     /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*\[.*\](?:\s*```)?/gms; // Use greedy .* here too for consistency
 const CLEANUP_PLACEHOLDER = '[Simulated Tool Calls Removed]';
 
-/**
- * Citation tracking for footnotes
- */
-interface CitationTracker {
-    citations: Map<string, { title: string; url: string }>;
-    last: number;
-}
-
-/**
- * Create a new citation tracker
- */
-function createCitationTracker(): CitationTracker {
-    return {
-        citations: new Map(),
-        last: 0,
-    };
-}
-
-/**
- * Format citation as a footnote and return a reference marker
- */
-function formatCitation(
-    tracker: CitationTracker,
-    citation: { title: string; url: string }
-): string {
-    if (!tracker.citations.has(citation.url)) {
-        tracker.citations.set(citation.url, citation);
-        tracker.last++;
-    }
-    return ` [${Array.from(tracker.citations.keys()).indexOf(citation.url) + 1}]`;
-}
-
-/**
- * Generate formatted footnotes from citation tracker
- */
-function generateFootnotes(tracker: CitationTracker): string {
-    if (tracker.citations.size === 0) return '';
-
-    const footnotes = Array.from(tracker.citations.values())
-        .map((citation, i) => `[${i + 1}] ${citation.title} – ${citation.url}`)
-        .join('\n');
-
-    return '\n\nReferences:\n' + footnotes;
-}
 
 // --- Helper Functions ---
 

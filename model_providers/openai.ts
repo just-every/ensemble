@@ -33,53 +33,18 @@ import {
     bufferDelta,
     flushBufferedDeltas,
 } from '../utils/delta_buffer.js';
+import {
+    createCitationTracker,
+    formatCitation,
+    generateFootnotes,
+    type CitationTracker,
+} from '../utils/citation_tracker.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort } from 'openai/resources/shared.js';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
 
-/**
- * Citation tracking for footnotes
- */
-interface CitationTracker {
-    citations: Map<string, { title: string; url: string }>;
-}
-
-/**
- * Create a new citation tracker
- */
-function createCitationTracker(): CitationTracker {
-    return {
-        citations: new Map(),
-    };
-}
-
-/**
- * Format citation as a footnote and return a reference marker
- */
-function formatCitation(
-    tracker: CitationTracker,
-    citation: { title: string; url: string }
-): string {
-    if (!tracker.citations.has(citation.url)) {
-        tracker.citations.set(citation.url, citation);
-    }
-    return ` [${Array.from(tracker.citations.keys()).indexOf(citation.url) + 1}]`;
-}
-
-/**
- * Generate formatted footnotes from citation tracker
- */
-function generateFootnotes(tracker: CitationTracker): string {
-    if (tracker.citations.size === 0) return '';
-
-    const footnotes = Array.from(tracker.citations.values())
-        .map((citation, i) => `[${i + 1}] ${citation.title} – ${citation.url}`)
-        .join('\n');
-
-    return '\n\nReferences:\n' + footnotes;
-}
 
 // Convert our tool definition to OpenAI's format
 /**

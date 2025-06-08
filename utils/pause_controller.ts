@@ -72,7 +72,8 @@ class PauseControllerImpl extends EventEmitter implements PauseController {
         }
         
         if (abortSignal?.aborted) {
-            throw new Error('Operation aborted while waiting for pause');
+            const { PauseAbortError } = await import('../types/errors.js');
+            throw new PauseAbortError();
         }
     }
 }

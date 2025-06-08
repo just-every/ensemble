@@ -52,6 +52,33 @@ export {
     type PauseController
 } from './utils/pause_controller.js';
 
+// Export image validation utilities
+export {
+    isValidBase64,
+    detectImageType
+} from './utils/image_validation.js';
+
+// Export citation tracking utilities
+export {
+    createCitationTracker,
+    formatCitation,
+    generateFootnotes,
+    type CitationTracker,
+    type Citation
+} from './utils/citation_tracker.js';
+
+// Export error types
+export {
+    EnsembleError,
+    ProviderError,
+    ToolExecutionError,
+    AbortError,
+    PauseAbortError,
+    QuotaExceededError,
+    ModelNotFoundError,
+    ConfigurationError
+} from './types/errors.js';
+
 // Export new tool execution utilities
 export {
     runningToolTracker,

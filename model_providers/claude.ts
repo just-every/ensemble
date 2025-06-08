@@ -7,6 +7,12 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { v4 as uuidv4 } from 'uuid';
+import {
+    createCitationTracker,
+    formatCitation,
+    generateFootnotes,
+    type CitationTracker,
+} from '../utils/citation_tracker.js';
 
 /**
  * Format web search results into a readable text format
@@ -17,72 +23,6 @@ function formatWebSearchResults(results: any[]): string {
         .filter(r => r.type === 'web_search_result')
         .map((r, i) => `${i + 1}. ${r.title || 'Untitled'} – ${r.url}`)
         .join('\n');
-}
-
-/**
- * Citation tracking for footnotes
- */
-interface CitationTracker {
-    citations: Map<string, { title: string; url: string; citedText: string }>;
-    lastIndex: number;
-}
-
-/**
- * Create a new citation tracker
- */
-function createCitationTracker(): CitationTracker {
-    return {
-        citations: new Map(),
-        lastIndex: 0,
-    };
-}
-
-/**
- * Format citation as a footnote and return a reference marker
- */
-function formatCitation(
-    tracker: CitationTracker,
-    citation: {
-        title: string;
-        url: string;
-        cited_text: string;
-        encrypted_index?: string;
-    }
-): string {
-    // Use URL as key to deduplicate citations
-    const url = citation.url;
-    let index: number;
-
-    if (tracker.citations.has(url)) {
-        // Find the index of this citation in the tracker (1-based)
-        const entries = Array.from(tracker.citations.entries());
-        index = entries.findIndex(([k]) => k === url) + 1;
-    } else {
-        // Create new citation
-        tracker.lastIndex++;
-        index = tracker.lastIndex;
-        tracker.citations.set(url, {
-            title: citation.title,
-            url: citation.url,
-            citedText: citation.cited_text,
-        });
-    }
-
-    // Return the reference marker
-    return ` [${index}]`;
-}
-
-/**
- * Generate formatted footnotes from citation tracker
- */
-function generateFootnotes(tracker: CitationTracker): string {
-    if (tracker.citations.size === 0) return '';
-
-    const footnotes = Array.from(tracker.citations.values())
-        .map((citation, i) => `[${i + 1}] ${citation.title} – ${citation.url}`)
-        .join('\n');
-
-    return '\n\nReferences:\n' + footnotes;
 }
 import {
     ModelProvider,
@@ -765,7 +705,11 @@ export class ClaudeProvider implements ModelProvider {
                             // Format the citation and append a reference marker
                             const citationMarker = formatCitation(
                                 citationTracker,
-                                event.delta.citation
+                                {
+                                    title: event.delta.citation.title,
+                                    url: event.delta.citation.url,
+                                    citedText: event.delta.citation.cited_text,
+                                }
                             );
 
                             // Yield the citation marker
