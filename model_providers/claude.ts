@@ -11,7 +11,6 @@ import {
     createCitationTracker,
     formatCitation,
     generateFootnotes,
-    type CitationTracker,
 } from '../utils/citation_tracker.js';
 
 /**
@@ -80,7 +79,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                             // Remove empty enum to avoid validation errors
                             delete propCopy.enum;
                         }
-                    } catch (e) {
+                    } catch {
                         // If enum resolution fails, remove it
                         delete propCopy.enum;
                     }

@@ -2,7 +2,7 @@
  * Unit test for tool rounds to verify infinite loop prevention
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent, ensembleRequest, createToolFunction } from '../index.js';
 import type { ResponseInput } from '../types/types.js';
 import {
@@ -65,7 +65,8 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of stream) {
             // Just consume the stream
         }
 
@@ -173,7 +174,8 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of stream) {
             // Just consume the stream
         }
 
@@ -220,7 +222,8 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of stream) {
             // Just consume the stream
         }
 
@@ -267,7 +270,8 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of stream) {
             // Just consume the stream
         }
 
@@ -313,7 +317,8 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
         const stream = ensembleRequest(messages, agent);
 
-        for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of stream) {
             // Just consume the stream
         }
 

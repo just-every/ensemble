@@ -14,8 +14,8 @@ import {
 // Re-export for backward compatibility
 export type { EmbedOpts };
 
-// Extend the base ModelProvider interface to add embedding and image generation support
-export interface ModelProvider extends BaseModelProvider {}
+// Use the base ModelProvider interface for embedding and image generation support
+export type ModelProvider = BaseModelProvider;
 
 // Import external model functions
 import {

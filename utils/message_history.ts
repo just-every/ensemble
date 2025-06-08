@@ -5,10 +5,10 @@
 import {
     ResponseInput,
     ResponseInputItem,
-    ResponseInputMessage,
-    ResponseInputFunctionCall,
-    ResponseInputFunctionCallOutput,
-    type ToolCallResult,
+    // ResponseInputMessage,
+    // ResponseInputFunctionCall,
+    // ResponseInputFunctionCallOutput,
+    // type ToolCallResult,
 } from '../types/types.js';
 
 export interface MessageHistoryOptions {
@@ -307,7 +307,7 @@ export class MessageHistory {
      */
     private inferToolPurpose(toolName: string, args: string): string {
         try {
-            const parsedArgs = JSON.parse(args);
+            JSON.parse(args); // Validate JSON
 
             // Common patterns
             if (toolName.includes('read') || toolName.includes('get')) {

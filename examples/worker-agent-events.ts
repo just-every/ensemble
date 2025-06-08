@@ -123,14 +123,14 @@ async function main() {
     console.log('Executing operator agent with worker delegation...\n');
 
     // Simulate a complex task that requires multiple specialists
-    const task = `I need help building a simple web application that displays real-time cryptocurrency prices. 
+    /* const task = `I need help building a simple web application that displays real-time cryptocurrency prices. 
 
 Please:
 1. Research the best free APIs for cryptocurrency data
 2. Write the HTML, CSS, and JavaScript code for the application  
 3. Make sure the code follows best practices
 
-Coordinate between your specialist agents to complete this task.`;
+Coordinate between your specialist agents to complete this task.`; */
 
     try {
         // This will trigger worker agents as needed
@@ -199,7 +199,7 @@ Coordinate between your specialist agents to complete this task.`;
 
     // Show event timeline
     console.log('\nEvent Timeline:');
-    events.forEach((event, i) => {
+    events.forEach(event => {
         const timestamp = event.timestamp || 'unknown';
         const time = new Date(timestamp).toLocaleTimeString();
 

@@ -104,7 +104,7 @@ async function demonstrateCompactionBehavior() {
     console.log('\n📊 Compaction Behavior Demonstration\n');
 
     // Create an agent with explicit history thread management
-    const agent = new Agent({
+    new Agent({
         name: 'CompactionDemoAgent',
         model: 'gemini-2.5-flash-preview-05-20', // 1M context
         instructions: 'You are demonstrating automatic history compaction.',

@@ -37,7 +37,6 @@ import {
     createCitationTracker,
     formatCitation,
     generateFootnotes,
-    type CitationTracker,
 } from '../utils/citation_tracker.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort } from 'openai/resources/shared.js';
@@ -218,7 +217,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                             // Remove empty enum to avoid OpenAI validation errors
                             delete propCopy.enum;
                         }
-                    } catch (e) {
+                    } catch {
                         // If enum resolution fails, remove it
                         delete propCopy.enum;
                     }

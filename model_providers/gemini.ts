@@ -19,7 +19,6 @@ import {
     FunctionCallingConfigMode,
     GenerateContentResponseUsageMetadata,
     GenerateContentResponse,
-    Part,
     type GenerateContentConfig,
     type GenerateContentParameters,
 } from '@google/genai';
@@ -206,7 +205,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                             // Remove empty enum to avoid validation errors
                             delete propCopy.enum;
                         }
-                    } catch (e) {
+                    } catch {
                         // If enum resolution fails, remove it
                         delete propCopy.enum;
                     }

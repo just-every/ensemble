@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MessageHistory } from '../utils/message_history.js';
-import { ResponseInput } from '../types/types.js';
 
 // Mock the model_data module
 vi.mock('../data/model_data.js', () => ({

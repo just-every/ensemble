@@ -77,10 +77,9 @@ async function demonstrateModelScoring() {
             ],
         });
 
-        let modelUsed = '';
         for await (const event of response) {
             if (event.type === 'message_delta') {
-                modelUsed += event.content;
+                // Process event
             }
         }
         console.log(`Run ${i + 1}: Selected model based on weighted scores`);

@@ -5,30 +5,30 @@
  * using Claude API for models that don't support image input.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+// import Anthropic from '@anthropic-ai/sdk';
 import { ensembleRequest, findModel } from '../index.js';
 
 // Define the types we need based on the Anthropic SDK structure
-type TextBlock = {
-    type: 'text';
-    text: string;
-};
+// type TextBlock = {
+//     type: 'text';
+//     text: string;
+// };
 
-type ImageBlock = {
-    type: 'image';
-    source: {
-        type: 'base64';
-        media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
-        data: string;
-    };
-};
+// type ImageBlock = {
+//     type: 'image';
+//     source: {
+//         type: 'base64';
+//         media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+//         data: string;
+//     };
+// };
 
-type MessageContent = TextBlock | ImageBlock;
+// type MessageContent = TextBlock | ImageBlock;
 
-type Message = {
-    role: 'user' | 'assistant' | 'system';
-    content: MessageContent[];
-};
+// type Message = {
+//     role: 'user' | 'assistant' | 'system';
+//     content: MessageContent[];
+// };
 
 // Cache for image descriptions
 interface ImageDescriptionCache {

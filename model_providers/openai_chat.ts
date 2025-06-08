@@ -29,7 +29,7 @@ import {
     appendMessageWithImage,
     resizeAndSplitForOpenAI,
 } from '../utils/image_utils.js';
-import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
+// import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import {
     DeltaBuffer,
     bufferDelta,
@@ -39,7 +39,6 @@ import {
     createCitationTracker,
     formatCitation,
     generateFootnotes,
-    type CitationTracker,
 } from '../utils/citation_tracker.js';
 
 // Extended types for Perplexity/OpenRouter response formats
@@ -96,7 +95,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
                             // Remove empty enum to avoid OpenAI validation errors
                             delete propCopy.enum;
                         }
-                    } catch (e) {
+                    } catch {
                         // If enum resolution fails, remove it
                         delete propCopy.enum;
                     }
@@ -488,7 +487,7 @@ export class OpenAIChat implements ModelProvider {
                                         JSON.parse(funcDetails.arguments); // Validate JSON string
                                         toolCall.function.arguments =
                                             funcDetails.arguments;
-                                    } catch (e) {
+                                    } catch {
                                         console.warn(
                                             `(${this.provider}) Argument string is not valid JSON, wrapping in quotes:`,
                                             funcDetails.arguments
@@ -513,7 +512,7 @@ export class OpenAIChat implements ModelProvider {
                                         JSON.parse(callData.arguments); // Validate JSON string
                                         toolCall.function.arguments =
                                             callData.arguments;
-                                    } catch (e) {
+                                    } catch {
                                         console.warn(
                                             `(${this.provider}) Argument string is not valid JSON, wrapping in quotes:`,
                                             callData.arguments

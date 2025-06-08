@@ -6,7 +6,6 @@
  */
 
 import { MessageHistory } from '../utils/message_history.js';
-import type { ResponseInput } from '../types/types.js';
 
 async function demonstrateImprovedCompaction() {
     console.log('=== Improved Message History Compaction ===\n');
