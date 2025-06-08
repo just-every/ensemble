@@ -102,10 +102,7 @@ async function convertToClaudeTools(tools: ToolFunction[]): Promise<any[]> {
     return await Promise.all(
         tools.map(async tool => {
             // Special handling for web search tool
-            if (
-                tool.definition.function.name === 'claude_web_search' ||
-                tool.definition.function.name === 'web_search'
-            ) {
+            if (tool.definition.function.name === 'claude_web_search') {
                 return {
                     type: 'web_search_20250305',
                     name: 'web_search',

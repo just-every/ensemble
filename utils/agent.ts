@@ -31,16 +31,20 @@ import { v4 as uuid } from 'uuid';
 export const agentToolCache = new Map<string, ToolFunction[]>();
 
 export function exportAgent(agent: any, model?: string): AgentExportDefinition {
-    return typeof agent.export === 'function'
-        ? agent.export()
-        : {
-              agent_id: agent.agent_id,
-              name: agent.name,
-              model: model || agent.model,
-              modelClass: agent.modelClass,
-              parent_id: agent.parent_id,
-              cwd: agent.cwd,
-          };
+    const agentExport =
+        typeof agent.export === 'function'
+            ? agent.export()
+            : {
+                  agent_id: agent.agent_id,
+                  name: agent.name,
+                  model: agent.model,
+                  modelClass: agent.modelClass,
+                  parent_id: agent.parent_id,
+                  cwd: agent.cwd,
+              };
+
+    if (model) agentExport.model;
+    return agentExport;
 }
 
 /**

@@ -244,10 +244,7 @@ async function convertToOpenAITools(
 ): Promise<any> {
     requestParams.tools = await Promise.all(
         tools.map(async (tool: ToolFunction) => {
-            if (
-                tool.definition.function.name === 'openai_web_search' ||
-                tool.definition.function.name === 'web_search'
-            ) {
+            if (tool.definition.function.name === 'openai_web_search') {
                 delete requestParams.reasoning;
                 return {
                     type: 'web_search_preview',

@@ -229,10 +229,7 @@ async function convertToGeminiFunctionDeclarations(
     const declarations = await Promise.all(
         tools.map(async tool => {
             // Special handling for Google web search
-            if (
-                tool.definition.function.name === 'google_web_search' ||
-                tool.definition.function.name === 'web_search'
-            ) {
+            if (tool.definition.function.name === 'google_web_search') {
                 console.log('[Gemini] Enabling Google Search grounding');
                 // Return null for this special tool - we'll handle it separately in the config
                 return null;
@@ -852,8 +849,7 @@ export class GeminiProvider implements ModelProvider {
                 // Check for Google web search tool
                 hasGoogleWebSearch = tools.some(
                     tool =>
-                        tool.definition.function.name === 'google_web_search' ||
-                        tool.definition.function.name === 'web_search'
+                        tool.definition.function.name === 'google_web_search'
                 );
 
                 // Configure standard function calling tools
