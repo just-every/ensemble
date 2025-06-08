@@ -17,13 +17,11 @@ import {
     AgentExportDefinition,
     WorkerFunction,
     ToolParameterMap,
+    ProviderStreamEvent,
     type ToolCallResult,
 } from '../types/types.js';
 
-import {
-    createToolFunction,
-    ensembleRequest,
-} from '../index.js';
+import { createToolFunction, ensembleRequest } from '../index.js';
 
 import { v4 as uuid } from 'uuid';
 // Import removed to fix lint error
@@ -155,6 +153,7 @@ export class Agent implements AgentDefinition {
     ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
+    onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions
     processParams?: (
@@ -212,6 +211,7 @@ export class Agent implements AgentDefinition {
         ) => Promise<[Agent, ResponseInput]>;
         this.onThinking = definition.onThinking;
         this.onResponse = definition.onResponse;
+        this.onEvent = definition.onEvent;
 
         // Configure JSON formatting if schema is provided
         if (this.jsonSchema) {
@@ -234,6 +234,13 @@ export class Agent implements AgentDefinition {
                 this.workers.map((createAgentFn: WorkerFunction) => {
                     // Call the function with no arguments or adjust based on what ExecutableFunction expects
                     const agent = createAgentFn() as Agent;
+
+                    // Set parent relationship and pass the parent's onEvent to the worker agent
+                    agent.parent_id = this.agent_id;
+                    if (this.onEvent) {
+                        agent.onEvent = this.onEvent;
+                    }
+
                     return agent.asTool();
                 })
             );
@@ -258,6 +265,15 @@ export class Agent implements AgentDefinition {
                 // Create a copy of the agent for this particular tool run with a unique ID
                 const agent = cloneAgent(this);
                 agent.agent_id = uuid();
+
+                // Set up parent relationship and event forwarding
+                // 'this' refers to the worker agent, which already has parent_id set
+                agent.parent_id = this.parent_id;
+
+                // If the parent has an onEvent handler, pass it to the child
+                if (this.onEvent) {
+                    agent.onEvent = this.onEvent;
+                }
 
                 if (agent.processParams) {
                     let paramsObj: Record<string, any>;
@@ -564,20 +580,124 @@ async function runAgentTool(
         content: prompt,
     });
 
+    // Emit agent_start event if onEvent handler is available
+    if (agent.onEvent) {
+        const agentExport =
+            typeof (agent as any).export === 'function'
+                ? (agent as any).export()
+                : {
+                      agent_id: agent.agent_id,
+                      name: agent.name,
+                      model: agent.model,
+                      modelClass: agent.modelClass,
+                      parent_id: agent.parent_id,
+                      cwd: agent.cwd,
+                  };
+
+        const startEvent: ProviderStreamEvent = {
+            type: 'agent_start',
+            agent: agentExport,
+            input: prompt,
+            parent_id: agent.parent_id,
+            timestamp: new Date().toISOString(),
+        };
+
+        try {
+            await agent.onEvent(startEvent);
+        } catch (error) {
+            console.warn(`Error in onEvent handler for agent_start: ${error}`);
+        }
+    }
+
     try {
         const stream = ensembleRequest(messages, agent);
         let fullResponse = '';
 
-        // Process the stream to get the full response
+        // Process the stream and forward all events
         for await (const event of stream) {
+            // Forward all events to the onEvent handler if available
+            if (agent.onEvent) {
+                try {
+                    await agent.onEvent(event);
+                } catch (error) {
+                    console.warn(`Error in onEvent handler: ${error}`);
+                }
+            }
+
             if (event.type === 'message_complete' && 'content' in event) {
                 fullResponse = event.content;
+            }
+        }
+
+        // Emit agent_done event if onEvent handler is available
+        if (agent.onEvent) {
+            const agentExport =
+                typeof (agent as any).export === 'function'
+                    ? (agent as any).export()
+                    : {
+                          agent_id: agent.agent_id,
+                          name: agent.name,
+                          model: agent.model,
+                          modelClass: agent.modelClass,
+                          parent_id: agent.parent_id,
+                          cwd: agent.cwd,
+                      };
+
+            const doneEvent: ProviderStreamEvent = {
+                type: 'agent_done',
+                agent: agentExport,
+                input: prompt,
+                output: fullResponse,
+                parent_id: agent.parent_id,
+                timestamp: new Date().toISOString(),
+            };
+
+            try {
+                await agent.onEvent(doneEvent);
+            } catch (error) {
+                console.warn(
+                    `Error in onEvent handler for agent_done: ${error}`
+                );
             }
         }
 
         return fullResponse;
     } catch (error) {
         console.error(`Error in ${agent.name}: ${error}`);
+
+        // Emit agent_done with error if onEvent handler is available
+        if (agent.onEvent) {
+            const agentExport =
+                typeof (agent as any).export === 'function'
+                    ? (agent as any).export()
+                    : {
+                          agent_id: agent.agent_id,
+                          name: agent.name,
+                          model: agent.model,
+                          modelClass: agent.modelClass,
+                          parent_id: agent.parent_id,
+                          cwd: agent.cwd,
+                      };
+
+            const errorEvent: ProviderStreamEvent = {
+                type: 'agent_done',
+                agent: agentExport,
+                input: prompt,
+                output: `Error in ${agent.name}: ${error}`,
+                status: 'error',
+                parent_id: agent.parent_id,
+                timestamp: new Date().toISOString(),
+            };
+
+            try {
+                await agent.onEvent(errorEvent);
+            } catch (eventError) {
+                console.warn(
+                    `Error in onEvent handler for agent_done: ${eventError}`
+                );
+            }
+        }
+
         return `Error in ${agent.name}: ${error}`;
     }
 }
@@ -589,7 +709,9 @@ async function runAgentTool(
  * @param agent The agent or agent definition to get tools from
  * @returns Promise resolving to an array of tools
  */
-export async function getToolsFromAgent(agent: AgentDefinition | Agent): Promise<ToolFunction[]> {
+export async function getToolsFromAgent(
+    agent: AgentDefinition | Agent
+): Promise<ToolFunction[]> {
     // Check if it's an Agent instance with getTools method
     if (agent && typeof (agent as Agent).getTools === 'function') {
         return await (agent as Agent).getTools();

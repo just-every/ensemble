@@ -73,7 +73,7 @@ describe('PauseController', () => {
 
         it('should wait while paused and continue after resume', async () => {
             pause();
-            
+
             let resolved = false;
             const waitPromise = waitWhilePaused(50).then(() => {
                 resolved = true;
@@ -91,40 +91,48 @@ describe('PauseController', () => {
 
         it('should respect abort signal', async () => {
             pause();
-            
+
             const controller = new AbortController();
-            
+
             // Start waiting with abort signal
             const waitPromise = waitWhilePaused(50, controller.signal);
-            
+
             // Abort after a short delay
             setTimeout(() => controller.abort(), 100);
-            
+
             // Should throw when aborted
-            await expect(waitPromise).rejects.toThrow('Operation aborted while waiting for pause');
+            await expect(waitPromise).rejects.toThrow(
+                'Operation aborted while waiting for pause'
+            );
         });
 
         it('should handle multiple concurrent waiters', async () => {
             pause();
-            
+
             let resolved1 = false;
             let resolved2 = false;
             let resolved3 = false;
-            
-            const wait1 = waitWhilePaused(50).then(() => { resolved1 = true; });
-            const wait2 = waitWhilePaused(100).then(() => { resolved2 = true; });
-            const wait3 = waitWhilePaused(150).then(() => { resolved3 = true; });
-            
+
+            const wait1 = waitWhilePaused(50).then(() => {
+                resolved1 = true;
+            });
+            const wait2 = waitWhilePaused(100).then(() => {
+                resolved2 = true;
+            });
+            const wait3 = waitWhilePaused(150).then(() => {
+                resolved3 = true;
+            });
+
             // All should be waiting
             await new Promise(resolve => setTimeout(resolve, 100));
             expect(resolved1).toBe(false);
             expect(resolved2).toBe(false);
             expect(resolved3).toBe(false);
-            
+
             // Resume and wait for all
             resume();
             await Promise.all([wait1, wait2, wait3]);
-            
+
             expect(resolved1).toBe(true);
             expect(resolved2).toBe(true);
             expect(resolved3).toBe(true);
@@ -142,7 +150,7 @@ describe('PauseController', () => {
             pause();
             expect(isPaused()).toBe(true);
             expect(getPauseController().isPaused()).toBe(true);
-            
+
             getPauseController().resume();
             expect(isPaused()).toBe(false);
         });

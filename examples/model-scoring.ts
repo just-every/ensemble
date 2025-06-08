@@ -1,6 +1,6 @@
 /**
  * Example demonstrating model scoring and disabling functionality
- * 
+ *
  * This example shows how to use modelScores for weighted random selection
  * and disabledModels to exclude specific models from selection.
  */
@@ -16,13 +16,14 @@ const scoredAgent: AgentDefinition = {
     // Higher scores mean higher probability of selection
     // Score of 0 means the model will never be selected
     modelScores: {
-        'gpt-4.1': 80,              // 80 weight - strongly preferred
-        'gemini-2.5-flash-preview-05-20-low': 60,  // 60 weight
-        'claude-3-5-haiku-latest': 40,              // 40 weight
-        'grok-3-mini-fast': 20,                     // 20 weight - least preferred
-        'deepseek-chat': 0,                         // 0 weight - will never be selected
+        'gpt-4.1': 80, // 80 weight - strongly preferred
+        'gemini-2.5-flash-preview-05-20-low': 60, // 60 weight
+        'claude-3-5-haiku-latest': 40, // 40 weight
+        'grok-3-mini-fast': 20, // 20 weight - least preferred
+        'deepseek-chat': 0, // 0 weight - will never be selected
     },
-    instructions: 'You are a helpful assistant. When asked about which model you are, please state your model name.',
+    instructions:
+        'You are a helpful assistant. When asked about which model you are, please state your model name.',
 };
 
 // Example 2: Disabling specific models
@@ -32,8 +33,8 @@ const restrictedAgent: AgentDefinition = {
     modelClass: 'standard',
     // These models will never be selected
     disabledModels: [
-        'deepseek-chat',     // Completely disable DeepSeek
-        'grok-3-mini-fast',  // Completely disable Grok
+        'deepseek-chat', // Completely disable DeepSeek
+        'grok-3-mini-fast', // Completely disable Grok
     ],
     instructions: 'You are a helpful assistant with restricted model access.',
 };
@@ -44,16 +45,17 @@ const combinedAgent: AgentDefinition = {
     description: 'Agent with both scoring and disabled models',
     modelClass: 'reasoning',
     modelScores: {
-        'gemini-2.5-pro-preview-05-06': 90,      // Strongly prefer Gemini Pro
-        'o4-mini-high': 70,                       // Good alternative
-        'claude-3-7-sonnet-latest': 50,           // Medium preference
-        'o3-high': 30,                            // Lower preference
+        'gemini-2.5-pro-preview-05-06': 90, // Strongly prefer Gemini Pro
+        'o4-mini-high': 70, // Good alternative
+        'claude-3-7-sonnet-latest': 50, // Medium preference
+        'o3-high': 30, // Lower preference
     },
     disabledModels: [
-        'claude-opus-4-20250514',    // Disable expensive Opus model
-        'claude-sonnet-4-20250514',  // Disable another Claude model
+        'claude-opus-4-20250514', // Disable expensive Opus model
+        'claude-sonnet-4-20250514', // Disable another Claude model
     ],
-    instructions: 'You are an advanced reasoning assistant with model preferences.',
+    instructions:
+        'You are an advanced reasoning assistant with model preferences.',
 };
 
 // Example usage
@@ -69,7 +71,8 @@ async function demonstrateModelScoring() {
                 {
                     type: 'message',
                     role: 'user',
-                    content: 'Which model are you? (Please just state the model name)',
+                    content:
+                        'Which model are you? (Please just state the model name)',
                 },
             ],
         });
@@ -84,7 +87,7 @@ async function demonstrateModelScoring() {
     }
 
     console.log('\n=== Disabled Models Example ===\n');
-    
+
     // Test the restricted agent
     const restrictedResponse = await ensembleRequest({
         agent: restrictedAgent,
@@ -92,12 +95,15 @@ async function demonstrateModelScoring() {
             {
                 type: 'message',
                 role: 'user',
-                content: 'Hello! Can you tell me about your model restrictions?',
+                content:
+                    'Hello! Can you tell me about your model restrictions?',
             },
         ],
     });
 
-    console.log('Restricted agent response (will not use deepseek-chat or grok-3-mini-fast):');
+    console.log(
+        'Restricted agent response (will not use deepseek-chat or grok-3-mini-fast):'
+    );
     for await (const event of restrictedResponse) {
         if (event.type === 'message_delta') {
             process.stdout.write(event.content);

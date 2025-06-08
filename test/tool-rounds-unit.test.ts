@@ -5,7 +5,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent, ensembleRequest, createToolFunction } from '../index.js';
 import type { ResponseInput } from '../types/types.js';
-import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
+import {
+    testProviderConfig,
+    resetTestProviderConfig,
+} from '../model_providers/test_provider.js';
 
 describe('Tool Rounds Infinite Loop Prevention', () => {
     beforeEach(() => {
@@ -21,12 +24,12 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
     it('should respect maxToolCallRoundsPerTurn limit', async () => {
         let callCount = 0;
-        
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'recursive_tool';
         testProviderConfig.toolArguments = { value: 1 };
-        
+
         // Create a tool that always wants to be called again
         const recursiveTool = createToolFunction(
             async (value: number) => {
@@ -60,12 +63,12 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
         // Mock the test provider to always suggest tool use
         const stream = ensembleRequest(messages, agent);
-        
+
         // Process the stream
         for await (const event of stream) {
             // Just consume the stream
         }
-        
+
         // Should have called the tool exactly 3 times (one per round)
         expect(callCount).toBeLessThanOrEqual(3);
         expect(callCount).toBeGreaterThan(0);
@@ -73,13 +76,13 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
     it('should respect maxToolCalls limit', async () => {
         let callCount = 0;
-        
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'tool_0'; // Use the first tool
-        
+
         // Create multiple tools to test maxToolCalls limit
-        const tools = Array.from({ length: 10 }, (_, i) => 
+        const tools = Array.from({ length: 10 }, (_, i) =>
             createToolFunction(
                 async () => {
                     callCount++;
@@ -95,7 +98,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
                 `tool_${i}`
             )
         );
-        
+
         const agent = new Agent({
             name: 'TestAgent',
             model: 'test-model',
@@ -124,7 +127,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
         // The limit should prevent more than 5 tool calls total
         expect(totalToolCalls).toBeLessThanOrEqual(5);
-        
+
         // The test provider simulates one tool call per round
         // With maxToolCalls=5, we should see at most 5 calls
         expect(callCount).toBeLessThanOrEqual(5);
@@ -132,13 +135,13 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
     });
 
     it('should handle parallel tool calls within limits', async () => {
-        let callLog: string[] = [];
-        
+        const callLog: string[] = [];
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'parallel_tool';
         testProviderConfig.toolArguments = { id: 'A' };
-        
+
         const parallelTool = createToolFunction(
             async (id: string) => {
                 callLog.push(id);
@@ -168,7 +171,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        
+
         // Process the stream
         for await (const event of stream) {
             // Just consume the stream
@@ -180,13 +183,13 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
     it('should not make any tool calls when limits are 0', async () => {
         let callCount = 0;
-        
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'simple_tool';
         testProviderConfig.toolArguments = {};
         testProviderConfig.fixedResponse = 'I would use the tool but I cannot.';
-        
+
         const tool = createToolFunction(
             async () => {
                 callCount++;
@@ -215,7 +218,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        
+
         // Process the stream
         for await (const event of stream) {
             // Just consume the stream
@@ -227,12 +230,12 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
     it('should allow first round but no additional rounds when maxToolCallRoundsPerTurn is 0', async () => {
         let callCount = 0;
-        
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'recursive_tool';
         testProviderConfig.toolArguments = { value: 1 };
-        
+
         const tool = createToolFunction(
             async (value: number) => {
                 callCount++;
@@ -262,7 +265,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        
+
         // Process the stream
         for await (const event of stream) {
             // Just consume the stream
@@ -275,12 +278,12 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
     it('should include limit messages in response', async () => {
         let callCount = 0;
-        
+
         // Configure test provider to simulate tool calls
         testProviderConfig.simulateToolCall = true;
         testProviderConfig.toolName = 'needy_tool';
         testProviderConfig.toolArguments = {};
-        
+
         const tool = createToolFunction(
             async () => {
                 callCount++;
@@ -309,7 +312,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         ];
 
         const stream = ensembleRequest(messages, agent);
-        
+
         for await (const event of stream) {
             // Just consume the stream
         }

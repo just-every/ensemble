@@ -7,16 +7,16 @@ import { ConfigurationError } from '../types/errors.js';
 export interface EnsembleConfig {
     /** Default timeout for tool execution (ms) */
     defaultToolTimeout: number;
-    
+
     /** Maximum number of concurrent tool executions */
     maxConcurrentTools: number;
-    
+
     /** Default pause check interval (ms) */
     pauseCheckInterval: number;
-    
+
     /** Default message history compaction threshold */
     historyCompactionThreshold: number;
-    
+
     /** API keys for various providers */
     apiKeys: {
         openai?: string;
@@ -73,7 +73,10 @@ class ConfigManager {
         }
 
         if (process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS) {
-            const maxTools = parseInt(process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS, 10);
+            const maxTools = parseInt(
+                process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS,
+                10
+            );
             if (isNaN(maxTools) || maxTools <= 0) {
                 throw new ConfigurationError(
                     'ENSEMBLE_MAX_CONCURRENT_TOOLS must be a positive number',
@@ -84,7 +87,10 @@ class ConfigManager {
         }
 
         if (process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL) {
-            const interval = parseInt(process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL, 10);
+            const interval = parseInt(
+                process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL,
+                10
+            );
             if (isNaN(interval) || interval <= 0) {
                 throw new ConfigurationError(
                     'ENSEMBLE_PAUSE_CHECK_INTERVAL must be a positive number',
@@ -95,7 +101,9 @@ class ConfigManager {
         }
 
         if (process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD) {
-            const threshold = parseFloat(process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD);
+            const threshold = parseFloat(
+                process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD
+            );
             if (isNaN(threshold) || threshold <= 0 || threshold > 1) {
                 throw new ConfigurationError(
                     'ENSEMBLE_HISTORY_COMPACTION_THRESHOLD must be a number between 0 and 1',
@@ -178,6 +186,8 @@ export function getConfig(): EnsembleConfig {
 /**
  * Convenience function to get a specific config value
  */
-export function getConfigValue<K extends keyof EnsembleConfig>(key: K): EnsembleConfig[K] {
+export function getConfigValue<K extends keyof EnsembleConfig>(
+    key: K
+): EnsembleConfig[K] {
     return getConfigManager().get(key);
 }

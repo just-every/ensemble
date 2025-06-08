@@ -931,7 +931,9 @@ export class GeminiProvider implements ModelProvider {
             );
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            const { waitWhilePaused } = await import(
+                '../utils/pause_controller.js'
+            );
             await waitWhilePaused(100, agent.abortSignal);
 
             // --- Start streaming with retry logic ---
@@ -956,10 +958,10 @@ export class GeminiProvider implements ModelProvider {
                     console.log(
                         `[Gemini] System paused during stream for model ${model}. Waiting...`
                     );
-                    
+
                     // Wait while paused instead of aborting
                     await waitWhilePaused(100, agent.abortSignal);
-                    
+
                     // If we're resuming, continue processing
                     console.log(
                         `[Gemini] System resumed, continuing stream for model ${model}`

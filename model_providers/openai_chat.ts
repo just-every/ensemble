@@ -68,7 +68,6 @@ const TOOL_CALL_CLEANUP_REGEX =
     /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*\[.*\](?:\s*```)?/gms; // Use greedy .* here too for consistency
 const CLEANUP_PLACEHOLDER = '[Simulated Tool Calls Removed]';
 
-
 // --- Helper Functions ---
 
 /** Resolves any async enum values in tool parameters */
@@ -615,7 +614,9 @@ export class OpenAIChat implements ModelProvider {
     ): AsyncGenerator<ProviderStreamEvent> {
         // Get tools asynchronously (getTools now returns a Promise)
         const { getToolsFromAgent } = await import('../utils/agent.js');
-        const toolsPromise = agent ? getToolsFromAgent(agent) : Promise.resolve([]);
+        const toolsPromise = agent
+            ? getToolsFromAgent(agent)
+            : Promise.resolve([]);
         const tools = await toolsPromise;
         const settings: ModelSettings | undefined = agent?.modelSettings;
         let requestId: string | undefined;
@@ -681,7 +682,9 @@ export class OpenAIChat implements ModelProvider {
             );
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            const { waitWhilePaused } = await import(
+                '../utils/pause_controller.js'
+            );
             await waitWhilePaused(100, agent.abortSignal);
 
             // --- Process Stream ---
@@ -709,10 +712,10 @@ export class OpenAIChat implements ModelProvider {
                         console.log(
                             `[${this.provider}] System paused during stream for model ${model}. Waiting...`
                         );
-                        
+
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
-                        
+
                         // If we're resuming, continue processing
                         console.log(
                             `[${this.provider}] System resumed, continuing stream for model ${model}`

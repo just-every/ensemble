@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getModelFromAgent, getModelFromClass } from '../model_providers/model_provider.js';
+import {
+    getModelFromAgent,
+    getModelFromClass,
+} from '../model_providers/model_provider.js';
 import { AgentDefinition } from '../types/types.js';
 
 // Mock the quota tracker
@@ -33,8 +36,8 @@ describe('Model Scoring and Disabling', () => {
         const agent: AgentDefinition = {
             modelClass: 'standard',
             modelScores: {
-                'gpt-4.1': 90,  // Should be selected most often
-                'gemini-2.5-flash-preview-05-20-low': 10,  // Should be selected rarely
+                'gpt-4.1': 90, // Should be selected most often
+                'gemini-2.5-flash-preview-05-20-low': 10, // Should be selected rarely
             },
         };
 
@@ -50,8 +53,9 @@ describe('Model Scoring and Disabling', () => {
         // With 90:10 weighting, gpt-4.1 should be selected significantly more often
         // We'll allow some variance but expect at least 70% for the high-weight model
         const gptCount = selectionCounts['gpt-4.1'] || 0;
-        const geminiCount = selectionCounts['gemini-2.5-flash-preview-05-20-low'] || 0;
-        
+        const geminiCount =
+            selectionCounts['gemini-2.5-flash-preview-05-20-low'] || 0;
+
         // Only check if both models were available
         if (gptCount > 0 && geminiCount > 0) {
             expect(gptCount).toBeGreaterThan(geminiCount * 3); // At least 3x more
@@ -76,7 +80,11 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat');
             expect(model).not.toBe('grok-3-mini-fast');
             // Should only select from scored models that aren't disabled
-            expect(['gpt-4.1', 'gemini-2.5-flash-preview-05-20-low', 'claude-3-5-haiku-latest']).toContain(model);
+            expect([
+                'gpt-4.1',
+                'gemini-2.5-flash-preview-05-20-low',
+                'claude-3-5-haiku-latest',
+            ]).toContain(model);
         }
     });
 
@@ -107,15 +115,20 @@ describe('Model Scoring and Disabling', () => {
         // Run multiple times
         let zeroWeightSelected = false;
         for (let i = 0; i < 20; i++) {
-            const model = await getModelFromClass('standard', [], ['deepseek-chat'], modelScores);
+            const model = await getModelFromClass(
+                'standard',
+                [],
+                ['deepseek-chat'],
+                modelScores
+            );
             expect(model).not.toBe('deepseek-chat'); // Should never select disabled
-            
+
             // With a score of 0, gemini should never be selected when gpt-4.1 is available
             if (model === 'gemini-2.5-flash-preview-05-20-low') {
                 zeroWeightSelected = true;
             }
         }
-        
+
         // Zero-weight model should not be selected when other models have positive weights
         expect(zeroWeightSelected).toBe(false);
     });

@@ -371,12 +371,17 @@ async function* performVerification(
 
         const retryMessages: ResponseInput = [
             ...messages,
-            { type: 'message', role: 'assistant', content: output, status: 'completed' } as ResponseOutputMessage,
+            {
+                type: 'message',
+                role: 'assistant',
+                content: output,
+                status: 'completed',
+            } as ResponseOutputMessage,
             {
                 type: 'message',
                 role: 'developer',
-                content: `Verification failed: ${verification.reason}\n\nPlease correct your response.`
-            } as ResponseInputMessage
+                content: `Verification failed: ${verification.reason}\n\nPlease correct your response.`,
+            } as ResponseInputMessage,
         ];
 
         // Create a new agent for retry without verifier to avoid infinite recursion
@@ -399,7 +404,12 @@ async function* performVerification(
 
         // Verify the retry
         if (retryOutput) {
-            yield* performVerification(agent, retryOutput, messages, attempt + 1);
+            yield* performVerification(
+                agent,
+                retryOutput,
+                messages,
+                attempt + 1
+            );
         }
     } else {
         // Max attempts reached
@@ -443,10 +453,7 @@ async function processToolCall(
         const rawResult = await handleToolCall(toolCall, tool, agent);
 
         // Process the result (summarization, truncation, etc.)
-        const processedResult = await processToolResult(
-            toolCall,
-            rawResult
-        );
+        const processedResult = await processToolResult(toolCall, rawResult);
 
         const toolCallResult: ToolCallResult = {
             toolCall,

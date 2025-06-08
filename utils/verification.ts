@@ -32,8 +32,17 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
 
     const verificationMessages: ResponseInput = [
         ...originalMessages,
-        { type: 'message', role: 'assistant', content: output, status: 'completed' } as ResponseOutputMessage,
-        { type: 'message', role: 'user', content: verificationPrompt } as ResponseInputMessage,
+        {
+            type: 'message',
+            role: 'assistant',
+            content: output,
+            status: 'completed',
+        } as ResponseOutputMessage,
+        {
+            type: 'message',
+            role: 'user',
+            content: verificationPrompt,
+        } as ResponseInputMessage,
     ];
 
     // Create a verifier with JSON schema enforcement
@@ -54,9 +63,12 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
     };
 
     try {
-        const stream = ensembleRequest(verificationMessages, verifierWithSchema);
+        const stream = ensembleRequest(
+            verificationMessages,
+            verifierWithSchema
+        );
         let fullResponse = '';
-        
+
         for await (const event of stream) {
             if (event.type === 'message_complete' && 'content' in event) {
                 fullResponse = event.content;

@@ -27,7 +27,9 @@ describe('Tool Result Processor', () => {
     describe('createSummary', () => {
         it('should create a summary using LLM', async () => {
             // Import the mocked function
-            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const { ensembleRequest } = await import(
+                '../core/ensemble_request.js'
+            );
             const mockEnsembleRequest = ensembleRequest as any;
 
             // Mock the async generator
@@ -62,7 +64,9 @@ describe('Tool Result Processor', () => {
         });
 
         it('should fallback to truncation on error', async () => {
-            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const { ensembleRequest } = await import(
+                '../core/ensemble_request.js'
+            );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockRejectedValue(new Error('LLM error'));
 
@@ -73,7 +77,9 @@ describe('Tool Result Processor', () => {
         });
 
         it('should handle empty response from LLM', async () => {
-            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const { ensembleRequest } = await import(
+                '../core/ensemble_request.js'
+            );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 // Empty response
@@ -118,7 +124,9 @@ describe('Tool Result Processor', () => {
         });
 
         it('should summarize long results for non-skip tools', async () => {
-            const { ensembleRequest } = await import('../core/ensemble_request.js');
+            const { ensembleRequest } = await import(
+                '../core/ensemble_request.js'
+            );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 yield { type: 'message_delta', content: 'Summarized content' };

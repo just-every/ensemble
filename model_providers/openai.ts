@@ -45,7 +45,6 @@ import type { ReasoningEffort } from 'openai/resources/shared.js';
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
 
-
 // Convert our tool definition to OpenAI's format
 /**
  * Process a JSON schema to make it compatible with OpenAI's requirements
@@ -841,7 +840,7 @@ export class OpenAIProvider implements ModelProvider {
                             model !== originalModel)
                     ) {
                         // If id exists and doesn't start with 'msg_', remove it
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
                         const { id, ...rest } = message;
                         message = rest;
                         console.log(
@@ -961,7 +960,9 @@ export class OpenAIProvider implements ModelProvider {
             );
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            const { waitWhilePaused } = await import(
+                '../utils/pause_controller.js'
+            );
             await waitWhilePaused(100, agent.abortSignal);
 
             const stream = await this.client.responses.create(requestParams);
@@ -988,10 +989,10 @@ export class OpenAIProvider implements ModelProvider {
                         console.log(
                             `[OpenAI] System paused during stream for model ${model}. Waiting...`
                         );
-                        
+
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
-                        
+
                         // If we're resuming, continue processing
                         console.log(
                             `[OpenAI] System resumed, continuing stream for model ${model}`

@@ -153,7 +153,6 @@ function cleanBase64Data(imageData: string): string {
     return imageData.replace(/^data:image\/[a-z]+;base64,/, '');
 }
 
-
 /**
  * Processes images and adds them to the input array for OpenAI
  * Resizes images to max 1024px width and splits into sections if height > 768px
@@ -220,13 +219,24 @@ async function convertToClaudeMessage(
                 // Try to extract the first valid JSON object
                 const firstBraceIndex = argsString.indexOf('{');
                 const firstCloseBraceIndex = argsString.indexOf('}') + 1;
-                if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
-                    const firstJsonStr = argsString.substring(firstBraceIndex, firstCloseBraceIndex);
+                if (
+                    firstBraceIndex !== -1 &&
+                    firstCloseBraceIndex > firstBraceIndex
+                ) {
+                    const firstJsonStr = argsString.substring(
+                        firstBraceIndex,
+                        firstCloseBraceIndex
+                    );
                     try {
                         inputArgs = JSON.parse(firstJsonStr);
-                        console.log(`Successfully extracted first JSON object: ${firstJsonStr}`);
+                        console.log(
+                            `Successfully extracted first JSON object: ${firstJsonStr}`
+                        );
                     } catch (innerE) {
-                        console.error(`Failed to parse extracted JSON: ${firstJsonStr}`, innerE);
+                        console.error(
+                            `Failed to parse extracted JSON: ${firstJsonStr}`,
+                            innerE
+                        );
                         inputArgs = {};
                     }
                 } else {
@@ -566,7 +576,9 @@ export class ClaudeProvider implements ModelProvider {
             const citationTracker = createCitationTracker();
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            const { waitWhilePaused } = await import(
+                '../utils/pause_controller.js'
+            );
             await waitWhilePaused(100, agent.abortSignal);
 
             // Make the API call
@@ -583,10 +595,10 @@ export class ClaudeProvider implements ModelProvider {
                         console.log(
                             `[Claude] System paused during stream for model ${model}. Waiting...`
                         );
-                        
+
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
-                        
+
                         // If we're resuming, continue processing
                         console.log(
                             `[Claude] System resumed, continuing stream for model ${model}`
@@ -687,8 +699,8 @@ export class ClaudeProvider implements ModelProvider {
                                         function: {
                                             ...currentToolCall.function,
                                             // Don't expose partial arguments that might be malformed
-                                            arguments: '{}' // Placeholder until complete
-                                        }
+                                            arguments: '{}', // Placeholder until complete
+                                        },
                                     } as ToolCall,
                                 };
                             } catch (err) {
@@ -785,7 +797,9 @@ export class ClaudeProvider implements ModelProvider {
                         event.content_block?.type === 'tool_use'
                     ) {
                         const toolUse = event.content_block;
-                        const toolId = toolUse.id || `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                        const toolId =
+                            toolUse.id ||
+                            `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                         const toolName = toolUse.name;
                         const toolInput =
                             toolUse.input !== undefined ? toolUse.input : {};
@@ -812,10 +826,12 @@ export class ClaudeProvider implements ModelProvider {
                             // Finalize arguments if they were streamed partially
                             if (currentToolCall.function._partialArguments) {
                                 // Validate that we have proper JSON before finalizing
-                                const partialArgs = currentToolCall.function._partialArguments;
+                                const partialArgs =
+                                    currentToolCall.function._partialArguments;
                                 try {
                                     JSON.parse(partialArgs); // Validate JSON
-                                    currentToolCall.function.arguments = partialArgs;
+                                    currentToolCall.function.arguments =
+                                        partialArgs;
                                 } catch (jsonError) {
                                     console.warn(
                                         `Invalid JSON in partial arguments for ${currentToolCall.function.name}: ${partialArgs}`,
@@ -823,26 +839,46 @@ export class ClaudeProvider implements ModelProvider {
                                     );
                                     // Try to extract the first valid JSON object if it's concatenated
                                     if (partialArgs.includes('}{')) {
-                                        const firstBraceIndex = partialArgs.indexOf('{');
-                                        const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
-                                        if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
-                                            const firstJsonStr = partialArgs.substring(firstBraceIndex, firstCloseBraceIndex);
+                                        const firstBraceIndex =
+                                            partialArgs.indexOf('{');
+                                        const firstCloseBraceIndex =
+                                            partialArgs.indexOf('}') + 1;
+                                        if (
+                                            firstBraceIndex !== -1 &&
+                                            firstCloseBraceIndex >
+                                                firstBraceIndex
+                                        ) {
+                                            const firstJsonStr =
+                                                partialArgs.substring(
+                                                    firstBraceIndex,
+                                                    firstCloseBraceIndex
+                                                );
                                             try {
                                                 JSON.parse(firstJsonStr); // Validate extracted JSON
-                                                currentToolCall.function.arguments = firstJsonStr;
-                                                console.log(`Extracted valid JSON from partial arguments: ${firstJsonStr}`);
+                                                currentToolCall.function.arguments =
+                                                    firstJsonStr;
+                                                console.log(
+                                                    `Extracted valid JSON from partial arguments: ${firstJsonStr}`
+                                                );
                                             } catch (extractError) {
-                                                console.error(`Failed to extract valid JSON: ${firstJsonStr}`, extractError);
-                                                currentToolCall.function.arguments = '{}';
+                                                console.error(
+                                                    `Failed to extract valid JSON: ${firstJsonStr}`,
+                                                    extractError
+                                                );
+                                                currentToolCall.function.arguments =
+                                                    '{}';
                                             }
                                         } else {
-                                            currentToolCall.function.arguments = '{}';
+                                            currentToolCall.function.arguments =
+                                                '{}';
                                         }
                                     } else {
-                                        currentToolCall.function.arguments = '{}';
+                                        currentToolCall.function.arguments =
+                                            '{}';
                                     }
                                 }
-                                delete currentToolCall.function._partialArguments; // Clean up temporary field
+                                delete currentToolCall.function
+                                    ._partialArguments; // Clean up temporary field
                             }
                             yield {
                                 type: 'tool_start',
@@ -895,11 +931,16 @@ export class ClaudeProvider implements ModelProvider {
                             // Only emit tool_start if we haven't already emitted it
                             if (!toolCallStarted) {
                                 // Finalize arguments if they were streamed partially with proper JSON validation
-                                if (currentToolCall.function._partialArguments) {
-                                    const partialArgs = currentToolCall.function._partialArguments;
+                                if (
+                                    currentToolCall.function._partialArguments
+                                ) {
+                                    const partialArgs =
+                                        currentToolCall.function
+                                            ._partialArguments;
                                     try {
                                         JSON.parse(partialArgs); // Validate JSON
-                                        currentToolCall.function.arguments = partialArgs;
+                                        currentToolCall.function.arguments =
+                                            partialArgs;
                                     } catch (jsonError) {
                                         console.warn(
                                             `Invalid JSON in partial arguments at message_stop for ${currentToolCall.function.name}: ${partialArgs}`,
@@ -907,26 +948,46 @@ export class ClaudeProvider implements ModelProvider {
                                         );
                                         // Try to extract the first valid JSON object if it's concatenated
                                         if (partialArgs.includes('}{')) {
-                                            const firstBraceIndex = partialArgs.indexOf('{');
-                                            const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
-                                            if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
-                                                const firstJsonStr = partialArgs.substring(firstBraceIndex, firstCloseBraceIndex);
+                                            const firstBraceIndex =
+                                                partialArgs.indexOf('{');
+                                            const firstCloseBraceIndex =
+                                                partialArgs.indexOf('}') + 1;
+                                            if (
+                                                firstBraceIndex !== -1 &&
+                                                firstCloseBraceIndex >
+                                                    firstBraceIndex
+                                            ) {
+                                                const firstJsonStr =
+                                                    partialArgs.substring(
+                                                        firstBraceIndex,
+                                                        firstCloseBraceIndex
+                                                    );
                                                 try {
                                                     JSON.parse(firstJsonStr); // Validate extracted JSON
-                                                    currentToolCall.function.arguments = firstJsonStr;
-                                                    console.log(`Extracted valid JSON at message_stop: ${firstJsonStr}`);
+                                                    currentToolCall.function.arguments =
+                                                        firstJsonStr;
+                                                    console.log(
+                                                        `Extracted valid JSON at message_stop: ${firstJsonStr}`
+                                                    );
                                                 } catch (extractError) {
-                                                    console.error(`Failed to extract valid JSON at message_stop: ${firstJsonStr}`, extractError);
-                                                    currentToolCall.function.arguments = '{}';
+                                                    console.error(
+                                                        `Failed to extract valid JSON at message_stop: ${firstJsonStr}`,
+                                                        extractError
+                                                    );
+                                                    currentToolCall.function.arguments =
+                                                        '{}';
                                                 }
                                             } else {
-                                                currentToolCall.function.arguments = '{}';
+                                                currentToolCall.function.arguments =
+                                                    '{}';
                                             }
                                         } else {
-                                            currentToolCall.function.arguments = '{}';
+                                            currentToolCall.function.arguments =
+                                                '{}';
                                         }
                                     }
-                                    delete currentToolCall.function._partialArguments;
+                                    delete currentToolCall.function
+                                        ._partialArguments;
                                 }
 
                                 yield {

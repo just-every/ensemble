@@ -21,7 +21,8 @@ async function demonstrateImprovedCompaction() {
     await history.add({
         type: 'message',
         role: 'system',
-        content: 'You are a helpful coding assistant specializing in TypeScript.',
+        content:
+            'You are a helpful coding assistant specializing in TypeScript.',
     });
 
     // Simulate a conversation about building a web app
@@ -31,25 +32,28 @@ async function demonstrateImprovedCompaction() {
     await history.add({
         type: 'message',
         role: 'user',
-        content: 'I want to build a web app with React and TypeScript. What files do I need?',
+        content:
+            'I want to build a web app with React and TypeScript. What files do I need?',
     });
 
     await history.add({
         type: 'message',
         role: 'assistant',
-        content: 'I\'ll help you set up a React TypeScript project. You\'ll need these essential files:\n\n' +
-                '1. package.json - for dependencies\n' +
-                '2. tsconfig.json - TypeScript configuration\n' +
-                '3. src/index.tsx - entry point\n' +
-                '4. public/index.html - HTML template\n\n' +
-                'TODO: Create a proper project structure with components folder.',
+        content:
+            "I'll help you set up a React TypeScript project. You'll need these essential files:\n\n" +
+            '1. package.json - for dependencies\n' +
+            '2. tsconfig.json - TypeScript configuration\n' +
+            '3. src/index.tsx - entry point\n' +
+            '4. public/index.html - HTML template\n\n' +
+            'TODO: Create a proper project structure with components folder.',
     });
 
     // Important message - let's pin it
     await history.add({
         type: 'message',
         role: 'user',
-        content: 'IMPORTANT: The app must work offline and sync when online. Use IndexedDB for storage.',
+        content:
+            'IMPORTANT: The app must work offline and sync when online. Use IndexedDB for storage.',
     });
     history.pinMessage(history.count() - 1); // Pin the last message
 
@@ -87,12 +91,13 @@ async function demonstrateImprovedCompaction() {
         await history.add({
             type: 'message',
             role: 'assistant',
-            content: `For ${topic}, here are the key considerations:\n\n` +
-                    `1. First principle: ${topic} should be modular\n` +
-                    `2. Use industry standards\n` +
-                    `3. Consider scalability\n\n` +
-                    `The approach is to implement ${topic} incrementally.\n` +
-                    `TODO: Research specific libraries for ${topic}.`,
+            content:
+                `For ${topic}, here are the key considerations:\n\n` +
+                `1. First principle: ${topic} should be modular\n` +
+                `2. Use industry standards\n` +
+                `3. Consider scalability\n\n` +
+                `The approach is to implement ${topic} incrementally.\n` +
+                `TODO: Research specific libraries for ${topic}.`,
         });
 
         // Add some tool calls
@@ -121,9 +126,11 @@ async function demonstrateImprovedCompaction() {
     const info = history.getExtractedInfo();
 
     console.log('\nKey Entities:');
-    Array.from(info.entities).slice(-5).forEach(entity => {
-        console.log(`  - ${entity}`);
-    });
+    Array.from(info.entities)
+        .slice(-5)
+        .forEach(entity => {
+            console.log(`  - ${entity}`);
+        });
 
     console.log('\nDecisions Made:');
     info.decisions.slice(-3).forEach(decision => {
@@ -142,18 +149,20 @@ async function demonstrateImprovedCompaction() {
 
     // Check if compaction occurred
     const messages = await history.getMessages();
-    const hasCompactionSummary = messages.some(m =>
-        m.type === 'message' &&
-        typeof m.content === 'string' &&
-        m.content.includes('[Previous Conversation Summary]')
+    const hasCompactionSummary = messages.some(
+        m =>
+            m.type === 'message' &&
+            typeof m.content === 'string' &&
+            m.content.includes('[Previous Conversation Summary]')
     );
 
     if (hasCompactionSummary) {
         console.log('\n=== Compaction Occurred ===');
-        const summaryMsg = messages.find(m =>
-            m.type === 'message' &&
-            typeof m.content === 'string' &&
-            m.content.includes('[Previous Conversation Summary]')
+        const summaryMsg = messages.find(
+            m =>
+                m.type === 'message' &&
+                typeof m.content === 'string' &&
+                m.content.includes('[Previous Conversation Summary]')
         );
 
         if (summaryMsg && typeof summaryMsg.content === 'string') {
@@ -163,10 +172,11 @@ async function demonstrateImprovedCompaction() {
     }
 
     // Verify pinned message is preserved
-    const pinnedMsg = messages.find(m =>
-        m.type === 'message' &&
-        typeof m.content === 'string' &&
-        m.content.includes('IMPORTANT: The app must work offline')
+    const pinnedMsg = messages.find(
+        m =>
+            m.type === 'message' &&
+            typeof m.content === 'string' &&
+            m.content.includes('IMPORTANT: The app must work offline')
     );
 
     console.log('\n=== Pinned Message Status ===');

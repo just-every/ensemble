@@ -67,7 +67,9 @@ function createFileSystemTools() {
                 },
             },
             function: async ({ text }: { text: string }) => {
-                console.log(`🔧 Tool: count_words("${text.substring(0, 20)}...")`);
+                console.log(
+                    `🔧 Tool: count_words("${text.substring(0, 20)}...")`
+                );
                 return `Word count: ${text.split(/\s+/).length}`;
             },
         },
@@ -79,13 +81,15 @@ async function main() {
 
     // Example 1: Tool Call Limits
     console.log('1. Testing maxToolCalls (limit: 3):');
-    console.log('   Request: "List files, read each one, and count words in each"\n');
+    console.log(
+        '   Request: "List files, read each one, and count words in each"\n'
+    );
 
     const agent1 = new Agent({
         name: 'file_analyzer',
         maxToolCalls: 3, // Limit total tool calls
         tools: createFileSystemTools(),
-        onToolCall: async (toolCall) => {
+        onToolCall: async toolCall => {
             console.log(`   → Executing: ${toolCall.function.name}`);
         },
     });
@@ -94,7 +98,8 @@ async function main() {
         {
             type: 'message',
             role: 'user',
-            content: 'List all files, then read each file and count words in each.',
+            content:
+                'List all files, then read each file and count words in each.',
         },
     ];
 
@@ -111,7 +116,7 @@ async function main() {
         name: 'limited_analyzer',
         maxToolCallRoundsPerTurn: 1, // Only 1 round of tool calls
         tools: createFileSystemTools(),
-        onToolCall: async (toolCall) => {
+        onToolCall: async toolCall => {
             console.log(`   → Round 1: ${toolCall.function.name}`);
         },
     });
@@ -134,7 +139,8 @@ async function main() {
         {
             type: 'message',
             role: 'assistant',
-            content: 'I can help you analyze files. What would you like to know?',
+            content:
+                'I can help you analyze files. What would you like to know?',
         },
         {
             type: 'message',
@@ -177,7 +183,7 @@ async function main() {
         tools: createFileSystemTools(),
         verifier: verifierAgent,
         maxVerificationAttempts: 2,
-        onToolCall: async (toolCall) => {
+        onToolCall: async toolCall => {
             console.log(`   → Tool: ${toolCall.function.name}`);
         },
     });
@@ -191,7 +197,9 @@ async function main() {
         },
     ];
 
-    console.log('   (Verifier will check if the response includes specific word counts)\n');
+    console.log(
+        '   (Verifier will check if the response includes specific word counts)\n'
+    );
 
     const stream4 = ensembleRequest(messages4, agent4);
     const result4 = await convertStreamToMessages(stream4);

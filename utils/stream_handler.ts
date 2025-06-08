@@ -27,22 +27,28 @@ export class StreamHandler<TEvent> {
      */
     async *handleStream(
         stream: AsyncIterable<TEvent>,
-        transformer: (chunk: TEvent) => ProviderStreamEvent | ProviderStreamEvent[] | null
+        transformer: (
+            chunk: TEvent
+        ) => ProviderStreamEvent | ProviderStreamEvent[] | null
     ): AsyncGenerator<ProviderStreamEvent> {
         const {
             pauseCheckInterval = 100,
             abortSignal,
             providerName = 'Unknown',
-            modelName = 'Unknown'
+            modelName = 'Unknown',
         } = this.options;
 
         try {
             for await (const chunk of stream) {
                 // Check for pause before processing each chunk
                 if (isPaused()) {
-                    console.log(`[${providerName}] System paused during stream for model ${modelName}. Waiting...`);
+                    console.log(
+                        `[${providerName}] System paused during stream for model ${modelName}. Waiting...`
+                    );
                     await waitWhilePaused(pauseCheckInterval, abortSignal);
-                    console.log(`[${providerName}] System resumed, continuing stream for model ${modelName}`);
+                    console.log(
+                        `[${providerName}] System resumed, continuing stream for model ${modelName}`
+                    );
                 }
 
                 // Transform the chunk into provider events
@@ -85,8 +91,10 @@ export function createStreamHandler<TEvent>(
  */
 export function createMessageDeltaTransformer(messageId: string) {
     let order = 0;
-    
-    return function transformMessageDelta(content: string): ProviderStreamEvent {
+
+    return function transformMessageDelta(
+        content: string
+    ): ProviderStreamEvent {
         return {
             type: 'message_delta',
             content,
@@ -101,7 +109,9 @@ export function createMessageDeltaTransformer(messageId: string) {
  * Common event transformer for message completion
  */
 export function createMessageCompleteTransformer(messageId: string) {
-    return function transformMessageComplete(content: string): ProviderStreamEvent {
+    return function transformMessageComplete(
+        content: string
+    ): ProviderStreamEvent {
         return {
             type: 'message_complete',
             content,

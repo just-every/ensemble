@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '../utils/agent.js';
-import { ensembleRequest, mergeHistoryThread } from '../core/ensemble_request.js';
+import {
+    ensembleRequest,
+    mergeHistoryThread,
+} from '../core/ensemble_request.js';
 import type {
     ResponseInput,
     ToolCall,
@@ -27,12 +30,14 @@ describe('Agent Features', () => {
                 '../model_providers/model_provider.js'
             );
             const mockProvider = {
-                createResponseStream: vi.fn().mockImplementation(async function* () {
-                    yield {
-                        type: 'message_complete',
-                        content: 'Response from thread',
-                    };
-                }),
+                createResponseStream: vi
+                    .fn()
+                    .mockImplementation(async function* () {
+                        yield {
+                            type: 'message_complete',
+                            content: 'Response from thread',
+                        };
+                    }),
             };
             (getModelProvider as any).mockReturnValue(mockProvider);
 
@@ -73,7 +78,11 @@ describe('Agent Features', () => {
                 { type: 'message', role: 'user', content: 'Message 1' },
                 { type: 'message', role: 'assistant', content: 'Response 1' },
                 { type: 'message', role: 'user', content: 'Thread message' },
-                { type: 'message', role: 'assistant', content: 'Thread response' },
+                {
+                    type: 'message',
+                    role: 'assistant',
+                    content: 'Thread response',
+                },
             ];
 
             mergeHistoryThread(mainHistory, thread, 2);
@@ -100,55 +109,72 @@ describe('Agent Features', () => {
 
             let callCount = 0;
             const mockProvider = {
-                createResponseStream: vi.fn().mockImplementation(async function* () {
-                    callCount++;
-                    if (callCount === 1) {
-                        // First round: 3 tool calls
-                        yield {
-                            type: 'tool_start',
-                            tool_call: {
-                                id: 'call1',
-                                type: 'function',
-                                function: { name: 'test_tool', arguments: '{}' },
-                            },
-                        };
-                        yield {
-                            type: 'tool_start',
-                            tool_call: {
-                                id: 'call2',
-                                type: 'function',
-                                function: { name: 'test_tool', arguments: '{}' },
-                            },
-                        };
-                        yield {
-                            type: 'tool_start',
-                            tool_call: {
-                                id: 'call3',
-                                type: 'function',
-                                function: { name: 'test_tool', arguments: '{}' },
-                            },
-                        };
-                    } else {
-                        // Second round: Try 2 more tool calls
-                        yield {
-                            type: 'tool_start',
-                            tool_call: {
-                                id: 'call4',
-                                type: 'function',
-                                function: { name: 'test_tool', arguments: '{}' },
-                            },
-                        };
-                        yield {
-                            type: 'tool_start',
-                            tool_call: {
-                                id: 'call5',
-                                type: 'function',
-                                function: { name: 'test_tool', arguments: '{}' },
-                            },
-                        };
-                    }
-                    yield { type: 'message_complete', content: 'Done' };
-                }),
+                createResponseStream: vi
+                    .fn()
+                    .mockImplementation(async function* () {
+                        callCount++;
+                        if (callCount === 1) {
+                            // First round: 3 tool calls
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: 'call1',
+                                    type: 'function',
+                                    function: {
+                                        name: 'test_tool',
+                                        arguments: '{}',
+                                    },
+                                },
+                            };
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: 'call2',
+                                    type: 'function',
+                                    function: {
+                                        name: 'test_tool',
+                                        arguments: '{}',
+                                    },
+                                },
+                            };
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: 'call3',
+                                    type: 'function',
+                                    function: {
+                                        name: 'test_tool',
+                                        arguments: '{}',
+                                    },
+                                },
+                            };
+                        } else {
+                            // Second round: Try 2 more tool calls
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: 'call4',
+                                    type: 'function',
+                                    function: {
+                                        name: 'test_tool',
+                                        arguments: '{}',
+                                    },
+                                },
+                            };
+                            yield {
+                                type: 'tool_start',
+                                tool_call: {
+                                    id: 'call5',
+                                    type: 'function',
+                                    function: {
+                                        name: 'test_tool',
+                                        arguments: '{}',
+                                    },
+                                },
+                            };
+                        }
+                        yield { type: 'message_complete', content: 'Done' };
+                    }),
             };
             (getModelProvider as any).mockReturnValue(mockProvider);
 
@@ -206,19 +232,27 @@ describe('Agent Features', () => {
 
             let callCount = 0;
             const mockProvider = {
-                createResponseStream: vi.fn().mockImplementation(async function* () {
-                    callCount++;
-                    // Always return tool calls
-                    yield {
-                        type: 'tool_start',
-                        tool_call: {
-                            id: `call${callCount}`,
-                            type: 'function',
-                            function: { name: 'test_tool', arguments: '{}' },
-                        },
-                    };
-                    yield { type: 'message_complete', content: `Round ${callCount}` };
-                }),
+                createResponseStream: vi
+                    .fn()
+                    .mockImplementation(async function* () {
+                        callCount++;
+                        // Always return tool calls
+                        yield {
+                            type: 'tool_start',
+                            tool_call: {
+                                id: `call${callCount}`,
+                                type: 'function',
+                                function: {
+                                    name: 'test_tool',
+                                    arguments: '{}',
+                                },
+                            },
+                        };
+                        yield {
+                            type: 'message_complete',
+                            content: `Round ${callCount}`,
+                        };
+                    }),
             };
             (getModelProvider as any).mockReturnValue(mockProvider);
 
@@ -268,43 +302,47 @@ describe('Agent Features', () => {
             let verifierCallCount = 0;
 
             const mockProvider = {
-                createResponseStream: vi.fn().mockImplementation(async function* (
-                    messages: ResponseInput,
-                    model: string,
-                    agent: AgentDefinition
-                ) {
-                    if (agent.name === 'verifier_agent') {
-                        verifierCallCount++;
-                        if (verifierCallCount === 1) {
-                            // First verification: fail
-                            yield {
-                                type: 'message_complete',
-                                content: '{"status": "fail", "reason": "Missing details"}',
-                            };
+                createResponseStream: vi
+                    .fn()
+                    .mockImplementation(async function* (
+                        messages: ResponseInput,
+                        model: string,
+                        agent: AgentDefinition
+                    ) {
+                        if (agent.name === 'verifier_agent') {
+                            verifierCallCount++;
+                            if (verifierCallCount === 1) {
+                                // First verification: fail
+                                yield {
+                                    type: 'message_complete',
+                                    content:
+                                        '{"status": "fail", "reason": "Missing details"}',
+                                };
+                            } else {
+                                // Second verification: pass
+                                yield {
+                                    type: 'message_complete',
+                                    content: '{"status": "pass"}',
+                                };
+                            }
                         } else {
-                            // Second verification: pass
-                            yield {
-                                type: 'message_complete',
-                                content: '{"status": "pass"}',
-                            };
+                            mainCallCount++;
+                            if (mainCallCount === 1) {
+                                // First attempt
+                                yield {
+                                    type: 'message_complete',
+                                    content: 'Incomplete response',
+                                };
+                            } else {
+                                // Retry with better response
+                                yield {
+                                    type: 'message_complete',
+                                    content:
+                                        'Complete response with all details',
+                                };
+                            }
                         }
-                    } else {
-                        mainCallCount++;
-                        if (mainCallCount === 1) {
-                            // First attempt
-                            yield {
-                                type: 'message_complete',
-                                content: 'Incomplete response',
-                            };
-                        } else {
-                            // Retry with better response
-                            yield {
-                                type: 'message_complete',
-                                content: 'Complete response with all details',
-                            };
-                        }
-                    }
-                }),
+                    }),
             };
             (getModelProvider as any).mockReturnValue(mockProvider);
 
@@ -341,7 +379,9 @@ describe('Agent Features', () => {
             expect(failMessage).toBeDefined();
 
             const passMessage = events.find(
-                e => e.type === 'message_delta' && e.content?.includes('✓ Output verified')
+                e =>
+                    e.type === 'message_delta' &&
+                    e.content?.includes('✓ Output verified')
             );
             expect(passMessage).toBeDefined();
         });
@@ -352,25 +392,28 @@ describe('Agent Features', () => {
             );
 
             const mockProvider = {
-                createResponseStream: vi.fn().mockImplementation(async function* (
-                    messages: ResponseInput,
-                    model: string,
-                    agent: AgentDefinition
-                ) {
-                    if (agent.name === 'verifier_agent') {
-                        // Always fail verification
-                        yield {
-                            type: 'message_complete',
-                            content: '{"status": "fail", "reason": "Not good enough"}',
-                        };
-                    } else {
-                        // Main agent response
-                        yield {
-                            type: 'message_complete',
-                            content: 'Some response',
-                        };
-                    }
-                }),
+                createResponseStream: vi
+                    .fn()
+                    .mockImplementation(async function* (
+                        messages: ResponseInput,
+                        model: string,
+                        agent: AgentDefinition
+                    ) {
+                        if (agent.name === 'verifier_agent') {
+                            // Always fail verification
+                            yield {
+                                type: 'message_complete',
+                                content:
+                                    '{"status": "fail", "reason": "Not good enough"}',
+                            };
+                        } else {
+                            // Main agent response
+                            yield {
+                                type: 'message_complete',
+                                content: 'Some response',
+                            };
+                        }
+                    }),
             };
             (getModelProvider as any).mockReturnValue(mockProvider);
 
@@ -396,7 +439,9 @@ describe('Agent Features', () => {
             const failureMessage = events.find(
                 e =>
                     e.type === 'message_delta' &&
-                    e.content?.includes('❌ Verification failed after 3 attempts')
+                    e.content?.includes(
+                        '❌ Verification failed after 3 attempts'
+                    )
             );
             expect(failureMessage).toBeDefined();
         });

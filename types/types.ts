@@ -312,7 +312,11 @@ export type StreamEventType =
     // Git-related events
     | 'git_pull_request'
     // Stream termination event
-    | 'stream_end';
+    | 'stream_end'
+    // Agent lifecycle events
+    | 'agent_start'
+    | 'agent_status'
+    | 'agent_done';
 
 /**
  * Base streaming event interface
@@ -408,6 +412,18 @@ export interface ResponseOutputEvent extends StreamEventBase {
 }
 
 /**
+ * Agent lifecycle streaming events
+ */
+export interface AgentEvent extends StreamEventBase {
+    type: 'agent_start' | 'agent_status' | 'agent_done';
+    agent: AgentExportDefinition;
+    input?: string;
+    output?: string;
+    status?: string;
+    parent_id?: string;
+}
+
+/**
  * Union type for all ensemble streaming events
  */
 export type ProviderStreamEvent =
@@ -418,7 +434,8 @@ export type ProviderStreamEvent =
     | ToolEvent
     | ErrorEvent
     | CostUpdateEvent
-    | ResponseOutputEvent;
+    | ResponseOutputEvent
+    | AgentEvent;
 
 /**
  * Model provider interface
@@ -763,6 +780,7 @@ export interface AgentDefinition {
     ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
+    onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions
     processParams?: (
@@ -774,7 +792,7 @@ export interface AgentDefinition {
     }>;
 
     allowedEvents?: string[];
-    
+
     /** Optional abort signal to cancel operations */
     abortSignal?: AbortSignal;
 }

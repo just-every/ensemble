@@ -2,7 +2,11 @@
  * Tool Result Processor - Handles summarization and truncation of tool results
  */
 
-import { ToolCall, ResponseInput, type AgentDefinition } from '../types/types.js';
+import {
+    ToolCall,
+    ResponseInput,
+    type AgentDefinition,
+} from '../types/types.js';
 import {
     MAX_RESULT_LENGTH,
     SKIP_SUMMARIZATION_TOOLS,
