@@ -23,7 +23,7 @@ import {
     log_llm_response,
     log_llm_error,
 } from '../utils/llm_logger.js';
-import { isPaused } from '../utils/communication.js';
+import { isPaused } from '../utils/pause_controller.js';
 import {
     appendMessageWithImage,
     resizeAndSplitForOpenAI,

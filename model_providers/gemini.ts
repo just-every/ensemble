@@ -41,7 +41,7 @@ import {
     log_llm_request,
     log_llm_response,
 } from '../utils/llm_logger.js';
-import { isPaused } from '../utils/communication.js';
+import { isPaused } from '../utils/pause_controller.js';
 import {
     appendMessageWithImage,
     resizeAndTruncateForGemini,
