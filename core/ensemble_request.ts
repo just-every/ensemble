@@ -316,8 +316,8 @@ async function* executeRound(
     // Complete then process any tool calls
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
 
-    // Restore original onEvent handler
-    agent.onEvent = originalOnEvent;
+    // Clear tool event buffer handler
+    agent.onToolEvent = undefined;
 
     // Yield any events that were buffered during tool execution
     for (const bufferedEvent of toolEventBuffer) {
