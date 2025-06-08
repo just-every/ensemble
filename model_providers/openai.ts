@@ -995,6 +995,10 @@ export class OpenAIProvider implements ModelProvider {
                 requestParams
             );
 
+            // Wait while system is paused before making the API request
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            await waitWhilePaused(100, agent.abortSignal);
+
             const stream = await this.client.responses.create(requestParams);
 
             // Track delta positions for each message_id
@@ -1017,15 +1021,16 @@ export class OpenAIProvider implements ModelProvider {
                     // Check if the system was paused during the stream
                     if (isPaused()) {
                         console.log(
-                            `[OpenAI] System paused during stream for model ${model}. Aborting processing.`
+                            `[OpenAI] System paused during stream for model ${model}. Waiting...`
                         );
-                        yield {
-                            type: 'message_delta', // Or a specific 'stream_aborted' event
-                            content: '\n⏸️ Stream paused by user.',
-                            message_id: 'pause-notification-stream', // Use a distinct ID
-                            order: 999, // Ensure it appears last if needed
-                        };
-                        break; // Exit the loop to stop processing further chunks
+                        
+                        // Wait while paused instead of aborting
+                        await waitWhilePaused(100, agent.abortSignal);
+                        
+                        // If we're resuming, continue processing
+                        console.log(
+                            `[OpenAI] System resumed, continuing stream for model ${model}`
+                        );
                     }
 
                     // --- Response Lifecycle Events ---

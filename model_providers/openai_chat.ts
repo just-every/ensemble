@@ -23,6 +23,7 @@ import {
     log_llm_request,
     log_llm_response,
 } from '../utils/llm_logger.js';
+import { isPaused } from '../utils/communication.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
 import {
     appendMessageWithImage,
@@ -717,6 +718,10 @@ export class OpenAIChat implements ModelProvider {
                 requestParams
             );
 
+            // Wait while system is paused before making the API request
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            await waitWhilePaused(100, agent.abortSignal);
+
             // --- Process Stream ---
             const stream =
                 await this.client.chat.completions.create(requestParams);
@@ -736,6 +741,21 @@ export class OpenAIChat implements ModelProvider {
                 const deltaBuffers = new Map<string, DeltaBuffer>();
                 for await (const chunk of stream) {
                     chunks.push(chunk);
+
+                    // Check if the system was paused during the stream
+                    if (isPaused()) {
+                        console.log(
+                            `[${this.provider}] System paused during stream for model ${model}. Waiting...`
+                        );
+                        
+                        // Wait while paused instead of aborting
+                        await waitWhilePaused(100, agent.abortSignal);
+                        
+                        // If we're resuming, continue processing
+                        console.log(
+                            `[${this.provider}] System resumed, continuing stream for model ${model}`
+                        );
+                    }
 
                     // ... (stream aggregation logic unchanged) ...
                     const choice = chunk.choices[0];

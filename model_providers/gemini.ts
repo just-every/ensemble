@@ -930,6 +930,10 @@ export class GeminiProvider implements ModelProvider {
                 requestParams
             );
 
+            // Wait while system is paused before making the API request
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            await waitWhilePaused(100, agent.abortSignal);
+
             // --- Start streaming with retry logic ---
             const getStreamFn = () =>
                 this.client.models.generateContentStream(requestParams);
@@ -950,16 +954,16 @@ export class GeminiProvider implements ModelProvider {
                 // Check if the system was paused during the stream
                 if (isPaused()) {
                     console.log(
-                        `[Gemini] System paused during stream for model ${model}. Aborting processing.`
+                        `[Gemini] System paused during stream for model ${model}. Waiting...`
                     );
-                    yield {
-                        type: 'message_delta', // Or a specific 'stream_aborted' event
-                        content: '\n⏸️ Stream paused by user.',
-                        message_id: messageId, // Use the existing messageId
-                        order: 999, // Ensure it appears last if needed
-                    };
-                    // Note: We might need to update usageMetadata based on partial processing if possible
-                    break; // Exit the loop to stop processing further chunks
+                    
+                    // Wait while paused instead of aborting
+                    await waitWhilePaused(100, agent.abortSignal);
+                    
+                    // If we're resuming, continue processing
+                    console.log(
+                        `[Gemini] System resumed, continuing stream for model ${model}`
+                    );
                 }
 
                 // Handle function calls (if present)

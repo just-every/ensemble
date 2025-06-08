@@ -24,6 +24,7 @@ import { MessageHistory } from '../utils/message_history.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 import { verifyOutput } from '../utils/verification.js';
+import { waitWhilePaused } from '../utils/pause_controller.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 
@@ -183,6 +184,9 @@ async function* executeRound(
         [agent, messages] = await agent.onRequest(agent, messages);
     }
 
+    // Wait while paused before creating the stream
+    await waitWhilePaused(100, agent.abortSignal);
+
     // Create provider and agent with fresh settings
     const provider = getModelProvider(model);
 
@@ -276,6 +280,7 @@ async function* executeRound(
                     name: toolCall.function.name,
                     arguments: toolCall.function.arguments,
                     model,
+                    status: 'completed',
                 };
 
                 // Run tools in parallel
@@ -320,6 +325,7 @@ async function* executeRound(
             name: toolResult.toolCall.function.name,
             output: toolResult.output + (toolResult.error || ''),
             model,
+            status: 'completed',
         };
 
         history.add(functionOutput);

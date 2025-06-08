@@ -774,6 +774,9 @@ export interface AgentDefinition {
     }>;
 
     allowedEvents?: string[];
+    
+    /** Optional abort signal to cancel operations */
+    abortSignal?: AbortSignal;
 }
 
 export interface ToolParameter {

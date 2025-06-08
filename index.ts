@@ -42,6 +42,16 @@ export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
 export { createToolFunction } from './utils/create_tool_function.js';
 
+// Export pause controller
+export {
+    getPauseController,
+    isPaused,
+    pause,
+    resume,
+    waitWhilePaused,
+    type PauseController
+} from './utils/pause_controller.js';
+
 // Export new tool execution utilities
 export {
     runningToolTracker,

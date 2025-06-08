@@ -625,6 +625,10 @@ export class ClaudeProvider implements ModelProvider {
             // Citation tracking
             const citationTracker = createCitationTracker();
 
+            // Wait while system is paused before making the API request
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
+            await waitWhilePaused(100, agent.abortSignal);
+
             // Make the API call
             const stream = await this.client.messages.create(requestParams);
 
@@ -637,16 +641,16 @@ export class ClaudeProvider implements ModelProvider {
                     // Check if the system was paused during the stream
                     if (isPaused()) {
                         console.log(
-                            `[Claude] System paused during stream for model ${model}. Aborting processing.`
+                            `[Claude] System paused during stream for model ${model}. Waiting...`
                         );
-                        yield {
-                            type: 'message_delta', // Or a specific 'stream_aborted' event
-                            content: '\n⏸️ Stream paused by user.',
-                            message_id: messageId, // Use the existing messageId
-                            order: 999, // Ensure it appears last if needed
-                        };
-                        streamCompletedSuccessfully = false; // Mark as not fully completed
-                        break; // Exit the loop to stop processing further chunks
+                        
+                        // Wait while paused instead of aborting
+                        await waitWhilePaused(100, agent.abortSignal);
+                        
+                        // If we're resuming, continue processing
+                        console.log(
+                            `[Claude] System resumed, continuing stream for model ${model}`
+                        );
                     }
 
                     // --- Accumulate Usage ---
