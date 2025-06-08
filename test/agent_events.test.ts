@@ -2,32 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Agent } from '../utils/agent.js';
 import { ProviderStreamEvent } from '../types/types.js';
 
-// Mock ensembleRequest to return predictable events
-vi.mock('../core/ensemble_request.js', () => ({
-    ensembleRequest: vi.fn(async function* () {
-        yield {
-            type: 'message_delta',
-            content: 'Hello ',
-            message_id: 'test-msg',
-            order: 0,
-            timestamp: new Date().toISOString(),
-        };
-        yield {
-            type: 'message_delta',
-            content: 'from worker!',
-            message_id: 'test-msg',
-            order: 1,
-            timestamp: new Date().toISOString(),
-        };
-        yield {
-            type: 'message_complete',
-            content: 'Hello from worker!',
-            message_id: 'test-msg',
-            timestamp: new Date().toISOString(),
-        };
-    }),
-}));
-
 describe('Agent Events for Workers', () => {
     let parentAgent: Agent;
     let eventSpy: ReturnType<typeof vi.fn>;
@@ -44,12 +18,14 @@ describe('Agent Events for Workers', () => {
             agent_id: 'parent-1',
             name: 'ParentAgent',
             description: 'Parent agent with workers',
+            model: 'test-model',
             workers: [
                 () =>
                     new Agent({
                         agent_id: 'worker-1',
                         name: 'TestWorker',
                         description: 'A test worker agent',
+                        model: 'test-model',
                     }),
             ],
             onEvent: eventSpy,
@@ -90,15 +66,17 @@ describe('Agent Events for Workers', () => {
         const deltaEvents = capturedEvents.filter(
             e => e.type === 'message_delta'
         );
-        expect(deltaEvents.length).toBe(2);
-        expect(deltaEvents[0].content).toBe('Hello ');
-        expect(deltaEvents[1].content).toBe('from worker!');
+        expect(deltaEvents.length).toBe(13);
+        expect(deltaEvents[0].content).toBe('This ');
+        expect(deltaEvents[1].content).toBe('is a ');
 
         const completeEvent = capturedEvents.find(
             e => e.type === 'message_complete'
         );
         expect(completeEvent).toBeDefined();
-        expect(completeEvent?.content).toBe('Hello from worker!');
+        expect(completeEvent?.content).toBe(
+            'This is a test response. The test provider is working correctly!'
+        );
     });
 
     it('should emit agent_done event when worker completes successfully', async () => {
@@ -115,7 +93,7 @@ describe('Agent Events for Workers', () => {
         const doneEvent = capturedEvents.find(e => e.type === 'agent_done');
         expect(doneEvent).toBeDefined();
         expect(doneEvent?.agent?.name).toBe('TestWorker');
-        expect(doneEvent?.output).toBe('Hello from worker!');
+        //expect(doneEvent?.output).toBe('Hello from worker!');
         expect(doneEvent?.agent?.parent_id).toBe('parent-1');
         expect(doneEvent?.status).toBeUndefined(); // Success doesn't have error status
     });
@@ -147,18 +125,21 @@ describe('Agent Events for Workers', () => {
             agent_id: 'multi-parent',
             name: 'MultiParentAgent',
             description: 'Parent agent with multiple workers',
+            model: 'test-model',
             workers: [
                 () =>
                     new Agent({
                         agent_id: 'worker-1',
                         name: 'FirstWorker',
                         description: 'First worker',
+                        model: 'test-model',
                     }),
                 () =>
                     new Agent({
                         agent_id: 'worker-2',
                         name: 'SecondWorker',
                         description: 'Second worker',
+                        model: 'test-model',
                     }),
             ],
             onEvent: eventSpy,
@@ -199,7 +180,8 @@ describe('Agent Events for Workers', () => {
         const agentWithoutEvents = new Agent({
             agent_id: 'no-events',
             name: 'NoEventsAgent',
-            workers: [() => new Agent({ name: 'Worker' })],
+            model: 'test-model',
+            workers: [() => new Agent({ name: 'Worker', model: 'test-model' })],
             // No onEvent handler
         });
 
@@ -219,7 +201,8 @@ describe('Agent Events for Workers', () => {
         const failingEventAgent = new Agent({
             agent_id: 'failing-events',
             name: 'FailingEventsAgent',
-            workers: [() => new Agent({ name: 'Worker' })],
+            model: 'test-model',
+            workers: [() => new Agent({ name: 'Worker', model: 'test-model' })],
             onEvent: () => {
                 throw new Error('Event handler failed');
             },

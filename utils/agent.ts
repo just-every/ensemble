@@ -30,13 +30,13 @@ import { v4 as uuid } from 'uuid';
 // Keys are agent_ids, values are arrays of custom tool functions
 export const agentToolCache = new Map<string, ToolFunction[]>();
 
-export function exportAgent(agent: any) {
+export function exportAgent(agent: any, model?: string): AgentExportDefinition {
     return typeof agent.export === 'function'
         ? agent.export()
         : {
               agent_id: agent.agent_id,
               name: agent.name,
-              model: agent.model,
+              model: model || agent.model,
               modelClass: agent.modelClass,
               parent_id: agent.parent_id,
               cwd: agent.cwd,
@@ -593,38 +593,12 @@ async function runAgentTool(
         content: prompt,
     });
 
-    // Emit agent_start event
-    if (agent.onEvent) {
-        try {
-            await agent.onEvent({
-                type: 'agent_start',
-                agent: exportAgent(agent),
-                input: prompt,
-                timestamp: new Date().toISOString(),
-            });
-        } catch (error) {
-            console.warn(`Error in onEvent handler for agent_start: ${error}`);
-        }
-    }
-
     try {
         const stream = ensembleRequest(messages, agent);
         let fullResponse = '';
 
         // Forward all events from the sub-agent
         for await (const event of stream) {
-            if (agent.onEvent) {
-                try {
-                    // Add agent context to all events
-                    const eventWithContext = {
-                        ...event,
-                        agent: exportAgent(agent),
-                    };
-                    await agent.onEvent(eventWithContext);
-                } catch (error) {
-                    console.warn(`Error in onEvent handler: ${error}`);
-                }
-            }
             if (agent.onToolEvent) {
                 await agent.onToolEvent(event);
             }
@@ -634,45 +608,9 @@ async function runAgentTool(
             }
         }
 
-        // Emit agent_done event
-        if (agent.onEvent) {
-            try {
-                await agent.onEvent({
-                    type: 'agent_done',
-                    agent: exportAgent(agent),
-                    input: prompt,
-                    output: fullResponse,
-                    timestamp: new Date().toISOString(),
-                });
-            } catch (error) {
-                console.warn(
-                    `Error in onEvent handler for agent_done: ${error}`
-                );
-            }
-        }
-
         return fullResponse;
     } catch (error) {
         console.error(`Error in ${agent.name}: ${error}`);
-
-        // Emit agent_done with error
-        if (agent.onEvent) {
-            try {
-                await agent.onEvent({
-                    type: 'agent_done',
-                    agent: exportAgent(agent),
-                    input: prompt,
-                    output: `Error in ${agent.name}: ${error}`,
-                    status: 'error',
-                    timestamp: new Date().toISOString(),
-                });
-            } catch (error) {
-                console.warn(
-                    `Error in onEvent handler for agent_done: ${error}`
-                );
-            }
-        }
-
         return `Error in ${agent.name}: ${error}`;
     }
 }

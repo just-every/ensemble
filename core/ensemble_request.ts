@@ -25,6 +25,7 @@ import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 import { verifyOutput } from '../utils/verification.js';
 import { waitWhilePaused } from '../utils/pause_controller.js';
+import { exportAgent } from '../utils/agent.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 
@@ -179,6 +180,19 @@ async function* executeRound(
     // Get current messages
     let messages = await history.getMessages(model);
 
+    if (agent.onEvent) {
+        await agent.onEvent({
+            type: 'agent_start',
+            agent: exportAgent(agent, model),
+            input:
+                'content' in messages[0] &&
+                typeof messages[0].content === 'string'
+                    ? messages[0].content
+                    : undefined,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
     // Allow agent onRequest hook
     if (agent.onRequest) {
         [agent, messages] = await agent.onRequest(agent, messages);
@@ -208,6 +222,7 @@ async function* executeRound(
         yield event;
 
         if (agent.onEvent) {
+            event.agent = exportAgent(agent, model);
             await agent.onEvent(event);
         }
 
@@ -350,6 +365,14 @@ async function* executeRound(
             type: 'response_output',
             message: functionOutput,
         };
+    }
+
+    if (agent.onEvent) {
+        await agent.onEvent({
+            type: 'agent_done',
+            agent: exportAgent(agent, model),
+            timestamp: new Date().toISOString(),
+        });
     }
 }
 
