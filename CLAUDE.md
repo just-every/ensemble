@@ -76,3 +76,26 @@ npm run lint:fix      # Auto-fix lint issues
 - Strict mode is disabled (`"strict": false`)
 - Outputs to `./dist/` with source maps and declarations
 - All imports must use `.js` extension (even for `.ts` files)
+
+## CRITICAL: Pre-Commit Requirements
+
+**BEFORE EVERY COMMIT AND PUSH, YOU MUST:**
+
+1. **Run and fix linting errors:**
+   ```bash
+   npm run lint:fix
+   ```
+
+2. **Run all tests and ensure they pass:**
+   ```bash
+   npm run test
+   ```
+
+3. **Run the build and ensure it compiles successfully:**
+   ```bash
+   npm run build
+   ```
+
+4. **If ANY of the above fail, fix the issues before committing**
+
+**NO EXCEPTIONS:** Never commit or push code that fails linting, tests, or build. This is mandatory and must be done for every single commit.

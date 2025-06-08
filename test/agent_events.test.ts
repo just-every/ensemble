@@ -73,7 +73,7 @@ describe('Agent Events for Workers', () => {
         expect(startEvent).toBeDefined();
         expect(startEvent?.agent?.name).toBe('TestWorker');
         expect(startEvent?.input).toBe('**Task:** Test task for worker');
-        expect(startEvent?.parent_id).toBe('parent-1');
+        expect(startEvent?.agent?.parent_id).toBe('parent-1');
     });
 
     it('should forward all streaming events from worker execution', async () => {
@@ -116,7 +116,7 @@ describe('Agent Events for Workers', () => {
         expect(doneEvent).toBeDefined();
         expect(doneEvent?.agent?.name).toBe('TestWorker');
         expect(doneEvent?.output).toBe('Hello from worker!');
-        expect(doneEvent?.parent_id).toBe('parent-1');
+        expect(doneEvent?.agent?.parent_id).toBe('parent-1');
         expect(doneEvent?.status).toBeUndefined(); // Success doesn't have error status
     });
 
