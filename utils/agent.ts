@@ -30,6 +30,19 @@ import { v4 as uuid } from 'uuid';
 // Keys are agent_ids, values are arrays of custom tool functions
 export const agentToolCache = new Map<string, ToolFunction[]>();
 
+export function exportAgent(agent: any) {
+    return typeof agent.export === 'function'
+        ? agent.export()
+        : {
+            agent_id: agent.agent_id,
+            name: agent.name,
+            model: agent.model,
+            modelClass: agent.modelClass,
+            parent_id: agent.parent_id,
+            cwd: agent.cwd,
+        };
+}
+
 /**
  * Get agent-specific tools for a particular agent
  *
@@ -154,6 +167,7 @@ export class Agent implements AgentDefinition {
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
     onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
+    onToolEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions
     processParams?: (
@@ -163,8 +177,6 @@ export class Agent implements AgentDefinition {
         prompt: string;
         intelligence?: 'low' | 'standard' | 'high';
     }>;
-
-    allowedEvents?: string[];
 
     constructor(definition: AgentDefinition) {
         // Validate that we received a proper AgentDefinition
@@ -212,6 +224,7 @@ export class Agent implements AgentDefinition {
         this.onThinking = definition.onThinking;
         this.onResponse = definition.onResponse;
         this.onEvent = definition.onEvent;
+        this.onToolEvent = definition.onToolEvent;
 
         // Configure JSON formatting if schema is provided
         if (this.jsonSchema) {
@@ -580,27 +593,13 @@ async function runAgentTool(
         content: prompt,
     });
 
-    // Create agent export info
-    const agentExport =
-        typeof (agent as any).export === 'function'
-            ? (agent as any).export()
-            : {
-                  agent_id: agent.agent_id,
-                  name: agent.name,
-                  model: agent.model,
-                  modelClass: agent.modelClass,
-                  parent_id: agent.parent_id,
-                  cwd: agent.cwd,
-              };
-
     // Emit agent_start event
     if (agent.onEvent) {
         try {
             await agent.onEvent({
                 type: 'agent_start',
-                agent: agentExport,
+                agent: exportAgent(agent),
                 input: prompt,
-                parent_id: agent.parent_id,
                 timestamp: new Date().toISOString(),
             });
         } catch (error) {
@@ -619,13 +618,15 @@ async function runAgentTool(
                     // Add agent context to all events
                     const eventWithContext = {
                         ...event,
-                        agent: agentExport,
-                        parent_id: agent.parent_id,
+                        agent: exportAgent(agent),
                     };
                     await agent.onEvent(eventWithContext);
                 } catch (error) {
                     console.warn(`Error in onEvent handler: ${error}`);
                 }
+            }
+            if (agent.onToolEvent) {
+                await agent.onToolEvent(event);
             }
 
             if (event.type === 'message_complete' && 'content' in event) {
@@ -638,10 +639,9 @@ async function runAgentTool(
             try {
                 await agent.onEvent({
                     type: 'agent_done',
-                    agent: agentExport,
+                    agent: exportAgent(agent),
                     input: prompt,
                     output: fullResponse,
-                    parent_id: agent.parent_id,
                     timestamp: new Date().toISOString(),
                 });
             } catch (error) {
@@ -660,11 +660,10 @@ async function runAgentTool(
             try {
                 await agent.onEvent({
                     type: 'agent_done',
-                    agent: agentExport,
+                    agent: exportAgent(agent),
                     input: prompt,
                     output: `Error in ${agent.name}: ${error}`,
                     status: 'error',
-                    parent_id: agent.parent_id,
                     timestamp: new Date().toISOString(),
                 });
             } catch (error) {

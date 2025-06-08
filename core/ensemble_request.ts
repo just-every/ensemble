@@ -198,29 +198,18 @@ async function* executeRound(
     // Buffer for events emitted during tool execution
     const toolEventBuffer: ProviderStreamEvent[] = [];
 
-    // Wrap onEvent to both collect events and call original handler immediately
-    const originalOnEvent = agent.onEvent;
-    agent.onEvent = async (event: ProviderStreamEvent) => {
+    // Add tool event buffers
+    agent.onToolEvent = async (event: ProviderStreamEvent) => {
         // Buffer for the main stream
         toolEventBuffer.push(event);
-
-        // Call original handler immediately for real-time transmission
-        if (originalOnEvent) {
-            try {
-                await originalOnEvent(event);
-            } catch (error) {
-                console.warn(`Error in onEvent handler: ${error}`);
-            }
-        }
     };
 
     for await (const event of stream) {
-        // Apply event filtering
-        if (agent.allowedEvents && !agent.allowedEvents.includes(event.type)) {
-            continue;
-        }
-
         yield event;
+
+        if (agent.onEvent) {
+            await agent.onEvent(event);
+        }
 
         // Handle different event types
         switch (event.type) {

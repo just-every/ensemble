@@ -325,7 +325,6 @@ export interface StreamEventBase {
     type: StreamEventType;
     timestamp?: string; // Timestamp for the event, shared by all event types
     agent?: AgentExportDefinition; // Optional agent context
-    parent_id?: string; // Optional parent reference
 }
 
 /**
@@ -783,6 +782,7 @@ export interface AgentDefinition {
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
     onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
+    onToolEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions
     processParams?: (
@@ -792,8 +792,6 @@ export interface AgentDefinition {
         prompt: string;
         intelligence?: 'low' | 'standard' | 'high';
     }>;
-
-    allowedEvents?: string[];
 
     /** Optional abort signal to cancel operations */
     abortSignal?: AbortSignal;
