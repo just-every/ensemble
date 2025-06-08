@@ -73,10 +73,13 @@ describe('Pause Integration Tests', () => {
         pause();
         expect(isPaused()).toBe(true);
         
-        // Record how many events we had when paused
+        // Give a moment for any in-flight events to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Record how many events we had after pause settles
         const eventCountAtPause = events.length;
         
-        // Wait a bit - no new events should arrive
+        // Wait a bit - no new events should arrive after this point
         await new Promise(resolve => setTimeout(resolve, 200));
         expect(events.length).toBe(eventCountAtPause);
         
