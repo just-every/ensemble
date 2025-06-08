@@ -43,7 +43,7 @@ export function exportAgent(agent: any, model?: string): AgentExportDefinition {
                   cwd: agent.cwd,
               };
 
-    if (model) agentExport.model;
+    if (model) agentExport.model = model;
     return agentExport;
 }
 
