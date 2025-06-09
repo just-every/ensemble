@@ -985,49 +985,51 @@ export class GeminiProvider implements ModelProvider {
                 }
 
                 for (const candidate of chunk.candidates) {
-                    for (const part of candidate.content.parts) {
-                        let text = '';
-                        if (part.text) {
-                            text += part.text;
-                        }
-                        if (part.executableCode) {
-                            if (text) {
-                                text += '\n\n';
+                    if (candidate.content.parts) {
+                        for (const part of candidate.content.parts) {
+                            let text = '';
+                            if (part.text) {
+                                text += part.text;
                             }
-                            text += part.executableCode;
-                        }
-                        if (part.videoMetadata) {
-                            if (text) {
-                                text += '\n\n';
+                            if (part.executableCode) {
+                                if (text) {
+                                    text += '\n\n';
+                                }
+                                text += part.executableCode;
                             }
-                            text += JSON.stringify(part.videoMetadata);
-                        }
-                        if (text.length > 0) {
-                            const ev: MessageEvent = {
-                                type: 'message_delta',
-                                content: '',
-                                message_id: messageId,
-                                order: eventOrder++,
-                            };
-                            if (part.thought) {
-                                thoughtBuffer += text;
-                                ev.thinking_content = text;
-                            } else {
-                                contentBuffer += text;
-                                ev.content = text;
+                            if (part.videoMetadata) {
+                                if (text) {
+                                    text += '\n\n';
+                                }
+                                text += JSON.stringify(part.videoMetadata);
                             }
-                            yield ev as MessageEvent;
-                        }
-                        if (part.inlineData?.data) {
-                            yield {
-                                type: 'file_complete',
-                                data_format: 'base64',
-                                data: part.inlineData.data,
-                                mime_type:
-                                    part.inlineData.mimeType || 'image/png',
-                                message_id: uuidv4(),
-                                order: eventOrder++,
-                            };
+                            if (text.length > 0) {
+                                const ev: MessageEvent = {
+                                    type: 'message_delta',
+                                    content: '',
+                                    message_id: messageId,
+                                    order: eventOrder++,
+                                };
+                                if (part.thought) {
+                                    thoughtBuffer += text;
+                                    ev.thinking_content = text;
+                                } else {
+                                    contentBuffer += text;
+                                    ev.content = text;
+                                }
+                                yield ev as MessageEvent;
+                            }
+                            if (part.inlineData?.data) {
+                                yield {
+                                    type: 'file_complete',
+                                    data_format: 'base64',
+                                    data: part.inlineData.data,
+                                    mime_type:
+                                        part.inlineData.mimeType || 'image/png',
+                                    message_id: uuidv4(),
+                                    order: eventOrder++,
+                                };
+                            }
                         }
                     }
                     const gChunks =

@@ -280,9 +280,6 @@ export type StreamEventType =
     | 'message_start'
     | 'message_delta'
     | 'message_complete'
-    | 'talk_start'
-    | 'talk_delta'
-    | 'talk_complete'
     | 'audio_stream'
     | 'tool_start'
     | 'tool_delta'
@@ -359,13 +356,6 @@ export interface FileEvent extends StreamEventBase {
 }
 
 /**
- * Message streaming event
- */
-export interface TalkEvent extends MessageEventBase {
-    type: 'talk_start' | 'talk_delta' | 'talk_complete';
-}
-
-/**
  * Tool call streaming event
  */
 export interface ToolEvent extends StreamEventBase {
@@ -431,7 +421,6 @@ export type ProviderStreamEvent =
     | StreamEventBase
     | MessageEvent
     | FileEvent
-    | TalkEvent
     | ToolEvent
     | ErrorEvent
     | CostUpdateEvent
