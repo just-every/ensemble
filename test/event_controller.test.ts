@@ -18,7 +18,7 @@ describe('EventController', () => {
     });
 
     it('should set and clear event handler', () => {
-        const handler = (_event: ProviderStreamEvent) => {};
+        const handler = () => {};
 
         setEventHandler(handler);
         expect(hasEventHandler()).toBe(true);

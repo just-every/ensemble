@@ -529,7 +529,6 @@ export class ClaudeProvider implements ModelProvider {
                             'claude-opus-4-20250514',
                         ].includes(model)
                     ) {
-
                         max_tokens = Math.min(max_tokens, 64000);
                     } else {
                         max_tokens = Math.min(max_tokens, 8192);
