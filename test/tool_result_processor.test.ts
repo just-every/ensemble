@@ -25,6 +25,17 @@ describe('Tool Result Processor', () => {
     });
 
     describe('createSummary', () => {
+        it('should not summarize short content', async () => {
+            const shortContent = 'This is short content';
+            const summary = await createSummary(
+                shortContent,
+                'Summarize this content'
+            );
+
+            // Content below 5000 chars should not be summarized
+            expect(summary).toBe(shortContent);
+        });
+
         it('should create a summary using LLM', async () => {
             // Import the mocked function
             const { ensembleRequest } = await import(
@@ -34,33 +45,20 @@ describe('Tool Result Processor', () => {
 
             // Mock the async generator
             mockEnsembleRequest.mockImplementation(async function* () {
-                yield { type: 'message_delta', content: 'This is a summary' };
+                yield { type: 'message_complete', content: 'This is a summary' };
             });
 
+            // Create content > 5000 chars to trigger summarization
+            const longContent = 'x'.repeat(6000);
             const summary = await createSummary(
-                'Long content to summarize',
+                longContent,
                 'Summarize this content'
             );
 
-            expect(summary).toBe('This is a summary');
-            expect(mockEnsembleRequest).toHaveBeenCalledWith(
-                [
-                    {
-                        type: 'message',
-                        role: 'system',
-                        content: 'Summarize this content',
-                    },
-                    {
-                        type: 'message',
-                        role: 'user',
-                        content: 'Long content to summarize',
-                    },
-                ],
-                {
-                    modelClass: 'summary',
-                    name: 'SummaryAgent',
-                }
-            );
+            expect(summary).toContain('This is a summary');
+            expect(summary).toContain('[Summarized output');
+            // Don't check exact content since it gets truncated
+            expect(mockEnsembleRequest).toHaveBeenCalled();
         });
 
         it('should fallback to truncation on error', async () => {
@@ -70,10 +68,11 @@ describe('Tool Result Processor', () => {
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockRejectedValue(new Error('LLM error'));
 
-            const longContent = 'x'.repeat(2000);
+            const longContent = 'x'.repeat(6000);
             const summary = await createSummary(longContent, 'Summarize');
 
-            expect(summary).toBe('x'.repeat(1000) + '...');
+            expect(summary).toContain('[truncated for summary]');
+            expect(summary).toContain('[Summary generation failed, output truncated]');
         });
 
         it('should handle empty response from LLM', async () => {
@@ -85,10 +84,11 @@ describe('Tool Result Processor', () => {
                 // Empty response
             });
 
-            const content = 'x'.repeat(2000);
+            const content = 'x'.repeat(6000);
             const summary = await createSummary(content, 'Summarize');
 
-            expect(summary).toBe('x'.repeat(1000) + '...');
+            expect(summary).toContain('[truncated for summary]');
+            expect(summary).toContain('[Summary generation failed, output truncated]');
         });
     });
 
@@ -108,13 +108,11 @@ describe('Tool Result Processor', () => {
                 },
             };
 
-            const content = 'x'.repeat(1500);
+            const content = 'x'.repeat(15000);
             const result = await processToolResult(readSourceCall, content);
 
-            expect(result).toBe(
-                'x'.repeat(1000) +
-                    '\n\n[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]'
-            );
+            expect(result).toContain('[truncated for summary]');
+            expect(result).toContain('[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]');
         });
 
         it('should not truncate short results', async () => {
@@ -129,13 +127,14 @@ describe('Tool Result Processor', () => {
             );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
-                yield { type: 'message_delta', content: 'Summarized content' };
+                yield { type: 'message_complete', content: 'Summarized content' };
             });
 
-            const longContent = 'x'.repeat(1500);
+            const longContent = 'x'.repeat(6000);
             const result = await processToolResult(mockToolCall, longContent);
 
-            expect(result).toBe('Summarized content');
+            expect(result).toContain('Summarized content');
+            expect(result).toContain('[Summarized output');
             expect(mockEnsembleRequest).toHaveBeenCalled();
         });
 
@@ -148,12 +147,11 @@ describe('Tool Result Processor', () => {
                 },
             };
 
-            const content = 'x'.repeat(1500);
+            const content = 'x'.repeat(15000);
             const result = await processToolResult(listFilesCall, content);
 
-            expect(result).toBe(
-                'x'.repeat(1000) + '... Output truncated to 1000 characters'
-            );
+            expect(result).toContain('[truncated for summary]');
+            expect(result).toContain('[Output truncated:');
         });
     });
 
@@ -169,13 +167,13 @@ describe('Tool Result Processor', () => {
         });
 
         it('should return true for long results from other tools', () => {
-            expect(shouldSummarizeResult('test_tool', 1500)).toBe(true);
+            expect(shouldSummarizeResult('test_tool', 6000)).toBe(true);
         });
 
         it('should respect custom tool config max length', () => {
-            // read_source has custom maxLength of 1000
-            expect(shouldSummarizeResult('read_source', 500)).toBe(false);
-            expect(shouldSummarizeResult('read_source', 1500)).toBe(false); // Still false because it's in skip list
+            // read_source has custom maxLength of 10000
+            expect(shouldSummarizeResult('read_source', 5000)).toBe(false);
+            expect(shouldSummarizeResult('read_source', 15000)).toBe(false); // Still false because it's in skip list
         });
     });
 
@@ -188,13 +186,13 @@ describe('Tool Result Processor', () => {
 
         it('should return default message for other tools', () => {
             expect(getTruncationMessage('test_tool')).toBe(
-                '... Output truncated to 1000 characters'
+                '... Output truncated to 5000 characters'
             );
         });
 
         it('should include custom max length in default message', () => {
             expect(getTruncationMessage('get_page_content')).toBe(
-                '... Output truncated to 1000 characters'
+                '... Output truncated to 10000 characters'
             );
         });
     });

@@ -110,6 +110,8 @@ export {
     processToolResult,
     shouldSummarizeResult,
     getTruncationMessage,
+    clearSummaryCache,
+    getSummaryCacheStats,
 } from './utils/tool_result_processor.js';
 export * from './config/tool_execution.js';
 

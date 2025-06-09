@@ -29,8 +29,9 @@ export const STATUS_TRACKING_TOOLS = new Set([
 
 /**
  * Maximum length for tool results before summarization
+ * This is used as a fallback for truncation when summarization fails
  */
-export const MAX_RESULT_LENGTH = 1000;
+export const MAX_RESULT_LENGTH = 5000;
 
 /**
  * Tools that skip summarization (but still get truncated)
@@ -54,16 +55,26 @@ export interface ToolConfig {
 export const TOOL_CONFIGS: Record<string, ToolConfig> = {
     read_source: {
         skipSummarization: true,
-        maxLength: 1000,
+        maxLength: 10000,
         truncationMessage:
             '\n\n[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]',
     },
     get_page_content: {
         skipSummarization: true,
-        maxLength: 1000,
+        maxLength: 10000,
     },
     read_file: {
         skipSummarization: true,
-        maxLength: 1000,
+        maxLength: 10000,
+    },
+    // Tools that should summarize more aggressively
+    run_shell_command: {
+        maxLength: 5000,
+    },
+    execute_code: {
+        maxLength: 5000,
+    },
+    debug_code: {
+        maxLength: 5000,
     },
 };
