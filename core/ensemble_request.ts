@@ -331,16 +331,8 @@ async function* executeRound(
     // Complete then process any tool calls
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
 
-    // Clear tool event buffer handler
-    agent.onToolEvent = undefined;
-
-    // Yield any events that were buffered during tool execution
-    for (const bufferedEvent of toolEventBuffer) {
-        yield bufferedEvent;
-    }
-
     for (const toolResult of toolResults) {
-        yield {
+        const toolDoneEvent: ProviderStreamEvent = {
             type: 'tool_done',
             tool_call: toolResult.toolCall,
             result: {
@@ -349,6 +341,11 @@ async function* executeRound(
                 error: toolResult.error,
             },
         };
+        yield toolDoneEvent;
+        if (agent.onEvent) {
+            toolDoneEvent.agent = exportAgent(agent, model);
+            await agent.onEvent(toolDoneEvent);
+        }
 
         const functionOutput: ResponseInputFunctionCallOutput = {
             type: 'function_call_output',
@@ -373,6 +370,11 @@ async function* executeRound(
             agent: exportAgent(agent, model),
             timestamp: new Date().toISOString(),
         });
+    }
+
+    // Yield any events that were buffered during tool execution
+    for (const bufferedEvent of toolEventBuffer) {
+        yield bufferedEvent;
     }
 }
 
