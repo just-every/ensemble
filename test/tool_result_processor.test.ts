@@ -45,7 +45,10 @@ describe('Tool Result Processor', () => {
 
             // Mock the async generator
             mockEnsembleRequest.mockImplementation(async function* () {
-                yield { type: 'message_complete', content: 'This is a summary' };
+                yield {
+                    type: 'message_complete',
+                    content: 'This is a summary',
+                };
             });
 
             // Create content > 5000 chars to trigger summarization
@@ -72,7 +75,9 @@ describe('Tool Result Processor', () => {
             const summary = await createSummary(longContent, 'Summarize');
 
             expect(summary).toContain('[truncated for summary]');
-            expect(summary).toContain('[Summary generation failed, output truncated]');
+            expect(summary).toContain(
+                '[Summary generation failed, output truncated]'
+            );
         });
 
         it('should handle empty response from LLM', async () => {
@@ -88,7 +93,9 @@ describe('Tool Result Processor', () => {
             const summary = await createSummary(content, 'Summarize');
 
             expect(summary).toContain('[truncated for summary]');
-            expect(summary).toContain('[Summary generation failed, output truncated]');
+            expect(summary).toContain(
+                '[Summary generation failed, output truncated]'
+            );
         });
     });
 
@@ -112,7 +119,9 @@ describe('Tool Result Processor', () => {
             const result = await processToolResult(readSourceCall, content);
 
             expect(result).toContain('[truncated for summary]');
-            expect(result).toContain('[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]');
+            expect(result).toContain(
+                '[Full output truncated: Use write_source(summary_id, file_path) to write full output to a file.]'
+            );
         });
 
         it('should not truncate short results', async () => {
@@ -127,7 +136,10 @@ describe('Tool Result Processor', () => {
             );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
-                yield { type: 'message_complete', content: 'Summarized content' };
+                yield {
+                    type: 'message_complete',
+                    content: 'Summarized content',
+                };
             });
 
             const longContent = 'x'.repeat(6000);
