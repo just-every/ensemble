@@ -76,9 +76,9 @@ export const MODEL_CLASSES = {
             'gemini-2.5-flash-preview-05-20-max', // Google
             'o4-mini-high', // OpenAI
             'o3-high', // OpenAI
-            'claude-3-7-sonnet-latest', // Anthropic
-            'claude-opus-4-20250514', // Anthropic
-            'claude-sonnet-4-20250514', // Anthropic
+            'claude-opus-4-20250514-max', // Anthropic
+            'claude-sonnet-4-20250514-max', // Anthropic
+            'claude-3-7-sonnet-latest-max', // Anthropic
             //'grok-3-mini-fast', // X.AI
         ],
         random: true,
@@ -100,8 +100,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'o4-mini-low', // OpenAI
             'o3-low', // OpenAI
-            'claude-3-7-sonnet-latest', // Anthropic
-            'claude-sonnet-4-20250514', // Anthropic
+            'claude-sonnet-4-20250514-medium', // Anthropic
             'grok-3-mini-fast', // X.AI
             //'deepseek-reasoner',      // DeepSeek
             //'meta-llama/llama-4-maverick', // Meta/OpenRouter
@@ -117,7 +116,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-flash-preview-05-20-high', // Google
             //'o4-mini-high', // OpenAI
             'o3-medium', // OpenAI
-            'claude-3-7-sonnet-latest', // Anthropic
+            'claude-sonnet-4-20250514-medium', // Anthropic
             'grok-3-mini-fast', // X.AI
         ],
         random: true,
@@ -126,8 +125,10 @@ export const MODEL_CLASSES = {
     // Programming models
     code: {
         models: [
-            'claude-3-7-sonnet-latest', // Anthropic
-            'gpt-4.1', // OpenAI
+            'codex-mini-latest', // OpenAI
+            'claude-opus-4-20250514-medium', // Anthropic
+            'claude-sonnet-4-20250514-max', // Anthropic
+            'o3-medium', // OpenAI
             'gemini-2.5-flash-preview-05-20-medium', // Google
         ],
         random: true,
@@ -162,7 +163,8 @@ export const MODEL_CLASSES = {
             'o3-low', // OpenAI
             'gemini-2.5-flash-preview-05-20-max', // Google
             'gemini-2.5-pro-preview-05-06', // 'gemini-2.5-pro-exp-03-25', // Google
-            'claude-3-7-sonnet-latest', // Anthropic
+            'claude-opus-4-20250514-low', // Anthropic
+            'claude-sonnet-4-20250514-max', // Anthropic
             //'grok-2-vision', // X.AI
             //'gpt-4.1', // OpenAI
         ],
@@ -174,6 +176,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-4.1-mini', // OpenAI
             'gemini-2.5-flash-preview-05-20-low', // Google
+            'claude-sonnet-4-20250514-low', // Anthropic
         ],
         random: true,
     },
@@ -182,7 +185,6 @@ export const MODEL_CLASSES = {
     search: {
         models: [
             'gpt-4.1', // OpenAI
-            //'o4-mini', // OpenAI
             'deepseek-reasoner', // DeepSeek
             'gemini-2.5-flash-preview-05-20', // Google
             'perplexity/sonar-deep-research', // Perplexity
@@ -194,8 +196,6 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
             'imagen-3.0-generate-002', // Google Imagen 3
-            'dall-e-3', // OpenAI DALL-E 3
-            'dall-e-2', // OpenAI DALL-E 2 (supports editing)
         ],
     },
 
@@ -318,11 +318,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
     {
         id: 'qwen/qwen3-235b-a22b',
-        aliases: [
-            'qwen/qwen3-235b-a22b-low',
-            'qwen/qwen3-235b-a22b-medium',
-            'qwen/qwen3-235b-a22b-high',
-        ],
         provider: 'openrouter',
         cost: {
             input_per_million: 0.1,
@@ -721,7 +716,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
     {
         id: 'o3',
-        aliases: ['o3-2025-04-16', 'o3-low', 'o3-medium', 'o3-high'],
+        aliases: ['o3-2025-04-16'],
         provider: 'openai',
         cost: {
             input_per_million: 10,
@@ -1039,14 +1034,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
     {
         id: 'gemini-2.5-flash-preview-05-20',
-        aliases: [
-            'gemini-2.5-flash',
-            'gemini-2.5-flash-preview-04-17',
-            'gemini-2.5-flash-preview-05-20-low',
-            'gemini-2.5-flash-preview-05-20-medium',
-            'gemini-2.5-flash-preview-05-20-high',
-            'gemini-2.5-flash-preview-05-20-max',
-        ],
+        aliases: ['gemini-2.5-flash', 'gemini-2.5-flash-preview-04-17'],
         provider: 'google',
         cost: {
             input_per_million: 0.15,
@@ -1365,5 +1353,19 @@ export function findModel(modelId: string): ModelEntry | undefined {
     if (directMatch) return directMatch;
 
     // Check for alias match
-    return MODEL_REGISTRY.find(model => model.aliases?.includes(modelId));
+    const aliasMatch = MODEL_REGISTRY.find(model =>
+        model.aliases?.includes(modelId)
+    );
+    if (aliasMatch) return aliasMatch;
+
+    // If model ends in -low, -medium, -high or -max, remove suffix and try again
+    const suffixes = ['-low', '-medium', '-high', '-max'];
+    for (const suffix of suffixes) {
+        if (modelId.endsWith(suffix)) {
+            const baseName = modelId.slice(0, -suffix.length);
+            return findModel(baseName);
+        }
+    }
+
+    return undefined;
 }

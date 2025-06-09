@@ -40,7 +40,7 @@ import {
     log_llm_response,
 } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { ModelClassID } from '../data/model_data.js';
+import { findModel, ModelClassID } from '../data/model_data.js';
 import {
     appendMessageWithImage,
     resizeAndTruncateForClaude,
@@ -50,6 +50,14 @@ import {
     bufferDelta,
     flushBufferedDeltas,
 } from '../utils/delta_buffer.js';
+
+// Define mappings for thinking budget configurations
+const THINKING_BUDGET_CONFIGS: Record<string, number> = {
+    '-low': 0,
+    '-medium': 8000,
+    '-high': 16000,
+    '-max': 32000,
+};
 
 /**
  * Resolves any async enum values in tool parameters
@@ -453,8 +461,62 @@ export class ClaudeProvider implements ModelProvider {
             const settings: ModelSettings | undefined = agent?.modelSettings;
             const modelClass: ModelClassID | undefined = agent?.modelClass;
 
+            // Enable interleaved thinking where possible
+            let headers = undefined;
+            if (
+                model.startsWith('claude-sonnet-4') ||
+                model.startsWith('claude-opus-4')
+            ) {
+                headers = {
+                    'anthropic-beta': 'interleaved-thinking-2025-05-14',
+                };
+            }
+
+            // Enable thinking if specified for the model
             let thinking = undefined;
-            let max_tokens = settings?.max_tokens || 64000; // Default max tokens if not specified
+            let thinkingSet = false;
+            for (const [suffix, budget] of Object.entries(
+                THINKING_BUDGET_CONFIGS
+            )) {
+                if (model.endsWith(suffix)) {
+                    thinkingSet = true;
+                    if (budget > 0) {
+                        thinking = {
+                            type: 'enabled',
+                            budget_tokens: budget,
+                        };
+                    }
+                    model = model.slice(0, -suffix.length);
+                    break;
+                }
+            }
+
+            // Set max tokens based on settings or model
+            const modelData = findModel(model);
+            let max_tokens =
+                settings?.max_tokens ||
+                modelData?.features?.max_output_tokens ||
+                8192;
+            // Ensure we don't go over the limit if using settings
+            if (modelData?.features?.max_output_tokens) {
+                max_tokens = Math.min(
+                    max_tokens,
+                    modelData.features.max_output_tokens
+                );
+            }
+
+            if (
+                !thinkingSet &&
+                (model.startsWith('claude-sonnet-4') ||
+                    model.startsWith('claude-opus-4') ||
+                    model.startsWith('claude-3-7-sonnet'))
+            ) {
+                // Default extended thinking
+                thinking = {
+                    type: 'enabled',
+                    budget_tokens: 8000,
+                };
+            }
             switch (modelClass) {
                 case 'monologue':
                 case 'reasoning':
@@ -467,11 +529,7 @@ export class ClaudeProvider implements ModelProvider {
                             'claude-opus-4-20250514',
                         ].includes(model)
                     ) {
-                        // Extended thinking
-                        thinking = {
-                            type: 'enabled',
-                            budget_tokens: 16000,
-                        };
+
                         max_tokens = Math.min(max_tokens, 64000);
                     } else {
                         max_tokens = Math.min(max_tokens, 8192);
@@ -525,6 +583,7 @@ export class ClaudeProvider implements ModelProvider {
                 ...(settings?.temperature !== undefined
                     ? { temperature: settings.temperature }
                     : {}),
+                ...(headers ? { headers } : {}),
             };
 
             // Add tools if provided, using the corrected conversion function
