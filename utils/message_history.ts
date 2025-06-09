@@ -5,9 +5,8 @@
 import {
     ResponseInput,
     ResponseInputItem,
-    // ResponseInputMessage,
-    // ResponseInputFunctionCall,
-    // ResponseInputFunctionCallOutput,
+    ResponseInputMessage,
+    ResponseInputFunctionCallOutput,
     // type ToolCallResult,
 } from '../types/types.js';
 
@@ -139,6 +138,8 @@ export class MessageHistory {
      */
     async getMessages(model?: string): Promise<ResponseInput> {
         await this.checkAndCompact(model);
+        // Ensure proper tool result sequencing before returning messages
+        this.ensureToolResultSequence();
         return [...this.messages];
     }
 
@@ -808,5 +809,104 @@ Keep the summary focused and relevant for continuing the conversation.`;
     private estimateTextTokens(text: string): number {
         // Simple estimation: ~4 characters per token
         return Math.ceil(text.length / 4);
+    }
+
+    /**
+     * Ensures proper message sequencing where tool results immediately follow tool calls.
+     * This fixes the issue where assistant text messages can be inserted between
+     * tool_use blocks and their corresponding tool_result blocks.
+     */
+    public ensureToolResultSequence(): void {
+        const reorderedMessages: PinnableMessage[] = [];
+        let i = 0;
+
+        while (i < this.messages.length) {
+            const currentMsg = this.messages[i];
+
+            if (currentMsg.type === 'function_call') {
+                // Add the function call
+                reorderedMessages.push(currentMsg);
+
+                // Look for the corresponding function_call_output
+                const callId = currentMsg.call_id;
+                let foundOutput = false;
+
+                // Search for the output in the remaining messages
+                for (let j = i + 1; j < this.messages.length; j++) {
+                    const potentialOutput = this.messages[j];
+                    if (
+                        potentialOutput.type === 'function_call_output' &&
+                        potentialOutput.call_id === callId
+                    ) {
+                        // Found the output, add it immediately after the call
+                        reorderedMessages.push(potentialOutput);
+                        // Remove the output from its original position
+                        this.messages.splice(j, 1);
+                        foundOutput = true;
+                        break;
+                    }
+                }
+
+                if (!foundOutput) {
+                    // No matching output found, create an error output
+                    console.warn(
+                        `[MessageHistory] No matching output found for tool call ${callId}. Creating error output.`
+                    );
+                    const errorOutput: ResponseInputFunctionCallOutput = {
+                        type: 'function_call_output',
+                        call_id: callId,
+                        name: currentMsg.name,
+                        output: JSON.stringify({
+                            error: 'Tool call did not complete or output was missing.',
+                        }),
+                        status: 'incomplete',
+                        model: currentMsg.model,
+                    };
+                    reorderedMessages.push(errorOutput);
+                }
+
+                i++;
+            } else if (currentMsg.type === 'function_call_output') {
+                // Check if this is an orphaned output (no preceding function_call)
+                const callId = currentMsg.call_id;
+                let hasMatchingCall = false;
+
+                // Check if we already processed its matching call
+                for (let j = reorderedMessages.length - 1; j >= 0; j--) {
+                    const msg = reorderedMessages[j];
+                    if (
+                        msg.type === 'function_call' &&
+                        msg.call_id === callId
+                    ) {
+                        hasMatchingCall = true;
+                        break;
+                    }
+                }
+
+                if (!hasMatchingCall) {
+                    // This is an orphaned output, convert to regular message
+                    console.warn(
+                        `[MessageHistory] Found orphaned function_call_output with call_id ${callId}. Converting to regular message.`
+                    );
+                    const regularMessage: ResponseInputMessage = {
+                        type: 'message',
+                        role: 'user',
+                        content: `Tool result (${currentMsg.name || 'unknown_tool'}): ${currentMsg.output}`,
+                        status: 'completed',
+                        model: currentMsg.model,
+                    };
+                    reorderedMessages.push(regularMessage);
+                }
+                // If it has a matching call, it was already added, so skip it
+                i++;
+            } else {
+                // Regular message, just add it
+                reorderedMessages.push(currentMsg);
+                i++;
+            }
+        }
+
+        // Replace messages with reordered array
+        this.messages = reorderedMessages;
     }
 }

@@ -881,9 +881,26 @@ export class OpenAIChat implements ModelProvider {
                                 if (typedDelta.function?.name)
                                     partialCall.function.name =
                                         typedDelta.function.name;
-                                if (typedDelta.function?.arguments)
-                                    partialCall.function.arguments +=
+                                if (typedDelta.function?.arguments) {
+                                    // For xAI/Grok, validate accumulated arguments to prevent JSON errors
+                                    const newArgs =
                                         typedDelta.function.arguments;
+                                    const accumulatedArgs =
+                                        partialCall.function.arguments +
+                                        newArgs;
+
+                                    // Try to parse to check if we have valid JSON so far
+                                    try {
+                                        JSON.parse(accumulatedArgs);
+                                        partialCall.function.arguments =
+                                            accumulatedArgs;
+                                    } catch {
+                                        // If parsing fails, it might be incomplete JSON
+                                        // For xAI, we'll just accumulate and validate later
+                                        partialCall.function.arguments =
+                                            accumulatedArgs;
+                                    }
+                                }
                             }
                         }
                     }
@@ -967,6 +984,54 @@ export class OpenAIChat implements ModelProvider {
                     ).filter(call => call.id && call.function.name);
                     if (completedToolCalls.length > 0) {
                         for (const completedToolCall of completedToolCalls) {
+                            // Validate and fix JSON arguments before yielding
+                            if (completedToolCall.function.arguments) {
+                                try {
+                                    // Try to parse to validate JSON
+                                    const parsed = JSON.parse(
+                                        completedToolCall.function.arguments
+                                    );
+                                    // Re-stringify to ensure clean format
+                                    completedToolCall.function.arguments =
+                                        JSON.stringify(parsed);
+                                } catch (error) {
+                                    console.warn(
+                                        `(${this.provider}) Invalid JSON in tool arguments for ${completedToolCall.function.name}, attempting to fix: ${error}`
+                                    );
+
+                                    // For xAI/Grok, try to extract valid JSON
+                                    const argStr =
+                                        completedToolCall.function.arguments;
+
+                                    // Try to find a complete JSON object
+                                    const matches = argStr.match(
+                                        /\{(?:[^{}]|(?:\{[^{}]*\}))*\}/
+                                    );
+                                    if (matches && matches[0]) {
+                                        try {
+                                            const parsed = JSON.parse(
+                                                matches[0]
+                                            );
+                                            completedToolCall.function.arguments =
+                                                JSON.stringify(parsed);
+                                            console.log(
+                                                `(${this.provider}) Successfully extracted valid JSON`
+                                            );
+                                        } catch {
+                                            // If all else fails, use empty object
+                                            completedToolCall.function.arguments =
+                                                '{}';
+                                            console.error(
+                                                `(${this.provider}) Could not parse arguments, using empty object`
+                                            );
+                                        }
+                                    } else {
+                                        completedToolCall.function.arguments =
+                                            '{}';
+                                    }
+                                }
+                            }
+
                             yield {
                                 type: 'tool_start',
                                 tool_call: completedToolCall,
