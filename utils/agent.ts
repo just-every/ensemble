@@ -257,6 +257,10 @@ export class Agent implements AgentDefinition {
                     if (this.onEvent) {
                         agent.onEvent = this.onEvent;
                     }
+                    // Also pass onToolEvent for proper event buffering
+                    if (this.onToolEvent) {
+                        agent.onToolEvent = this.onToolEvent;
+                    }
 
                     return agent.asTool();
                 })
@@ -290,6 +294,11 @@ export class Agent implements AgentDefinition {
                 // If the parent has an onEvent handler, pass it to the child
                 if (this.onEvent) {
                     agent.onEvent = this.onEvent;
+                }
+
+                // CRITICAL: Also inherit onToolEvent so worker events are buffered correctly
+                if (this.onToolEvent) {
+                    agent.onToolEvent = this.onToolEvent;
                 }
 
                 if (agent.processParams) {
@@ -598,13 +607,16 @@ async function runAgentTool(
     });
 
     try {
+        // Save the parent's onToolEvent before ensembleRequest overwrites it
+        const parentOnToolEvent = agent.onToolEvent;
+
         const stream = ensembleRequest(messages, agent);
         let fullResponse = '';
 
-        // Forward all events from the sub-agent
+        // Forward all events from the sub-agent to the parent's event buffer
         for await (const event of stream) {
-            if (agent.onToolEvent) {
-                await agent.onToolEvent(event);
+            if (parentOnToolEvent) {
+                await parentOnToolEvent(event);
             }
 
             if (event.type === 'message_complete' && 'content' in event) {
