@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Agent } from '../utils/agent.js';
 import { ProviderStreamEvent } from '../types/types.js';
+import { setEventHandler } from '../utils/event_controller.js';
 
 describe('Agent Events for Workers', () => {
     let parentAgent: Agent;
@@ -13,7 +14,10 @@ describe('Agent Events for Workers', () => {
             capturedEvents.push(event);
         });
 
-        // Create parent agent with workers and event handler
+        // Set up global event handler
+        setEventHandler(eventSpy);
+
+        // Create parent agent with workers
         parentAgent = new Agent({
             agent_id: 'parent-1',
             name: 'ParentAgent',
@@ -28,8 +32,12 @@ describe('Agent Events for Workers', () => {
                         model: 'test-model',
                     }),
             ],
-            onEvent: eventSpy,
         });
+    });
+
+    afterEach(() => {
+        // Clear the event handler
+        setEventHandler(null);
     });
 
     it('should emit agent_start event when worker begins execution', async () => {
@@ -175,14 +183,17 @@ describe('Agent Events for Workers', () => {
         expect(startEvents[1].agent?.name).toBe('SecondWorker');
     });
 
-    it('should work without onEvent handler (no events emitted)', async () => {
-        // Create agent without onEvent handler
+    it('should work without global event handler', async () => {
+        // Clear the global event handler
+        setEventHandler(null);
+        capturedEvents = [];
+
+        // Create agent without global event handler
         const agentWithoutEvents = new Agent({
             agent_id: 'no-events',
             name: 'NoEventsAgent',
             model: 'test-model',
             workers: [() => new Agent({ name: 'Worker', model: 'test-model' })],
-            // No onEvent handler
         });
 
         const tools = await agentWithoutEvents.getTools();
@@ -192,20 +203,22 @@ describe('Agent Events for Workers', () => {
         const result = await workerTool.function('Test task');
         expect(typeof result).toBe('string');
 
-        // No events should have been captured
+        // No events should have been captured since no handler is set
         expect(capturedEvents.length).toBe(0);
     });
 
-    it('should handle errors in onEvent handler gracefully', async () => {
-        // Create agent with failing onEvent handler
+    it('should handle errors in global event handler gracefully', async () => {
+        // Set a failing global event handler
+        setEventHandler(() => {
+            throw new Error('Event handler failed');
+        });
+
+        // Create agent
         const failingEventAgent = new Agent({
             agent_id: 'failing-events',
             name: 'FailingEventsAgent',
             model: 'test-model',
             workers: [() => new Agent({ name: 'Worker', model: 'test-model' })],
-            onEvent: () => {
-                throw new Error('Event handler failed');
-            },
         });
 
         const tools = await failingEventAgent.getTools();

@@ -170,7 +170,6 @@ export class Agent implements AgentDefinition {
     ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
-    onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
     onToolEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions
@@ -227,7 +226,6 @@ export class Agent implements AgentDefinition {
         ) => Promise<[Agent, ResponseInput]>;
         this.onThinking = definition.onThinking;
         this.onResponse = definition.onResponse;
-        this.onEvent = definition.onEvent;
         this.onToolEvent = definition.onToolEvent;
 
         // Configure JSON formatting if schema is provided
@@ -252,12 +250,9 @@ export class Agent implements AgentDefinition {
                     // Call the function with no arguments or adjust based on what ExecutableFunction expects
                     const agent = createAgentFn() as Agent;
 
-                    // Set parent relationship and pass the parent's onEvent to the worker agent
+                    // Set parent relationship and pass onToolEvent to the worker agent
                     agent.parent_id = this.agent_id;
-                    if (this.onEvent) {
-                        agent.onEvent = this.onEvent;
-                    }
-                    // Also pass onToolEvent for proper event buffering
+                    // Pass onToolEvent for proper event buffering
                     if (this.onToolEvent) {
                         agent.onToolEvent = this.onToolEvent;
                     }
@@ -290,11 +285,6 @@ export class Agent implements AgentDefinition {
                 // Set up parent relationship and event forwarding
                 // 'this' refers to the worker agent, which already has parent_id set
                 agent.parent_id = this.parent_id;
-
-                // If the parent has an onEvent handler, pass it to the child
-                if (this.onEvent) {
-                    agent.onEvent = this.onEvent;
-                }
 
                 // CRITICAL: Also inherit onToolEvent so worker events are buffered correctly
                 if (this.onToolEvent) {

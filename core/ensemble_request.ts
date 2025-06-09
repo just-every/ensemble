@@ -25,7 +25,7 @@ import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 import { verifyOutput } from '../utils/verification.js';
 import { waitWhilePaused } from '../utils/pause_controller.js';
-import { exportAgent } from '../utils/agent.js';
+import { emitEvent } from '../utils/event_controller.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 
@@ -180,18 +180,20 @@ async function* executeRound(
     // Get current messages
     let messages = await history.getMessages(model);
 
-    if (agent.onEvent) {
-        await agent.onEvent({
+    // Emit agent_start event through global event controller
+    await emitEvent(
+        {
             type: 'agent_start',
-            agent: exportAgent(agent, model),
             input:
                 'content' in messages[0] &&
                 typeof messages[0].content === 'string'
                     ? messages[0].content
                     : undefined,
             timestamp: new Date().toISOString(),
-        });
-    }
+        },
+        agent,
+        model
+    );
 
     // Allow agent onRequest hook
     if (agent.onRequest) {
@@ -221,10 +223,8 @@ async function* executeRound(
     for await (const event of stream) {
         yield event;
 
-        if (agent.onEvent) {
-            event.agent = exportAgent(agent, model);
-            await agent.onEvent(event);
-        }
+        // Emit event through global event controller
+        await emitEvent(event, agent, model);
 
         // Handle different event types
         switch (event.type) {
@@ -342,10 +342,8 @@ async function* executeRound(
             },
         };
         yield toolDoneEvent;
-        if (agent.onEvent) {
-            toolDoneEvent.agent = exportAgent(agent, model);
-            await agent.onEvent(toolDoneEvent);
-        }
+        // Emit tool done event through global event controller
+        await emitEvent(toolDoneEvent, agent, model);
 
         const functionOutput: ResponseInputFunctionCallOutput = {
             type: 'function_call_output',
@@ -364,13 +362,15 @@ async function* executeRound(
         };
     }
 
-    if (agent.onEvent) {
-        await agent.onEvent({
+    // Emit agent_done event through global event controller
+    await emitEvent(
+        {
             type: 'agent_done',
-            agent: exportAgent(agent, model),
             timestamp: new Date().toISOString(),
-        });
-    }
+        },
+        agent,
+        model
+    );
 
     // Yield any events that were buffered during tool execution
     for (const bufferedEvent of toolEventBuffer) {
@@ -521,7 +521,7 @@ async function processToolCall(
             toolCall,
             id: toolCall.id,
             call_id: toolCall.call_id || toolCall.id,
-            output: errorOutput,
+            error: errorOutput,
         };
 
         if (agent.onToolError) {

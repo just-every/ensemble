@@ -142,7 +142,7 @@ export interface ToolCallResult {
     toolCall: ToolCall;
     id: string;
     call_id: string;
-    output: string;
+    output?: string;
     error?: string;
 }
 
@@ -781,7 +781,6 @@ export interface AgentDefinition {
     ) => Promise<[any, ResponseInput]>; // Reverted back to AgentInterface
     onResponse?: (message: ResponseOutputMessage) => Promise<void>;
     onThinking?: (message: ResponseThinkingMessage) => Promise<void>;
-    onEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
     onToolEvent?: (event: ProviderStreamEvent) => void | Promise<void>;
 
     params?: ToolParameterMap; // Map of parameter names to their definitions

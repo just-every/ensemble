@@ -52,6 +52,16 @@ export {
     type PauseController,
 } from './utils/pause_controller.js';
 
+// Export event controller
+export {
+    getEventController,
+    setEventHandler,
+    emitEvent,
+    hasEventHandler,
+    type EventController,
+    type EventHandler,
+} from './utils/event_controller.js';
+
 // Export image validation utilities
 export { isValidBase64, detectImageType } from './utils/image_validation.js';
 

@@ -1,20 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { ProviderStreamEvent, AgentDefinition } from '../types/types.js';
+import { setEventHandler } from '../utils/event_controller.js';
 
 describe('runAgentTool Event Context', () => {
-    it('should add agent context to all streamed events', async () => {
-        const capturedEvents: ProviderStreamEvent[] = [];
+    let capturedEvents: ProviderStreamEvent[] = [];
 
-        // Create a mock agent with onEvent handler
+    beforeEach(() => {
+        capturedEvents = [];
+        // Set up global event handler to capture events
+        setEventHandler((event: ProviderStreamEvent) => {
+            capturedEvents.push(event);
+        });
+    });
+
+    afterEach(() => {
+        // Clear the event handler
+        setEventHandler(null);
+    });
+
+    it('should add agent context to all streamed events', async () => {
+        // Create a mock agent without onEvent handler
         const mockAgent: AgentDefinition = {
             agent_id: 'test-agent-123',
             name: 'TestAgent',
             model: 'test-model',
             modelClass: 'mini',
             parent_id: 'parent-agent-456',
-            onEvent: async (event: ProviderStreamEvent) => {
-                capturedEvents.push(event);
-            },
         };
 
         // Import runAgentTool (it's not exported, so we need to test indirectly)
@@ -30,7 +41,6 @@ describe('runAgentTool Event Context', () => {
         // Manually set the properties we need
         (agent as any).agent_id = mockAgent.agent_id;
         (agent as any).parent_id = mockAgent.parent_id;
-        (agent as any).onEvent = mockAgent.onEvent;
 
         // Get the agent's tool representation
         const agentTool = agent.asTool();
@@ -94,8 +104,6 @@ describe('runAgentTool Event Context', () => {
     });
 
     it('should preserve original event properties when adding context', async () => {
-        const capturedEvents: ProviderStreamEvent[] = [];
-
         // Create a mock agent
         const mockAgent: AgentDefinition = {
             agent_id: 'test-agent-789',
@@ -103,9 +111,6 @@ describe('runAgentTool Event Context', () => {
             model: 'test-model',
             modelClass: 'mini',
             parent_id: 'parent-agent-999',
-            onEvent: async (event: ProviderStreamEvent) => {
-                capturedEvents.push(event);
-            },
         };
 
         const { Agent } = await import('../utils/agent.js');
@@ -118,7 +123,6 @@ describe('runAgentTool Event Context', () => {
 
         (agent as any).agent_id = mockAgent.agent_id;
         (agent as any).parent_id = mockAgent.parent_id;
-        (agent as any).onEvent = mockAgent.onEvent;
 
         const agentTool = agent.asTool();
 
