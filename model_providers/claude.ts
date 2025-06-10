@@ -582,7 +582,6 @@ export class ClaudeProvider implements ModelProvider {
                 ...(settings?.temperature !== undefined
                     ? { temperature: settings.temperature }
                     : {}),
-                ...(headers ? { headers } : {}),
             };
 
             // Add tools if provided, using the corrected conversion function
@@ -636,7 +635,9 @@ export class ClaudeProvider implements ModelProvider {
             await waitWhilePaused(100, agent.abortSignal);
 
             // Make the API call
-            const stream = await this.client.messages.create(requestParams);
+            const stream = await this.client.messages.create(requestParams, {
+                ...(headers ? { headers } : {}),
+            });
 
             const events: ProviderStreamEvent[] = [];
             try {
