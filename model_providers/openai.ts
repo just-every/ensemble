@@ -1348,11 +1348,7 @@ export class OpenAIProvider implements ModelProvider {
                         // A delta was added to a reasoning summary text
                         const itemId =
                             event.item_id + '-' + event.summary_index;
-                        if (!reasoningPositions.has(itemId)) {
-                            reasoningPositions.set(itemId, 0);
-                            reasoningAggregates.set(itemId, '');
-                        }
-                        const position = reasoningPositions.get(itemId)!;
+                        let position = reasoningPositions.get(itemId) ?? 0;
                         reasoningAggregates.set(
                             itemId,
                             reasoningAggregates.get(itemId)! + event.delta
@@ -1364,9 +1360,9 @@ export class OpenAIProvider implements ModelProvider {
                             content: '', // No visible content for reasoning
                             message_id: itemId,
                             thinking_content: event.delta,
-                            order: position,
+                            order: position++,
                         };
-                        reasoningPositions.set(itemId, position + 1);
+                        reasoningPositions.set(itemId, position);
                     } else if (
                         event.type === 'response.reasoning_summary_text.done' &&
                         event.text !== undefined
@@ -1437,13 +1433,17 @@ export class OpenAIProvider implements ModelProvider {
                 // Flush any buffered d
                 for (const ev of flushBufferedDeltas(
                     deltaBuffers,
-                    (id, content) =>
-                        ({
+                    (id, content) => {
+                        let position = messagePositions.get(id) ?? 0;
+                        position++;
+                        messagePositions.set(id, position);
+                        return {
                             type: 'message_delta',
                             content,
                             message_id: id,
-                            order: messagePositions.get(id) ?? 0,
-                        }) as ProviderStreamEvent
+                            order: position,
+                        } as ProviderStreamEvent;
+                    }
                 )) {
                     yield ev;
                 }
