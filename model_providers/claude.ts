@@ -55,8 +55,8 @@ import {
 const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-low': 0,
     '-medium': 8000,
-    '-high': 16000,
-    '-max': 32000,
+    '-high': 15000,
+    '-max': 30000,
 };
 
 /**
@@ -516,29 +516,6 @@ export class ClaudeProvider implements ModelProvider {
                     type: 'enabled',
                     budget_tokens: 8000,
                 };
-            }
-            switch (modelClass) {
-                case 'monologue':
-                case 'reasoning':
-                case 'code':
-                    if (
-                        [
-                            'claude-3-7-sonnet-latest',
-                            'claude-3-7-sonnet-20250219',
-                            'claude-sonnet-4-20250514',
-                            'claude-opus-4-20250514',
-                        ].includes(model)
-                    ) {
-                        max_tokens = Math.min(max_tokens, 64000);
-                    } else {
-                        max_tokens = Math.min(max_tokens, 8192);
-                    }
-                    break;
-                case 'standard':
-                    max_tokens = Math.min(max_tokens, 8192);
-                    break;
-                default:
-                    max_tokens = Math.min(max_tokens, 4096); // Lower limit for other classes
             }
 
             if (settings?.json_schema) {

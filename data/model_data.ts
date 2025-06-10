@@ -72,9 +72,10 @@ export const MODEL_CLASSES = {
     // Advanced reasoning models
     reasoning: {
         models: [
-            'gemini-2.5-pro-preview-05-06', // 'gemini-2.5-pro-exp-03-25', // Google
+            'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-max', // Google
             'o4-mini-high', // OpenAI
+            'o3-pro', // OpenAI
             'o3-high', // OpenAI
             'claude-opus-4-20250514-max', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
@@ -96,10 +97,10 @@ export const MODEL_CLASSES = {
     // Monologue models
     monologue: {
         models: [
-            'gemini-2.5-pro-preview-05-06', // 'gemini-2.5-pro-exp-03-25', // Google
+            'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'o4-mini-low', // OpenAI
-            'o3-low', // OpenAI
+            'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
             'grok-3-mini-fast', // X.AI
             //'deepseek-reasoner',      // DeepSeek
@@ -112,10 +113,10 @@ export const MODEL_CLASSES = {
     // Metacognition models
     metacognition: {
         models: [
-            'gemini-2.5-pro-preview-05-06', // 'gemini-2.5-pro-exp-03-25', // Google
+            'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-high', // Google
             //'o4-mini-high', // OpenAI
-            'o3-medium', // OpenAI
+            'o3-high', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
             'grok-3-mini-fast', // X.AI
         ],
@@ -128,7 +129,7 @@ export const MODEL_CLASSES = {
             'codex-mini-latest', // OpenAI
             'claude-opus-4-20250514-medium', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
-            'o3-medium', // OpenAI
+            'o3-high', // OpenAI
             'gemini-2.5-flash-preview-05-20-medium', // Google
         ],
         random: true,
@@ -160,9 +161,9 @@ export const MODEL_CLASSES = {
         models: [
             //'computer-use-preview',     // OpenAI
             'o4-mini-medium', // OpenAI
-            'o3-low', // OpenAI
+            'o3-medium', // OpenAI
             'gemini-2.5-flash-preview-05-20-max', // Google
-            'gemini-2.5-pro-preview-05-06', // 'gemini-2.5-pro-exp-03-25', // Google
+            'gemini-2.5-pro-preview-06-05', // Google
             'claude-opus-4-20250514-low', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
             //'grok-2-vision', // X.AI
@@ -719,9 +720,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['o3-2025-04-16'],
         provider: 'openai',
         cost: {
-            input_per_million: 10,
-            cached_input_per_million: 2.5,
-            output_per_million: 40,
+            input_per_million: 2,
+            cached_input_per_million: 0.5,
+            output_per_million: 8,
         },
         features: {
             context_length: 200000, // Confirmed
@@ -738,7 +739,31 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 84, // HumanEval
             reasoning: 79, // GPQA Diamond
         },
-        description: 'Powerful reasoning model (superseded by o1-pro)',
+        description: 'Powerful reasoning model',
+    },
+    {
+        id: 'o3-pro',
+        aliases: ['o3-pro-2025-06-10'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 20,
+            output_per_million: 80,
+        },
+        features: {
+            context_length: 200000, // Confirmed
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 85, // Legacy overall score
+        scores: {
+            monologue: 87, // Humanity's Last Exam
+            code: 84, // HumanEval
+            reasoning: 79, // GPQA Diamond
+        },
+        description: 'Most powerful reasoning model',
     },
     {
         id: 'o1',
@@ -971,39 +996,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Google (Gemini) models
     //
 
-    // Gemini 2.5 Pro (Experimental/Free)
+    // Gemini 2.5 Pro
     {
-        id: 'gemini-2.5-pro-exp-03-25',
-        provider: 'google',
-        cost: {
-            input_per_million: 0,
-            output_per_million: 0,
-            cached_input_per_million: 0,
-        },
-        features: {
-            context_length: 1048576, // Confirmed
-            input_modality: ['text', 'image', 'video', 'audio'],
-            output_modality: ['text'],
-            tool_use: true, // Function calling
-            streaming: true,
-            json_output: true,
-            max_output_tokens: 65536, // Confirmed
-        },
-        rate_limit_fallback: 'gemini-2.5-pro-preview-05-06',
-        class: 'reasoning',
-        score: 85, // Legacy overall score
-        scores: {
-            monologue: 78, // Humanity's Last Exam
-            code: 70, // HumanEval
-            reasoning: 66, // GPQA Diamond
-        },
-        description:
-            'Free experimental version of Gemini 2.5 Pro. Excels at coding & complex reasoning.',
-    },
-    // Gemini 2.5 Pro (Paid Preview)
-    {
-        id: 'gemini-2.5-pro-preview-05-06',
-        aliases: ['gemini-2.5-pro'],
+        id: 'gemini-2.5-pro-preview-06-05',
+        aliases: [
+            'gemini-2.5-pro',
+            'gemini-2.5-pro-exp-03-25',
+            'gemini-2.5-pro-preview-05-06',
+        ],
         provider: 'google',
         cost: {
             // Tiered pricing

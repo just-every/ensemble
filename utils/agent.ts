@@ -190,7 +190,7 @@ export class Agent implements AgentDefinition {
         }
 
         this.agent_id = definition.agent_id || uuid();
-        this.name = definition.name.replaceAll(' ', '_');
+        this.name = (definition.name || 'Agent').replaceAll(' ', '_');
         this.description = definition.description;
         this.instructions = definition.instructions;
         this.tools = definition.tools || [];
