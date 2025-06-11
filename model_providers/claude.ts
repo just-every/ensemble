@@ -59,6 +59,31 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-max': 30000,
 };
 
+// Content has many forms... here we extract them all!
+function contentToString(content: any) {
+    if (content) {
+        if (typeof content === 'string') {
+            return content;
+        } else if (Array.isArray(content)) {
+            let results = '';
+            content.forEach(eachContent => {
+                if (typeof eachContent === 'string') {
+                    results += eachContent;
+                } else if (typeof eachContent.text === 'string') {
+                    results += eachContent.text;
+                } else {
+                    results += JSON.stringify(eachContent.text);
+                }
+            });
+            return results;
+        } else if (typeof content.text === 'string') {
+            return content.text;
+        }
+        return JSON.stringify(content);
+    }
+    return '';
+}
+
 /**
  * Resolves any async enum values in tool parameters
  */
@@ -391,16 +416,7 @@ export class ClaudeProvider implements ModelProvider {
 
             let content = '';
             if ('content' in msg) {
-                if (typeof msg.content === 'string') {
-                    content = msg.content;
-                } else if (
-                    (msg.content as any).text &&
-                    typeof (msg.content as any).text === 'string'
-                ) {
-                    content = (msg.content as any).text;
-                } else {
-                    content = JSON.stringify(msg.content);
-                }
+                content = contentToString(msg.content).trim();
             }
 
             const structuredMsg = await convertToClaudeMessage(
@@ -467,7 +483,6 @@ export class ClaudeProvider implements ModelProvider {
                 ? await getToolsFromAgent(agent)
                 : [];
             const settings: ModelSettings | undefined = agent?.modelSettings;
-            const modelClass: ModelClassID | undefined = agent?.modelClass;
 
             // Enable interleaved thinking where possible
             let headers = undefined;
@@ -543,22 +558,13 @@ export class ClaudeProvider implements ModelProvider {
             // Ensure content is a string. Handle cases where content might be structured differently or missing.
             const systemPrompt = claudeMessages.reduce((acc, msg): string => {
                 if (msg.role === 'system' && msg.content) {
-                    if (typeof msg.content === 'string') {
-                        return acc + msg.content + '\n';
-                    } else if (Array.isArray(msg.content)) {
-                        msg.content.forEach(content => {
-                            if (typeof content === 'string') {
-                                return (acc += content + '\n');
-                            } else if (typeof content.text === 'string') {
-                                return (acc += content.text + '\n');
-                            }
-                            return (acc += JSON.stringify(content.text) + '\n');
-                        });
-                        return acc;
-                    } else if (typeof msg.content.text === 'string') {
-                        return acc + msg.content.text + '\n';
+                    if (!acc) {
+                        acc = '';
                     }
-                    return acc + JSON.stringify(msg.content) + '\n';
+                    if (acc.length > 0) {
+                        acc += '\n\n';
+                    }
+                    return acc + contentToString(msg.content).trim();
                 }
                 return acc;
             }, '');
@@ -571,7 +577,7 @@ export class ClaudeProvider implements ModelProvider {
                     m => m.role === 'user' || m.role === 'assistant'
                 ),
                 // Add system prompt string if it exists
-                ...(systemPrompt ? { system: systemPrompt } : {}),
+                ...(systemPrompt ? { system: systemPrompt.trim() } : {}),
                 stream: true,
                 max_tokens,
                 ...(thinking ? { thinking } : {}),
