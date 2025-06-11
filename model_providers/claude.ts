@@ -401,11 +401,13 @@ export class ClaudeProvider implements ModelProvider {
      *
      * @param messages The original conversation history.
      * @param modelId  The Claude model identifier (used to decide image handling).
+     * @param thinkingEnabled Whether thinking is enabled for this request.
      * @returns Array of Claude-ready messages.
      */
     private async prepareClaudeMessages(
         messages: ResponseInput,
-        modelId: string
+        modelId: string,
+        thinkingEnabled: boolean = false
     ): Promise<ClaudeMessage[]> {
         const result: ClaudeMessage[] = [];
         const seenToolUseIds = new Set<string>(); // Track tool_use IDs to prevent duplicates
@@ -455,6 +457,36 @@ export class ClaudeProvider implements ModelProvider {
                 }
             }
             /* ---------- End Claude message build ---------- */
+        }
+
+        // If thinking is enabled, handle consecutive assistant messages
+        if (thinkingEnabled && result.length > 1) {
+            for (let i = 1; i < result.length; i++) {
+                const prevMsg = result[i - 1];
+                const currentMsg = result[i];
+                
+                // Check for consecutive assistant messages
+                if (prevMsg.role === 'assistant' && currentMsg.role === 'assistant') {
+                    // Check if current assistant message starts with a thinking block
+                    let hasThinkingBlock = false;
+                    
+                    if (Array.isArray(currentMsg.content)) {
+                        hasThinkingBlock = currentMsg.content.length > 0 && 
+                            (currentMsg.content[0].type === 'thinking' || 
+                             currentMsg.content[0].type === 'redacted_thinking');
+                    }
+                    
+                    // If no thinking block, convert to user message
+                    if (!hasThinkingBlock) {
+                        const contentStr = contentToString(currentMsg.content);
+                        currentMsg.role = 'user';
+                        currentMsg.content = [{
+                            type: 'text',
+                            text: `Previous thoughts:\n\n${contentStr}`
+                        }];
+                    }
+                }
+            }
         }
 
         return result;
@@ -549,10 +581,14 @@ export class ClaudeProvider implements ModelProvider {
                 });
             }
 
+            // Determine if thinking is enabled
+            const thinkingEnabled = thinking !== undefined && thinking.type === 'enabled';
+            
             // Preprocess *and* convert messages for Claude in one pass
             const claudeMessages = await this.prepareClaudeMessages(
                 messages,
-                model
+                model,
+                thinkingEnabled
             );
 
             // Ensure content is a string. Handle cases where content might be structured differently or missing.
