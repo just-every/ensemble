@@ -80,6 +80,7 @@ export const MODEL_CLASSES = {
             'claude-opus-4-20250514-max', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
             'claude-3-7-sonnet-latest-max', // Anthropic
+            'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
             //'grok-3-mini-fast', // X.AI
         ],
         random: true,
@@ -90,6 +91,7 @@ export const MODEL_CLASSES = {
         models: [
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'grok-3-mini-fast', // X.AI
+            'mistralai/magistral-small-2506', // Mistral/OpenRouter
         ],
         random: true,
     },
@@ -102,7 +104,7 @@ export const MODEL_CLASSES = {
             'o4-mini-low', // OpenAI
             'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
-            'grok-3-mini-fast', // X.AI
+            //'grok-3-mini-fast', // X.AI
             //'deepseek-reasoner',      // DeepSeek
             //'meta-llama/llama-4-maverick', // Meta/OpenRouter
             //'qwen/qwen3-235b-a22b-medium', // Qwen/OpenRouter
@@ -1253,6 +1255,47 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description:
             'Best suited for exhaustive research, generating detailed reports and in-depth insights.',
     },
+    // Mistral models (via OpenRouter)
+    {
+        id: 'mistralai/magistral-small-2506',
+        provider: 'openrouter',
+        cost: {
+            input_per_million: 0.5,
+            output_per_million: 1.5,
+        },
+        features: {
+            context_length: 40000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning_mini',
+        score: 72,
+        description: 'Magistral Small is a 24B parameter instruction-tuned model based on Mistral-Small-3.1 (2503), enhanced through supervised fine-tuning on traces from Magistral Medium and further refined via reinforcement learning. It is optimized for reasoning and supports a wide multilingual range, including over 20 languages.',
+    },
+    {
+        id: 'mistralai/magistral-medium-2506:thinking',
+        provider: 'openrouter',
+        cost: {
+            input_per_million: 2.0,
+            output_per_million: 5.0,
+        },
+        features: {
+            context_length: 40960,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        score: 80,
+        description: "Magistral is Mistral's first reasoning model. It is ideal for general purpose use requiring longer thought processing and better accuracy than with non-reasoning LLMs. From legal research and financial forecasting to software development and creative storytelling — this model solves multi-step challenges where transparency and precision are critical.",
+    },
+
     // Test model for unit tests
     {
         id: 'test-model',
