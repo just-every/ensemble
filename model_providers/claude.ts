@@ -1014,14 +1014,11 @@ export class ClaudeProvider implements ModelProvider {
                         if (currentToolCall && !toolCallStarted) {
                             // Only emit tool_start if we haven't already emitted it
                             // This is a fallback in case content_block_stop didn't fire
-                                // Finalize arguments if they were streamed partially with proper JSON validation
-                                if (
-                                    currentToolCall.function._partialArguments
-                                ) {
-                                    const partialArgs =
-                                        currentToolCall.function
-                                            ._partialArguments;
-                                    try {
+                            // Finalize arguments if they were streamed partially with proper JSON validation
+                            if (currentToolCall.function._partialArguments) {
+                                const partialArgs =
+                                    currentToolCall.function._partialArguments;
+                                try {
                                         JSON.parse(partialArgs); // Validate JSON
                                         currentToolCall.function.arguments =
                                             partialArgs;
@@ -1070,15 +1067,14 @@ export class ClaudeProvider implements ModelProvider {
                                                 '{}';
                                         }
                                     }
-                                    delete currentToolCall.function
-                                        ._partialArguments;
-                                }
-
-                                yield {
-                                    type: 'tool_start',
-                                    tool_call: currentToolCall as ToolCall,
-                                };
+                                delete currentToolCall.function
+                                    ._partialArguments;
                             }
+
+                            yield {
+                                type: 'tool_start',
+                                tool_call: currentToolCall as ToolCall,
+                            };
                         }
 
                         // Flush any buffered deltas before final message_complete

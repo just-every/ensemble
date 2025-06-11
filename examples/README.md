@@ -16,6 +16,7 @@ This directory contains examples demonstrating various features of the Ensemble 
 - [result-processing.ts](./result-processing.ts) - Result summarization and truncation
 - [tool-lifecycle.ts](./tool-lifecycle.ts) - Tool lifecycle callbacks
 - [abort-signals.ts](./abort-signals.ts) - Graceful cancellation with abort signals
+- [model-configuration.ts](./model-configuration.ts) - Customize model classes and selection
 
 ## Running Examples
 

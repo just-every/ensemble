@@ -19,7 +19,7 @@ export {
     registerExternalModel,
     getExternalModel,
     getExternalProvider,
-    overrideModelClass,
+    isExternalModel,
 } from './utils/external_models.js';
 
 // Export all model data (excluding ModelClassID to avoid conflict)
@@ -128,6 +128,20 @@ export {
     getAgentSpecificTools,
     agentToolCache,
 } from './utils/agent.js';
+
+// Export model configuration utilities
+export {
+    getModelClass,
+    getModelClassNames,
+    overrideModelClass,
+    setModelClassModels,
+    addModelToClass,
+    removeModelFromClass,
+    setModelClassRandom,
+    resetModelClass,
+    getAllModelClasses,
+    updateModelClasses,
+} from './utils/model_class_config.js';
 
 // Re-export singleton instances
 import { costTracker as _costTracker } from './utils/cost_tracker.js';
