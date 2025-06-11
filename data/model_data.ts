@@ -209,6 +209,18 @@ export const MODEL_CLASSES = {
         ],
         description: 'Vector embedding models for semantic search and RAG',
     },
+
+    voice: {
+        models: [
+            'tts-1', // OpenAI's standard TTS model - optimized for real-time
+            'tts-1-hd', // OpenAI's high-quality TTS model
+            'eleven_multilingual_v2', // ElevenLabs multilingual model
+            'eleven_turbo_v2_5', // ElevenLabs turbo model for low latency
+            'gemini-2.5-flash-preview-tts', // Gemini's flash TTS model
+            'gemini-2.5-pro-preview-tts', // Gemini's pro TTS model
+        ],
+        description: 'Text-to-Speech models for voice generation',
+    },
 };
 
 // Add supported embedding dimensions for various models
@@ -1136,6 +1148,106 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             "OpenAI's GPT-Image-1 model for text-to-image generation. Supports quality levels (low: $0.011-0.016, medium: $0.042-0.063, high: $0.167-0.25) and sizes (1024x1024, 1024x1536, 1536x1024).",
     },
 
+    // Voice/TTS models
+    {
+        id: 'tts-1',
+        provider: 'openai',
+        cost: {
+            input_per_million: 15.0, // $15 per million input characters (not tokens)
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description:
+            "OpenAI's standard text-to-speech model, optimized for real-time use. Supports 6 voices and multiple audio formats.",
+    },
+    {
+        id: 'tts-1-hd',
+        provider: 'openai',
+        cost: {
+            input_per_million: 30.0, // $30 per million input characters (not tokens)
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description:
+            "OpenAI's high-definition text-to-speech model for superior audio quality. Supports 6 voices and multiple audio formats.",
+    },
+    {
+        id: 'eleven_multilingual_v2',
+        provider: 'elevenlabs',
+        cost: {
+            input_per_million: 300.0, // $0.30 per 1000 characters = $300 per million
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description:
+            "ElevenLabs' multilingual text-to-speech model supporting 29 languages with natural voice cloning capabilities.",
+    },
+    {
+        id: 'eleven_turbo_v2_5',
+        provider: 'elevenlabs',
+        cost: {
+            input_per_million: 180.0, // $0.18 per 1000 characters = $180 per million
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description:
+            "ElevenLabs' turbo model optimized for low-latency text-to-speech with high quality output.",
+    },
+    {
+        id: 'gemini-2.5-flash-preview-tts',
+        provider: 'google',
+        cost: {
+            input_per_million: 10.0, // Estimated at $10 per million characters
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+            context_length: 32000, // 32k token context window
+        },
+        class: 'voice',
+        description:
+            "Gemini's fast text-to-speech model with support for 24 languages and 30 distinct voices. Optimized for low-latency applications.",
+    },
+    {
+        id: 'gemini-2.5-pro-preview-tts',
+        provider: 'google',
+        cost: {
+            input_per_million: 20.0, // Estimated at $20 per million characters
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+            context_length: 32000, // 32k token context window
+        },
+        class: 'voice',
+        description:
+            "Gemini's advanced text-to-speech model with superior voice quality, expression control, and multi-speaker support for creating dynamic conversations.",
+    },
+
     // Code-specific models (removed claude-code and codex as they're now external)
     {
         id: 'codex-mini-latest',
@@ -1273,7 +1385,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning_mini',
         score: 72,
-        description: 'Magistral Small is a 24B parameter instruction-tuned model based on Mistral-Small-3.1 (2503), enhanced through supervised fine-tuning on traces from Magistral Medium and further refined via reinforcement learning. It is optimized for reasoning and supports a wide multilingual range, including over 20 languages.',
+        description:
+            'Magistral Small is a 24B parameter instruction-tuned model based on Mistral-Small-3.1 (2503), enhanced through supervised fine-tuning on traces from Magistral Medium and further refined via reinforcement learning. It is optimized for reasoning and supports a wide multilingual range, including over 20 languages.',
     },
     {
         id: 'mistralai/magistral-medium-2506:thinking',
@@ -1293,7 +1406,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 80,
-        description: "Magistral is Mistral's first reasoning model. It is ideal for general purpose use requiring longer thought processing and better accuracy than with non-reasoning LLMs. From legal research and financial forecasting to software development and creative storytelling — this model solves multi-step challenges where transparency and precision are critical.",
+        description:
+            "Magistral is Mistral's first reasoning model. It is ideal for general purpose use requiring longer thought processing and better accuracy than with non-reasoning LLMs. From legal research and financial forecasting to software development and creative storytelling — this model solves multi-step challenges where transparency and precision are critical.",
     },
 
     // Test model for unit tests

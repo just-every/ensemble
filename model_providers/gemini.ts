@@ -21,19 +21,22 @@ import {
     GenerateContentResponse,
     type GenerateContentConfig,
     type GenerateContentParameters,
+    type SpeechConfig,
+    Modality,
 } from '@google/genai';
 import { EmbedOpts } from './model_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 import {
-    ModelProvider,
     ToolFunction,
     ModelSettings,
     ProviderStreamEvent,
     ResponseInput,
     AgentDefinition,
     ImageGenerationOpts,
+    VoiceGenerationOpts,
     type MessageEvent,
 } from '../types/types.js';
+import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../index.js';
 import {
     log_llm_error,
@@ -466,11 +469,12 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 /**
  * Gemini model provider implementation
  */
-export class GeminiProvider implements ModelProvider {
+export class GeminiProvider extends BaseModelProvider {
     private _client?: GoogleGenAI;
     private apiKey?: string;
 
     constructor(apiKey?: string) {
+        super('google');
         // Store the API key for lazy initialization
         this.apiKey = apiKey || process.env.GOOGLE_API_KEY;
     }
@@ -1241,6 +1245,202 @@ export class GeminiProvider implements ModelProvider {
 
         // Default pricing
         return 0.04;
+    }
+
+    /**
+     * Generate speech audio from text using Gemini's Text-to-Speech models
+     * @param text Text to convert to speech
+     * @param model Model ID for TTS (e.g., 'gemini-2.5-flash-preview-tts')
+     * @param opts Optional parameters for voice generation
+     * @returns Promise resolving to audio stream or buffer
+     */
+    async createVoice(
+        text: string,
+        model: string = 'gemini-2.5-flash-preview-tts',
+        opts?: VoiceGenerationOpts
+    ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
+        try {
+            console.log(
+                `[Gemini] Generating speech with model ${model}, text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`
+            );
+
+            // Map voice options to Gemini's voice names
+            const voiceName = this.mapVoiceToGemini(opts?.voice);
+
+            // Build speech config
+            const speechConfig: SpeechConfig = {
+                voiceConfig: {
+                    prebuiltVoiceConfig: {
+                        voiceName: voiceName,
+                    },
+                },
+            };
+
+            // Prepare generation config
+            const config: GenerateContentConfig = {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: speechConfig,
+            };
+
+            // Speed adjustment is not directly supported in Gemini TTS
+            // But we can suggest it in the prompt
+            let promptText = text;
+            if (opts?.speed && opts.speed !== 1.0) {
+                const speedDescription =
+                    opts.speed < 1.0
+                        ? `slowly at ${Math.round(opts.speed * 100)}% speed`
+                        : `quickly at ${Math.round(opts.speed * 100)}% speed`;
+                promptText = `Say ${speedDescription}: ${text}`;
+            }
+
+            // Generate the audio
+            const response = await this.client.models.generateContent({
+                model,
+                contents: [{ role: 'user', parts: [{ text: promptText }] }],
+                config,
+            });
+
+            // Extract audio data from response
+            if (!response.candidates || response.candidates.length === 0) {
+                throw new Error('No audio generated from Gemini TTS');
+            }
+
+            const candidate = response.candidates[0];
+            if (
+                !candidate.content.parts ||
+                candidate.content.parts.length === 0
+            ) {
+                throw new Error('No audio parts in Gemini TTS response');
+            }
+
+            // Find the audio part
+            let audioData: string | undefined;
+            for (const part of candidate.content.parts) {
+                if (
+                    part.inlineData &&
+                    part.inlineData.mimeType?.includes('audio')
+                ) {
+                    audioData = part.inlineData.data;
+                    break;
+                }
+            }
+
+            if (!audioData) {
+                throw new Error('No audio data found in Gemini TTS response');
+            }
+
+            // Track usage
+            const textLength = text.length;
+            costTracker.addUsage({
+                model,
+                input_tokens: Math.ceil(textLength / 4), // Rough estimate
+                output_tokens: 0,
+                metadata: {
+                    voice: voiceName,
+                    text_length: textLength,
+                    type: 'voice_generation',
+                },
+            });
+
+            // Convert base64 to ArrayBuffer
+            const binaryString = atob(audioData);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            // Return as stream if requested
+            if (opts?.stream) {
+                // Create a readable stream from the audio data
+                const chunkSize = 8192; // 8KB chunks
+                let position = 0;
+
+                return new ReadableStream<Uint8Array>({
+                    pull(controller) {
+                        if (position >= bytes.length) {
+                            controller.close();
+                            return;
+                        }
+
+                        const chunk = bytes.slice(
+                            position,
+                            Math.min(position + chunkSize, bytes.length)
+                        );
+                        position += chunk.length;
+                        controller.enqueue(chunk);
+                    },
+                });
+            }
+
+            // Return as ArrayBuffer
+            return bytes.buffer;
+        } catch (error) {
+            console.error('[Gemini] Error generating voice:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Map common voice names to Gemini's prebuilt voice names
+     */
+    private mapVoiceToGemini(voice?: string): string {
+        // Gemini's available voices (as of the documentation)
+        const geminiVoices = [
+            'Kore',
+            'Puck',
+            'Charon',
+            'Fenrir',
+            'Aoede',
+            'Glados',
+            // Add more as they become available
+        ];
+
+        if (!voice) {
+            return 'Kore'; // Default voice
+        }
+
+        // Check if it's already a valid Gemini voice name
+        if (geminiVoices.includes(voice)) {
+            return voice;
+        }
+
+        // Map common voice names to Gemini voices
+        const voiceMap: Record<string, string> = {
+            // OpenAI-style voices to Gemini mapping
+            alloy: 'Kore',
+            echo: 'Puck',
+            fable: 'Charon',
+            onyx: 'Fenrir',
+            nova: 'Aoede',
+            shimmer: 'Glados',
+
+            // Gender/style based mapping
+            male: 'Puck',
+            female: 'Kore',
+            neutral: 'Charon',
+            young: 'Aoede',
+            mature: 'Fenrir',
+            robotic: 'Glados',
+
+            // Direct names (case-insensitive)
+            kore: 'Kore',
+            puck: 'Puck',
+            charon: 'Charon',
+            fenrir: 'Fenrir',
+            aoede: 'Aoede',
+            glados: 'Glados',
+        };
+
+        const mappedVoice = voiceMap[voice.toLowerCase()];
+        if (mappedVoice) {
+            return mappedVoice;
+        }
+
+        // If no mapping found, use default
+        console.warn(
+            `[Gemini] Unknown voice '${voice}', using default voice 'Kore'`
+        );
+        return 'Kore';
     }
 }
 

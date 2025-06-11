@@ -461,6 +461,19 @@ export interface ModelProvider {
         model?: string,
         opts?: ImageGenerationOpts
     ): Promise<string[]>;
+
+    /**
+     * Generates speech audio from text (Text-to-Speech)
+     * @param text Text to convert to speech
+     * @param model Model ID for TTS (e.g., 'tts-1', 'tts-1-hd')
+     * @param opts Optional parameters for voice generation
+     * @returns Promise resolving to audio stream or buffer
+     */
+    createVoice?(
+        text: string,
+        model: string,
+        opts?: VoiceGenerationOpts
+    ): Promise<ReadableStream<Uint8Array> | ArrayBuffer>;
 }
 
 /**
@@ -480,7 +493,8 @@ export type ModelClassID =
     | 'vision_mini'
     | 'search'
     | 'image_generation'
-    | 'embedding';
+    | 'embedding'
+    | 'voice';
 
 // Available model providers
 export type ModelProviderID =
@@ -490,6 +504,7 @@ export type ModelProviderID =
     | 'xai'
     | 'deepseek'
     | 'openrouter'
+    | 'elevenlabs'
     | 'test';
 
 // ================================================================
@@ -716,6 +731,65 @@ export interface ImageGenerationOpts {
     mask?: string;
 }
 
+// ================================================================
+// Voice Generation Types
+// ================================================================
+
+/**
+ * Options for voice/speech generation (Text-to-Speech)
+ */
+export interface VoiceGenerationOpts {
+    /** Voice to use for synthesis (OpenAI voices or ElevenLabs voice ID) */
+    voice?:
+        | 'alloy'
+        | 'echo'
+        | 'fable'
+        | 'onyx'
+        | 'nova'
+        | 'shimmer'
+        | 'rachel'
+        | 'domi'
+        | 'bella'
+        | 'antoni'
+        | 'elli'
+        | 'josh'
+        | 'arnold'
+        | 'adam'
+        | 'sam'
+        | 'george'
+        | string; // Also accepts ElevenLabs voice IDs directly
+
+    /** Speed of speech (OpenAI: 0.25 to 4.0, default 1.0) */
+    speed?: number;
+
+    /** Output format for the audio */
+    response_format?:
+        | 'mp3'
+        | 'opus'
+        | 'aac'
+        | 'flac'
+        | 'wav'
+        | 'pcm'
+        | 'mp3_low'
+        | 'mp3_high'
+        | 'pcm_16000'
+        | 'pcm_22050'
+        | 'pcm_24000'
+        | 'pcm_44100'
+        | 'ulaw';
+
+    /** Whether to stream the audio response */
+    stream?: boolean;
+
+    /** ElevenLabs-specific voice settings */
+    voice_settings?: {
+        stability?: number; // 0-1, default 0.5
+        similarity_boost?: number; // 0-1, default 0.75
+        style?: number; // 0-1, default 0.0
+        use_speaker_boost?: boolean; // default true
+    };
+}
+
 export type WorkerFunction = (...args: any[]) => AgentDefinition;
 
 /**
@@ -783,6 +857,24 @@ export interface AgentDefinition {
 
     /** Optional abort signal to cancel operations */
     abortSignal?: AbortSignal;
+
+    /** Optional retry configuration for handling network errors and transient failures */
+    retryOptions?: {
+        /** Maximum number of retry attempts (default: 3) */
+        maxRetries?: number;
+        /** Initial delay in milliseconds before first retry (default: 1000) */
+        initialDelay?: number;
+        /** Maximum delay in milliseconds between retries (default: 30000) */
+        maxDelay?: number;
+        /** Backoff multiplier for exponential backoff (default: 2) */
+        backoffMultiplier?: number;
+        /** Additional error codes to consider retryable */
+        additionalRetryableErrors?: string[];
+        /** Additional HTTP status codes to consider retryable */
+        additionalRetryableStatusCodes?: number[];
+        /** Callback when a retry occurs */
+        onRetry?: (error: any, attempt: number) => void;
+    };
 }
 
 export interface ToolParameter {
