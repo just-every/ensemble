@@ -38,6 +38,22 @@ export async function* ensembleRequest(
 ): AsyncGenerator<ProviderStreamEvent> {
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
+    if (agent.instructions) {
+        const firstMsg = conversationHistory[0];
+        const alreadyHasInstructions =
+            firstMsg &&
+            'content' in firstMsg &&
+            typeof firstMsg.content === 'string' &&
+            firstMsg.content.trim() === agent.instructions.trim();
+
+        if (!alreadyHasInstructions) {
+            conversationHistory.unshift({
+                type: 'message',
+                role: 'system',
+                content: agent.instructions,
+            });
+        }
+    }
 
     // Use message history manager with automatic compaction
     const history = new MessageHistory(conversationHistory, {
