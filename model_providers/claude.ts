@@ -62,22 +62,22 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 // Content has many forms... here we extract them all!
 function contentToString(content: any) {
     if (content) {
-        if (typeof content === 'string') {
-            return content;
-        } else if (Array.isArray(content)) {
+        if (Array.isArray(content)) {
             let results = '';
-            content.forEach(eachContent => {
-                if (typeof eachContent === 'string') {
-                    results += eachContent;
-                } else if (typeof eachContent.text === 'string') {
-                    results += eachContent.text;
-                } else {
-                    results += JSON.stringify(eachContent.text);
+            for (const eachContent of content) {
+                const convertedContent = contentToString(eachContent);
+                if (convertedContent.length > 0) {
+                    if (results.length > 0) {
+                        results += '\n\n';
+                    }
+                    results += convertedContent;
                 }
-            });
-            return results;
+            }
+            return results.trim();
+        } else if (typeof content === 'string') {
+            return content.trim();
         } else if (typeof content.text === 'string') {
-            return content.text;
+            return content.text.trim();
         }
         return JSON.stringify(content);
     }
@@ -416,7 +416,7 @@ export class ClaudeProvider implements ModelProvider {
 
             let content = '';
             if ('content' in msg) {
-                content = contentToString(msg.content).trim();
+                content = contentToString(msg.content);
             }
 
             const structuredMsg = await convertToClaudeMessage(
@@ -558,13 +558,10 @@ export class ClaudeProvider implements ModelProvider {
             // Ensure content is a string. Handle cases where content might be structured differently or missing.
             const systemPrompt = claudeMessages.reduce((acc, msg): string => {
                 if (msg.role === 'system' && msg.content) {
-                    if (!acc) {
-                        acc = '';
-                    }
                     if (acc.length > 0) {
                         acc += '\n\n';
                     }
-                    return acc + contentToString(msg.content).trim();
+                    acc += contentToString(msg.content);
                 }
                 return acc;
             }, '');
