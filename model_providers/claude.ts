@@ -311,12 +311,18 @@ async function convertToClaudeMessage(
             return null; // Skip messages with no text content
         }
 
-        const messageRole: 'user' | 'system' | 'assistant' =
-            role === 'assistant'
-                ? 'assistant'
-                : (role === 'system' || role === 'developer') && !result?.length
-                  ? 'system'
-                  : 'user';
+        let messageRole: 'assistant' | 'user' | 'system' | 'developer' =
+            role as 'assistant' | 'user' | 'system' | 'developer';
+        if (messageRole === 'developer') {
+            if (!result?.length) {
+                messageRole = 'system';
+            } else {
+                messageRole = 'user';
+            }
+        }
+        if (!['user', 'assistant', 'system'].includes(messageRole)) {
+            messageRole = 'user';
+        }
 
         let contentBlocks = [];
         contentBlocks = await appendMessageWithImage(
@@ -534,12 +540,13 @@ export class ClaudeProvider implements ModelProvider {
 
             // Ensure content is a string. Handle cases where content might be structured differently or missing.
             const systemPrompt = claudeMessages.reduce((acc, msg): string => {
-                if (
-                    msg.role === 'system' &&
-                    msg.content &&
-                    typeof msg.content === 'string'
-                ) {
-                    return acc + msg.content + '\n'; // Append system prompt content
+                if (msg.role === 'system' && msg.content) {
+                    if (typeof msg.content === 'string') {
+                        return acc + msg.content + '\n';
+                    } else if (msg.content.text) {
+                        return acc + msg.content.text + '\n';
+                    }
+                    return acc + JSON.stringify(msg.content) + '\n';
                 }
                 return acc;
             }, '');
