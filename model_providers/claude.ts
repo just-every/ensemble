@@ -1011,15 +1011,9 @@ export class ClaudeProvider implements ModelProvider {
                         }
 
                         // Complete any pending tool call (should ideally be handled by content_block_stop)
-                        if (currentToolCall) {
-                            // If a tool call is still active here, it means content_block_stop might not have fired correctly.
-                            console.warn(
-                                'Tool call was still active at message_stop:',
-                                currentToolCall
-                            );
-
+                        if (currentToolCall && !toolCallStarted) {
                             // Only emit tool_start if we haven't already emitted it
-                            if (!toolCallStarted) {
+                            // This is a fallback in case content_block_stop didn't fire
                                 // Finalize arguments if they were streamed partially with proper JSON validation
                                 if (
                                     currentToolCall.function._partialArguments
@@ -1085,9 +1079,6 @@ export class ClaudeProvider implements ModelProvider {
                                     tool_call: currentToolCall as ToolCall,
                                 };
                             }
-                            // If tool_start was already emitted, we don't need to do anything
-                            // The tool execution will be handled by ensemble_request.ts
-                            currentToolCall = null; // Reset anyway
                         }
 
                         // Flush any buffered deltas before final message_complete
