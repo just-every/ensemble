@@ -7,6 +7,8 @@ This directory contains examples demonstrating various features of the Ensemble 
 - [basic-request.ts](./basic-request.ts) - Simple LLM request with streaming
 - [tool-calling.ts](./tool-calling.ts) - Basic tool calling example
 - [embeddings.ts](./embeddings.ts) - Generate embeddings
+- [voice-generation.ts](./voice-generation.ts) - Text-to-Speech generation
+- [voice-generation-gemini.ts](./voice-generation-gemini.ts) - Gemini TTS with advanced features
 
 ## Advanced Examples
 

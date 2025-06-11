@@ -12,8 +12,8 @@ A simple interface for interacting with multiple LLM providers during a single c
 - 🛠️ **Advanced Tool Calling** - Parallel/sequential execution, timeouts, and background tracking
 - 📝 **Automatic History Compaction** - Handle unlimited conversation length with intelligent summarization
 - 🤖 **Agent Orientated** - Advanced agent capabilities with verification and tool management
-- 🔌 **Multi-Provider Support** - OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter
-- 🖼️ **Multi-Modal** - Support for text, images, and embeddings
+- 🔌 **Multi-Provider Support** - OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter, ElevenLabs
+- 🖼️ **Multi-Modal** - Support for text, images, embeddings, and voice generation
 - 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
 - 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 
@@ -34,6 +34,7 @@ export GOOGLE_API_KEY=your-google-key
 export XAI_API_KEY=your-xai-key
 export DEEPSEEK_API_KEY=your-deepseek-key
 export OPENROUTER_API_KEY=your-openrouter-key
+export ELEVENLABS_API_KEY=your-elevenlabs-key
 ```
 
 These variables enable access to the respective providers. Only the keys you need are required.
@@ -148,6 +149,43 @@ Key configuration options:
 - **Timeout Handling** - Automatic timeout with background tracking
 - **Result Summarization** - Long outputs are intelligently summarized
 - **Abort Signals** - Graceful cancellation support
+
+### Voice Generation
+
+Generate natural-sounding speech from text using Text-to-Speech models:
+
+```typescript
+import { ensembleVoice, ensembleVoiceStream } from '@just-every/ensemble';
+
+// Simple voice generation
+const audioData = await ensembleVoice('Hello, world!', {
+    model: 'tts-1' // or 'gemini-2.5-flash-preview-tts'
+});
+
+// Voice generation with options
+const audioData = await ensembleVoice('Welcome to our service', {
+    model: 'tts-1-hd'
+}, {
+    voice: 'nova',        // Voice selection
+    speed: 1.2,          // Speech speed (0.25-4.0)
+    response_format: 'mp3' // Audio format
+});
+
+// Streaming voice generation
+for await (const event of ensembleVoiceStream('Long text...', {
+    model: 'gemini-2.5-pro-preview-tts'
+})) {
+    if (event.type === 'audio_stream') {
+        // Process audio chunk
+        processAudioChunk(event.data);
+    }
+}
+```
+
+**Supported Voice Models:**
+- OpenAI: `tts-1`, `tts-1-hd`
+- Google Gemini: `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`
+- ElevenLabs: `eleven_multilingual_v2`, `eleven_turbo_v2_5`
 
 ## Development
 

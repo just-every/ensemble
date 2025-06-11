@@ -32,6 +32,7 @@ import { grokProvider } from './grok.js';
 import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
+import { elevenLabsProvider } from './elevenlabs.js';
 import {
     MODEL_CLASSES,
     ModelClassID,
@@ -49,6 +50,7 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'computer-use-preview': openaiProvider,
     'dall-e': openaiProvider, // Image generation models
     'gpt-image': openaiProvider, // GPT-Image-1 model
+    'tts-': openaiProvider, // TTS models
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
@@ -62,6 +64,10 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
 
     // DeepSeek models
     'deepseek-': deepSeekProvider,
+
+    // ElevenLabs models
+    eleven_: elevenLabsProvider,
+    'elevenlabs-': elevenLabsProvider,
 
     // Test provider for testing
     'test-': testProvider,
@@ -97,6 +103,8 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             );
         case 'openrouter':
             return !!process.env.OPENROUTER_API_KEY;
+        case 'elevenlabs':
+            return !!process.env.ELEVENLABS_API_KEY;
         case 'test':
             return true; // Test provider is always valid
         default: {
@@ -130,7 +138,8 @@ export function getProviderFromModel(model: string): ModelProviderID {
         model.startsWith('text-') ||
         model.startsWith('computer-use-preview') ||
         model.startsWith('dall-e') ||
-        model.startsWith('gpt-image')
+        model.startsWith('gpt-image') ||
+        model.startsWith('tts-')
     ) {
         return 'openai';
     } else if (model.startsWith('claude-')) {
@@ -141,6 +150,8 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'xai';
     } else if (model.startsWith('deepseek-')) {
         return 'deepseek';
+    } else if (model.startsWith('eleven_') || model.startsWith('elevenlabs-')) {
+        return 'elevenlabs';
     } else if (model.startsWith('test-')) {
         return 'test';
     }

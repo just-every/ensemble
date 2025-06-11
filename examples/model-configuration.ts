@@ -1,6 +1,6 @@
 /**
  * Example: Configuring Model Classes in Ensemble
- * 
+ *
  * This example demonstrates how to customize model class configurations
  * to control which models are used for different purposes.
  */
@@ -26,11 +26,7 @@ console.log(standardClass);
 // Example 2: Override an entire model class
 // Use only specific models for coding tasks
 overrideModelClass('code', {
-    models: [
-        'claude-opus-4-20250514-medium',
-        'codex-mini-latest',
-        'o3-medium',
-    ],
+    models: ['claude-opus-4-20250514-medium', 'codex-mini-latest', 'o3-medium'],
     random: true, // Randomly select between these models
 });
 
@@ -48,11 +44,11 @@ setModelClassRandom('reasoning', false);
 
 // Example 6: Set specific models for a class
 // Use only fast models for the mini class
-setModelClassModels('mini', [
-    'gpt-4.1-nano',
-    'claude-3-5-haiku-latest',
-    'gemini-2.0-flash-lite',
-], true); // Keep random selection
+setModelClassModels(
+    'mini',
+    ['gpt-4.1-nano', 'claude-3-5-haiku-latest', 'gemini-2.0-flash-lite'],
+    true
+); // Keep random selection
 
 // Example 7: Bulk update multiple classes
 updateModelClasses({
@@ -67,10 +63,7 @@ updateModelClasses({
     },
     // Use fastest models for summaries
     summary: {
-        models: [
-            'gpt-4.1-mini',
-            'gemini-2.5-flash-preview-05-20-low',
-        ],
+        models: ['gpt-4.1-mini', 'gemini-2.5-flash-preview-05-20-low'],
         random: true,
     },
 });
@@ -79,11 +72,14 @@ updateModelClasses({
 console.log('\nAll model class configurations:');
 const allClasses = getAllModelClasses();
 for (const [className, config] of Object.entries(allClasses)) {
-    console.log(`${className}: ${config.models.length} models, random: ${config.random}`);
+    console.log(
+        `${className}: ${config.models.length} models, random: ${config.random}`
+    );
 }
 
 // Example 9: Use with an agent
-async function example() {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _example() {
     const codeAgent = new Agent({
         name: 'Code Assistant',
         modelClass: 'code', // Will use our customized code class
@@ -109,10 +105,7 @@ if (process.env.NODE_ENV === 'production') {
     // Use stable, proven models in production
     updateModelClasses({
         standard: {
-            models: [
-                'gpt-4.1',
-                'claude-3-5-haiku-latest',
-            ],
+            models: ['gpt-4.1', 'claude-3-5-haiku-latest'],
             random: false, // Use first available model for consistency
         },
     });
