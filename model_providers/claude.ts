@@ -398,6 +398,8 @@ export class ClaudeProvider implements ModelProvider {
                     typeof (msg.content as any).text === 'string'
                 ) {
                     content = (msg.content as any).text;
+                } else {
+                    content = JSON.stringify(msg.content);
                 }
             }
 
@@ -543,7 +545,17 @@ export class ClaudeProvider implements ModelProvider {
                 if (msg.role === 'system' && msg.content) {
                     if (typeof msg.content === 'string') {
                         return acc + msg.content + '\n';
-                    } else if (msg.content.text) {
+                    } else if (Array.isArray(msg.content)) {
+                        msg.content.forEach(content => {
+                            if (typeof content === 'string') {
+                                return (acc += content + '\n');
+                            } else if (typeof content.text === 'string') {
+                                return (acc += content.text + '\n');
+                            }
+                            return (acc += JSON.stringify(content.text) + '\n');
+                        });
+                        return acc;
+                    } else if (typeof msg.content.text === 'string') {
                         return acc + msg.content.text + '\n';
                     }
                     return acc + JSON.stringify(msg.content) + '\n';
