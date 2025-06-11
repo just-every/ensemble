@@ -99,3 +99,83 @@ npm run lint:fix      # Auto-fix lint issues
 4. **If ANY of the above fail, fix the issues before committing**
 
 **NO EXCEPTIONS:** Never commit or push code that fails linting, tests, or build. This is mandatory and must be done for every single commit.
+
+## Code Style Guidelines
+
+- Use async generators for streaming responses
+- Implement proper error handling with custom error types
+- Follow provider abstraction patterns
+- Use TypeScript generics appropriately
+- Keep provider implementations consistent
+
+## Testing Instructions
+
+- Run `npm test` for all tests
+- Use Vitest for unit and integration tests
+- Mock API calls in tests
+- Test streaming behavior thoroughly
+- Verify tool calling edge cases
+
+## Repository Etiquette
+
+- Branch names: `feature/provider-name`, `fix/issue-description`
+- Conventional commits required
+- Update API documentation for changes
+- Add tests for new providers/features
+
+## Developer Environment Setup
+
+1. Clone repository
+2. Run `npm install`
+3. Copy `.env.example` to `.env`
+4. Add provider API keys
+5. Run `npm test` to verify setup
+6. Run examples to test providers
+
+## Package Management
+
+- Keep provider dependencies optional
+- Use peer dependencies where appropriate
+- Minimize core dependencies
+- Document provider-specific requirements
+
+## Project-Specific Warnings
+
+- **Provider Limits**: Each provider has different rate limits
+- **Streaming Differences**: Providers emit events differently
+- **Tool Calling**: Not all providers support all tool features
+- **Cost Tracking**: Ensure accurate token counting per provider
+- **Type Safety**: Strict mode is OFF - be extra careful
+
+## Key Utility Functions & APIs
+
+- `ensembleRequest()`: Main streaming function
+- `BaseModelProvider`: Provider abstraction class
+- `MessageHistory`: Conversation management
+- `ToolExecutionManager`: Tool timeout handling
+- `CostTracker`: Usage and cost monitoring
+- `ModelRegistry`: Available models database
+
+## Troubleshooting
+
+### Common Issues
+
+- **Provider errors**: Check API keys and quotas
+- **Streaming issues**: Verify event handler setup
+- **Tool timeouts**: Adjust timeout settings
+- **Memory leaks**: Check stream cleanup
+- **Type errors**: Remember strict mode is disabled
+
+### Debug Mode
+
+Enable detailed logging:
+```bash
+DEBUG=ensemble:* npm test
+```
+
+### Provider Testing
+
+Test specific provider:
+```bash
+npm test -- --grep "provider-name"
+```

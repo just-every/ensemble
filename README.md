@@ -149,6 +149,61 @@ Key configuration options:
 - **Result Summarization** - Long outputs are intelligently summarized
 - **Abort Signals** - Graceful cancellation support
 
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Build
+npm run build
+
+# Generate docs
+npm run docs
+
+# Lint
+npm run lint
+```
+
+## Architecture
+
+Ensemble provides a unified interface across multiple LLM providers:
+
+1. **Provider Abstraction** - All providers extend `BaseModelProvider`
+2. **Event Streaming** - Consistent events across all providers
+3. **Tool System** - Automatic parameter mapping and execution
+4. **Message History** - Intelligent conversation management
+5. **Cost Tracking** - Built-in usage monitoring
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new features
+4. Submit a pull request
+
+## Troubleshooting
+
+### Provider Issues
+- Ensure API keys are set correctly
+- Check rate limits for your provider
+- Verify model names match provider expectations
+
+### Tool Calling
+- Tools must follow the OpenAI function schema
+- Ensure tool functions are async
+- Check timeout settings for long-running tools
+
+### Streaming Issues
+- Verify network connectivity
+- Check for provider-specific errors in events
+- Enable debug logging with `DEBUG=ensemble:*`
+
 ## License
 
 MIT
