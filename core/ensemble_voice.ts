@@ -126,7 +126,21 @@ export async function* ensembleVoiceStream(
     };
 
     // Get the audio stream
-    const result = await ensembleVoice(text, agent, streamOptions);
+    let result;
+    try {
+        result = await ensembleVoice(text, agent, streamOptions);
+        console.log(
+            '[ensembleVoiceStream] Got result from ensembleVoice:',
+            typeof result,
+            result instanceof ReadableStream ? 'ReadableStream' : 'ArrayBuffer'
+        );
+    } catch (error) {
+        console.error(
+            '[ensembleVoiceStream] Error calling ensembleVoice:',
+            error
+        );
+        throw error;
+    }
 
     if (!(result instanceof ReadableStream)) {
         throw new Error('Expected streaming response but got buffer');
@@ -138,10 +152,15 @@ export async function* ensembleVoiceStream(
     let chunkIndex = 0;
 
     try {
+        let totalBytesReceived = 0;
         while (true) {
             const { done, value } = await reader.read();
 
             if (value) {
+                totalBytesReceived += value.length;
+                console.log(
+                    `[ensembleVoiceStream] Received chunk: ${value.length} bytes, total: ${totalBytesReceived} bytes`
+                );
                 // Append to buffer
                 const newBuffer = new Uint8Array(buffer.length + value.length);
                 newBuffer.set(buffer);
@@ -159,13 +178,17 @@ export async function* ensembleVoiceStream(
                 const base64Chunk = Buffer.from(chunk).toString('base64');
                 const isFinalChunk = done && buffer.length === 0;
 
-                yield {
+                const audioEvent = {
                     type: 'audio_stream',
                     chunkIndex: chunkIndex++,
                     isFinalChunk: isFinalChunk,
                     data: base64Chunk,
                     timestamp: new Date().toISOString(),
                 };
+                console.log(
+                    `[ensembleVoiceStream] Yielding audio chunk ${audioEvent.chunkIndex}, size: ${chunk.length} bytes, final: ${isFinalChunk}`
+                );
+                yield audioEvent;
 
                 if (isFinalChunk) break;
             }
