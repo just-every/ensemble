@@ -14,72 +14,12 @@ export type { VoiceGenerationOpts };
  * @param text - Text to convert to speech
  * @param agent - Agent configuration with model selection
  * @param options - Optional configuration for voice generation
- * @returns Promise that resolves to audio data stream or buffer
- *
- * @example
- * ```typescript
- * // Simple voice generation
- * const audioStream = await ensembleVoice('Hello, world!', {
- *   model: 'tts-1'
- * });
- *
- * // With specific voice and format
- * const audioStream = await ensembleVoice('Welcome to our service', {
- *   model: 'tts-1-hd'
- * }, {
- *   voice: 'nova',
- *   response_format: 'mp3'
- * });
- *
- * // Streaming audio
- * const stream = await ensembleVoice('Long text content...', {
- *   model: 'tts-1'
- * }, {
- *   stream: true
- * });
- * ```
- */
-export async function ensembleVoice(
-    text: string,
-    agent: AgentDefinition,
-    options: VoiceGenerationOpts = {}
-): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
-    // Determine which model to use
-    const model = await getModelFromAgent(agent, 'voice');
-
-    // Get the provider for this model
-    let provider: ModelProvider;
-    try {
-        provider = getModelProvider(model);
-    } catch (error) {
-        throw new Error(
-            `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-    }
-
-    if (!provider.createVoice) {
-        throw new Error(
-            `Provider for model ${model} does not support voice generation`
-        );
-    }
-
-    // Generate the voice using the provider
-    return provider.createVoice(text, model, options);
-}
-
-/**
- * Generate streaming speech audio from text
- * This is a convenience wrapper that always returns a stream
- *
- * @param text - Text to convert to speech
- * @param agent - Agent configuration with model selection
- * @param options - Optional configuration for voice generation
  * @returns AsyncGenerator that yields audio chunks with event metadata
  *
  * @example
  * ```typescript
  * // Stream audio with events
- * for await (const event of ensembleVoiceStream('Hello, world!', {
+ * for await (const event of ensembleVoice('Hello, world!', {
  *   model: 'tts-1'
  * })) {
  *   if (event.type === 'audio_stream') {
@@ -87,18 +27,25 @@ export async function ensembleVoice(
  *     await processAudioChunk(event.data);
  *   }
  * }
+ *
+ * // With specific voice and format
+ * for await (const event of ensembleVoice('Welcome to our service', {
+ *   model: 'tts-1-hd'
+ * }, {
+ *   voice: 'nova',
+ *   response_format: 'mp3'
+ * })) {
+ *   // Handle events
+ * }
  * ```
  */
-export async function* ensembleVoiceStream(
+export async function* ensembleVoice(
     text: string,
     agent: AgentDefinition,
     options: VoiceGenerationOpts = {}
 ): AsyncGenerator<any> {
     // Force streaming
     const streamOptions = { ...options, stream: true };
-
-    // Determine which model to use (for cost tracking)
-    await getModelFromAgent(agent, 'voice');
 
     // Get the audio format and PCM parameters if applicable
     const format = options.response_format || 'mp3';
@@ -125,18 +72,37 @@ export async function* ensembleVoiceStream(
         }),
     };
 
+    // Determine which model to use
+    const model = await getModelFromAgent(agent, 'voice');
+
+    // Get the provider for this model
+    let provider: ModelProvider;
+    try {
+        provider = getModelProvider(model);
+    } catch (error) {
+        throw new Error(
+            `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+    }
+
+    if (!provider.createVoice) {
+        throw new Error(
+            `Provider for model ${model} does not support voice generation`
+        );
+    }
+
     // Get the audio stream
     let result;
     try {
-        result = await ensembleVoice(text, agent, streamOptions);
+        result = await provider.createVoice(text, model, streamOptions);
         console.log(
-            '[ensembleVoiceStream] Got result from ensembleVoice:',
+            '[ensembleVoice] Got result from provider:',
             typeof result,
             result instanceof ReadableStream ? 'ReadableStream' : 'ArrayBuffer'
         );
     } catch (error) {
         console.error(
-            '[ensembleVoiceStream] Error calling ensembleVoice:',
+            '[ensembleVoice] Error calling provider.createVoice:',
             error
         );
         throw error;
@@ -159,7 +125,7 @@ export async function* ensembleVoiceStream(
             if (value) {
                 totalBytesReceived += value.length;
                 console.log(
-                    `[ensembleVoiceStream] Received chunk: ${value.length} bytes, total: ${totalBytesReceived} bytes`
+                    `[ensembleVoice] Received chunk: ${value.length} bytes, total: ${totalBytesReceived} bytes`
                 );
                 // Append to buffer
                 const newBuffer = new Uint8Array(buffer.length + value.length);
@@ -186,7 +152,7 @@ export async function* ensembleVoiceStream(
                     timestamp: new Date().toISOString(),
                 };
                 console.log(
-                    `[ensembleVoiceStream] Yielding audio chunk ${audioEvent.chunkIndex}, size: ${chunk.length} bytes, final: ${isFinalChunk}`
+                    `[ensembleVoice] Yielding audio chunk ${audioEvent.chunkIndex}, size: ${chunk.length} bytes, final: ${isFinalChunk}`
                 );
                 yield audioEvent;
 

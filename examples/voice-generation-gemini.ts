@@ -5,7 +5,7 @@
  * to generate natural-sounding speech from text.
  */
 
-import { ensembleVoice, ensembleVoiceStream } from '../index.js';
+import { ensembleVoice } from '../index.js';
 import type { AgentDefinition, VoiceGenerationOpts } from '../index.js';
 import { writeFile } from 'fs/promises';
 import { Buffer } from 'buffer';
@@ -22,16 +22,18 @@ async function simpleVoiceGeneration() {
         "Hello! This is a test of Gemini's text-to-speech capabilities. The voice quality is quite impressive.";
 
     try {
-        const audioData = await ensembleVoice(text, agent);
+        const outputPath = 'output/gemini-voice-simple.mp3';
+        let audioBuffer = Buffer.alloc(0);
 
-        // Save to file
-        if (audioData instanceof ArrayBuffer) {
-            await writeFile(
-                'output/gemini-voice-simple.mp3',
-                Buffer.from(audioData)
-            );
-            console.log('✓ Audio saved to output/gemini-voice-simple.mp3');
+        for await (const event of ensembleVoice(text, agent)) {
+            if (event.type === 'audio_stream' && event.data) {
+                const chunk = Buffer.from(event.data, 'base64');
+                audioBuffer = Buffer.concat([audioBuffer, chunk]);
+            }
         }
+
+        await writeFile(outputPath, audioBuffer);
+        console.log(`✓ Audio saved to ${outputPath}`);
     } catch (error) {
         console.error('Error:', error);
     }
@@ -56,17 +58,18 @@ async function voiceSelectionExample() {
         };
 
         try {
-            const audioData = await ensembleVoice(text, agent, options);
+            const outputPath = `output/gemini-voice-${voice.toLowerCase()}.mp3`;
+            let audioBuffer = Buffer.alloc(0);
 
-            if (audioData instanceof ArrayBuffer) {
-                await writeFile(
-                    `output/gemini-voice-${voice.toLowerCase()}.mp3`,
-                    Buffer.from(audioData)
-                );
-                console.log(
-                    `✓ Audio saved to output/gemini-voice-${voice.toLowerCase()}.mp3`
-                );
+            for await (const event of ensembleVoice(text, agent, options)) {
+                if (event.type === 'audio_stream' && event.data) {
+                    const chunk = Buffer.from(event.data, 'base64');
+                    audioBuffer = Buffer.concat([audioBuffer, chunk]);
+                }
             }
+
+            await writeFile(outputPath, audioBuffer);
+            console.log(`✓ Audio saved to ${outputPath}`);
         } catch (error) {
             console.error(`Error with voice ${voice}:`, error);
         }
@@ -90,13 +93,12 @@ async function streamingExample() {
 
     const options: VoiceGenerationOpts = {
         voice: 'nova', // This will be mapped to a Gemini voice
-        stream: true,
     };
 
     try {
         let audioBuffer = Buffer.alloc(0);
 
-        for await (const event of ensembleVoiceStream(text, agent, options)) {
+        for await (const event of ensembleVoice(text, agent, options)) {
             if (event.type === 'audio_stream' && event.data) {
                 const chunk = Buffer.from(event.data, 'base64');
                 audioBuffer = Buffer.concat([audioBuffer, chunk]);
@@ -141,15 +143,18 @@ async function multiLanguageExample() {
         };
 
         try {
-            const audioData = await ensembleVoice(text, agent, options);
+            const outputPath = `output/gemini-voice-${lang}.mp3`;
+            let audioBuffer = Buffer.alloc(0);
 
-            if (audioData instanceof ArrayBuffer) {
-                await writeFile(
-                    `output/gemini-voice-${lang}.mp3`,
-                    Buffer.from(audioData)
-                );
-                console.log(`✓ Audio saved to output/gemini-voice-${lang}.mp3`);
+            for await (const event of ensembleVoice(text, agent, options)) {
+                if (event.type === 'audio_stream' && event.data) {
+                    const chunk = Buffer.from(event.data, 'base64');
+                    audioBuffer = Buffer.concat([audioBuffer, chunk]);
+                }
             }
+
+            await writeFile(outputPath, audioBuffer);
+            console.log(`✓ Audio saved to ${outputPath}`);
         } catch (error) {
             console.error(`Error with language ${lang}:`, error);
         }
@@ -200,17 +205,18 @@ async function expressionControlExample() {
         };
 
         try {
-            const audioData = await ensembleVoice(text, agent, options);
+            const outputPath = `output/gemini-voice-${label}.mp3`;
+            let audioBuffer = Buffer.alloc(0);
 
-            if (audioData instanceof ArrayBuffer) {
-                await writeFile(
-                    `output/gemini-voice-${label}.mp3`,
-                    Buffer.from(audioData)
-                );
-                console.log(
-                    `✓ Audio saved to output/gemini-voice-${label}.mp3`
-                );
+            for await (const event of ensembleVoice(text, agent, options)) {
+                if (event.type === 'audio_stream' && event.data) {
+                    const chunk = Buffer.from(event.data, 'base64');
+                    audioBuffer = Buffer.concat([audioBuffer, chunk]);
+                }
             }
+
+            await writeFile(outputPath, audioBuffer);
+            console.log(`✓ Audio saved to ${outputPath}`);
         } catch (error) {
             console.error(`Error with ${label} expression:`, error);
         }

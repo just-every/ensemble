@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { ensembleVoice, ensembleVoiceStream } from '../core/ensemble_voice.js';
+import { ensembleVoice } from '../core/ensemble_voice.js';
 
 // Mock the OpenAI provider
 vi.mock('../model_providers/openai.js', () => {
@@ -50,65 +50,6 @@ describe('Voice Generation', () => {
     });
 
     describe('ensembleVoice', () => {
-        it('should generate voice as ArrayBuffer', async () => {
-            const mockAudioData = new ArrayBuffer(1024);
-            mockProvider.createVoice.mockResolvedValue(mockAudioData);
-
-            const result = await ensembleVoice(
-                'Hello, world!',
-                { model: 'tts-1' },
-                { voice: 'nova', stream: false }
-            );
-
-            expect(result).toBe(mockAudioData);
-            expect(mockProvider.createVoice).toHaveBeenCalledWith(
-                'Hello, world!',
-                'tts-1',
-                { voice: 'nova', stream: false }
-            );
-        });
-
-        it('should generate voice as ReadableStream', async () => {
-            const mockStream = new ReadableStream<Uint8Array>({
-                start(controller) {
-                    controller.enqueue(new Uint8Array([1, 2, 3]));
-                    controller.close();
-                },
-            });
-            mockProvider.createVoice.mockResolvedValue(mockStream);
-
-            const result = await ensembleVoice(
-                'Streaming test',
-                { model: 'tts-1' },
-                { voice: 'echo', stream: true }
-            );
-
-            expect(result).toBeInstanceOf(ReadableStream);
-            expect(mockProvider.createVoice).toHaveBeenCalledWith(
-                'Streaming test',
-                'tts-1',
-                { voice: 'echo', stream: true }
-            );
-        });
-
-        it('should throw error if provider does not support voice', async () => {
-            const providerWithoutVoice = {
-                createResponseStream: vi.fn(),
-                // createVoice is missing
-            };
-            vi.mocked(getModelProvider).mockReturnValueOnce(
-                providerWithoutVoice as any
-            );
-
-            await expect(
-                ensembleVoice('Test', { model: 'unsupported-model' })
-            ).rejects.toThrow(
-                'Provider for model tts-1 does not support voice generation'
-            );
-        });
-    });
-
-    describe('ensembleVoiceStream', () => {
         it('should yield audio stream events', async () => {
             const mockChunks = [
                 new Uint8Array([1, 2, 3]),
@@ -126,7 +67,7 @@ describe('Voice Generation', () => {
             mockProvider.createVoice.mockResolvedValue(mockStream);
 
             const events = [];
-            for await (const event of ensembleVoiceStream(
+            for await (const event of ensembleVoice(
                 'Stream test',
                 { model: 'tts-1' },
                 { voice: 'alloy', response_format: 'opus' }
@@ -154,7 +95,7 @@ describe('Voice Generation', () => {
             mockProvider.createVoice.mockResolvedValue(mockStream);
 
             const events = [];
-            for await (const event of ensembleVoiceStream(
+            for await (const event of ensembleVoice(
                 'Force stream',
                 { model: 'tts-1' },
                 { stream: false } // This should be overridden
@@ -177,7 +118,7 @@ describe('Voice Generation', () => {
             // Create generator and collect results
             const events = [];
             try {
-                for await (const event of ensembleVoiceStream('Should fail', {
+                for await (const event of ensembleVoice('Should fail', {
                     model: 'tts-1',
                 })) {
                     events.push(event);
@@ -204,13 +145,39 @@ describe('Voice Generation', () => {
             mockProvider.createVoice.mockResolvedValue(mockStream);
 
             const events = [];
-            for await (const event of ensembleVoiceStream('Default format', {
+            for await (const event of ensembleVoice('Default format', {
                 model: 'tts-1',
             })) {
                 events.push(event);
             }
 
             expect(events[0].format).toBe('mp3');
+        });
+
+        it('should throw error if provider does not support voice', async () => {
+            const providerWithoutVoice = {
+                createResponseStream: vi.fn(),
+                // createVoice is missing
+            };
+            vi.mocked(getModelProvider).mockReturnValueOnce(
+                providerWithoutVoice as any
+            );
+
+            const events = [];
+            try {
+                for await (const event of ensembleVoice('Test', {
+                    model: 'unsupported-model',
+                })) {
+                    events.push(event);
+                }
+            } catch (error) {
+                expect(error.message).toContain(
+                    'Provider for model tts-1 does not support voice generation'
+                );
+                return;
+            }
+
+            expect.fail('Should have thrown an error');
         });
     });
 
@@ -230,9 +197,14 @@ describe('Voice Generation', () => {
         });
 
         it('should work with ElevenLabs models', async () => {
-            const mockAudioData = new ArrayBuffer(2048);
+            const mockStream = new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(new Uint8Array([10, 20, 30]));
+                    controller.close();
+                },
+            });
             const elevenLabsProvider = {
-                createVoice: vi.fn().mockResolvedValue(mockAudioData),
+                createVoice: vi.fn().mockResolvedValue(mockStream),
             };
 
             vi.mocked(getModelProvider).mockReturnValueOnce(
@@ -245,7 +217,8 @@ describe('Voice Generation', () => {
                 'eleven_multilingual_v2'
             );
 
-            const result = await ensembleVoice(
+            const events = [];
+            for await (const event of ensembleVoice(
                 'Test ElevenLabs',
                 { model: 'eleven_multilingual_v2' },
                 {
@@ -255,9 +228,11 @@ describe('Voice Generation', () => {
                         similarity_boost: 0.75,
                     },
                 }
-            );
+            )) {
+                events.push(event);
+            }
 
-            expect(result).toBe(mockAudioData);
+            expect(events.length).toBeGreaterThan(0);
             expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
                 'Test ElevenLabs',
                 'eleven_multilingual_v2',
@@ -267,6 +242,7 @@ describe('Voice Generation', () => {
                         stability: 0.5,
                         similarity_boost: 0.75,
                     },
+                    stream: true,
                 }
             );
         });
@@ -294,7 +270,7 @@ describe('Voice Generation', () => {
             );
 
             const events = [];
-            for await (const event of ensembleVoiceStream(
+            for await (const event of ensembleVoice(
                 'ElevenLabs stream',
                 { model: 'eleven_turbo_v2_5' },
                 { voice: 'rachel', response_format: 'mp3_high' }
@@ -307,7 +283,7 @@ describe('Voice Generation', () => {
             expect(events.length).toBeGreaterThan(0);
             expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
                 'ElevenLabs stream',
-                'tts-1', // Model is mocked to return 'tts-1'
+                'eleven_turbo_v2_5',
                 { voice: 'rachel', response_format: 'mp3_high', stream: true }
             );
         });

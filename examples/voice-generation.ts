@@ -3,21 +3,20 @@
  * Example of using ensembleVoice for Text-to-Speech generation
  */
 
-import { ensembleVoice, ensembleVoiceStream } from '../index.js';
-import { writeFile } from 'fs/promises';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
+import { ensembleVoice } from '../index.js';
 import { createWriteStream } from 'fs';
 
-// Example 1: Generate speech and save to file (buffer mode)
+// Example 1: Generate speech and save to file
 async function generateSpeechBuffer() {
-    console.log('\n=== Example 1: Generate speech buffer ===');
+    console.log('\n=== Example 1: Generate speech and save to file ===');
 
     try {
         const text = 'Hello! This is a test of the OpenAI text-to-speech API.';
+        const outputStream = createWriteStream('output-buffer.mp3');
+        let totalChunks = 0;
 
-        // Generate speech as ArrayBuffer
-        const audioBuffer = await ensembleVoice(
+        // Generate speech with streaming
+        for await (const event of ensembleVoice(
             text,
             {
                 model: 'tts-1',
@@ -25,23 +24,27 @@ async function generateSpeechBuffer() {
             {
                 voice: 'nova',
                 response_format: 'mp3',
-                stream: false, // Get buffer instead of stream
             }
-        );
-
-        if (audioBuffer instanceof ArrayBuffer) {
-            // Save to file
-            await writeFile('output-buffer.mp3', Buffer.from(audioBuffer));
-            console.log('✓ Saved speech to output-buffer.mp3');
+        )) {
+            if (event.type === 'audio_stream' && event.data) {
+                totalChunks++;
+                const buffer = Buffer.from(event.data, 'base64');
+                outputStream.write(buffer);
+            }
         }
+
+        outputStream.end();
+        console.log(
+            `✓ Saved speech to output-buffer.mp3 (${totalChunks} chunks)`
+        );
     } catch (error) {
         console.error('Error generating speech:', error);
     }
 }
 
-// Example 2: Stream speech directly to file
+// Example 2: Process audio with real-time chunk monitoring
 async function streamSpeechToFile() {
-    console.log('\n=== Example 2: Stream speech to file ===');
+    console.log('\n=== Example 2: Process audio with real-time monitoring ===');
 
     try {
         const text =
@@ -49,8 +52,11 @@ async function streamSpeechToFile() {
             'Streaming is more efficient for longer texts because you can start ' +
             'playing the audio before the entire generation is complete.';
 
-        // Generate speech as stream
-        const audioStream = await ensembleVoice(
+        const outputStream = createWriteStream('output-stream.mp3');
+        let bytesReceived = 0;
+
+        // Generate speech with streaming
+        for await (const event of ensembleVoice(
             text,
             {
                 model: 'tts-1',
@@ -58,24 +64,31 @@ async function streamSpeechToFile() {
             {
                 voice: 'echo',
                 response_format: 'mp3',
-                stream: true, // Get stream
             }
-        );
+        )) {
+            if (event.type === 'audio_stream' && event.data) {
+                const buffer = Buffer.from(event.data, 'base64');
+                bytesReceived += buffer.length;
+                outputStream.write(buffer);
 
-        if (audioStream instanceof ReadableStream) {
-            // Convert Web ReadableStream to Node.js stream
-            const nodeStream = Readable.from(audioStream);
-
-            // Pipe to file
-            await pipeline(nodeStream, createWriteStream('output-stream.mp3'));
-            console.log('✓ Streamed speech to output-stream.mp3');
+                if (event.chunkIndex % 5 === 0) {
+                    console.log(
+                        `  Processing... ${bytesReceived} bytes received`
+                    );
+                }
+            }
         }
+
+        outputStream.end();
+        console.log(
+            `✓ Streamed speech to output-stream.mp3 (${bytesReceived} bytes total)`
+        );
     } catch (error) {
         console.error('Error streaming speech:', error);
     }
 }
 
-// Example 3: Use ensembleVoiceStream for event-based processing
+// Example 3: Process audio events with detailed tracking
 async function processAudioEvents() {
     console.log('\n=== Example 3: Process audio events ===');
 
@@ -85,9 +98,10 @@ async function processAudioEvents() {
 
         const outputStream = createWriteStream('output-events.mp3');
         let totalChunks = 0;
+        let totalBytes = 0;
 
         // Stream with events
-        for await (const event of ensembleVoiceStream(
+        for await (const event of ensembleVoice(
             text,
             {
                 model: 'tts-1-hd', // High quality model
@@ -99,17 +113,23 @@ async function processAudioEvents() {
             }
         )) {
             if (event.type === 'audio_stream') {
-                totalChunks++;
-                outputStream.write(event.data);
-                console.log(
-                    `Received chunk ${totalChunks} (${event.data.length} bytes)`
-                );
+                if (event.data) {
+                    totalChunks++;
+                    const buffer = Buffer.from(event.data, 'base64');
+                    totalBytes += buffer.length;
+                    outputStream.write(buffer);
+                    console.log(
+                        `Received chunk ${event.chunkIndex} (${buffer.length} bytes)`
+                    );
+                } else if (event.format) {
+                    console.log(`Audio format: ${event.format}`);
+                }
             }
         }
 
         outputStream.end();
         console.log(
-            `✓ Processed ${totalChunks} audio chunks to output-events.mp3`
+            `✓ Processed ${totalChunks} audio chunks to output-events.mp3 (${totalBytes} bytes)`
         );
     } catch (error) {
         console.error('Error processing audio events:', error);
@@ -134,7 +154,9 @@ async function compareVoices() {
         try {
             console.log(`Generating with voice: ${voice}...`);
 
-            const audioBuffer = await ensembleVoice(
+            const outputStream = createWriteStream(`voice-${voice}.mp3`);
+
+            for await (const event of ensembleVoice(
                 text,
                 {
                     model: 'tts-1',
@@ -142,14 +164,15 @@ async function compareVoices() {
                 {
                     voice,
                     response_format: 'mp3',
-                    stream: false,
                 }
-            );
-
-            if (audioBuffer instanceof ArrayBuffer) {
-                await writeFile(`voice-${voice}.mp3`, Buffer.from(audioBuffer));
-                console.log(`✓ Saved voice-${voice}.mp3`);
+            )) {
+                if (event.type === 'audio_stream' && event.data) {
+                    outputStream.write(Buffer.from(event.data, 'base64'));
+                }
             }
+
+            outputStream.end();
+            console.log(`✓ Saved voice-${voice}.mp3`);
         } catch (error) {
             console.error(`Error with voice ${voice}:`, error);
         }
@@ -167,7 +190,9 @@ async function testAudioFormats() {
         try {
             console.log(`Generating ${format} format...`);
 
-            const audioBuffer = await ensembleVoice(
+            const outputStream = createWriteStream(`format-test.${format}`);
+
+            for await (const event of ensembleVoice(
                 text,
                 {
                     model: 'tts-1',
@@ -175,17 +200,15 @@ async function testAudioFormats() {
                 {
                     voice: 'nova',
                     response_format: format,
-                    stream: false,
                 }
-            );
-
-            if (audioBuffer instanceof ArrayBuffer) {
-                await writeFile(
-                    `format-test.${format}`,
-                    Buffer.from(audioBuffer)
-                );
-                console.log(`✓ Saved format-test.${format}`);
+            )) {
+                if (event.type === 'audio_stream' && event.data) {
+                    outputStream.write(Buffer.from(event.data, 'base64'));
+                }
             }
+
+            outputStream.end();
+            console.log(`✓ Saved format-test.${format}`);
         } catch (error) {
             console.error(`Error with format ${format}:`, error);
         }
@@ -201,7 +224,9 @@ async function elevenLabsExample() {
             'This is a test of the ElevenLabs text-to-speech API with high-quality voices.';
 
         // Generate with ElevenLabs multilingual model
-        const audioBuffer = await ensembleVoice(
+        const outputStream = createWriteStream('elevenlabs-output.mp3');
+
+        for await (const event of ensembleVoice(
             text,
             {
                 model: 'eleven_multilingual_v2',
@@ -209,14 +234,15 @@ async function elevenLabsExample() {
             {
                 voice: 'adam', // Using preset voice name
                 response_format: 'mp3_high',
-                stream: false,
             }
-        );
-
-        if (audioBuffer instanceof ArrayBuffer) {
-            await writeFile('elevenlabs-output.mp3', Buffer.from(audioBuffer));
-            console.log('✓ Saved ElevenLabs speech to elevenlabs-output.mp3');
+        )) {
+            if (event.type === 'audio_stream' && event.data) {
+                outputStream.write(Buffer.from(event.data, 'base64'));
+            }
         }
+
+        outputStream.end();
+        console.log('✓ Saved ElevenLabs speech to elevenlabs-output.mp3');
     } catch (error) {
         console.error('Error with ElevenLabs:', error);
     }
@@ -236,7 +262,7 @@ async function elevenLabsStreamingExample() {
         let totalChunks = 0;
         const outputStream = createWriteStream('elevenlabs-stream.mp3');
 
-        for await (const event of ensembleVoiceStream(
+        for await (const event of ensembleVoice(
             text,
             {
                 model: 'eleven_turbo_v2_5', // Turbo model for low latency
@@ -287,7 +313,11 @@ async function compareElevenLabsVoices() {
         try {
             console.log(`Generating with ElevenLabs voice: ${voice}...`);
 
-            const audioBuffer = await ensembleVoice(
+            const outputStream = createWriteStream(
+                `elevenlabs-voice-${voice}.mp3`
+            );
+
+            for await (const event of ensembleVoice(
                 text,
                 {
                     model: 'eleven_multilingual_v2',
@@ -295,17 +325,15 @@ async function compareElevenLabsVoices() {
                 {
                     voice,
                     response_format: 'mp3',
-                    stream: false,
                 }
-            );
-
-            if (audioBuffer instanceof ArrayBuffer) {
-                await writeFile(
-                    `elevenlabs-voice-${voice}.mp3`,
-                    Buffer.from(audioBuffer)
-                );
-                console.log(`✓ Saved elevenlabs-voice-${voice}.mp3`);
+            )) {
+                if (event.type === 'audio_stream' && event.data) {
+                    outputStream.write(Buffer.from(event.data, 'base64'));
+                }
             }
+
+            outputStream.end();
+            console.log(`✓ Saved elevenlabs-voice-${voice}.mp3`);
         } catch (error) {
             console.error(`Error with ElevenLabs voice ${voice}:`, error);
         }
