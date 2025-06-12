@@ -6,7 +6,6 @@
  */
 
 import {
-    ModelProvider,
     ToolFunction,
     ModelSettings,
     ProviderStreamEvent,
@@ -14,7 +13,9 @@ import {
     ResponseInput,
     AgentDefinition,
     ImageGenerationOpts,
+    VoiceGenerationOpts,
 } from '../types/types.js';
+import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
 import { costTracker } from '../index.js';
@@ -364,11 +365,12 @@ async function addImagesToInput(
 /**
  * OpenAI model provider implementation
  */
-export class OpenAIProvider implements ModelProvider {
+export class OpenAIProvider extends BaseModelProvider {
     private _client?: OpenAI;
     private apiKey?: string;
 
     constructor(apiKey?: string) {
+        super('openai');
         // Store the API key for lazy initialization
         this.apiKey = apiKey || process.env.OPENAI_API_KEY;
     }
@@ -662,6 +664,78 @@ export class OpenAIProvider implements ModelProvider {
 
         // Default/unknown pricing
         return 0.04;
+    }
+
+    /**
+     * Generate speech audio from text using OpenAI's TTS API
+     *
+     * @param text - The text to convert to speech
+     * @param model - The TTS model to use (tts-1 or tts-1-hd)
+     * @param opts - Optional parameters for voice generation
+     * @returns A promise that resolves to audio stream or buffer
+     */
+    async createVoice(
+        text: string,
+        model: string,
+        opts?: VoiceGenerationOpts
+    ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
+        try {
+            // Default voice and parameters
+            const voice = opts?.voice || 'alloy';
+            const speed = opts?.speed || 1.0;
+            const response_format = opts?.response_format || 'mp3';
+
+            console.log(
+                `[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`
+            );
+
+            // Create the speech request
+            const response = await this.client.audio.speech.create({
+                model,
+                input: text,
+                voice,
+                speed,
+                response_format: response_format as any,
+            });
+
+            // Track usage for cost calculation
+            const characterCount = text.length;
+            const costPerThousandChars = model === 'tts-1-hd' ? 0.03 : 0.015;
+            const cost = (characterCount / 1000) * costPerThousandChars;
+
+            costTracker.addUsage({
+                model,
+                metadata: {
+                    character_count: characterCount,
+                    cost,
+                    voice,
+                    format: response_format,
+                },
+            });
+
+            // Handle streaming vs buffer response
+            if (opts?.stream) {
+                // Return the response body as a ReadableStream
+                const nodeStream = response.body;
+
+                // Convert Node.js Readable to Web ReadableStream
+                return new ReadableStream<Uint8Array>({
+                    async start(controller) {
+                        for await (const chunk of nodeStream) {
+                            controller.enqueue(new Uint8Array(chunk));
+                        }
+                        controller.close();
+                    },
+                });
+            } else {
+                // Return as ArrayBuffer
+                const buffer = await response.arrayBuffer();
+                return buffer;
+            }
+        } catch (error) {
+            console.error('[OpenAI] Error generating speech:', error);
+            throw error;
+        }
     }
 
     /**

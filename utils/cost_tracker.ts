@@ -11,6 +11,8 @@ import {
     TieredPrice,
     TimeBasedPrice,
 } from '../data/model_data.js';
+import { emitEvent, hasEventHandler } from './event_controller.js';
+import { CostUpdateEvent } from '../types/types.js';
 
 /**
  * Simplified cost tracker for the ensemble package
@@ -217,6 +219,27 @@ class CostTracker {
 
             // Add to entries list
             this.entries.push(usage);
+
+            // Emit cost_update event if an event handler is set
+            if (hasEventHandler()) {
+                const costUpdateEvent: CostUpdateEvent = {
+                    type: 'cost_update',
+                    usage: {
+                        input_tokens: usage.input_tokens || 0,
+                        output_tokens: usage.output_tokens || 0,
+                        total_tokens:
+                            (usage.input_tokens || 0) +
+                            (usage.output_tokens || 0),
+                        cached_tokens: usage.cached_tokens,
+                    },
+                    timestamp: new Date().toISOString(),
+                };
+
+                // Emit asynchronously without blocking
+                emitEvent(costUpdateEvent).catch(error => {
+                    console.error('Error emitting cost_update event:', error);
+                });
+            }
 
             // Notify all callbacks
             for (const callback of this.onAddUsageCallbacks) {

@@ -222,8 +222,15 @@ async function* executeRound(
     // Create provider and agent with fresh settings
     const provider = getModelProvider(model);
 
-    // Stream the response
-    const stream = provider.createResponseStream(messages, model, agent);
+    // Stream the response with retry support if available
+    const stream =
+        'createResponseStreamWithRetry' in provider
+            ? (provider as any).createResponseStreamWithRetry(
+                  messages,
+                  model,
+                  agent
+              )
+            : provider.createResponseStream(messages, model, agent);
 
     const toolPromises: Promise<ToolCallResult>[] = [];
 

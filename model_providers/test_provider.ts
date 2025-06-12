@@ -7,13 +7,13 @@
  */
 
 import {
-    ModelProvider,
     ResponseInput,
     ProviderStreamEvent,
     ToolCall,
     ResponseInputItem,
     AgentDefinition,
 } from '../types/types.js';
+import { BaseModelProvider } from './base_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
 import { costTracker } from '../index.js';
@@ -106,10 +106,11 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * TestProvider implementation of the ModelProvider interface
  */
-export class TestProvider implements ModelProvider {
+export class TestProvider extends BaseModelProvider {
     private config: TestProviderConfig;
 
     constructor(config: TestProviderConfig = testProviderConfig) {
+        super('test');
         this.config = config;
     }
 

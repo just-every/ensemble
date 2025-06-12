@@ -39,7 +39,10 @@ describe('Model Class Configuration', () => {
             });
 
             const config = getModelClass('standard');
-            expect(config?.models).toEqual(['gpt-4.1', 'claude-3-5-haiku-latest']);
+            expect(config?.models).toEqual([
+                'gpt-4.1',
+                'claude-3-5-haiku-latest',
+            ]);
             expect(config?.random).toBe(MODEL_CLASSES.standard.random); // Preserved
         });
     });
@@ -73,8 +76,10 @@ describe('Model Class Configuration', () => {
         });
 
         it('should warn for non-existent models but still add them', () => {
-            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-            
+            const consoleSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
             overrideModelClass('standard', {
                 models: ['non-existent-model'],
             });
@@ -92,15 +97,21 @@ describe('Model Class Configuration', () => {
 
     describe('setModelClassModels', () => {
         it('should set models for a class', () => {
-            setModelClassModels('mini', ['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
+            setModelClassModels('mini', [
+                'gpt-4.1-nano',
+                'claude-3-5-haiku-latest',
+            ]);
 
             const config = getModelClass('mini');
-            expect(config?.models).toEqual(['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
+            expect(config?.models).toEqual([
+                'gpt-4.1-nano',
+                'claude-3-5-haiku-latest',
+            ]);
         });
 
         it('should preserve random setting when not specified', () => {
             const originalRandom = MODEL_CLASSES.mini.random;
-            
+
             setModelClassModels('mini', ['gpt-4.1-nano']);
 
             const config = getModelClass('mini');
@@ -118,7 +129,7 @@ describe('Model Class Configuration', () => {
     describe('addModelToClass', () => {
         it('should add a model to a class', () => {
             const originalModels = MODEL_CLASSES.standard.models;
-            
+
             addModelToClass('standard', 'new-model');
 
             const config = getModelClass('standard');
@@ -129,7 +140,7 @@ describe('Model Class Configuration', () => {
         it('should not add duplicate models', () => {
             const originalModels = MODEL_CLASSES.standard.models;
             const existingModel = originalModels[0];
-            
+
             addModelToClass('standard', existingModel);
 
             const config = getModelClass('standard');
@@ -140,7 +151,7 @@ describe('Model Class Configuration', () => {
     describe('removeModelFromClass', () => {
         it('should remove a model from a class', () => {
             const modelToRemove = MODEL_CLASSES.standard.models[0];
-            
+
             removeModelFromClass('standard', modelToRemove);
 
             const config = getModelClass('standard');
@@ -149,7 +160,7 @@ describe('Model Class Configuration', () => {
 
         it('should do nothing if model not in class', () => {
             const originalLength = MODEL_CLASSES.standard.models.length;
-            
+
             removeModelFromClass('standard', 'non-existent-model');
 
             const config = getModelClass('standard');
@@ -190,7 +201,9 @@ describe('Model Class Configuration', () => {
             expect(allClasses).toHaveProperty('standard');
             expect(allClasses).toHaveProperty('mini');
             expect(allClasses).toHaveProperty('reasoning');
-            expect(allClasses.standard.models).toEqual(MODEL_CLASSES.standard.models);
+            expect(allClasses.standard.models).toEqual(
+                MODEL_CLASSES.standard.models
+            );
         });
 
         it('should include overrides in the result', () => {

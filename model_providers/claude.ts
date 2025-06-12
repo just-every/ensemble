@@ -24,7 +24,6 @@ function formatWebSearchResults(results: any[]): string {
         .join('\n');
 }
 import {
-    ModelProvider,
     ToolFunction,
     ModelSettings,
     ProviderStreamEvent,
@@ -33,6 +32,7 @@ import {
     ResponseInputItem,
     AgentDefinition,
 } from '../types/types.js';
+import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../index.js';
 import {
     log_llm_error,
@@ -40,7 +40,7 @@ import {
     log_llm_response,
 } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { findModel, ModelClassID } from '../data/model_data.js';
+import { findModel } from '../data/model_data.js';
 import {
     appendMessageWithImage,
     resizeAndTruncateForClaude,
@@ -370,11 +370,12 @@ async function convertToClaudeMessage(
 /**
  * Claude model provider implementation
  */
-export class ClaudeProvider implements ModelProvider {
+export class ClaudeProvider extends BaseModelProvider {
     private _client?: Anthropic;
     private apiKey?: string;
 
     constructor(apiKey?: string) {
+        super('anthropic');
         // Store the API key for lazy initialization
         this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY;
     }
@@ -464,26 +465,33 @@ export class ClaudeProvider implements ModelProvider {
             for (let i = 1; i < result.length; i++) {
                 const prevMsg = result[i - 1];
                 const currentMsg = result[i];
-                
+
                 // Check for consecutive assistant messages
-                if (prevMsg.role === 'assistant' && currentMsg.role === 'assistant') {
+                if (
+                    prevMsg.role === 'assistant' &&
+                    currentMsg.role === 'assistant'
+                ) {
                     // Check if current assistant message starts with a thinking block
                     let hasThinkingBlock = false;
-                    
+
                     if (Array.isArray(currentMsg.content)) {
-                        hasThinkingBlock = currentMsg.content.length > 0 && 
-                            (currentMsg.content[0].type === 'thinking' || 
-                             currentMsg.content[0].type === 'redacted_thinking');
+                        hasThinkingBlock =
+                            currentMsg.content.length > 0 &&
+                            (currentMsg.content[0].type === 'thinking' ||
+                                currentMsg.content[0].type ===
+                                    'redacted_thinking');
                     }
-                    
+
                     // If no thinking block, convert to user message
                     if (!hasThinkingBlock) {
                         const contentStr = contentToString(currentMsg.content);
                         currentMsg.role = 'user';
-                        currentMsg.content = [{
-                            type: 'text',
-                            text: `Previous thoughts:\n\n${contentStr}`
-                        }];
+                        currentMsg.content = [
+                            {
+                                type: 'text',
+                                text: `Previous thoughts:\n\n${contentStr}`,
+                            },
+                        ];
                     }
                 }
             }
@@ -582,8 +590,9 @@ export class ClaudeProvider implements ModelProvider {
             }
 
             // Determine if thinking is enabled
-            const thinkingEnabled = thinking !== undefined && thinking.type === 'enabled';
-            
+            const thinkingEnabled =
+                thinking !== undefined && thinking.type === 'enabled';
+
             // Preprocess *and* convert messages for Claude in one pass
             const claudeMessages = await this.prepareClaudeMessages(
                 messages,
@@ -1019,46 +1028,42 @@ export class ClaudeProvider implements ModelProvider {
                                 const partialArgs =
                                     currentToolCall.function._partialArguments;
                                 try {
-                                        JSON.parse(partialArgs); // Validate JSON
-                                        currentToolCall.function.arguments =
-                                            partialArgs;
-                                    } catch (jsonError) {
-                                        console.warn(
-                                            `Invalid JSON in partial arguments at message_stop for ${currentToolCall.function.name}: ${partialArgs}`,
-                                            jsonError
-                                        );
-                                        // Try to extract the first valid JSON object if it's concatenated
-                                        if (partialArgs.includes('}{')) {
-                                            const firstBraceIndex =
-                                                partialArgs.indexOf('{');
-                                            const firstCloseBraceIndex =
-                                                partialArgs.indexOf('}') + 1;
-                                            if (
-                                                firstBraceIndex !== -1 &&
-                                                firstCloseBraceIndex >
-                                                    firstBraceIndex
-                                            ) {
-                                                const firstJsonStr =
-                                                    partialArgs.substring(
-                                                        firstBraceIndex,
-                                                        firstCloseBraceIndex
-                                                    );
-                                                try {
-                                                    JSON.parse(firstJsonStr); // Validate extracted JSON
-                                                    currentToolCall.function.arguments =
-                                                        firstJsonStr;
-                                                    console.log(
-                                                        `Extracted valid JSON at message_stop: ${firstJsonStr}`
-                                                    );
-                                                } catch (extractError) {
-                                                    console.error(
-                                                        `Failed to extract valid JSON at message_stop: ${firstJsonStr}`,
-                                                        extractError
-                                                    );
-                                                    currentToolCall.function.arguments =
-                                                        '{}';
-                                                }
-                                            } else {
+                                    JSON.parse(partialArgs); // Validate JSON
+                                    currentToolCall.function.arguments =
+                                        partialArgs;
+                                } catch (jsonError) {
+                                    console.warn(
+                                        `Invalid JSON in partial arguments at message_stop for ${currentToolCall.function.name}: ${partialArgs}`,
+                                        jsonError
+                                    );
+                                    // Try to extract the first valid JSON object if it's concatenated
+                                    if (partialArgs.includes('}{')) {
+                                        const firstBraceIndex =
+                                            partialArgs.indexOf('{');
+                                        const firstCloseBraceIndex =
+                                            partialArgs.indexOf('}') + 1;
+                                        if (
+                                            firstBraceIndex !== -1 &&
+                                            firstCloseBraceIndex >
+                                                firstBraceIndex
+                                        ) {
+                                            const firstJsonStr =
+                                                partialArgs.substring(
+                                                    firstBraceIndex,
+                                                    firstCloseBraceIndex
+                                                );
+                                            try {
+                                                JSON.parse(firstJsonStr); // Validate extracted JSON
+                                                currentToolCall.function.arguments =
+                                                    firstJsonStr;
+                                                console.log(
+                                                    `Extracted valid JSON at message_stop: ${firstJsonStr}`
+                                                );
+                                            } catch (extractError) {
+                                                console.error(
+                                                    `Failed to extract valid JSON at message_stop: ${firstJsonStr}`,
+                                                    extractError
+                                                );
                                                 currentToolCall.function.arguments =
                                                     '{}';
                                             }
@@ -1066,7 +1071,11 @@ export class ClaudeProvider implements ModelProvider {
                                             currentToolCall.function.arguments =
                                                 '{}';
                                         }
+                                    } else {
+                                        currentToolCall.function.arguments =
+                                            '{}';
                                     }
+                                }
                                 delete currentToolCall.function
                                     ._partialArguments;
                             }

@@ -7,22 +7,26 @@ vi.mock('@google/genai', () => ({
     GoogleGenAI: vi.fn().mockImplementation(() => ({
         models: {
             generateContent: vi.fn().mockResolvedValue({
-                candidates: [{
-                    content: {
-                        parts: [{
-                            inlineData: {
-                                mimeType: 'audio/mpeg',
-                                data: 'bW9jayBhdWRpbyBkYXRh' // "mock audio data" in base64
-                            }
-                        }]
-                    }
-                }]
-            })
-        }
+                candidates: [
+                    {
+                        content: {
+                            parts: [
+                                {
+                                    inlineData: {
+                                        mimeType: 'audio/mpeg',
+                                        data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }),
+        },
     })),
     Modality: {
-        AUDIO: 'AUDIO'
-    }
+        AUDIO: 'AUDIO',
+    },
 }));
 
 describe('Gemini Voice Generation', () => {
@@ -47,7 +51,7 @@ describe('Gemini Voice Generation', () => {
         const text = 'Testing voice selection';
         const model = 'gemini-2.5-pro-preview-tts';
         const opts: VoiceGenerationOpts = {
-            voice: 'Puck'
+            voice: 'Puck',
         };
 
         const result = await provider.createVoice(text, model, opts);
@@ -62,7 +66,7 @@ describe('Gemini Voice Generation', () => {
             { input: 'alloy', expected: 'Kore' },
             { input: 'nova', expected: 'Aoede' },
             { input: 'male', expected: 'Puck' },
-            { input: 'female', expected: 'Kore' }
+            { input: 'female', expected: 'Kore' },
         ];
 
         for (const { input } of voiceMappings) {
@@ -76,13 +80,13 @@ describe('Gemini Voice Generation', () => {
         const text = 'Testing streaming';
         const model = 'gemini-2.5-flash-preview-tts';
         const opts: VoiceGenerationOpts = {
-            stream: true
+            stream: true,
         };
 
         const result = await provider.createVoice(text, model, opts);
 
         expect(result).toBeInstanceOf(ReadableStream);
-        
+
         // Test reading from the stream
         const reader = (result as ReadableStream<Uint8Array>).getReader();
         const { value, done } = await reader.read();
@@ -95,7 +99,7 @@ describe('Gemini Voice Generation', () => {
         const text = 'Testing speed';
         const model = 'gemini-2.5-flash-preview-tts';
         const opts: VoiceGenerationOpts = {
-            speed: 1.5
+            speed: 1.5,
         };
 
         const result = await provider.createVoice(text, model, opts);
@@ -109,10 +113,14 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock an error response
-        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
+        const mockGenAI = vi.mocked(
+            (provider as any).client.models.generateContent
+        );
         mockGenAI.mockRejectedValueOnce(new Error('API Error'));
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('API Error');
+        await expect(provider.createVoice(text, model)).rejects.toThrow(
+            'API Error'
+        );
     });
 
     test('should handle empty response', async () => {
@@ -120,10 +128,14 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock empty response
-        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
+        const mockGenAI = vi.mocked(
+            (provider as any).client.models.generateContent
+        );
         mockGenAI.mockResolvedValueOnce({ candidates: [] });
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio generated from Gemini TTS');
+        await expect(provider.createVoice(text, model)).rejects.toThrow(
+            'No audio generated from Gemini TTS'
+        );
     });
 
     test('should handle response without audio parts', async () => {
@@ -131,17 +143,25 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock response without audio parts
-        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
+        const mockGenAI = vi.mocked(
+            (provider as any).client.models.generateContent
+        );
         mockGenAI.mockResolvedValueOnce({
-            candidates: [{
-                content: {
-                    parts: [{
-                        text: 'Some text instead of audio'
-                    }]
-                }
-            }]
+            candidates: [
+                {
+                    content: {
+                        parts: [
+                            {
+                                text: 'Some text instead of audio',
+                            },
+                        ],
+                    },
+                },
+            ],
         });
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data found in Gemini TTS response');
+        await expect(provider.createVoice(text, model)).rejects.toThrow(
+            'No audio data found in Gemini TTS response'
+        );
     });
 });

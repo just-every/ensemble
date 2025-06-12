@@ -42,7 +42,7 @@ These variables enable access to the respective providers. Only the keys you nee
 ## Quick Start
 
 ```typescript
-import { ensembleRequest } from '@just-every/ensemble';
+import { ensembleRequest, ensembleResult } from '@just-every/ensemble';
 
 const messages = [
     { type: 'message', role: 'user', content: 'How many of the letter "e" is there in "Ensemble"?' }
@@ -66,11 +66,18 @@ const validatorAgent = {
     modelClass: 'code',
 };
 // Continue conversation with new agent
-for await (const event of ensembleRequest(messages, validatorAgent)) {
-    if (event.type === 'message_complete') {
-        console.log(event.content);
-    }
-}
+const stream = ensembleRequest(messages, validatorAgent);
+// Alternative method of collecting response
+const result = await ensembleResult(stream);
+console.log('Validation Result:', {
+    message: result.message,
+    cost: result.cost,
+    completed: result.completed,
+    duration: result.endTime
+        ? result.endTime.getTime() - result.startTime.getTime()
+        : 0,
+    messageIds: Array.from(result.messageIds),
+});
 ```
 
 ## Documentation

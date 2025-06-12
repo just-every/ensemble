@@ -4,7 +4,9 @@
  */
 
 import { MODEL_CLASSES, findModel } from '../data/model_data.js';
-import { ModelClass, ModelClassID } from '../types/types.js';
+import { ModelClass } from '../types/types.js';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { ModelClassID } from '../types/types.js';
 import {
     overrideModelClass as _overrideModelClass,
     getModelClassOverride,
@@ -23,15 +25,15 @@ export function getModelClass(className: string): ModelClass | undefined {
 
     // Get the base configuration
     const baseConfig = MODEL_CLASSES[className as keyof typeof MODEL_CLASSES];
-    
+
     // Get any override
     const override = getModelClassOverride(className);
-    
+
     // If no override, return base config
     if (!override) {
         return { ...baseConfig };
     }
-    
+
     // Merge override with base config
     return {
         ...baseConfig,
@@ -62,7 +64,7 @@ export function overrideModelClass(
     if (!(className in MODEL_CLASSES)) {
         throw new Error(`Model class '${className}' does not exist`);
     }
-    
+
     // Validate models if provided
     if (config.models) {
         for (const modelId of config.models) {
@@ -73,7 +75,7 @@ export function overrideModelClass(
             }
         }
     }
-    
+
     _overrideModelClass(className, config);
 }
 
@@ -92,7 +94,7 @@ export function setModelClassModels(
     if (!currentConfig) {
         throw new Error(`Model class '${className}' does not exist`);
     }
-    
+
     overrideModelClass(className, {
         models,
         random: random !== undefined ? random : currentConfig.random,
@@ -109,12 +111,12 @@ export function addModelToClass(className: string, modelId: string): void {
     if (!currentConfig) {
         throw new Error(`Model class '${className}' does not exist`);
     }
-    
+
     // Check if model already exists in the class
     if (currentConfig.models.includes(modelId)) {
         return; // Already in the class
     }
-    
+
     // Add the model
     const newModels = [...currentConfig.models, modelId];
     setModelClassModels(className, newModels);
@@ -130,10 +132,10 @@ export function removeModelFromClass(className: string, modelId: string): void {
     if (!currentConfig) {
         throw new Error(`Model class '${className}' does not exist`);
     }
-    
+
     // Filter out the model
     const newModels = currentConfig.models.filter(id => id !== modelId);
-    
+
     // Only update if the model was actually removed
     if (newModels.length < currentConfig.models.length) {
         setModelClassModels(className, newModels);
@@ -150,7 +152,7 @@ export function setModelClassRandom(className: string, random: boolean): void {
     if (!currentConfig) {
         throw new Error(`Model class '${className}' does not exist`);
     }
-    
+
     overrideModelClass(className, {
         models: currentConfig.models,
         random,
@@ -173,14 +175,14 @@ export function resetModelClass(className: string): void {
  */
 export function getAllModelClasses(): Record<string, ModelClass> {
     const result: Record<string, ModelClass> = {};
-    
+
     for (const className of getModelClassNames()) {
         const config = getModelClass(className);
         if (config) {
             result[className] = config;
         }
     }
-    
+
     return result;
 }
 
