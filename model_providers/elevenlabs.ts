@@ -155,9 +155,9 @@ class ElevenLabsProvider extends BaseModelProvider {
 
             costTracker.addUsage({
                 model,
+                cost, // Pass cost directly, not in metadata
                 metadata: {
                     character_count: characterCount,
-                    cost,
                     voice: voiceId,
                     format: outputFormat,
                 },

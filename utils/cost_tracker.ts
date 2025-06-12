@@ -52,7 +52,12 @@ class CostTracker {
             );
         }
 
-        // Initialize cost
+        // If cost is already provided (e.g., for voice generation), use it directly
+        if (usage.cost !== undefined && usage.cost !== null && usage.cost > 0) {
+            return usage;
+        }
+        
+        // Initialize cost for calculation
         usage.cost = 0;
 
         // Get token counts, defaulting to 0 if undefined
