@@ -2,6 +2,7 @@ import type { AgentDefinition, VoiceGenerationOpts } from '../types/types.js';
 import {
     getModelFromAgent,
     getModelProvider,
+    type ModelProvider,
 } from '../model_providers/model_provider.js';
 
 // Re-export for convenience
@@ -47,7 +48,14 @@ export async function ensembleVoice(
     const model = await getModelFromAgent(agent, 'voice');
 
     // Get the provider for this model
-    const provider = getModelProvider(model);
+    let provider: ModelProvider;
+    try {
+        provider = getModelProvider(model);
+    } catch (error) {
+        throw new Error(
+            `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+    }
 
     if (!provider.createVoice) {
         throw new Error(

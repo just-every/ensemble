@@ -468,10 +468,13 @@ export function getModelProvider(model?: string): ModelProvider {
         }
 
         for (const [prefix, provider] of Object.entries(MODEL_PROVIDER_MAP)) {
-            if (
-                model.startsWith(prefix) &&
-                isProviderKeyValid(getProviderFromModel(model))
-            ) {
+            if (model.startsWith(prefix)) {
+                const providerName = getProviderFromModel(model);
+                if (!isProviderKeyValid(providerName)) {
+                    throw new Error(
+                        `API key for ${providerName} provider is missing or invalid. Please set ${providerName.toUpperCase()}_API_KEY environment variable.`
+                    );
+                }
                 return provider;
             }
         }
