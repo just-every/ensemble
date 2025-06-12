@@ -56,7 +56,7 @@ class CostTracker {
         if (usage.cost !== undefined && usage.cost !== null && usage.cost > 0) {
             return usage;
         }
-        
+
         // Initialize cost for calculation
         usage.cost = 0;
 

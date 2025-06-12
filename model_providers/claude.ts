@@ -377,7 +377,7 @@ export class ClaudeProvider extends BaseModelProvider {
     constructor(apiKey?: string) {
         super('anthropic');
         // Store the API key for lazy initialization
-        this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY;
+        this.apiKey = apiKey;
     }
 
     /**
@@ -385,13 +385,15 @@ export class ClaudeProvider extends BaseModelProvider {
      */
     private get client(): Anthropic {
         if (!this._client) {
-            if (!this.apiKey) {
+            // Check for API key at runtime, not construction time
+            const apiKey = this.apiKey || process.env.ANTHROPIC_API_KEY;
+            if (!apiKey) {
                 throw new Error(
                     'Failed to initialize Claude client. Make sure ANTHROPIC_API_KEY is set.'
                 );
             }
             this._client = new Anthropic({
-                apiKey: this.apiKey,
+                apiKey: apiKey,
             });
         }
         return this._client;

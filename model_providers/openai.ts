@@ -372,7 +372,7 @@ export class OpenAIProvider extends BaseModelProvider {
     constructor(apiKey?: string) {
         super('openai');
         // Store the API key for lazy initialization
-        this.apiKey = apiKey || process.env.OPENAI_API_KEY;
+        this.apiKey = apiKey;
     }
 
     /**
@@ -381,13 +381,15 @@ export class OpenAIProvider extends BaseModelProvider {
      */
     private get client(): OpenAI {
         if (!this._client) {
-            if (!this.apiKey) {
+            // Check for API key at runtime, not construction time
+            const apiKey = this.apiKey || process.env.OPENAI_API_KEY;
+            if (!apiKey) {
                 throw new Error(
                     'Failed to initialize OpenAI client. Make sure OPENAI_API_KEY is set.'
                 );
             }
             this._client = new OpenAI({
-                apiKey: this.apiKey,
+                apiKey: apiKey,
             });
         }
         return this._client;

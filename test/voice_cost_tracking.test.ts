@@ -11,7 +11,7 @@ vi.mock('../model_providers/model_provider.js', () => ({
             const characterCount = text.length;
             const costPerThousandChars = model === 'tts-1-hd' ? 0.03 : 0.015;
             const cost = (characterCount / 1000) * costPerThousandChars;
-            
+
             // This is what OpenAI provider does
             costTracker.addUsage({
                 model,
@@ -22,7 +22,7 @@ vi.mock('../model_providers/model_provider.js', () => ({
                     format: 'mp3',
                 },
             });
-            
+
             // Return a mock stream
             return new ReadableStream<Uint8Array>({
                 start(controller) {
@@ -55,7 +55,7 @@ describe('Voice Cost Tracking', () => {
         const totalCost = costTracker.getTotalCost();
         const costIncrease = totalCost - initialCost;
         expect(costIncrease).toBeCloseTo(expectedCost, 6);
-        
+
         // Check model costs
         const costsByModel = costTracker.getCostsByModel();
         expect(costsByModel['tts-1']).toBeTruthy();
@@ -68,7 +68,7 @@ describe('Voice Cost Tracking', () => {
         const expectedCost = (text.length / 1000) * 0.03; // tts-1-hd pricing
 
         // Mock for HD model
-        const { getModelFromAgent, getModelProvider } = await import(
+        const { getModelFromAgent } = await import(
             '../model_providers/model_provider.js'
         );
         vi.mocked(getModelFromAgent).mockResolvedValueOnce('tts-1-hd');
@@ -88,13 +88,15 @@ describe('Voice Cost Tracking', () => {
     it('should accumulate total cost correctly', async () => {
         const text1 = 'First voice generation.';
         const text2 = 'Second voice generation with more text.';
-        
+
         // Generate two voice outputs
-        for await (const event of ensembleVoice(text1, { model: 'tts-1' })) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of ensembleVoice(text1, { model: 'tts-1' })) {
             // consume events
         }
-        
-        for await (const event of ensembleVoice(text2, { model: 'tts-1' })) {
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _event of ensembleVoice(text2, { model: 'tts-1' })) {
             // consume events
         }
 

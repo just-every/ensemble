@@ -21,17 +21,26 @@ export const ELEVENLABS_VOICES = {
  */
 class ElevenLabsProvider extends BaseModelProvider {
     public name = 'elevenlabs';
-    private apiKey: string;
+    private _apiKey?: string;
     private baseUrl = 'https://api.elevenlabs.io/v1';
 
     constructor() {
         super('elevenlabs');
-        this.apiKey = process.env.ELEVENLABS_API_KEY || '';
-        if (!this.apiKey) {
-            console.warn(
-                '[ElevenLabs] No API key found in ELEVENLABS_API_KEY environment variable'
-            );
+    }
+
+    /**
+     * Lazily access the API key
+     */
+    private get apiKey(): string {
+        if (!this._apiKey) {
+            this._apiKey = process.env.ELEVENLABS_API_KEY;
+            if (!this._apiKey) {
+                throw new Error(
+                    'ElevenLabs API key is required. Please set the ELEVENLABS_API_KEY environment variable.'
+                );
+            }
         }
+        return this._apiKey;
     }
 
     /**
@@ -80,12 +89,6 @@ class ElevenLabsProvider extends BaseModelProvider {
         model: string,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
-        if (!this.apiKey) {
-            throw new Error(
-                'ElevenLabs API key is required for voice generation'
-            );
-        }
-
         try {
             // Use the model ID as-is (ElevenLabs expects the full ID including prefix)
             const modelId = model;

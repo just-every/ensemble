@@ -476,7 +476,7 @@ export class GeminiProvider extends BaseModelProvider {
     constructor(apiKey?: string) {
         super('google');
         // Store the API key for lazy initialization
-        this.apiKey = apiKey || process.env.GOOGLE_API_KEY;
+        this.apiKey = apiKey;
     }
 
     /**
@@ -484,13 +484,15 @@ export class GeminiProvider extends BaseModelProvider {
      */
     private get client(): GoogleGenAI {
         if (!this._client) {
-            if (!this.apiKey) {
+            // Check for API key at runtime, not construction time
+            const apiKey = this.apiKey || process.env.GOOGLE_API_KEY;
+            if (!apiKey) {
                 throw new Error(
                     'Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.'
                 );
             }
             this._client = new GoogleGenAI({
-                apiKey: this.apiKey,
+                apiKey: apiKey,
                 vertexai: false,
             });
         }
