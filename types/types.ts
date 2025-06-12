@@ -788,6 +788,9 @@ export interface VoiceGenerationOpts {
         style?: number; // 0-1, default 0.0
         use_speaker_boost?: boolean; // default true
     };
+
+    /** Additional instructions to alter how the voice sounds */
+    instructions?: string;
 }
 
 export type WorkerFunction = (...args: any[]) => AgentDefinition;

@@ -693,6 +693,7 @@ export class OpenAIProvider extends BaseModelProvider {
             const response = await this.client.audio.speech.create({
                 model,
                 input: text,
+                instructions: opts?.instructions || undefined,
                 voice,
                 speed,
                 response_format: response_format as any,
