@@ -7,7 +7,6 @@
  */
 
 import {
-    ModelProvider,
     ToolFunction,
     ModelSettings,
     ProviderStreamEvent,
@@ -15,6 +14,7 @@ import {
     ResponseInput,
     AgentDefinition,
 } from '../types/types.js';
+import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { APIError } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { costTracker } from '../index.js';
@@ -219,14 +219,13 @@ async function mapMessagesToOpenAI(
     for (const msg of messages) {
         // Create a clean copy without non-standard properties
         const message = { ...msg };
-        // Remove properties that OpenAI doesn't recognize
-        delete (message as any).pinned;
+
         // Handle function call output messages
-        if (message.type === 'function_call_output') {
+        if (msg.type === 'function_call_output') {
             const toolMessage = {
                 role: 'tool',
-                tool_call_id: message.call_id,
-                content: message.output || '',
+                tool_call_id: msg.call_id,
+                content: msg.output || '',
             } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
             result = await appendMessageWithImage(
                 model,
@@ -237,7 +236,7 @@ async function mapMessagesToOpenAI(
             );
         }
         // Handle function call messages
-        else if (message.type === 'function_call') {
+        else if (msg.type === 'function_call') {
             // Type assertion to access function call fields
             const functionCallMsg = message as {
                 call_id: string;
@@ -261,12 +260,21 @@ async function mapMessagesToOpenAI(
         }
         // Handle standard message types
         else if (
-            !message.type ||
-            message.type === 'message' ||
-            message.type === 'thinking'
+            !msg.type ||
+            msg.type === 'message' ||
+            msg.type === 'thinking'
         ) {
             // Extract content from the message
             if ('content' in message) {
+                // Clean up non-standard fields before sending
+                delete (message as any).type;
+                delete (message as any).timestamp;
+                delete (message as any).model;
+                delete (message as any).pinned;
+                delete (message as any).status;
+                delete (message as any).thinking_id;
+                delete (message as any).signature;
+
                 if (message.role === 'developer') message.role = 'system';
                 if (!['system', 'user', 'assistant'].includes(message.role)) {
                     message.role = 'user';
@@ -297,7 +305,7 @@ type SimulatedToolCallParseResult = {
 /**
  * OpenAI model provider implementation.
  */
-export class OpenAIChat implements ModelProvider {
+export class OpenAIChat extends BaseModelProvider {
     protected _client?: OpenAI;
     protected provider: ModelProviderID;
     protected baseURL: string | undefined;
@@ -312,6 +320,7 @@ export class OpenAIChat implements ModelProvider {
         defaultHeaders?: Record<string, string | null | undefined>,
         commonParams?: any
     ) {
+        super(provider || 'openai');
         // Store parameters for lazy initialization
         this.provider = provider || 'openai';
         this.apiKey = apiKey || process.env.OPENAI_API_KEY;
