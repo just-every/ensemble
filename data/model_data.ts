@@ -1154,8 +1154,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'gpt-4o-mini-tts',
         provider: 'openai',
         cost: {
-            input_per_million: 10.0, // $10 per million input characters (not tokens) - estimated
-            output_per_million: 0, // No output tokens for TTS
+            input_per_million: 0.6, // $0.60 per million input characters
+            output_per_million: 12.0, // $12 per million audio tokens
         },
         features: {
             input_modality: ['text'],
@@ -1164,7 +1164,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'voice',
         description:
-            "OpenAI's efficient text-to-speech model powered by GPT-4O Mini. Optimized for low latency and cost-effective voice generation.",
+            "OpenAI's advanced text-to-speech model with natural-sounding output. Supports customizable tone, style, and emotion through instructions. 85% cheaper than ElevenLabs with estimated $0.015/minute of audio.",
     },
     {
         id: 'tts-1',
