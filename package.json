@@ -1,6 +1,6 @@
 {
     "name": "@just-every/ensemble",
-    "version": "0.2.54",
+    "version": "0.2.55",
     "description": "LLM provider abstraction layer with unified streaming interface",
     "type": "module",
     "main": "./dist/index.js",
