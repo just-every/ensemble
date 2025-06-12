@@ -87,8 +87,8 @@ class ElevenLabsProvider extends BaseModelProvider {
         }
 
         try {
-            // Extract model ID (remove prefix if present)
-            const modelId = model.replace(/^eleven_|^elevenlabs-/, '');
+            // Use the model ID as-is (ElevenLabs expects the full ID including prefix)
+            const modelId = model;
 
             // Map voice to voice ID if it's a preset name
             let voiceId = opts?.voice || 'adam';
