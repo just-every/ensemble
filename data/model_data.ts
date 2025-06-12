@@ -212,6 +212,7 @@ export const MODEL_CLASSES = {
 
     voice: {
         models: [
+            'gpt-4o-mini-tts', // OpenAI's efficient TTS model - default
             'tts-1', // OpenAI's standard TTS model - optimized for real-time
             'tts-1-hd', // OpenAI's high-quality TTS model
             'eleven_multilingual_v2', // ElevenLabs multilingual model
@@ -1149,6 +1150,22 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
 
     // Voice/TTS models
+    {
+        id: 'gpt-4o-mini-tts',
+        provider: 'openai',
+        cost: {
+            input_per_million: 10.0, // $10 per million input characters (not tokens) - estimated
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description:
+            "OpenAI's efficient text-to-speech model powered by GPT-4O Mini. Optimized for low latency and cost-effective voice generation.",
+    },
     {
         id: 'tts-1',
         provider: 'openai',
