@@ -38,6 +38,16 @@ export async function* ensembleRequest(
 ): AsyncGenerator<ProviderStreamEvent> {
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
+
+    // Ensure we have at least one message to prevent provider errors
+    if (conversationHistory.length === 0) {
+        conversationHistory.push({
+            type: 'message',
+            role: 'user',
+            content: 'Begin.',
+        });
+    }
+
     if (agent.instructions) {
         const firstMsg = conversationHistory[0];
         const alreadyHasInstructions =

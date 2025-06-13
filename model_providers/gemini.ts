@@ -750,9 +750,18 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Safety check for empty contents
             if (contents.length === 0) {
-                throw new Error(
-                    'No valid content found in messages after conversion.'
+                console.warn(
+                    'Gemini API Warning: No valid content found in messages after conversion. Adding default message.'
                 );
+                // Add a default user message
+                contents.push({
+                    role: 'user',
+                    parts: [
+                        {
+                            text: "Let's think this through step by step.",
+                        },
+                    ],
+                });
             }
 
             // Check if the last message is from the user

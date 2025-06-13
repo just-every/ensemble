@@ -938,6 +938,15 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
             }
 
+            // Ensure we have at least one message
+            if (input.length === 0) {
+                input.push({
+                    type: 'message',
+                    role: 'user',
+                    content: 'Please proceed.',
+                });
+            }
+
             // Format the request according to the Responses API specification
             let requestParams: ResponseCreateParamsStreaming = {
                 model,

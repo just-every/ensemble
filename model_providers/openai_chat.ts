@@ -651,6 +651,15 @@ export class OpenAIChat extends BaseModelProvider {
         try {
             // --- Prepare Request ---
             const chatMessages = await mapMessagesToOpenAI(messages, model);
+
+            // Ensure we have at least one message to prevent API errors
+            if (chatMessages.length === 0) {
+                chatMessages.push({
+                    role: 'user',
+                    content: 'Please begin.',
+                });
+            }
+
             let requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming =
                 { model, messages: chatMessages, stream: true };
             // ... (parameter setup unchanged) ...

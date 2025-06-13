@@ -1,6 +1,6 @@
 /**
  * Example: Using Perplexity models through OpenRouter
- * 
+ *
  * Prerequisites:
  * 1. Set OPENROUTER_API_KEY in your .env file
  * 2. Your OpenRouter API key should start with 'sk-or-'
@@ -15,8 +15,12 @@ dotenv.config();
 async function perplexityExample() {
     // Check if API key is available
     if (!process.env.OPENROUTER_API_KEY) {
-        console.error('Error: OPENROUTER_API_KEY not found in environment variables');
-        console.error('Please add OPENROUTER_API_KEY=sk-or-your-key to your .env file');
+        console.error(
+            'Error: OPENROUTER_API_KEY not found in environment variables'
+        );
+        console.error(
+            'Please add OPENROUTER_API_KEY=sk-or-your-key to your .env file'
+        );
         return;
     }
 
@@ -26,7 +30,8 @@ async function perplexityExample() {
         {
             type: 'message' as const,
             role: 'user' as const,
-            content: 'What are the latest developments in quantum computing? Please provide a brief summary.',
+            content:
+                'What are the latest developments in quantum computing? Please provide a brief summary.',
         },
     ];
 
@@ -36,13 +41,10 @@ async function perplexityExample() {
     };
 
     try {
-        let fullResponse = '';
-        
         for await (const event of ensembleRequest(messages, agent)) {
             switch (event.type) {
                 case 'message_delta':
                     process.stdout.write(event.content);
-                    fullResponse += event.content;
                     break;
                 case 'error':
                     console.error('\nError:', event.error);
