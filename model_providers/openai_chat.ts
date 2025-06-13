@@ -216,24 +216,43 @@ async function mapMessagesToOpenAI(
     // Use flatMap to allow returning multiple messages when needed (e.g., for image extraction)
     let result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
+    // Check if this is a Mistral model via OpenRouter (which doesn't support tool roles)
+    const isMistralViaOpenRouter = model.includes('mistral') || model.includes('magistral');
+
     for (const msg of messages) {
         // Create a clean copy without non-standard properties
         const message = { ...msg };
 
         // Handle function call output messages
         if (msg.type === 'function_call_output') {
-            const toolMessage = {
-                role: 'tool',
-                tool_call_id: msg.call_id,
-                content: msg.output || '',
-            } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
-            result = await appendMessageWithImage(
-                model,
-                result,
-                toolMessage,
-                'content',
-                addImagesToInput
-            );
+            if (isMistralViaOpenRouter) {
+                // For Mistral, convert tool messages to user messages with clear formatting
+                const userMessage = {
+                    role: 'user',
+                    content: `[Function Response]\nFunction: ${msg.name || 'unknown'}\nResult: ${msg.output || 'No output'}`,
+                } as OpenAI.Chat.Completions.ChatCompletionUserMessageParam;
+                result = await appendMessageWithImage(
+                    model,
+                    result,
+                    userMessage,
+                    'content',
+                    addImagesToInput
+                );
+            } else {
+                // For other providers, use standard tool message format
+                const toolMessage = {
+                    role: 'tool',
+                    tool_call_id: msg.call_id,
+                    content: msg.output || '',
+                } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
+                result = await appendMessageWithImage(
+                    model,
+                    result,
+                    toolMessage,
+                    'content',
+                    addImagesToInput
+                );
+            }
         }
         // Handle function call messages
         else if (msg.type === 'function_call') {
@@ -244,19 +263,28 @@ async function mapMessagesToOpenAI(
                 arguments?: string;
             };
 
-            result.push({
-                role: 'assistant',
-                tool_calls: [
-                    {
-                        id: functionCallMsg.call_id,
-                        type: 'function',
-                        function: {
-                            name: functionCallMsg.name || '',
-                            arguments: functionCallMsg.arguments || '',
+            if (isMistralViaOpenRouter) {
+                // For Mistral, convert function calls to assistant messages with clear formatting
+                result.push({
+                    role: 'assistant',
+                    content: `[Function Call]\nFunction: ${functionCallMsg.name || 'unknown'}\nArguments: ${functionCallMsg.arguments || '{}'}`,
+                } as OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam);
+            } else {
+                // For other providers, use standard tool_calls format
+                result.push({
+                    role: 'assistant',
+                    tool_calls: [
+                        {
+                            id: functionCallMsg.call_id,
+                            type: 'function',
+                            function: {
+                                name: functionCallMsg.name || '',
+                                arguments: functionCallMsg.arguments || '',
+                            },
                         },
-                    },
-                ],
-            } as OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam);
+                    ],
+                } as OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam);
+            }
         }
         // Handle standard message types
         else if (
@@ -679,8 +707,14 @@ export class OpenAIChat extends BaseModelProvider {
                     json_schema: settings.json_schema,
                 };
             }
-            if (tools && tools.length > 0)
+            // Check if this is a Mistral model that doesn't support tools
+            const isMistralModel = model.includes('mistral') || model.includes('magistral');
+            
+            if (tools && tools.length > 0 && !isMistralModel) {
                 requestParams.tools = await convertToOpenAITools(tools);
+            } else if (tools && tools.length > 0 && isMistralModel) {
+                console.warn(`(${this.provider}) Mistral models don't support native tool calling. Tools will be ignored.`);
+            }
 
             const overrideParams = { ...this.commonParams };
 
