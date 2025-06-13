@@ -689,6 +689,9 @@ export class OpenAIProvider extends BaseModelProvider {
             if (response_format.includes('pcm')) {
                 response_format = 'pcm';
             }
+            if (response_format.includes('mp3')) {
+                response_format = 'mp3';
+            }
 
             console.log(
                 `[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`

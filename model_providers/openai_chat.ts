@@ -274,6 +274,7 @@ async function mapMessagesToOpenAI(
                 delete (message as any).status;
                 delete (message as any).thinking_id;
                 delete (message as any).signature;
+                delete (message as any).id; // Remove id field that OpenRouter/Mistral doesn't accept
 
                 if (message.role === 'developer') message.role = 'system';
                 if (!['system', 'user', 'assistant'].includes(message.role)) {
