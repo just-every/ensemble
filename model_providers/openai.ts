@@ -685,7 +685,10 @@ export class OpenAIProvider extends BaseModelProvider {
             // Default voice and parameters
             const voice = opts?.voice || 'alloy';
             const speed = opts?.speed || 1.0;
-            const response_format = opts?.response_format || 'mp3';
+            let response_format = opts?.response_format || 'mp3';
+            if (response_format.includes('pcm')) {
+                response_format = 'pcm';
+            }
 
             console.log(
                 `[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`

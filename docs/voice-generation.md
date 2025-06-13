@@ -211,10 +211,10 @@ if (audioStream instanceof ReadableStream) {
 
 ## Event-Based Streaming
 
-Use `ensembleVoiceStream` for event-based processing:
+Use `ensembleVoice` for event-based processing:
 
 ```typescript
-for await (const event of ensembleVoiceStream(text, {
+for await (const event of ensembleVoice(text, {
     model: 'tts-1'
 })) {
     if (event.type === 'audio_stream') {
@@ -228,7 +228,7 @@ for await (const event of ensembleVoiceStream(text, {
 ## Complete Example
 
 ```typescript
-import { ensembleVoice, ensembleVoiceStream } from '@just-every/ensemble';
+import { ensembleVoice, ensembleVoice } from '@just-every/ensemble';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
@@ -263,7 +263,7 @@ async function generateWithProgress(text: string) {
     const chunks: Uint8Array[] = [];
     let totalBytes = 0;
     
-    for await (const event of ensembleVoiceStream(text, {
+    for await (const event of ensembleVoice(text, {
         model: 'tts-1'
     }, {
         voice: 'nova'
@@ -353,7 +353,7 @@ try {
 Here's a complete example using ElevenLabs with event-based streaming:
 
 ```typescript
-import { ensembleVoiceStream } from '@just-every/ensemble';
+import { ensembleVoice } from '@just-every/ensemble';
 import { createWriteStream } from 'fs';
 
 async function streamElevenLabsAudio() {
@@ -365,7 +365,7 @@ async function streamElevenLabsAudio() {
     const outputStream = createWriteStream('elevenlabs-output.mp3');
     let totalChunks = 0;
     
-    for await (const event of ensembleVoiceStream(text, {
+    for await (const event of ensembleVoice(text, {
         model: 'eleven_turbo_v2_5'
     }, {
         voice: 'rachel',

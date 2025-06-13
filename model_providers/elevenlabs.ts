@@ -124,6 +124,11 @@ class ElevenLabsProvider extends BaseModelProvider {
                     ...(opts?.voice_settings || {}),
                 },
             };
+            if (requestBody.voice_settings.speed > 1) {
+                // To try to keep similar to other providers
+                requestBody.voice_settings.speed =
+                    requestBody.voice_settings.speed / 2;
+            }
 
             const url = `${this.baseUrl}/text-to-speech/${voiceId}?output_format=${outputFormat}`;
 

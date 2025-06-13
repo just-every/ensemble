@@ -789,6 +789,7 @@ export interface VoiceGenerationOpts {
         similarity_boost?: number; // 0-1, default 0.75
         style?: number; // 0-1, default 0.0
         use_speaker_boost?: boolean; // default true
+        speed?: number; //default 1.0
     };
 
     /** Additional instructions to alter how the voice sounds */

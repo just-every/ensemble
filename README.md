@@ -162,7 +162,7 @@ Key configuration options:
 Generate natural-sounding speech from text using Text-to-Speech models:
 
 ```typescript
-import { ensembleVoice, ensembleVoiceStream } from '@just-every/ensemble';
+import { ensembleVoice, ensembleVoice } from '@just-every/ensemble';
 
 // Simple voice generation
 const audioData = await ensembleVoice('Hello, world!', {
@@ -179,7 +179,7 @@ const audioData = await ensembleVoice('Welcome to our service', {
 });
 
 // Streaming voice generation
-for await (const event of ensembleVoiceStream('Long text...', {
+for await (const event of ensembleVoice('Long text...', {
     model: 'gemini-2.5-pro-preview-tts'
 })) {
     if (event.type === 'audio_stream') {
