@@ -431,6 +431,8 @@ export type ProviderStreamEvent =
  * Model provider interface
  */
 export interface ModelProvider {
+    provider_id: string;
+
     createResponseStream(
         messages: ResponseInput,
         model: string,
@@ -790,6 +792,7 @@ export interface VoiceGenerationOpts {
     };
 
     /** Additional instructions to alter how the voice sounds */
+    affect?: string;
     instructions?: string;
 }
 

@@ -373,6 +373,7 @@ async function convertToClaudeMessage(
 export class ClaudeProvider extends BaseModelProvider {
     private _client?: Anthropic;
     private apiKey?: string;
+    public provider_id = 'claude';
 
     constructor(apiKey?: string) {
         super('anthropic');

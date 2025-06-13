@@ -368,6 +368,7 @@ async function addImagesToInput(
 export class OpenAIProvider extends BaseModelProvider {
     private _client?: OpenAI;
     private apiKey?: string;
+    public provider_id = 'openai';
 
     constructor(apiKey?: string) {
         super('openai');
@@ -691,11 +692,17 @@ export class OpenAIProvider extends BaseModelProvider {
                 `[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`
             );
 
+            // Add in affect
+            let instructions = opts?.instructions || undefined;
+            if (opts?.affect) {
+                instructions = `Sound ${opts.affect}${instructions ? ' and ' + instructions : ''}`;
+            }
+
             // Create the speech request
             const response = await this.client.audio.speech.create({
                 model,
                 input: text,
-                instructions: opts?.instructions || undefined,
+                instructions,
                 voice,
                 speed,
                 response_format: response_format as any,

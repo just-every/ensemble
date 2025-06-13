@@ -267,6 +267,8 @@ export function createToolFunction(
         }
         if (paramInfoObj?.default !== undefined) {
             paramDef.default = paramInfoObj.default;
+        } else if (defaultValue !== undefined) {
+            paramDef.default = defaultValue;
         }
         if (paramInfoObj?.minLength !== undefined) {
             paramDef.minLength = paramInfoObj.minLength;
@@ -287,7 +289,7 @@ export function createToolFunction(
         properties[apiParamName] = paramDef;
 
         // If parameter has no default value and is not marked optional, it's required
-        if (defaultValue === undefined && !paramInfoObj?.optional) {
+        if (paramDef.default === undefined && !paramInfoObj?.optional) {
             required.push(apiParamName);
         }
     }

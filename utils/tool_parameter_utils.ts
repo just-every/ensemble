@@ -17,6 +17,9 @@ export function coerceValue(
 
     // Handle undefined/null
     if (value === undefined || value === null) {
+        if (paramSpec.default) {
+            return [paramSpec.default, null];
+        }
         if (paramSpec.optional) {
             return [undefined, null];
         }

@@ -472,6 +472,7 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 export class GeminiProvider extends BaseModelProvider {
     private _client?: GoogleGenAI;
     private apiKey?: string;
+    public provider_id = 'gemini';
 
     constructor(apiKey?: string) {
         super('google');
@@ -1286,19 +1287,32 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Speed adjustment is not directly supported in Gemini TTS
             // But we can suggest it in the prompt
-            let promptText = text;
+            let say_prefix = '';
+            let say_postfix = '';
             if (opts?.speed && opts.speed !== 1.0) {
                 const speedDescription =
                     opts.speed < 1.0
                         ? `slowly at ${Math.round(opts.speed * 100)}% speed`
                         : `quickly at ${Math.round(opts.speed * 100)}% speed`;
-                promptText = `Say ${speedDescription}: ${text}`;
+                say_postfix = speedDescription;
+            }
+            if (opts?.affect) {
+                say_prefix = `Sound ${opts.affect}`;
+            }
+            if (say_postfix || say_prefix) {
+                if (say_postfix && say_prefix) {
+                    text = `${say_prefix} and say ${say_postfix}:\n${text}`;
+                } else if (say_postfix) {
+                    text = `Say ${say_postfix}:\n${text}`;
+                } else if (say_prefix) {
+                    text = `${say_prefix} and say:\n${text}`;
+                }
             }
 
             // Generate the audio
             const response = await this.client.models.generateContent({
                 model,
-                contents: [{ role: 'user', parts: [{ text: promptText }] }],
+                contents: [{ role: 'user', parts: [{ text }] }],
                 config,
             });
 

@@ -20,9 +20,9 @@ export const ELEVENLABS_VOICES = {
  * ElevenLabs provider for voice generation
  */
 class ElevenLabsProvider extends BaseModelProvider {
-    public name = 'elevenlabs';
     private _apiKey?: string;
     private baseUrl = 'https://api.elevenlabs.io/v1';
+    public provider_id = 'elevenlabs';
 
     constructor() {
         super('elevenlabs');
@@ -111,14 +111,17 @@ class ElevenLabsProvider extends BaseModelProvider {
                 `[ElevenLabs] Generating speech with model ${modelId}, voice: ${voiceId}, format: ${outputFormat}`
             );
 
+            // Add in affect for supported models
+            if (model === 'eleven_v3' && opts?.affect) {
+                text = `[${opts.affect.toUpperCase()}] ${text}`;
+            }
+
             const requestBody = {
                 text,
                 model_id: modelId,
                 voice_settings: {
-                    stability: 0.5,
+                    stability: 0.45,
                     similarity_boost: 0.75,
-                    style: 0.0,
-                    use_speaker_boost: true,
                     ...(opts?.voice_settings || {}),
                 },
             };

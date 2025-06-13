@@ -312,6 +312,7 @@ export class OpenAIChat extends BaseModelProvider {
     protected commonParams: any = {};
     protected apiKey?: string;
     protected defaultHeaders?: Record<string, string | null | undefined>;
+    public provider_id = 'openai_chat';
 
     constructor(
         provider?: ModelProviderID,

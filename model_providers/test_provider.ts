@@ -108,6 +108,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  */
 export class TestProvider extends BaseModelProvider {
     private config: TestProviderConfig;
+    public provider_id = 'test';
 
     constructor(config: TestProviderConfig = testProviderConfig) {
         super('test');
