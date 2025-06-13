@@ -312,7 +312,6 @@ export class OpenAIChat extends BaseModelProvider {
     protected commonParams: any = {};
     protected apiKey?: string;
     protected defaultHeaders?: Record<string, string | null | undefined>;
-    public provider_id = 'openai_chat';
 
     constructor(
         provider?: ModelProviderID,
@@ -324,7 +323,7 @@ export class OpenAIChat extends BaseModelProvider {
         super(provider || 'openai');
         // Store parameters for lazy initialization
         this.provider = provider || 'openai';
-        this.apiKey = apiKey || process.env.OPENAI_API_KEY;
+        this.apiKey = apiKey; // Don't read env var here, do it in the getter
         this.baseURL = baseURL;
         this.commonParams = commonParams || {};
         this.defaultHeaders = defaultHeaders || {
@@ -333,17 +332,36 @@ export class OpenAIChat extends BaseModelProvider {
     }
 
     /**
+     * Get the environment variable name for the API key based on provider
+     */
+    private getEnvVarName(): string {
+        switch (this.provider) {
+            case 'openrouter':
+                return 'OPENROUTER_API_KEY';
+            case 'xai':
+                return 'XAI_API_KEY';
+            case 'deepseek':
+                return 'DEEPSEEK_API_KEY';
+            case 'openai':
+            default:
+                return 'OPENAI_API_KEY';
+        }
+    }
+
+    /**
      * Lazily initialize the OpenAI client when first accessed
      */
     protected get client(): OpenAI {
         if (!this._client) {
-            if (!this.apiKey) {
+            // Check for API key at runtime
+            const apiKey = this.apiKey || process.env[this.getEnvVarName()];
+            if (!apiKey) {
                 throw new Error(
                     `Failed to initialize OpenAI client for ${this.provider}. API key is missing.`
                 );
             }
             this._client = new OpenAI({
-                apiKey: this.apiKey,
+                apiKey: apiKey,
                 baseURL: this.baseURL,
                 defaultHeaders: this.defaultHeaders,
             });

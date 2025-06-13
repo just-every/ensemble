@@ -368,7 +368,6 @@ async function addImagesToInput(
 export class OpenAIProvider extends BaseModelProvider {
     private _client?: OpenAI;
     private apiKey?: string;
-    public provider_id = 'openai';
 
     constructor(apiKey?: string) {
         super('openai');

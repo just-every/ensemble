@@ -15,7 +15,11 @@ import {
  * Abstract base class for model providers that implements common functionality
  */
 export abstract class BaseModelProvider implements ModelProvider {
-    constructor(protected providerId: ModelProviderID) {}
+    public provider_id: string;
+
+    constructor(protected providerId: ModelProviderID) {
+        this.provider_id = providerId;
+    }
 
     abstract createResponseStream(
         messages: ResponseInput,

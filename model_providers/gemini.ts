@@ -472,7 +472,6 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 export class GeminiProvider extends BaseModelProvider {
     private _client?: GoogleGenAI;
     private apiKey?: string;
-    public provider_id = 'gemini';
 
     constructor(apiKey?: string) {
         super('google');

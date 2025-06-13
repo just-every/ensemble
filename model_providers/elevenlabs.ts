@@ -22,7 +22,6 @@ export const ELEVENLABS_VOICES = {
 class ElevenLabsProvider extends BaseModelProvider {
     private _apiKey?: string;
     private baseUrl = 'https://api.elevenlabs.io/v1';
-    public provider_id = 'elevenlabs';
 
     constructor() {
         super('elevenlabs');
