@@ -81,7 +81,6 @@ export const MODEL_CLASSES = {
             'claude-sonnet-4-20250514-max', // Anthropic
             'claude-3-7-sonnet-latest-max', // Anthropic
             'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
-            //'grok-3-mini-fast', // X.AI
         ],
         random: true,
     },
@@ -91,7 +90,7 @@ export const MODEL_CLASSES = {
         models: [
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'grok-3-mini-fast', // X.AI
-            'mistralai/magistral-small-2506', // Mistral/OpenRouter
+            'o3-low', // OpenAI
         ],
         random: true,
     },
@@ -104,10 +103,6 @@ export const MODEL_CLASSES = {
             'o4-mini-low', // OpenAI
             'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
-            //'grok-3-mini-fast', // X.AI
-            //'deepseek-reasoner',      // DeepSeek
-            //'meta-llama/llama-4-maverick', // Meta/OpenRouter
-            //'qwen/qwen3-235b-a22b-medium', // Qwen/OpenRouter
         ],
         random: true,
     },
@@ -117,7 +112,6 @@ export const MODEL_CLASSES = {
         models: [
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-high', // Google
-            //'o4-mini-high', // OpenAI
             'o3-high', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
             'grok-3-mini-fast', // X.AI
