@@ -11,11 +11,19 @@ export const FUNCTION_TIMEOUT_MS = 30000; // 30 seconds
  * Tools that are excluded from timeout
  */
 export const EXCLUDED_FROM_TIMEOUT_FUNCTIONS = new Set([
+    'inspect_running_tool',
     'wait_for_running_tool',
-    'run_shell_command_with_output',
-    'execute_code',
-    'debug_code',
-    'test_code',
+    'terminate_running_tool',
+    'start_task',
+    'send_message',
+    'get_task_status',
+    'check_all_task_health',
+    'wait_for_running_task',
+    'read_source',
+    'write_source',
+    'read_file',
+    'write_file',
+    'list_directory',
 ]);
 
 /**
