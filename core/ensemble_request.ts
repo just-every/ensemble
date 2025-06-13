@@ -528,7 +528,11 @@ async function processToolCall(
         const rawResult = await handleToolCall(toolCall, tool, agent);
 
         // Process the result (summarization, truncation, etc.)
-        const processedResult = await processToolResult(toolCall, rawResult);
+        const processedResult = await processToolResult(
+            toolCall,
+            rawResult,
+            agent
+        );
 
         const toolCallResult: ToolCallResult = {
             toolCall,

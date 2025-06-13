@@ -217,7 +217,8 @@ async function mapMessagesToOpenAI(
     let result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
     // Check if this is a Mistral model via OpenRouter (which doesn't support tool roles)
-    const isMistralViaOpenRouter = model.includes('mistral') || model.includes('magistral');
+    const isMistralViaOpenRouter =
+        model.includes('mistral') || model.includes('magistral');
 
     for (const msg of messages) {
         // Create a clean copy without non-standard properties
@@ -708,12 +709,15 @@ export class OpenAIChat extends BaseModelProvider {
                 };
             }
             // Check if this is a Mistral model that doesn't support tools
-            const isMistralModel = model.includes('mistral') || model.includes('magistral');
-            
+            const isMistralModel =
+                model.includes('mistral') || model.includes('magistral');
+
             if (tools && tools.length > 0 && !isMistralModel) {
                 requestParams.tools = await convertToOpenAITools(tools);
             } else if (tools && tools.length > 0 && isMistralModel) {
-                console.warn(`(${this.provider}) Mistral models don't support native tool calling. Tools will be ignored.`);
+                console.warn(
+                    `(${this.provider}) Mistral models don't support native tool calling. Tools will be ignored.`
+                );
             }
 
             const overrideParams = { ...this.commonParams };

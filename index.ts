@@ -113,6 +113,14 @@ export {
     clearSummaryCache,
     getSummaryCacheStats,
 } from './utils/tool_result_processor.js';
+
+// Export summary utilities for expandable summaries
+export {
+    getSummaryTools,
+    hasExpansionTools,
+    read_source,
+    write_source,
+} from './utils/summary_utils.js';
 export * from './config/tool_execution.js';
 
 // Export verification utilities
