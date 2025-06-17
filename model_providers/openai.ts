@@ -1468,8 +1468,7 @@ export class OpenAIProvider extends BaseModelProvider {
                         // A reasoning summary text was completed
                         const itemId =
                             event.item_id + '-' + event.summary_index;
-                        const aggregatedThinking =
-                            reasoningAggregates.get(itemId) ?? event.text;
+                        const aggregatedThinking = event.text;
 
                         // Yield the completed thinking content
                         yield {

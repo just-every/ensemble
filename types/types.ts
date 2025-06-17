@@ -132,6 +132,7 @@ export interface ToolCall {
     function: {
         name: string;
         arguments: string;
+        arguments_formatted?: string;
     };
 }
 

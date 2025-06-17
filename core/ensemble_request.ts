@@ -244,6 +244,9 @@ async function* executeRound(
 
     const toolPromises: Promise<ToolCallResult>[] = [];
 
+    // Map to store formatted arguments for each tool call
+    const toolCallFormattedArgs = new Map<string, string>();
+
     // Buffer for events emitted during tool execution
     const toolEventBuffer: ProviderStreamEvent[] = [];
 
@@ -253,7 +256,79 @@ async function* executeRound(
         toolEventBuffer.push(event);
     };
 
-    for await (const event of stream) {
+    for await (let event of stream) {
+        // Handle tool_start events specially to add formatted arguments
+        if (event.type === 'tool_start') {
+            const toolEvent = event as ToolEvent;
+            if (toolEvent.tool_call) {
+                const toolCall = toolEvent.tool_call;
+
+                // Format arguments to match parameter order if possible
+                let argumentsFormatted: string | undefined;
+                try {
+                    // Find the tool definition to get parameter order
+                    const tool = agent.tools?.find(
+                        t =>
+                            t.definition.function.name ===
+                            toolCall.function.name
+                    );
+
+                    if (tool && 'definition' in tool) {
+                        const parsedArgs = JSON.parse(
+                            toolCall.function.arguments || '{}'
+                        );
+                        if (
+                            typeof parsedArgs === 'object' &&
+                            parsedArgs !== null &&
+                            !Array.isArray(parsedArgs)
+                        ) {
+                            // Get parameter names in the correct order
+                            const paramNames = Object.keys(
+                                tool.definition.function.parameters.properties
+                            );
+
+                            // Create ordered object
+                            const orderedArgs: Record<string, any> = {};
+                            for (const param of paramNames) {
+                                if (param in parsedArgs) {
+                                    orderedArgs[param] = parsedArgs[param];
+                                }
+                            }
+
+                            argumentsFormatted = JSON.stringify(
+                                orderedArgs,
+                                null,
+                                2
+                            );
+                        }
+                    }
+                } catch (error) {
+                    // If formatting fails, we'll just use the original
+                    console.debug('Failed to format tool arguments:', error);
+                }
+
+                // Store formatted arguments if we have them
+                if (argumentsFormatted) {
+                    toolCallFormattedArgs.set(toolCall.id, argumentsFormatted);
+                }
+
+                // Create a modified tool call with formatted arguments for the event
+                const modifiedEvent = {
+                    ...event,
+                    tool_call: {
+                        ...toolCall,
+                        function: {
+                            ...toolCall.function,
+                            arguments_formatted: argumentsFormatted,
+                        },
+                    },
+                };
+
+                // Update event to the modified one for further processing
+                event = modifiedEvent;
+            }
+        }
+
         yield event;
 
         // Emit event through global event controller
@@ -365,9 +440,23 @@ async function* executeRound(
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
 
     for (const toolResult of toolResults) {
+        // Get the formatted arguments if we stored them
+        const formattedArgs = toolCallFormattedArgs.get(toolResult.toolCall.id);
+
+        // Create tool call with formatted arguments
+        const toolCallWithFormattedArgs = formattedArgs
+            ? {
+                  ...toolResult.toolCall,
+                  function: {
+                      ...toolResult.toolCall.function,
+                      arguments_formatted: formattedArgs,
+                  },
+              }
+            : toolResult.toolCall;
+
         const toolDoneEvent: ProviderStreamEvent = {
             type: 'tool_done',
-            tool_call: toolResult.toolCall,
+            tool_call: toolCallWithFormattedArgs,
             result: {
                 call_id: toolResult.call_id || toolResult.id,
                 output: toolResult.output,

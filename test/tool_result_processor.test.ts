@@ -8,7 +8,12 @@ import {
 import { ToolCall } from '../types/types.js';
 
 // Mock the module before any imports that might use it
-vi.mock('../core/ensemble_request.js');
+vi.mock('../core/ensemble_request.js', () => ({
+    ensembleRequest: vi.fn(),
+}));
+
+// Import the mocked function
+import { ensembleRequest } from '../core/ensemble_request.js';
 
 describe('Tool Result Processor', () => {
     const mockToolCall: ToolCall = {
@@ -37,10 +42,6 @@ describe('Tool Result Processor', () => {
         });
 
         it('should create a summary using LLM', async () => {
-            // Import the mocked function
-            const { ensembleRequest } = await import(
-                '../core/ensemble_request.js'
-            );
             const mockEnsembleRequest = ensembleRequest as any;
 
             // Mock the async generator
@@ -65,9 +66,6 @@ describe('Tool Result Processor', () => {
         });
 
         it('should fallback to truncation on error', async () => {
-            const { ensembleRequest } = await import(
-                '../core/ensemble_request.js'
-            );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockRejectedValue(new Error('LLM error'));
 
@@ -81,9 +79,6 @@ describe('Tool Result Processor', () => {
         });
 
         it('should handle empty response from LLM', async () => {
-            const { ensembleRequest } = await import(
-                '../core/ensemble_request.js'
-            );
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 // Empty response
