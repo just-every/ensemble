@@ -34,3 +34,6 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Cache directories
+.cache/
