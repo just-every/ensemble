@@ -8,7 +8,7 @@ export {
     getModelFromAgent,
     getModelFromClass,
     isProviderKeyValid,
-    ModelProvider, // This is the extended interface from model_provider.ts
+    type ModelProvider, // This is the extended interface from model_provider.ts
 } from './model_providers/model_provider.js';
 
 // Export utility classes and types
@@ -27,11 +27,11 @@ export {
     MODEL_REGISTRY,
     MODEL_CLASSES,
     findModel,
-    ModelProviderID,
-    ModelUsage,
-    TieredPrice,
-    TimeBasedPrice,
-    ModelEntry,
+    type ModelProviderID,
+    type ModelUsage,
+    type TieredPrice,
+    type TimeBasedPrice,
+    type ModelEntry,
 } from './data/model_data.js';
 
 // Export all utils
@@ -89,13 +89,13 @@ export {
 // Export new tool execution utilities
 export {
     runningToolTracker,
-    RunningToolTracker,
-    RunningTool,
-    ToolCompletionEvent,
+    type RunningToolTracker,
+    type RunningTool,
+    type ToolCompletionEvent,
 } from './utils/running_tool_tracker.js';
 export {
     sequentialQueue,
-    SequentialQueue,
+    type SequentialQueue,
     runSequential,
 } from './utils/sequential_queue.js';
 export {
@@ -124,7 +124,7 @@ export {
 export * from './config/tool_execution.js';
 
 // Export verification utilities
-export { verifyOutput, VerificationResult } from './utils/verification.js';
+export { verifyOutput, type VerificationResult } from './utils/verification.js';
 
 // Export mergeHistoryThread utility
 export { mergeHistoryThread } from './core/ensemble_request.js';
@@ -162,6 +162,10 @@ export { ensembleRequest } from './core/ensemble_request.js';
 export { ensembleEmbed } from './core/ensemble_embed.js';
 export { ensembleImage } from './core/ensemble_image.js';
 export { ensembleVoice } from './core/ensemble_voice.js';
+export {
+    ensembleListen,
+    createAudioStreamFromMediaStream,
+} from './core/ensemble_listen.js';
 
 // Export ensemble result aggregator
 export {

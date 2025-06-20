@@ -1,0 +1,12 @@
+The tool call `web_search_with_tracking` was used to find information about OpenAI's Realtime API WebSocket implementation, specifically concerning PCM16 24kHz VAD transcription. The search returned 10 relevant results, including documentation from OpenAI and Microsoft Learn, as well as developer community discussions and blogs.
+
+The final result provides a detailed explanation of OpenAI's Realtime API, emphasizing its WebSocket implementation for real-time audio interactions with PCM16 24kHz VAD transcription. It covers:
+*   **Overview:** The API uses a stateful, bidirectional WebSocket connection for real-time voice and text input/output, differing from traditional HTTP APIs.
+*   **Audio Format:** It primarily supports 16-bit PCM audio (24kHz, mono), with audio chunks sent as base64-encoded PCM 16, and also supports G.711.
+*   **WebSocket Details:** The API maintains a continuous connection for low-latency data exchange, using various client and server events for transcription, function calling, and LLM context manipulation.
+*   **Voice Activity Detection (VAD):** VAD automatically detects user speech, with options like `semantic_vad` (prevents interruptions) and `server_vad` (server decides when to commit audio).
+*   **Best Practices:** Recommendations include optimizing audio chunk size/frequency (e.g., 1200 samples/chunk, every ~50ms), considering WebRTC for lower latency (though the query was WebSocket-focused), and aiming for sub-800ms voice-to-voice latency.
+*   **Limitations:** Challenges include the complexity of robust WebSocket reconnection, high bandwidth requirements (300-400 kbs), potential lack of advanced audio processing (like echo cancellation) compared to WebRTC, possible divergence between raw transcription and the model's interpretation, and the API's current beta status.
+*   **Implementation:** It outlines connecting via WebSocket with an API key and sending Base64-encoded audio data using `input_audio_buffer.append` events.
+
+In essence, the result details how OpenAI's Realtime API leverages WebSockets for real-time audio (PCM16 24kHz) interactions with VAD, offering powerful capabilities but requiring careful handling of audio formatting, latency, and WebSocket complexities due to its beta status.

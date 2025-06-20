@@ -477,6 +477,19 @@ export interface ModelProvider {
         model: string,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer>;
+
+    /**
+     * Transcribes audio to text (Speech-to-Text)
+     * @param audio Audio input to transcribe
+     * @param model Model ID for STT (e.g., 'whisper-1')
+     * @param opts Optional parameters for transcription
+     * @returns AsyncGenerator that yields transcription events
+     */
+    createTranscription?(
+        audio: TranscriptionAudioSource,
+        model: string,
+        opts?: TranscriptionOpts
+    ): AsyncGenerator<TranscriptionEvent>;
 }
 
 /**
@@ -497,7 +510,8 @@ export type ModelClassID =
     | 'search'
     | 'image_generation'
     | 'embedding'
-    | 'voice';
+    | 'voice'
+    | 'transcription';
 
 // Available model providers
 export type ModelProviderID =
@@ -797,6 +811,209 @@ export interface VoiceGenerationOpts {
     affect?: string;
     instructions?: string;
 }
+
+// ================================================================
+// Speech Transcription Types
+// ================================================================
+
+/**
+ * Options for speech transcription (Speech-to-Text)
+ */
+export interface TranscriptionOpts {
+    /** Language of the input audio in ISO-639-1 format (e.g., 'en', 'es', 'fr') */
+    language?: string;
+
+    /** Context prompt to guide the transcription */
+    prompt?: string;
+
+    /** Response format for the transcription */
+    response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
+
+    /** Temperature for sampling (0-1) */
+    temperature?: number;
+
+    /** Timestamp granularities to include */
+    timestamp_granularities?: ('word' | 'segment')[];
+
+    /** Whether to stream transcription results */
+    stream?: boolean;
+
+    /** Voice Activity Detection configuration */
+    vad?: {
+        /** Enable VAD (default: true for streaming) */
+        enabled?: boolean;
+        /** VAD mode: 'server_vad' (faster) or 'semantic_vad' (waits for complete thoughts) */
+        mode?: 'server_vad' | 'semantic_vad';
+        /** Threshold for detecting speech (0-1, default: 0.5) */
+        threshold?: number;
+        /** Milliseconds of audio to include before speech detection */
+        prefix_padding_ms?: number;
+        /** Milliseconds of silence before considering speech ended */
+        silence_duration_ms?: number;
+    };
+
+    /** Audio format of the input stream */
+    audio_format?: {
+        /** Sample rate in Hz (e.g., 16000, 24000, 44100) */
+        sampleRate?: number;
+        /** Number of channels (1 for mono, 2 for stereo) */
+        channels?: number;
+        /** Bit depth (e.g., 16, 24, 32) */
+        bitDepth?: number;
+        /** Encoding format */
+        encoding?: 'pcm' | 'opus' | 'flac';
+    };
+
+    /** Whether to include speaker diarization */
+    diarization?: boolean;
+
+    /** Maximum number of speakers to detect */
+    max_speakers?: number;
+
+    /** Whether to transcribe non-speech audio events */
+    audio_events?: boolean;
+}
+
+/**
+ * Audio source for transcription
+ */
+export type TranscriptionAudioSource =
+    | ReadableStream<Uint8Array> // Browser MediaStream
+    | ArrayBuffer // Complete audio buffer
+    | Blob // Audio file blob
+    | string; // Base64 encoded audio or URL
+
+/**
+ * Transcription event types
+ */
+export type TranscriptionEventType =
+    | 'transcription_start'
+    | 'transcription_delta'
+    | 'transcription_complete'
+    | 'vad_speech_start'
+    | 'vad_speech_end'
+    | 'speaker_change'
+    | 'audio_event'
+    | 'error'
+    | 'cost_update';
+
+/**
+ * Base transcription event
+ */
+export interface TranscriptionEventBase {
+    type: TranscriptionEventType;
+    timestamp: string;
+    agent?: AgentExportDefinition;
+}
+
+/**
+ * Transcription start event
+ */
+export interface TranscriptionStartEvent extends TranscriptionEventBase {
+    type: 'transcription_start';
+    format: TranscriptionOpts['response_format'];
+    language?: string;
+    audio_format?: TranscriptionOpts['audio_format'];
+}
+
+/**
+ * Transcription delta event (for streaming)
+ */
+export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
+    type: 'transcription_delta';
+    delta: string;
+    segment_id?: string;
+    speaker_id?: string;
+    start_time?: number;
+    end_time?: number;
+    confidence?: number;
+}
+
+/**
+ * Transcription complete event
+ */
+export interface TranscriptionCompleteEvent extends TranscriptionEventBase {
+    type: 'transcription_complete';
+    text: string;
+    segments?: TranscriptionSegment[];
+    duration?: number;
+    language?: string;
+    speakers?: SpeakerInfo[];
+}
+
+/**
+ * VAD speech events
+ */
+export interface VADSpeechEvent extends TranscriptionEventBase {
+    type: 'vad_speech_start' | 'vad_speech_end';
+    audio_ms?: number;
+}
+
+/**
+ * Speaker change event
+ */
+export interface SpeakerChangeEvent extends TranscriptionEventBase {
+    type: 'speaker_change';
+    previous_speaker?: string;
+    current_speaker: string;
+    timestamp_ms: number;
+}
+
+/**
+ * Audio event (non-speech sounds)
+ */
+export interface AudioEventDetection extends TranscriptionEventBase {
+    type: 'audio_event';
+    event_type: string; // e.g., 'laughter', 'applause', 'music'
+    start_time: number;
+    end_time: number;
+    confidence: number;
+}
+
+/**
+ * Transcription segment
+ */
+export interface TranscriptionSegment {
+    id: string;
+    text: string;
+    start: number;
+    end: number;
+    speaker_id?: string;
+    confidence?: number;
+    words?: WordTimestamp[];
+}
+
+/**
+ * Word-level timestamp
+ */
+export interface WordTimestamp {
+    word: string;
+    start: number;
+    end: number;
+    confidence?: number;
+}
+
+/**
+ * Speaker information
+ */
+export interface SpeakerInfo {
+    id: string;
+    segments: number;
+    total_duration: number;
+}
+
+/**
+ * Union type for all transcription events
+ */
+export type TranscriptionEvent =
+    | TranscriptionStartEvent
+    | TranscriptionDeltaEvent
+    | TranscriptionCompleteEvent
+    | VADSpeechEvent
+    | SpeakerChangeEvent
+    | AudioEventDetection
+    | ErrorEvent
+    | CostUpdateEvent;
 
 export type WorkerFunction = (...args: any[]) => AgentDefinition;
 

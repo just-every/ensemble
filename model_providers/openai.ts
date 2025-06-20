@@ -14,6 +14,14 @@ import {
     AgentDefinition,
     ImageGenerationOpts,
     VoiceGenerationOpts,
+    TranscriptionOpts,
+    TranscriptionEvent,
+    TranscriptionAudioSource,
+    TranscriptionStartEvent,
+    TranscriptionDeltaEvent,
+    TranscriptionCompleteEvent,
+    ErrorEvent,
+    CostUpdateEvent,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
@@ -1559,6 +1567,200 @@ export class OpenAIProvider extends BaseModelProvider {
                     'OpenAI streaming error: ' +
                     (error instanceof Error ? error.stack : String(error)),
             };
+        }
+    }
+
+    /**
+     * Transcribe audio using OpenAI's Whisper API
+     *
+     * @param audio - Audio input to transcribe
+     * @param model - Model ID (e.g., 'whisper-1')
+     * @param opts - Transcription options
+     * @returns AsyncGenerator that yields transcription events
+     */
+    async *createTranscription(
+        audio: TranscriptionAudioSource,
+        model: string,
+        opts?: TranscriptionOpts
+    ): AsyncGenerator<TranscriptionEvent> {
+        const requestId = log_llm_request(
+            'openai-transcription',
+            'openai',
+            model,
+            { audio: typeof audio, opts }
+        );
+
+        try {
+            // Emit start event
+            yield {
+                type: 'transcription_start' as const,
+                timestamp: new Date().toISOString(),
+                format: opts?.response_format || 'text',
+                language: opts?.language,
+            } as TranscriptionStartEvent;
+
+            // Convert audio source to File object for OpenAI API
+            let audioFile: File;
+
+            if (audio instanceof ReadableStream) {
+                // Collect stream chunks
+                const chunks: Uint8Array[] = [];
+                const reader = audio.getReader();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    if (value) chunks.push(value);
+                }
+
+                const blob = new Blob(chunks, { type: 'audio/wav' });
+                audioFile = new File([blob], 'audio.wav', {
+                    type: 'audio/wav',
+                });
+            } else if (audio instanceof ArrayBuffer) {
+                const blob = new Blob([audio], { type: 'audio/wav' });
+                audioFile = new File([blob], 'audio.wav', {
+                    type: 'audio/wav',
+                });
+            } else if (audio instanceof Blob) {
+                audioFile = new File([audio], 'audio.wav', {
+                    type: audio.type || 'audio/wav',
+                });
+            } else if (typeof audio === 'string') {
+                // Decode base64
+                const binaryString = atob(audio);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'audio/wav' });
+                audioFile = new File([blob], 'audio.wav', {
+                    type: 'audio/wav',
+                });
+            } else if ((audio as any) instanceof ArrayBuffer) {
+                // Handle ArrayBuffer
+                const blob = new Blob([audio as ArrayBuffer], {
+                    type: 'audio/wav',
+                });
+                audioFile = new File([blob], 'audio.wav', {
+                    type: 'audio/wav',
+                });
+            } else if (
+                (audio as any) instanceof Uint8Array ||
+                (typeof Buffer !== 'undefined' && Buffer.isBuffer(audio))
+            ) {
+                // Handle Uint8Array or Buffer
+                const blob = new Blob([audio as Uint8Array], {
+                    type: 'audio/wav',
+                });
+                audioFile = new File([blob], 'audio.wav', {
+                    type: 'audio/wav',
+                });
+            } else {
+                throw new Error('Unsupported audio source type');
+            }
+
+            // Call OpenAI transcription API
+            const response = await this.client.audio.transcriptions.create({
+                file: audioFile,
+                model: model || 'whisper-1',
+                language: opts?.language,
+                prompt: opts?.prompt,
+                response_format: opts?.response_format || 'text',
+                temperature: opts?.temperature,
+                timestamp_granularities: opts?.timestamp_granularities,
+            });
+
+            log_llm_response(requestId, response);
+
+            // Handle different response formats
+            if (
+                opts?.response_format === 'verbose_json' &&
+                typeof response === 'object'
+            ) {
+                const verboseResponse = response as any;
+
+                // Emit segments as deltas if available
+                if (verboseResponse.segments) {
+                    for (const segment of verboseResponse.segments) {
+                        yield {
+                            type: 'transcription_delta' as const,
+                            timestamp: new Date().toISOString(),
+                            delta: segment.text,
+                            segment_id: segment.id?.toString(),
+                            start_time: segment.start,
+                            end_time: segment.end,
+                        } as TranscriptionDeltaEvent;
+                    }
+                }
+
+                // Emit complete event
+                yield {
+                    type: 'transcription_complete' as const,
+                    timestamp: new Date().toISOString(),
+                    text: verboseResponse.text || '',
+                    segments: verboseResponse.segments,
+                    duration: verboseResponse.duration,
+                    language: verboseResponse.language || opts?.language,
+                } as TranscriptionCompleteEvent;
+            } else {
+                // Simple text response
+                const text =
+                    typeof response === 'string'
+                        ? response
+                        : (response as any).text || '';
+
+                // Emit as both delta and complete
+                yield {
+                    type: 'transcription_delta' as const,
+                    timestamp: new Date().toISOString(),
+                    delta: text,
+                } as TranscriptionDeltaEvent;
+
+                yield {
+                    type: 'transcription_complete' as const,
+                    timestamp: new Date().toISOString(),
+                    text: text,
+                    language: opts?.language,
+                } as TranscriptionCompleteEvent;
+            }
+
+            // Track costs (Whisper costs $0.006 per minute)
+            const audioSizeKB = audioFile.size / 1024;
+            const estimatedMinutes = audioSizeKB / 150; // Rough estimate: ~150KB per minute for typical audio
+            const cost = estimatedMinutes * 0.006;
+
+            costTracker.addUsage({
+                model: model || 'whisper-1',
+                cost: cost,
+                metadata: {
+                    audio_size_kb: audioSizeKB,
+                    estimated_minutes: estimatedMinutes,
+                },
+            });
+
+            yield {
+                type: 'cost_update' as const,
+                timestamp: new Date().toISOString(),
+                usage: {
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    total_tokens: 0,
+                },
+            } as CostUpdateEvent;
+        } catch (error) {
+            log_llm_error(requestId, error);
+
+            yield {
+                type: 'error' as const,
+                timestamp: new Date().toISOString(),
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Transcription failed',
+            } as ErrorEvent;
+
+            throw error;
         }
     }
 }
