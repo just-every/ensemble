@@ -187,16 +187,20 @@ async function realtimeTranscriptionGemini() {
     }
 }
 
-// Example 4: Browser microphone transcription (for web apps)
+// Example 4: Browser microphone transcription (SECURITY WARNING!)
 async function browserMicrophoneExample() {
     console.log('\n=== Example 4: Browser Microphone Transcription ===\n');
-    console.log('This example shows how to use ensembleListen in a browser:\n');
+    console.log('⚠️  SECURITY WARNING: This example requires API keys in the browser!');
+    console.log('For production use, see the client-server example below.\n');
+    console.log('This example shows how to use ensembleListen directly in a browser:\n');
 
     const exampleCode = `
+import { ensembleListen, createAudioStreamFromMediaStream} from '@just-every/ensemble';
+
 // In a browser environment:
 async function startMicrophoneTranscription() {
     // Get microphone access
-    const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
             channelCount: 1,
             sampleRate: 16000,
@@ -234,15 +238,15 @@ async function startMicrophoneTranscription() {
                 // Update UI with partial transcript
                 document.getElementById('transcript').textContent += event.delta;
                 break;
-                
+
             case 'vad_speech_start':
                 document.getElementById('status').textContent = 'Listening...';
                 break;
-                
+
             case 'vad_speech_end':
                 document.getElementById('status').textContent = 'Processing...';
                 break;
-                
+
             case 'transcription_complete':
                 document.getElementById('final-transcript').textContent = event.text;
                 break;
@@ -252,6 +256,42 @@ async function startMicrophoneTranscription() {
 `;
 
     console.log(exampleCode);
+}
+
+// Example 5: Secure client-server architecture (RECOMMENDED)
+async function clientServerExample() {
+    console.log('\n=== Example 5: Client-Server Architecture (RECOMMENDED) ===\n');
+    console.log('This is the recommended approach for production applications.');
+    console.log('API keys stay secure on the server, while audio is collected in the browser.\n');
+    
+    console.log('📁 Server-side code (audio-transcription-server.ts):');
+    console.log('   - Express server with WebSocket support');
+    console.log('   - Handles transcription using ensembleListen');
+    console.log('   - Keeps API keys secure on the server');
+    console.log('   - Supports both HTTP and WebSocket endpoints\n');
+    
+    console.log('📁 Client-side code (audio-transcription-client.html):');
+    console.log('   - Pure browser JavaScript (no API keys!)');
+    console.log('   - Captures audio from microphone');
+    console.log('   - Streams audio to server via WebSocket');
+    console.log('   - Receives transcription events from server\n');
+    
+    console.log('Key benefits:');
+    console.log('✅ API keys never exposed to client');
+    console.log('✅ Server can handle authentication/authorization');
+    console.log('✅ Server can log/monitor usage');
+    console.log('✅ Server can apply rate limiting');
+    console.log('✅ Works with any client (web, mobile, desktop)\n');
+    
+    console.log('To run the example:');
+    console.log('1. Start the server:');
+    console.log('   npx tsx examples/audio-transcription-server.ts\n');
+    console.log('2. Open the client in a browser:');
+    console.log('   open examples/audio-transcription-client.html\n');
+    console.log('3. Click "Start Transcription" and speak!\n');
+    
+    console.log('The server handles all the transcription logic while the client');
+    console.log('only handles audio capture and UI updates.');
 }
 
 // Main function to run examples
@@ -273,9 +313,12 @@ async function main() {
             case 'browser':
                 await browserMicrophoneExample();
                 break;
+            case 'client-server':
+                await clientServerExample();
+                break;
             default:
                 console.log(
-                    'Usage: npm run example:transcription [file|realtime-openai|realtime-gemini|browser]'
+                    'Usage: npm run example:transcription [file|realtime-openai|realtime-gemini|browser|client-server]'
                 );
                 console.log('\nExamples:');
                 console.log(
@@ -288,7 +331,10 @@ async function main() {
                     '  realtime-gemini - Real-time transcription with Gemini'
                 );
                 console.log(
-                    '  browser        - Example code for browser microphone'
+                    '  browser        - Example code for browser microphone (requires API keys in browser)'
+                );
+                console.log(
+                    '  client-server  - Secure client-server architecture (RECOMMENDED)'
                 );
         }
     } catch (error) {
