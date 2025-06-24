@@ -1475,8 +1475,9 @@ export class GeminiProvider extends BaseModelProvider {
      */
     async *createTranscription(
         audio: TranscriptionAudioSource,
+        agent: AgentDefinition,
         model: string,
-        opts?: TranscriptionOpts & { agent?: AgentDefinition }
+        opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent> {
         let session: any = null;
         let audioBuffer = Buffer.alloc(0);
@@ -1495,7 +1496,7 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Extract custom instructions from agent if provided
             const systemInstruction =
-                opts?.agent?.instructions ||
+                agent.instructions ||
                 `You are a real-time transcription assistant. Your only task is to transcribe speech as you hear it. DO NOT ADD YOUR OWN RESPONSE OR COMMENTARY. TRANSCRIBE WHAT YOU HEAR ONLY.
 Respond immediately with transcribed text as you process the audio.
 If quick corrections are used e.g. "Let's go to Point A, no Point B" then just remove incorrect part e.g. respond with "Let's go to Point B".

@@ -487,6 +487,7 @@ export interface ModelProvider {
      */
     createTranscription?(
         audio: TranscriptionAudioSource,
+        agent: AgentDefinition,
         model: string,
         opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent>;

@@ -167,6 +167,7 @@ export async function* ensembleListen(
         // Pass audio stream and options to provider
         const transcriptionGenerator = provider.createTranscription(
             audioStream,
+            agent,
             model,
             streamOptions
         );
