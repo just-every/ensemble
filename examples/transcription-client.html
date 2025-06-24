@@ -517,9 +517,9 @@
                         break;
                         
                     case 'transcription_turn':
-                        console.log('Turn complete');
-                        // Optionally add a visual indicator or new line
-                        this.appendTranscript('\n');
+                        console.log('Turn complete:', data.text);
+                        // Add a visual separator for turns
+                        this.appendTranscript('\n--- Turn Complete ---\n');
                         break;
                         
                     case 'cost_update':

@@ -213,6 +213,8 @@ describe('ensembleListen', () => {
             events.push(event);
             if (event.type === 'transcription_turn') {
                 turnCount++;
+                // Verify turn event includes accumulated text
+                expect(event.text).toBe('Hello, this is a test.');
             }
         }
 
@@ -232,5 +234,11 @@ describe('ensembleListen', () => {
 
         expect(turnIndex).toBeGreaterThan(firstDeltaIndex);
         expect(turnIndex).toBeLessThan(completeIndex);
+
+        // Complete event should have all turns joined
+        const completeEvent = events.find(
+            e => e.type === 'transcription_complete'
+        ) as any;
+        expect(completeEvent.text).toBe('Hello, this is a test.');
     });
 });

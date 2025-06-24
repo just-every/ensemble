@@ -160,6 +160,8 @@ export async function* ensembleListen(
     // Start transcription
     const startTime = Date.now();
     let fullTranscript = '';
+    let currentTurnText = '';
+    const allTurns: string[] = [];
 
     try {
         // Pass audio stream and options to provider
@@ -173,18 +175,40 @@ export async function* ensembleListen(
             // Track full transcript for complete event
             if (event.type === 'transcription_delta' && event.delta) {
                 fullTranscript += event.delta;
+                currentTurnText += event.delta;
             }
 
-            // Pass through all events
-            yield event;
+            // Handle turn complete
+            if (event.type === 'transcription_turn') {
+                // Add text to the turn event
+                const turnEvent: TranscriptionEvent = {
+                    ...event,
+                    text: currentTurnText,
+                };
+                yield turnEvent;
+
+                // Save turn and reset for next turn
+                if (currentTurnText.trim()) {
+                    allTurns.push(currentTurnText.trim());
+                }
+                currentTurnText = '';
+            } else {
+                // Pass through all other events
+                yield event;
+            }
         }
 
-        // Emit complete event if provider doesn't
+        // If there's remaining text not in a turn, add it as a final turn
+        if (currentTurnText.trim()) {
+            allTurns.push(currentTurnText.trim());
+        }
+
+        // Emit complete event with all turns joined
         const duration = (Date.now() - startTime) / 1000;
         const completeEvent: TranscriptionEvent = {
             type: 'transcription_complete',
             timestamp: new Date().toISOString(),
-            text: fullTranscript,
+            text: allTurns.length > 0 ? allTurns.join('\n') : fullTranscript,
             duration: duration,
         };
         yield completeEvent;

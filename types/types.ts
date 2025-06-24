@@ -1028,7 +1028,7 @@ export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
  */
 export interface TranscriptionTurnEvent extends TranscriptionEventBase {
     type: 'transcription_turn';
-    text?: string; // Optional cumulative text for the turn
+    text?: string; // Cumulative text for the completed turn (added by ensembleListen)
 }
 
 /**

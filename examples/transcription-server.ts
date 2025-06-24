@@ -168,7 +168,9 @@ async function startTranscription(connectionId: string, ws: any) {
                         );
                         break;
                     case 'transcription_turn':
-                        console.log(`🔄 [${connectionId}] Turn complete`);
+                        console.log(
+                            `🔄 [${connectionId}] Turn complete: "${event.text}"`
+                        );
                         break;
                     // Note: cost_update events are emitted globally by costTracker,
                     // not by ensembleListen directly

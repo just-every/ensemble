@@ -1555,6 +1555,7 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                                     const turnEvent: TranscriptionEvent = {
                                         type: 'transcription_turn',
                                         timestamp: new Date().toISOString(),
+                                        // text will be added by ensembleListen
                                     };
                                     transcriptEvents.push(turnEvent);
                                 }
