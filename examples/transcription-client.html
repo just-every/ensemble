@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ensemble Transcription Client</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-dark: #1557b0;
+            --success: #34a853;
+            --warning: #fbbc04;
+            --error: #ea4335;
+            --background: #f5f5f5;
+            --surface: #ffffff;
+            --text: #202124;
+            --text-secondary: #5f6368;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-section {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .status.connected .status-indicator {
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status.connecting .status-indicator {
+            background: var(--warning);
+            animation: pulse 1s infinite;
+        }
+
+        .status.error .status-indicator {
+            background: var(--error);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .primary-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        .primary-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .danger-btn {
+            background: var(--error);
+            color: white;
+        }
+
+        .danger-btn:hover:not(:disabled) {
+            background: #d33b2c;
+        }
+
+        .transcript-section {
+            margin-top: 24px;
+        }
+
+        .transcript-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .transcript-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .transcript-empty {
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 40px;
+        }
+
+        .transcript-line {
+            margin-bottom: 8px;
+            padding: 4px 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .error-message {
+            background: #fce8e6;
+            color: var(--error);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .audio-visualizer {
+            height: 60px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            padding: 0 20px;
+        }
+
+        .audio-bar {
+            width: 3px;
+            background: var(--primary);
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        .settings-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .setting-label {
+            font-weight: 500;
+        }
+
+        .server-url-input {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+                Ensemble Transcription Client
+            </h1>
+
+            <div class="status-section">
+                <div id="status" class="status">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Disconnected</span>
+                </div>
+                <div class="controls">
+                    <button id="connectBtn" class="primary-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        Connect & Start
+                    </button>
+                    <button id="stopBtn" class="danger-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M6 6h12v12H6z"/>
+                        </svg>
+                        Stop
+                    </button>
+                </div>
+            </div>
+
+            <div class="audio-visualizer" id="visualizer">
+                <!-- Audio bars will be inserted here -->
+            </div>
+
+            <div class="transcript-section">
+                <div class="transcript-header">
+                    <h2>Live Transcript</h2>
+                    <button id="clearBtn" onclick="clearTranscript()">Clear</button>
+                </div>
+                <div id="transcript" class="transcript-container">
+                    <div class="transcript-empty">Transcript will appear here...</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="duration">0:00</div>
+                    <div class="stat-label">Duration</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="dataSize">0 KB</div>
+                    <div class="stat-label">Audio Data</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tokenCount">0</div>
+                    <div class="stat-label">Tokens Used</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="cost">$0.00</div>
+                    <div class="stat-label">Estimated Cost</div>
+                </div>
+            </div>
+
+            <div id="errorContainer"></div>
+
+            <div class="settings-section">
+                <h3>Settings</h3>
+                <div class="setting-row">
+                    <span class="setting-label">Server URL:</span>
+                    <input 
+                        type="text" 
+                        id="serverUrl" 
+                        class="server-url-input" 
+                        value="ws://localhost:3003"
+                        placeholder="ws://localhost:3003"
+                    >
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Transcription client implementation
+        class TranscriptionClient {
+            constructor() {
+                this.ws = null;
+                this.mediaStream = null;
+                this.audioContext = null;
+                this.processor = null;
+                this.source = null;
+                this.isConnected = false;
+                this.startTime = null;
+                this.totalBytes = 0;
+                this.totalTokens = 0;
+                this.transcript = '';
+                
+                // Audio visualization
+                this.analyser = null;
+                this.visualizerBars = [];
+                
+                // Setup UI event handlers
+                this.setupEventHandlers();
+                this.createVisualizer();
+            }
+
+            setupEventHandlers() {
+                document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+                document.getElementById('stopBtn').addEventListener('click', () => this.disconnect());
+            }
+
+            createVisualizer() {
+                const visualizer = document.getElementById('visualizer');
+                for (let i = 0; i < 32; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    bar.style.height = '4px';
+                    visualizer.appendChild(bar);
+                    this.visualizerBars.push(bar);
+                }
+            }
+
+            async connect() {
+                try {
+                    this.updateStatus('connecting', 'Requesting microphone access...');
+                    
+                    // Get microphone access
+                    this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 1,
+                            sampleRate: 16000,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    });
+
+                    this.updateStatus('connecting', 'Connecting to server...');
+                    
+                    // Connect to WebSocket server
+                    const serverUrl = document.getElementById('serverUrl').value;
+                    this.ws = new WebSocket(serverUrl);
+                    this.ws.binaryType = 'arraybuffer';
+
+                    this.ws.onopen = () => {
+                        this.updateStatus('connected', 'Connected - Speak into your microphone');
+                        this.isConnected = true;
+                        this.startTime = Date.now();
+                        this.startAudioCapture();
+                        this.startStatsUpdate();
+                        
+                        // Send start message
+                        this.ws.send(JSON.stringify({ type: 'start' }));
+                        
+                        // Update UI
+                        document.getElementById('connectBtn').disabled = true;
+                        document.getElementById('stopBtn').disabled = false;
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        this.handleServerMessage(data);
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.showError('Connection error occurred');
+                    };
+
+                    this.ws.onclose = () => {
+                        this.updateStatus('disconnected', 'Disconnected from server');
+                        this.cleanup();
+                    };
+
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    this.showError(error.message);
+                    this.updateStatus('error', 'Failed to connect');
+                    this.cleanup();
+                }
+            }
+
+            startAudioCapture() {
+                this.audioContext = new AudioContext({ sampleRate: 16000 });
+                this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
+                
+                // Create analyser for visualization
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 64;
+                this.source.connect(this.analyser);
+                
+                // Create script processor for capturing audio
+                this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+                
+                this.processor.onaudioprocess = (e) => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        const float32Audio = e.inputBuffer.getChannelData(0);
+                        const int16Audio = this.convertFloat32ToInt16(float32Audio);
+                        
+                        // Send audio data
+                        this.ws.send(int16Audio.buffer);
+                        this.totalBytes += int16Audio.buffer.byteLength;
+                        
+                        // Update data size display
+                        document.getElementById('dataSize').textContent = 
+                            `${(this.totalBytes / 1024).toFixed(1)} KB`;
+                    }
+                };
+
+                this.source.connect(this.processor);
+                this.processor.connect(this.audioContext.destination);
+                
+                // Start visualization
+                this.visualize();
+            }
+
+            visualize() {
+                if (!this.analyser) return;
+                
+                const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+                this.analyser.getByteFrequencyData(dataArray);
+                
+                // Update bars
+                const barCount = this.visualizerBars.length;
+                const step = Math.floor(dataArray.length / barCount);
+                
+                for (let i = 0; i < barCount; i++) {
+                    const value = dataArray[i * step];
+                    const height = Math.max(4, (value / 255) * 60);
+                    this.visualizerBars[i].style.height = `${height}px`;
+                }
+                
+                if (this.isConnected) {
+                    requestAnimationFrame(() => this.visualize());
+                }
+            }
+
+            convertFloat32ToInt16(float32Array) {
+                const int16Array = new Int16Array(float32Array.length);
+                for (let i = 0; i < float32Array.length; i++) {
+                    const s = Math.max(-1, Math.min(1, float32Array[i]));
+                    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                return int16Array;
+            }
+
+            handleServerMessage(data) {
+                switch (data.type) {
+                    case 'transcription_start':
+                        console.log('Transcription started');
+                        break;
+                        
+                    case 'transcription_delta':
+                        this.appendTranscript(data.delta);
+                        break;
+                        
+                    case 'cost_update':
+                        this.updateCostInfo(data.usage);
+                        break;
+                        
+                    case 'transcription_complete':
+                        console.log('Transcription complete:', data.text);
+                        break;
+                        
+                    case 'error':
+                        this.showError(data.error);
+                        break;
+                        
+                    case 'status':
+                        console.log('Server status:', data.message);
+                        break;
+                }
+            }
+
+            appendTranscript(text) {
+                const container = document.getElementById('transcript');
+                
+                // Remove empty state message if present
+                const emptyMsg = container.querySelector('.transcript-empty');
+                if (emptyMsg) {
+                    emptyMsg.remove();
+                }
+                
+                // Add new transcript line
+                const line = document.createElement('div');
+                line.className = 'transcript-line';
+                line.textContent = text;
+                container.appendChild(line);
+                
+                // Update full transcript
+                this.transcript += text;
+                
+                // Auto-scroll to bottom
+                container.scrollTop = container.scrollHeight;
+            }
+
+            updateCostInfo(usage) {
+                if (usage) {
+                    this.totalTokens = usage.total_tokens || 0;
+                    document.getElementById('tokenCount').textContent = this.totalTokens.toLocaleString();
+                    
+                    // Calculate cost (Gemini Live pricing)
+                    const inputCost = (usage.input_tokens || 0) * 0.2 / 1_000_000;
+                    const outputCost = (usage.output_tokens || 0) * 0.8 / 1_000_000;
+                    const totalCost = inputCost + outputCost;
+                    
+                    document.getElementById('cost').textContent = `$${totalCost.toFixed(4)}`;
+                }
+            }
+
+            startStatsUpdate() {
+                this.statsInterval = setInterval(() => {
+                    if (this.startTime) {
+                        const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                        const minutes = Math.floor(elapsed / 60);
+                        const seconds = elapsed % 60;
+                        document.getElementById('duration').textContent = 
+                            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                }, 1000);
+            }
+
+            updateStatus(state, text) {
+                const statusEl = document.getElementById('status');
+                statusEl.className = `status ${state}`;
+                statusEl.querySelector('.status-text').textContent = text;
+            }
+
+            showError(message) {
+                const container = document.getElementById('errorContainer');
+                container.innerHTML = `
+                    <div class="error-message">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        ${message}
+                    </div>
+                `;
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    container.innerHTML = '';
+                }, 5000);
+            }
+
+            disconnect() {
+                this.updateStatus('disconnected', 'Disconnecting...');
+                this.cleanup();
+            }
+
+            cleanup() {
+                this.isConnected = false;
+                
+                // Close WebSocket
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                
+                // Stop audio
+                if (this.processor) {
+                    this.processor.disconnect();
+                    this.processor = null;
+                }
+                
+                if (this.source) {
+                    this.source.disconnect();
+                    this.source = null;
+                }
+                
+                if (this.analyser) {
+                    this.analyser.disconnect();
+                    this.analyser = null;
+                }
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+                
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                    this.mediaStream = null;
+                }
+                
+                // Clear stats interval
+                if (this.statsInterval) {
+                    clearInterval(this.statsInterval);
+                    this.statsInterval = null;
+                }
+                
+                // Reset visualizer
+                this.visualizerBars.forEach(bar => {
+                    bar.style.height = '4px';
+                });
+                
+                // Update UI
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                this.updateStatus('disconnected', 'Disconnected');
+            }
+        }
+
+        // Utility functions
+        function clearTranscript() {
+            const container = document.getElementById('transcript');
+            container.innerHTML = '<div class="transcript-empty">Transcript will appear here...</div>';
+        }
+
+        // Initialize client
+        const client = new TranscriptionClient();
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            client.cleanup();
+        });
+    </script>
+</body>
+</html>

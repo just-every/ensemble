@@ -15,6 +15,7 @@ import {
     ModelProviderID,
     TieredPrice,
     TimeBasedPrice,
+    ModalityPrice,
     ModelCost,
     ModelFeatures,
     ModelEntry,
@@ -31,6 +32,7 @@ export type {
     ModelProviderID,
     TieredPrice,
     TimeBasedPrice,
+    ModalityPrice,
     ModelCost,
     ModelFeatures,
     ModelEntry,
@@ -215,6 +217,13 @@ export const MODEL_CLASSES = {
             'gemini-2.5-pro-preview-tts', // Gemini's pro TTS model
         ],
         description: 'Text-to-Speech models for voice generation',
+    },
+    transcription: {
+        models: [
+            'gemini-live-2.5-flash-preview', // Gemini Live API for real-time transcription
+        ],
+        description:
+            'Speech-to-Text models for audio transcription with real-time streaming',
     },
 };
 
@@ -1502,6 +1511,35 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: "Google's Imagen 2 model for image generation",
+    },
+
+    //
+    // Transcription models
+    //
+
+    {
+        id: 'gemini-live-2.5-flash-preview',
+        provider: 'google',
+        cost: {
+            input_per_million: {
+                text: 0.5, // $0.50 per 1M input text tokens
+                audio: 3.0, // $3.00 per 1M input audio tokens
+                video: 3.0, // $3.00 per 1M input video tokens
+            },
+            output_per_million: {
+                text: 2.0, // $2.00 per 1M output text tokens
+                audio: 12.0, // $12.00 per 1M output audio tokens
+            },
+        },
+        features: {
+            context_length: 32000,
+            input_modality: ['text', 'audio', 'video'],
+            output_modality: ['text', 'audio'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description:
+            'Gemini Live API for real-time multimodal interaction with modality-specific pricing',
     },
 ];
 

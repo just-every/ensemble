@@ -35,6 +35,9 @@ import {
     ImageGenerationOpts,
     VoiceGenerationOpts,
     type MessageEvent,
+    TranscriptionOpts,
+    TranscriptionAudioSource,
+    TranscriptionEvent,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../index.js';
@@ -1466,6 +1469,285 @@ export class GeminiProvider extends BaseModelProvider {
         );
         return 'Kore';
     }
+
+    /**
+     * Create transcription from audio stream using Gemini Live API
+     */
+    async *createTranscription(
+        audio: TranscriptionAudioSource,
+        model: string,
+        opts?: TranscriptionOpts & { agent?: AgentDefinition }
+    ): AsyncGenerator<TranscriptionEvent> {
+        let session: any = null;
+        let audioBuffer = Buffer.alloc(0);
+        let isConnected = false;
+
+        try {
+            // Initialize AI client
+            const ai = new GoogleGenAI({ apiKey: this.apiKey });
+
+            // Set up real-time configuration
+            const realtimeConfig = opts?.realtimeConfig
+                ?.automaticActivityDetection || {
+                prefixPaddingMs: 20,
+                silenceDurationMs: 100,
+            };
+
+            // Extract custom instructions from agent if provided
+            const systemInstruction =
+                opts?.agent?.instructions ||
+                `You are a real-time transcription assistant. Your only task is to transcribe speech as you hear it. DO NOT ADD YOUR OWN RESPONSE OR COMMENTARY. TRANSCRIBE WHAT YOU HEAR ONLY.
+Respond immediately with transcribed text as you process the audio.
+If quick corrections are used e.g. "Let's go to Point A, no Point B" then just remove incorrect part e.g. respond with "Let's go to Point B".
+When it makes the transcription clearer, remove filler words (like "um") add punctuation, correct obvious grammar issues and add in missing words.`;
+
+            // Connect to Gemini Live API
+            console.log('[Gemini] Connecting to Live API for transcription...');
+
+            // Create a promise that resolves when connected
+            const connectionPromise = new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Connection timeout'));
+                }, 30000); // 30 second timeout
+
+                ai.live
+                    .connect({
+                        model: model,
+                        config: {
+                            responseModalities: [Modality.TEXT],
+                            systemInstruction: {
+                                parts: [{ text: systemInstruction }],
+                            },
+                            realtimeInputConfig: {
+                                automaticActivityDetection: realtimeConfig,
+                            },
+                        },
+                        callbacks: {
+                            onopen: () => {
+                                clearTimeout(timeout);
+                                console.log('[Gemini] Live session connected');
+                                isConnected = true;
+                                resolve();
+                            },
+                            onmessage: async (msg: any) => {
+                                // Handle transcript
+                                if (msg.serverContent?.modelTurn?.parts) {
+                                    for (const part of msg.serverContent
+                                        .modelTurn.parts) {
+                                        if (part.text && part.text.trim()) {
+                                            const deltaEvent: TranscriptionEvent =
+                                                {
+                                                    type: 'transcription_delta',
+                                                    timestamp:
+                                                        new Date().toISOString(),
+                                                    delta: part.text,
+                                                    partial: false, // Gemini Live doesn't distinguish
+                                                };
+
+                                            // Store event to yield later
+                                            transcriptEvents.push(deltaEvent);
+                                        }
+                                    }
+                                }
+
+                                // Handle usage metadata
+                                if (msg.usageMetadata) {
+                                    // Track usage with modality information
+                                    // This will automatically emit a cost_update event
+                                    costTracker.addUsage({
+                                        model: model,
+                                        input_tokens:
+                                            msg.usageMetadata
+                                                .promptTokenCount || 0,
+                                        output_tokens:
+                                            msg.usageMetadata
+                                                .responseTokenCount || 0,
+                                        input_modality: 'audio', // Audio input for transcription
+                                        output_modality: 'text', // Text output for transcription
+                                        metadata: {
+                                            totalTokens:
+                                                msg.usageMetadata
+                                                    .totalTokenCount || 0,
+                                            source: 'gemini-live-transcription',
+                                        },
+                                    });
+                                }
+                            },
+                            onerror: (err: any) => {
+                                console.error('[Gemini] Live API error:', err);
+                                connectionError = err;
+                            },
+                            onclose: () => {
+                                console.log('[Gemini] Live session closed');
+                                isConnected = false;
+                            },
+                        },
+                    })
+                    .then(s => {
+                        session = s;
+                    });
+            });
+
+            // Store events to yield
+            const transcriptEvents: TranscriptionEvent[] = [];
+            let connectionError: any = null;
+
+            // Wait for connection
+            await connectionPromise;
+
+            // Process audio stream
+            const audioStream = normalizeAudioSource(audio);
+            const reader = audioStream.getReader();
+
+            // Buffer configuration
+            const chunkSize = opts?.bufferConfig?.chunkSize || 8000; // 250ms at 16kHz
+            const flushInterval = opts?.bufferConfig?.flushInterval || 500;
+
+            // Set up flush timer
+            let flushTimer: NodeJS.Timeout | null = null;
+            const scheduleFlush = () => {
+                if (flushTimer) clearTimeout(flushTimer);
+                flushTimer = setTimeout(async () => {
+                    if (audioBuffer.length > 0 && session && isConnected) {
+                        await sendAudioChunk(audioBuffer);
+                        audioBuffer = Buffer.alloc(0);
+                    }
+                }, flushInterval);
+            };
+
+            // Helper to send audio chunk
+            const sendAudioChunk = async (chunk: Buffer) => {
+                try {
+                    await session.sendRealtimeInput({
+                        media: {
+                            mimeType: 'audio/pcm;rate=16000',
+                            data: chunk.toString('base64'),
+                        },
+                    });
+                } catch (err) {
+                    console.error('[Gemini] Error sending audio chunk:', err);
+                    throw err;
+                }
+            };
+
+            // Read and process audio
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) break;
+
+                    if (value) {
+                        // Append to buffer
+                        audioBuffer = Buffer.concat([
+                            audioBuffer,
+                            Buffer.from(value),
+                        ]);
+
+                        // Send in optimal chunks
+                        while (audioBuffer.length >= chunkSize) {
+                            const chunk = audioBuffer.slice(0, chunkSize);
+                            audioBuffer = audioBuffer.slice(chunkSize);
+
+                            if (session && isConnected) {
+                                await sendAudioChunk(chunk);
+                            }
+                        }
+
+                        scheduleFlush();
+                    }
+
+                    // Yield any pending events
+                    while (transcriptEvents.length > 0) {
+                        const event = transcriptEvents.shift();
+                        if (event) yield event;
+                    }
+
+                    // Check for connection errors
+                    if (connectionError) {
+                        throw connectionError;
+                    }
+                }
+
+                // Send any remaining audio
+                if (audioBuffer.length > 0 && session && isConnected) {
+                    await sendAudioChunk(audioBuffer);
+                }
+
+                // Wait a bit for final responses
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Yield any remaining events
+                while (transcriptEvents.length > 0) {
+                    const event = transcriptEvents.shift();
+                    if (event) yield event;
+                }
+            } finally {
+                reader.releaseLock();
+                if (flushTimer) clearTimeout(flushTimer);
+                if (session) {
+                    session.close();
+                }
+            }
+        } catch (error) {
+            console.error('[Gemini] Transcription error:', error);
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Transcription failed',
+            };
+            yield errorEvent;
+        }
+    }
+}
+
+// Helper to normalize audio source (local copy to avoid circular dependency)
+function normalizeAudioSource(
+    source: TranscriptionAudioSource
+): ReadableStream<Uint8Array> {
+    if (source instanceof ReadableStream) {
+        return source;
+    }
+
+    if (
+        typeof source === 'object' &&
+        source !== null &&
+        Symbol.asyncIterator in source
+    ) {
+        return new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const chunk of source as AsyncIterable<Uint8Array>) {
+                        controller.enqueue(chunk);
+                    }
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
+                }
+            },
+        });
+    }
+
+    if (typeof source === 'function') {
+        const iterable = source();
+        return normalizeAudioSource(iterable as TranscriptionAudioSource);
+    }
+
+    if (source instanceof ArrayBuffer || source instanceof Uint8Array) {
+        const data =
+            source instanceof ArrayBuffer ? new Uint8Array(source) : source;
+        return new ReadableStream({
+            start(controller) {
+                controller.enqueue(data);
+                controller.close();
+            },
+        });
+    }
+
+    throw new Error(`Unsupported audio source type: ${typeof source}`);
 }
 
 // Export an instance of the provider

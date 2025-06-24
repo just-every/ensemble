@@ -477,6 +477,19 @@ export interface ModelProvider {
         model: string,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer>;
+
+    /**
+     * Transcribes audio to text (Speech-to-Text)
+     * @param audio Audio input to transcribe
+     * @param model Model ID for STT (e.g., 'gemini-live-2.5-flash-preview')
+     * @param opts Optional parameters for transcription
+     * @returns AsyncGenerator that yields transcription events
+     */
+    createTranscription?(
+        audio: TranscriptionAudioSource,
+        model: string,
+        opts?: TranscriptionOpts
+    ): AsyncGenerator<TranscriptionEvent>;
 }
 
 /**
@@ -497,7 +510,8 @@ export type ModelClassID =
     | 'search'
     | 'image_generation'
     | 'embedding'
-    | 'voice';
+    | 'voice'
+    | 'transcription';
 
 // Available model providers
 export type ModelProviderID =
@@ -532,11 +546,19 @@ export interface TimeBasedPrice {
     peak_utc_end_minute: number; // e.g., 30 for 16:30
 }
 
+// Represents modality-specific pricing (e.g., for models that charge differently for text vs audio)
+export interface ModalityPrice {
+    text?: number | TieredPrice | TimeBasedPrice;
+    audio?: number | TieredPrice | TimeBasedPrice;
+    video?: number | TieredPrice | TimeBasedPrice;
+    image?: number | TieredPrice | TimeBasedPrice;
+}
+
 // Represents the cost structure for a model, potentially tiered or time-based
 export interface ModelCost {
-    // Cost components can be flat rate, token-tiered, or time-based
-    input_per_million?: number | TieredPrice | TimeBasedPrice;
-    output_per_million?: number | TieredPrice | TimeBasedPrice;
+    // Cost components can be flat rate, token-tiered, time-based, or modality-specific
+    input_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
+    output_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
     cached_input_per_million?: number | TieredPrice | TimeBasedPrice;
 
     // Cost per image (for image generation models like Imagen)
@@ -589,6 +611,8 @@ export interface ModelUsage {
     metadata?: Record<string, unknown>; // Additional metadata for usage tracking
     timestamp?: Date; // Timestamp of the usage, crucial for time-based pricing
     isFreeTierUsage?: boolean; // Flag for free tier usage override
+    input_modality?: 'text' | 'audio' | 'video' | 'image'; // Modality of input tokens
+    output_modality?: 'text' | 'audio' | 'video' | 'image'; // Modality of output tokens
 }
 
 // Interface for grouping models by class/capability
@@ -909,3 +933,117 @@ export interface ToolParameter {
 }
 
 export type ToolParameterMap = Record<string, string | ToolParameter>;
+
+// ================================================================
+// Speech Transcription Types
+// ================================================================
+
+/**
+ * Options for speech transcription (Speech-to-Text)
+ */
+export interface TranscriptionOpts {
+    /** Audio format of the input stream */
+    audioFormat?: {
+        /** Sample rate in Hz (e.g., 16000, 24000, 44100) */
+        sampleRate?: number;
+        /** Number of channels (1 for mono, 2 for stereo) */
+        channels?: number;
+        /** Encoding format */
+        encoding?: 'pcm' | 'opus' | 'flac';
+    };
+
+    /** Gemini-specific real-time configuration */
+    realtimeConfig?: {
+        /** Voice Activity Detection configuration */
+        automaticActivityDetection?: {
+            /** Milliseconds of audio to include before speech detection */
+            prefixPaddingMs?: number;
+            /** Milliseconds of silence before considering speech ended */
+            silenceDurationMs?: number;
+        };
+    };
+
+    /** Buffering configuration */
+    bufferConfig?: {
+        /** Size of audio chunks to send (default: 8000 bytes for 250ms at 16kHz) */
+        chunkSize?: number;
+        /** Milliseconds to wait before flushing partial buffer (default: 500) */
+        flushInterval?: number;
+    };
+
+    /** Whether to stream transcription results */
+    stream?: boolean;
+}
+
+/**
+ * Audio source for transcription
+ */
+export type TranscriptionAudioSource =
+    | ReadableStream<Uint8Array> // Primary: server-side stream
+    | AsyncIterable<Uint8Array> // Custom async iterators
+    | (() => AsyncIterable<Uint8Array>) // Factory function
+    | ArrayBuffer // Complete audio buffer
+    | Uint8Array; // Raw audio data
+
+/**
+ * Transcription event types
+ */
+export type TranscriptionEventType =
+    | 'transcription_start'
+    | 'transcription_delta'
+    | 'transcription_complete'
+    | 'error';
+
+/**
+ * Base transcription event
+ */
+export interface TranscriptionEventBase {
+    type: TranscriptionEventType;
+    timestamp: string;
+    agent?: AgentExportDefinition;
+}
+
+/**
+ * Transcription start event
+ */
+export interface TranscriptionStartEvent extends TranscriptionEventBase {
+    type: 'transcription_start';
+    format: string;
+    language?: string;
+    audioFormat?: TranscriptionOpts['audioFormat'];
+}
+
+/**
+ * Transcription delta event (for streaming)
+ */
+export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
+    type: 'transcription_delta';
+    delta: string;
+    partial?: boolean; // Always false for Gemini Live
+}
+
+/**
+ * Transcription complete event
+ */
+export interface TranscriptionCompleteEvent extends TranscriptionEventBase {
+    type: 'transcription_complete';
+    text: string;
+    duration?: number;
+}
+
+/**
+ * Transcription error event
+ */
+export interface TranscriptionErrorEvent extends TranscriptionEventBase {
+    type: 'error';
+    error: string;
+}
+
+/**
+ * Union type for all transcription events
+ */
+export type TranscriptionEvent =
+    | TranscriptionStartEvent
+    | TranscriptionDeltaEvent
+    | TranscriptionCompleteEvent
+    | TranscriptionErrorEvent;

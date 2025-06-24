@@ -162,6 +162,10 @@ export { ensembleRequest } from './core/ensemble_request.js';
 export { ensembleEmbed } from './core/ensemble_embed.js';
 export { ensembleImage } from './core/ensemble_image.js';
 export { ensembleVoice } from './core/ensemble_voice.js';
+export {
+    ensembleListen,
+    createAudioStreamFromMediaStream,
+} from './core/ensemble_listen.js';
 
 // Export ensemble result aggregator
 export {

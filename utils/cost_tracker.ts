@@ -10,6 +10,7 @@ import {
     ModelUsage,
     TieredPrice,
     TimeBasedPrice,
+    ModalityPrice,
 } from '../data/model_data.js';
 import { emitEvent, hasEventHandler } from './event_controller.js';
 import { CostUpdateEvent } from '../types/types.js';
@@ -91,13 +92,42 @@ class CostTracker {
         // Helper function to get price per million based on token count and cost structure
         const getPrice = (
             tokensForTierCheck: number,
-            costStructure: number | TieredPrice | TimeBasedPrice | undefined
+            costStructure:
+                | number
+                | TieredPrice
+                | TimeBasedPrice
+                | ModalityPrice
+                | undefined,
+            modality?: 'text' | 'audio' | 'video' | 'image'
         ): number => {
             if (typeof costStructure === 'number') {
                 return costStructure;
             }
 
             if (typeof costStructure === 'object' && costStructure !== null) {
+                // Check if it's a ModalityPrice object
+                if (
+                    'text' in costStructure ||
+                    'audio' in costStructure ||
+                    'video' in costStructure ||
+                    'image' in costStructure
+                ) {
+                    const modalityPrice = costStructure as ModalityPrice;
+                    const selectedModality = modality || 'text';
+                    const modalityCost = modalityPrice[selectedModality];
+
+                    // Recursively call getPrice with the modality-specific cost
+                    if (modalityCost !== undefined) {
+                        return getPrice(tokensForTierCheck, modalityCost);
+                    }
+
+                    // Default to text if modality not found
+                    return getPrice(
+                        tokensForTierCheck,
+                        modalityPrice.text || 0
+                    );
+                }
+
                 if ('peak_price_per_million' in costStructure) {
                     // Time-Based Pricing
                     const timeBasedCost = costStructure as TimeBasedPrice;
@@ -163,7 +193,8 @@ class CostTracker {
         ) {
             const inputPricePerMillion = getPrice(
                 original_input_tokens,
-                model.cost.input_per_million
+                model.cost.input_per_million,
+                usage.input_modality
             );
             usage.cost +=
                 (nonCachedInputTokens / 1000000) * inputPricePerMillion;
@@ -186,7 +217,8 @@ class CostTracker {
         if (output_tokens > 0 && model.cost?.output_per_million !== undefined) {
             const outputPricePerMillion = getPrice(
                 output_tokens,
-                model.cost.output_per_million
+                model.cost.output_per_million,
+                usage.output_modality
             );
             usage.cost += (output_tokens / 1000000) * outputPricePerMillion;
         }

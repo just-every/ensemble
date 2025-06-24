@@ -72,8 +72,10 @@
         "@anthropic-ai/sdk": "^0.54.0",
         "@google/genai": "^1.6.0",
         "dotenv": "^16.5.0",
+        "express": "^5.1.0",
         "openai": "^5.7.0",
         "sharp": "^0.34.2",
+        "ws": "^8.18.2",
         "zod": "^3.25.67"
     },
     "devDependencies": {
