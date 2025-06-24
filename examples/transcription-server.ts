@@ -167,6 +167,11 @@ async function startTranscription(connectionId: string, ws: any) {
                             `📝 [${connectionId}] Delta: ${event.delta}`
                         );
                         break;
+                    case 'transcription_preview':
+                        console.log(
+                            `🎤 [${connectionId}] User said: "${event.text}"`
+                        );
+                        break;
                     case 'transcription_turn':
                         console.log(
                             `🔄 [${connectionId}] Turn complete: "${event.text}"`

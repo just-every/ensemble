@@ -991,6 +991,7 @@ export type TranscriptionAudioSource =
 export type TranscriptionEventType =
     | 'transcription_start'
     | 'transcription_delta'
+    | 'transcription_preview'
     | 'transcription_turn'
     | 'transcription_complete'
     | 'error';
@@ -1024,6 +1025,15 @@ export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
 }
 
 /**
+ * Transcription preview event (Gemini's input audio transcription)
+ */
+export interface TranscriptionPreviewEvent extends TranscriptionEventBase {
+    type: 'transcription_preview';
+    text: string; // The transcribed input audio text
+    isFinal?: boolean; // Whether this is the final transcription for this input
+}
+
+/**
  * Transcription turn event (indicates end of a speaking turn)
  */
 export interface TranscriptionTurnEvent extends TranscriptionEventBase {
@@ -1054,6 +1064,7 @@ export interface TranscriptionErrorEvent extends TranscriptionEventBase {
 export type TranscriptionEvent =
     | TranscriptionStartEvent
     | TranscriptionDeltaEvent
+    | TranscriptionPreviewEvent
     | TranscriptionTurnEvent
     | TranscriptionCompleteEvent
     | TranscriptionErrorEvent;

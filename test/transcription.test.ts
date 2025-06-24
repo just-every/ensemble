@@ -27,6 +27,14 @@ vi.mock('../model_providers/model_provider.js', () => ({
                 type: 'transcription_turn',
                 timestamp: new Date().toISOString(),
             };
+
+            // Emit preview event (user's speech)
+            yield {
+                type: 'transcription_preview',
+                timestamp: new Date().toISOString(),
+                text: 'User input preview',
+                isFinal: true,
+            };
         }),
     })),
     getModelFromAgent: vi.fn(() =>
@@ -49,18 +57,19 @@ describe('ensembleListen', () => {
             events.push(event);
         }
 
-        // Should have received: start (from ensembleListen) + 2 deltas + turn + complete
-        expect(events.length).toBe(5);
+        // Should have received: start (from ensembleListen) + 2 deltas + turn + preview + complete
+        expect(events.length).toBe(6);
 
         // Check event types
         expect(events[0].type).toBe('transcription_start');
         expect(events[1].type).toBe('transcription_delta');
         expect(events[2].type).toBe('transcription_delta');
         expect(events[3].type).toBe('transcription_turn');
-        expect(events[4].type).toBe('transcription_complete');
+        expect(events[4].type).toBe('transcription_preview');
+        expect(events[5].type).toBe('transcription_complete');
 
         // Check transcript content
-        const completeEvent = events[4] as any;
+        const completeEvent = events[5] as any;
         expect(completeEvent.text).toBe('Hello, this is a test.');
     });
 
@@ -240,5 +249,39 @@ describe('ensembleListen', () => {
             e => e.type === 'transcription_complete'
         ) as any;
         expect(completeEvent.text).toBe('Hello, this is a test.');
+    });
+
+    it('should handle transcription_preview events', async () => {
+        const audioData = new Uint8Array(100);
+        const events: TranscriptionEvent[] = [];
+
+        for await (const event of ensembleListen(audioData, {
+            model: 'gemini-live-2.5-flash-preview',
+        })) {
+            events.push(event);
+        }
+
+        // Find preview event
+        const previewEvent = events.find(
+            e => e.type === 'transcription_preview'
+        ) as any;
+
+        expect(previewEvent).toBeDefined();
+        expect(previewEvent.text).toBe('User input preview');
+        expect(previewEvent.isFinal).toBe(true);
+
+        // Preview should come after turn but before complete
+        const previewIndex = events.findIndex(
+            e => e.type === 'transcription_preview'
+        );
+        const turnIndex = events.findIndex(
+            e => e.type === 'transcription_turn'
+        );
+        const completeIndex = events.findIndex(
+            e => e.type === 'transcription_complete'
+        );
+
+        expect(previewIndex).toBeGreaterThan(turnIndex);
+        expect(previewIndex).toBeLessThan(completeIndex);
     });
 });

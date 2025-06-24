@@ -1521,6 +1521,7 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                             realtimeInputConfig: {
                                 automaticActivityDetection: realtimeConfig,
                             },
+                            inputAudioTranscription: true, // Enable input audio transcription
                         },
                         callbacks: {
                             onopen: () => {
@@ -1530,7 +1531,37 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                                 resolve();
                             },
                             onmessage: async (msg: any) => {
-                                // Handle transcript
+                                // Handle input audio transcription (user's speech)
+                                if (
+                                    msg.serverContent?.inputAudioTranscription
+                                ) {
+                                    const transcriptionText =
+                                        msg.serverContent
+                                            .inputAudioTranscription.text ||
+                                        msg.serverContent
+                                            .inputAudioTranscription
+                                            .transcript ||
+                                        '';
+
+                                    if (transcriptionText) {
+                                        const previewEvent: TranscriptionEvent =
+                                            {
+                                                type: 'transcription_preview',
+                                                timestamp:
+                                                    new Date().toISOString(),
+                                                text: transcriptionText,
+                                                isFinal: true, // Gemini sends final transcriptions
+                                            };
+                                        transcriptEvents.push(previewEvent);
+
+                                        console.debug(
+                                            '[Gemini] Received input transcription:',
+                                            transcriptionText
+                                        );
+                                    }
+                                }
+
+                                // Handle transcript (model's response)
                                 if (msg.serverContent?.modelTurn?.parts) {
                                     for (const part of msg.serverContent
                                         .modelTurn.parts) {

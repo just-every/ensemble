@@ -172,6 +172,12 @@
             animation: fadeIn 0.3s ease;
         }
 
+        .transcript-line.preview {
+            color: var(--primary);
+            font-style: italic;
+            opacity: 0.9;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
@@ -516,6 +522,12 @@
                         this.appendTranscript(data.delta);
                         break;
                         
+                    case 'transcription_preview':
+                        console.log('User said:', data.text);
+                        // Show user's speech in a different style
+                        this.appendTranscript(`\n[You]: ${data.text}\n`, 'preview');
+                        break;
+                        
                     case 'transcription_turn':
                         console.log('Turn complete:', data.text);
                         // Add a visual separator for turns
@@ -540,7 +552,7 @@
                 }
             }
 
-            appendTranscript(text) {
+            appendTranscript(text, type = 'default') {
                 const container = document.getElementById('transcript');
                 
                 // Remove empty state message if present
@@ -551,7 +563,7 @@
                 
                 // Add new transcript line
                 const line = document.createElement('div');
-                line.className = 'transcript-line';
+                line.className = type === 'preview' ? 'transcript-line preview' : 'transcript-line';
                 line.textContent = text;
                 container.appendChild(line);
                 
