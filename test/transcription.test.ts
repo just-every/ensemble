@@ -21,6 +21,12 @@ vi.mock('../model_providers/model_provider.js', () => ({
                 delta: 'this is a test.',
                 partial: false,
             };
+
+            // Emit turn complete
+            yield {
+                type: 'transcription_turn',
+                timestamp: new Date().toISOString(),
+            };
         }),
     })),
     getModelFromAgent: vi.fn(() =>
@@ -43,17 +49,18 @@ describe('ensembleListen', () => {
             events.push(event);
         }
 
-        // Should have received: start (from ensembleListen) + 2 deltas + complete
-        expect(events.length).toBe(4);
+        // Should have received: start (from ensembleListen) + 2 deltas + turn + complete
+        expect(events.length).toBe(5);
 
         // Check event types
         expect(events[0].type).toBe('transcription_start');
         expect(events[1].type).toBe('transcription_delta');
         expect(events[2].type).toBe('transcription_delta');
-        expect(events[3].type).toBe('transcription_complete');
+        expect(events[3].type).toBe('transcription_turn');
+        expect(events[4].type).toBe('transcription_complete');
 
         // Check transcript content
-        const completeEvent = events[3] as any;
+        const completeEvent = events[4] as any;
         expect(completeEvent.text).toBe('Hello, this is a test.');
     });
 
@@ -193,5 +200,37 @@ describe('ensembleListen', () => {
         expect(events.length).toBeGreaterThanOrEqual(2);
         expect(events[0].type).toBe('transcription_start');
         expect(events[events.length - 1].type).toBe('transcription_complete');
+    });
+
+    it('should handle transcription_turn events', async () => {
+        const audioData = new Uint8Array(100);
+        const events: TranscriptionEvent[] = [];
+        let turnCount = 0;
+
+        for await (const event of ensembleListen(audioData, {
+            model: 'gemini-live-2.5-flash-preview',
+        })) {
+            events.push(event);
+            if (event.type === 'transcription_turn') {
+                turnCount++;
+            }
+        }
+
+        // Should have received at least one turn event
+        expect(turnCount).toBe(1);
+
+        // Turn event should come after deltas but before complete
+        const turnIndex = events.findIndex(
+            e => e.type === 'transcription_turn'
+        );
+        const firstDeltaIndex = events.findIndex(
+            e => e.type === 'transcription_delta'
+        );
+        const completeIndex = events.findIndex(
+            e => e.type === 'transcription_complete'
+        );
+
+        expect(turnIndex).toBeGreaterThan(firstDeltaIndex);
+        expect(turnIndex).toBeLessThan(completeIndex);
     });
 });

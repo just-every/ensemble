@@ -167,6 +167,9 @@ async function startTranscription(connectionId: string, ws: any) {
                             `📝 [${connectionId}] Delta: ${event.delta}`
                         );
                         break;
+                    case 'transcription_turn':
+                        console.log(`🔄 [${connectionId}] Turn complete`);
+                        break;
                     // Note: cost_update events are emitted globally by costTracker,
                     // not by ensembleListen directly
                     case 'error':

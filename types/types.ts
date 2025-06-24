@@ -991,6 +991,7 @@ export type TranscriptionAudioSource =
 export type TranscriptionEventType =
     | 'transcription_start'
     | 'transcription_delta'
+    | 'transcription_turn'
     | 'transcription_complete'
     | 'error';
 
@@ -1023,6 +1024,14 @@ export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
 }
 
 /**
+ * Transcription turn event (indicates end of a speaking turn)
+ */
+export interface TranscriptionTurnEvent extends TranscriptionEventBase {
+    type: 'transcription_turn';
+    text?: string; // Optional cumulative text for the turn
+}
+
+/**
  * Transcription complete event
  */
 export interface TranscriptionCompleteEvent extends TranscriptionEventBase {
@@ -1045,5 +1054,6 @@ export interface TranscriptionErrorEvent extends TranscriptionEventBase {
 export type TranscriptionEvent =
     | TranscriptionStartEvent
     | TranscriptionDeltaEvent
+    | TranscriptionTurnEvent
     | TranscriptionCompleteEvent
     | TranscriptionErrorEvent;

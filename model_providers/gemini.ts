@@ -1550,6 +1550,15 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                                     }
                                 }
 
+                                // Check for turn complete
+                                if (msg.serverContent?.turnComplete) {
+                                    const turnEvent: TranscriptionEvent = {
+                                        type: 'transcription_turn',
+                                        timestamp: new Date().toISOString(),
+                                    };
+                                    transcriptEvents.push(turnEvent);
+                                }
+
                                 // Handle usage metadata
                                 if (msg.usageMetadata) {
                                     // Track usage with modality information

@@ -516,6 +516,12 @@
                         this.appendTranscript(data.delta);
                         break;
                         
+                    case 'transcription_turn':
+                        console.log('Turn complete');
+                        // Optionally add a visual indicator or new line
+                        this.appendTranscript('\n');
+                        break;
+                        
                     case 'cost_update':
                         this.updateCostInfo(data.usage);
                         break;
