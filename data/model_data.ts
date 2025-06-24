@@ -216,18 +216,6 @@ export const MODEL_CLASSES = {
         ],
         description: 'Text-to-Speech models for voice generation',
     },
-
-    // Transcription (Speech-to-Text) models
-    transcription: {
-        models: [
-            'whisper-1', // OpenAI's Whisper - default for batch transcription
-            'gpt-4o-realtime-preview', // OpenAI's real-time streaming
-            'gemini-2.0-flash-live-001', // Gemini's live multimodal
-            'gemini-2.5-flash-preview-native-audio-dialog', // Gemini's native audio dialog
-        ],
-        description:
-            'Speech-to-Text models for audio transcription with optional real-time streaming',
-    },
 };
 
 // Add supported embedding dimensions for various models
@@ -1514,83 +1502,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: "Google's Imagen 2 model for image generation",
-    },
-
-    // Transcription models
-    {
-        id: 'whisper-1',
-        provider: 'openai',
-        cost: {
-            input_per_million: 0, // $0.006 per minute (calculated differently)
-            output_per_million: 0,
-        },
-        features: {
-            input_modality: ['audio'],
-            output_modality: ['text'],
-            streaming: false,
-            context_length: 25600, // ~30 minutes of audio
-        },
-        class: 'transcription',
-        description:
-            "OpenAI's Whisper model for speech-to-text transcription supporting 99 languages",
-    },
-    {
-        id: 'gpt-4o-realtime-preview',
-        aliases: ['gpt-4o-realtime-preview-2024-12-17'],
-        provider: 'openai',
-        cost: {
-            input_per_million: 100, // $0.10 per 1K tokens (audio)
-            output_per_million: 200, // $0.20 per 1K tokens (audio)
-            cached_input_per_million: 25,
-        },
-        features: {
-            input_modality: ['text', 'audio'],
-            output_modality: ['text', 'audio'],
-            streaming: true,
-            tool_use: true,
-            context_length: 128000,
-        },
-        class: 'transcription',
-        description:
-            "OpenAI's real-time voice model with <800ms latency, VAD, and native speech understanding",
-    },
-    {
-        id: 'gemini-2.0-flash-live-001',
-        provider: 'google',
-        cost: {
-            input_per_million: 0.265, // Same as flash text pricing
-            output_per_million: 1.05,
-            cached_input_per_million: 0.0663,
-        },
-        features: {
-            input_modality: ['text', 'audio', 'image', 'video'],
-            output_modality: ['text', 'audio'],
-            streaming: true,
-            tool_use: true,
-            context_length: 32000,
-        },
-        class: 'transcription',
-        description:
-            "Gemini's live multimodal model with real-time audio streaming and automatic VAD",
-    },
-    {
-        id: 'gemini-2.5-flash-preview-native-audio-dialog',
-        provider: 'google',
-        cost: {
-            input_per_million: 0.075,
-            output_per_million: 0.3,
-            cached_input_per_million: 0.01875,
-        },
-        features: {
-            input_modality: ['text', 'audio'],
-            output_modality: ['text', 'audio'],
-            streaming: true,
-            tool_use: true,
-            context_length: 32000,
-        },
-        class: 'transcription',
-        description:
-            "Gemini's native audio dialog model with affective understanding and proactive responses",
     },
 ];
 

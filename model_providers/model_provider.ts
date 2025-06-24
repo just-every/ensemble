@@ -51,9 +51,6 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'dall-e': openaiProvider, // Image generation models
     'gpt-image': openaiProvider, // GPT-Image-1 model
     'tts-': openaiProvider, // TTS models
-    'whisper-': openaiProvider, // Transcription models
-    'whisper-1': openaiProvider, // Specific Whisper model
-    'gpt-4o-realtime': openaiProvider, // Realtime models
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
@@ -142,9 +139,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
         model.startsWith('computer-use-preview') ||
         model.startsWith('dall-e') ||
         model.startsWith('gpt-image') ||
-        model.startsWith('tts-') ||
-        model.startsWith('whisper') ||
-        model === 'whisper-1'
+        model.startsWith('tts-')
     ) {
         return 'openai';
     } else if (model.startsWith('claude-')) {
@@ -473,10 +468,7 @@ export function getModelProvider(model?: string): ModelProvider {
         }
 
         for (const [prefix, provider] of Object.entries(MODEL_PROVIDER_MAP)) {
-            if (model === prefix || model.startsWith(prefix)) {
-                console.log(
-                    `[getModelProvider] Matched model ${model} with prefix ${prefix}`
-                );
+            if (model.startsWith(prefix)) {
                 const providerName = getProviderFromModel(model);
                 if (!isProviderKeyValid(providerName)) {
                     throw new Error(

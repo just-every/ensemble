@@ -356,41 +356,6 @@ export class TestProvider extends BaseModelProvider {
             return generateVector(input);
         }
     }
-
-    /**
-     * Simulates audio transcription for testing
-     */
-    async *createTranscription(
-        audio: any,
-        model: string,
-        opts?: any
-    ): AsyncGenerator<any> {
-        console.log('[TestProvider] Creating transcription for model:', model);
-
-        // Emit start event
-        yield {
-            type: 'transcription_start' as const,
-            timestamp: new Date().toISOString(),
-        };
-
-        // Simulate processing delay
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Emit delta event
-        const testTranscript = "This is a test transcription.";
-        yield {
-            type: 'transcription_delta' as const,
-            timestamp: new Date().toISOString(),
-            delta: testTranscript,
-        };
-
-        // Emit complete event
-        yield {
-            type: 'transcription_complete' as const,
-            timestamp: new Date().toISOString(),
-            text: testTranscript,
-        };
-    }
 }
 
 // Export an instance of the provider
