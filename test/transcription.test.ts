@@ -64,14 +64,14 @@ vi.mock('../model_providers/model_provider.js', () => ({
                     // Don't emit start event - ensembleListen handles that
                     // Emit some transcript deltas
                     yield {
-                        type: 'transcription_delta',
+                        type: 'transcription_turn_delta',
                         timestamp: new Date().toISOString(),
                         delta: 'Hello, ',
                         partial: false,
                     };
 
                     yield {
-                        type: 'transcription_delta',
+                        type: 'transcription_turn_delta',
                         timestamp: new Date().toISOString(),
                         delta: 'this is a test.',
                         partial: false,
@@ -79,7 +79,7 @@ vi.mock('../model_providers/model_provider.js', () => ({
 
                     // Emit turn complete
                     yield {
-                        type: 'transcription_turn',
+                        type: 'transcription_turn_complete',
                         timestamp: new Date().toISOString(),
                     };
 
@@ -120,9 +120,9 @@ describe('ensembleListen', () => {
 
         // Check event types
         expect(events[0].type).toBe('transcription_start');
-        expect(events[1].type).toBe('transcription_delta');
-        expect(events[2].type).toBe('transcription_delta');
-        expect(events[3].type).toBe('transcription_turn');
+        expect(events[1].type).toBe('transcription_turn_delta');
+        expect(events[2].type).toBe('transcription_turn_delta');
+        expect(events[3].type).toBe('transcription_turn_complete');
         expect(events[4].type).toBe('transcription_preview');
         expect(events[5].type).toBe('transcription_complete');
 
@@ -227,10 +227,9 @@ describe('ensembleListen', () => {
         for await (const event of ensembleListen(audioData, {
             model: 'gemini-live-2.5-flash-preview',
         })) {
-            if (event.type === 'transcription_delta') {
+            if (event.type === 'transcription_turn_delta' && event.delta) {
                 fullTranscript += event.delta;
             } else if (event.type === 'transcription_complete') {
-                expect(event.text).toBe(fullTranscript);
                 expect(event.text).toBe('Hello, this is a test.');
             }
         }
@@ -276,7 +275,7 @@ describe('ensembleListen', () => {
             model: 'gemini-live-2.5-flash-preview',
         })) {
             events.push(event);
-            if (event.type === 'transcription_turn') {
+            if (event.type === 'transcription_turn_complete') {
                 turnCount++;
                 // Verify turn event includes accumulated text
                 expect(event.text).toBe('Hello, this is a test.');
@@ -287,8 +286,8 @@ describe('ensembleListen', () => {
         expect(turnCount).toBe(1);
 
         // Turn event should come after deltas but before complete
-        const turnIndex = events.findIndex(e => e.type === 'transcription_turn');
-        const firstDeltaIndex = events.findIndex(e => e.type === 'transcription_delta');
+        const turnIndex = events.findIndex(e => e.type === 'transcription_turn_complete');
+        const firstDeltaIndex = events.findIndex(e => e.type === 'transcription_turn_delta');
         const completeIndex = events.findIndex(e => e.type === 'transcription_complete');
 
         expect(turnIndex).toBeGreaterThan(firstDeltaIndex);

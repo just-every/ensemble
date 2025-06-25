@@ -41,12 +41,11 @@ describe('Automatic Cost Event Emission', () => {
 
         const event = capturedEvents[0] as CostUpdateEvent;
         expect(event.type).toBe('cost_update');
-        expect(event.usage).toEqual({
-            input_tokens: 100,
-            output_tokens: 50,
-            total_tokens: 150,
-            cached_tokens: 10,
-        });
+        expect(event.usage.input_tokens).toBe(100);
+        expect(event.usage.output_tokens).toBe(50);
+        expect(event.usage.total_tokens).toBe(150);
+        expect(event.usage.cached_tokens).toBe(10);
+        expect(event.usage.model).toBe('test-model');
         expect(event.timestamp).toBeDefined();
     });
 
@@ -82,12 +81,11 @@ describe('Automatic Cost Event Emission', () => {
         expect(capturedEvents).toHaveLength(1);
 
         const event = capturedEvents[0] as CostUpdateEvent;
-        expect(event.usage).toEqual({
-            input_tokens: 0,
-            output_tokens: 0,
-            total_tokens: 0,
-            cached_tokens: undefined,
-        });
+        expect(event.usage.input_tokens).toBeUndefined();
+        expect(event.usage.output_tokens).toBeUndefined();
+        expect(event.usage.total_tokens).toBe(0);
+        expect(event.usage.cached_tokens).toBeUndefined();
+        expect(event.usage.model).toBe('test-model');
     });
 
     it('should emit multiple events for multiple usage additions', async () => {

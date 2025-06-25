@@ -220,7 +220,7 @@ export const MODEL_CLASSES = {
     },
     transcription: {
         models: [
-            'gemini-live-2.5-flash-preview', // Gemini Live API for real-time transcription
+            'gemini-2.0-flash-live-001', // Gemini Live API for real-time transcription
         ],
         description: 'Speech-to-Text models for audio transcription with real-time streaming',
     },
