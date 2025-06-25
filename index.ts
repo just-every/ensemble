@@ -41,6 +41,7 @@ export * from './utils/quota_tracker.js';
 export * from './utils/image_utils.js';
 export * from './utils/llm_logger.js';
 export { createToolFunction } from './utils/create_tool_function.js';
+export { AudioStreamPlayer } from './utils/audio_stream_player.js';
 
 // Export pause controller
 export {

@@ -231,6 +231,7 @@ describe('ensembleListen', () => {
                 fullTranscript += event.delta;
             } else if (event.type === 'transcription_complete') {
                 expect(event.text).toBe('Hello, this is a test.');
+                expect(fullTranscript).toBe('Hello, this is a test.');
             }
         }
     });

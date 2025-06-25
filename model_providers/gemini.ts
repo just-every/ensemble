@@ -1188,35 +1188,13 @@ export class GeminiProvider extends BaseModelProvider {
                 }
             }
 
-            // Generate the audio
-            const response = await this.client.models.generateContent({
+            // Use streaming API for better performance
+            console.log(`[Gemini] Starting generateContentStream call...`);
+            const streamPromise = this.client.models.generateContentStream({
                 model,
                 contents: [{ role: 'user', parts: [{ text }] }],
                 config,
             });
-
-            // Extract audio data from response
-            if (!response.candidates || response.candidates.length === 0) {
-                throw new Error('No audio generated from Gemini TTS');
-            }
-
-            const candidate = response.candidates[0];
-            if (!candidate.content.parts || candidate.content.parts.length === 0) {
-                throw new Error('No audio parts in Gemini TTS response');
-            }
-
-            // Find the audio part
-            let audioData: string | undefined;
-            for (const part of candidate.content.parts) {
-                if (part.inlineData && part.inlineData.mimeType?.includes('audio')) {
-                    audioData = part.inlineData.data;
-                    break;
-                }
-            }
-
-            if (!audioData) {
-                throw new Error('No audio data found in Gemini TTS response');
-            }
 
             // Track usage
             const textLength = text.length;
@@ -1231,35 +1209,77 @@ export class GeminiProvider extends BaseModelProvider {
                 },
             });
 
-            // Convert base64 to ArrayBuffer
-            const binaryString = atob(audioData);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-
             // Return as stream if requested
             if (opts?.stream) {
-                // Create a readable stream from the audio data
-                const chunkSize = 8192; // 8KB chunks
-                let position = 0;
+                // Create a transform stream to handle the streaming response
+                // Since Gemini returns all data at once, create a more efficient stream
+                const stream = await streamPromise;
+                const chunks: Uint8Array[] = [];
 
-                return new ReadableStream<Uint8Array>({
-                    pull(controller) {
-                        if (position >= bytes.length) {
-                            controller.close();
-                            return;
+                for await (const chunk of stream) {
+                    if (chunk.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data) {
+                        const part = chunk.candidates[0].content.parts[0];
+                        const binaryString = atob(part.inlineData.data);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
                         }
+                        chunks.push(bytes);
 
-                        const chunk = bytes.slice(position, Math.min(position + chunkSize, bytes.length));
-                        position += chunk.length;
-                        controller.enqueue(chunk);
+                        if (part.inlineData.mimeType) {
+                            console.log(`[Gemini] Audio format: ${part.inlineData.mimeType}`);
+                        }
+                    }
+                }
+
+                // Combine all chunks
+                const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const combined = new Uint8Array(totalLength);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    combined.set(chunk, offset);
+                    offset += chunk.length;
+                }
+
+                // Return as a single-chunk stream for efficiency
+                return new ReadableStream<Uint8Array>({
+                    start(controller) {
+                        controller.enqueue(combined);
+                        controller.close();
                     },
                 });
             }
 
+            // For non-streaming, collect all chunks
+            let allData = new Uint8Array(0);
+            const stream = await streamPromise;
+            for await (const chunk of stream) {
+                if (!chunk.candidates || !chunk.candidates[0]?.content?.parts) {
+                    continue;
+                }
+
+                const part = chunk.candidates[0].content.parts[0];
+                if (part?.inlineData?.data) {
+                    const binaryString = atob(part.inlineData.data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    // Append to allData
+                    const newData = new Uint8Array(allData.length + bytes.length);
+                    newData.set(allData);
+                    newData.set(bytes, allData.length);
+                    allData = newData;
+                }
+            }
+
+            if (allData.length === 0) {
+                throw new Error('No audio data generated from Gemini TTS');
+            }
+
             // Return as ArrayBuffer
-            return bytes.buffer;
+            return allData.buffer;
         } catch (error) {
             console.error('[Gemini] Error generating voice:', error);
             throw error;

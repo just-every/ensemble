@@ -91,6 +91,7 @@ describe('ElevenLabsProvider', () => {
                     style: 0.5,
                     use_speaker_boost: false,
                 },
+                speed: 1.1,
             });
 
             const fetchCall = (global.fetch as any).mock.calls[0];
@@ -101,6 +102,7 @@ describe('ElevenLabsProvider', () => {
                 similarity_boost: 0.9,
                 style: 0.5,
                 use_speaker_boost: false,
+                speed: 1.1,
             });
         });
 

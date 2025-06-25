@@ -14,6 +14,12 @@ export const ELEVENLABS_VOICES = {
     adam: 'pNInz6obpgDQGcFmaJgB',
     sam: 'yoZ06aMxZJJ28mfd3POQ',
     george: 'JBFqnCBsd6RMkjVDRZzb',
+    jessica: 'cgSgspJ2msm6clMCkdW9',
+    laura: 'FGY2WhTYpPnrIDTdsKH5',
+    callum: 'N2lVS1w4EtoT3dr4eOWO',
+    unreal: 'YOq2y2Up4RgXP2HyXjE5',
+    blondie: 'exsUS4vynmxd379XN4yO',
+    james: 'h0KXSKLMvNtfCIMB8I9L',
 } as const;
 
 /**
@@ -100,7 +106,7 @@ class ElevenLabsProvider extends BaseModelProvider {
             const outputFormat = this.mapOutputFormat(opts?.response_format || 'mp3_44100_128');
 
             console.log(
-                `[ElevenLabs] Generating speech with model ${modelId}, voice: ${voiceId}, format: ${outputFormat}`
+                `[ElevenLabs] Generating speech with model ${modelId}, voice: ${voiceId}, format: ${outputFormat}, streaming: ${opts?.stream || false}`
             );
 
             // Add in affect for supported models
@@ -112,17 +118,21 @@ class ElevenLabsProvider extends BaseModelProvider {
                 text,
                 model_id: modelId,
                 voice_settings: {
-                    stability: 0.45,
-                    similarity_boost: 0.75,
+                    stability: 0.4,
+                    similarity_boost: 0.5,
+                    use_speaker_boost: true,
                     ...(opts?.voice_settings || {}),
                 },
             };
-            if (requestBody.voice_settings.speed > 1) {
-                // To try to keep similar to other providers
-                requestBody.voice_settings.speed = requestBody.voice_settings.speed / 2;
+            
+            // Add speed to voice_settings if provided
+            if (opts?.speed !== undefined) {
+                (requestBody.voice_settings as any).speed = opts.speed;
             }
 
-            const url = `${this.baseUrl}/text-to-speech/${voiceId}?output_format=${outputFormat}`;
+            // Use streaming endpoint if streaming is requested
+            const endpoint = opts?.stream ? 'stream' : '';
+            const url = `${this.baseUrl}/text-to-speech/${voiceId}${endpoint ? '/stream' : ''}?output_format=${outputFormat}`;
 
             const response = await fetch(url, {
                 method: 'POST',

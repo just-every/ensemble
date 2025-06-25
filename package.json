@@ -41,8 +41,9 @@
         "lint": "eslint '**/*.{ts,tsx}'",
         "lint:fix": "eslint '**/*.{ts,tsx}' --fix",
         "docs": "typedoc",
-        "demo:live": "npx tsx demo/live-server.ts",
-        "demo:transcription": "npx tsx demo/transcription-server.ts"
+        "demo:live": "npm run build && npx tsx demo/live-server.ts",
+        "demo:listen": "npm run build && npx tsx demo/transcription-server.ts",
+        "demo:voice": "npm run build && npx tsx demo/voice-server.ts"
     },
     "exports": {
         ".": {
