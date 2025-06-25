@@ -1505,6 +1505,89 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'transcription',
         description: 'Gemini Live API for real-time multimodal interaction with modality-specific pricing',
     },
+    {
+        id: 'gemini-2.0-flash-live-001',
+        provider: 'google',
+        cost: {
+            input_per_million: {
+                text: 0.5, // $0.50 per 1M input text tokens
+                audio: 3.0, // $3.00 per 1M input audio tokens
+                video: 3.0, // $3.00 per 1M input video tokens
+            },
+            output_per_million: {
+                text: 2.0, // $2.00 per 1M output text tokens
+                audio: 12.0, // $12.00 per 1M output audio tokens
+            },
+        },
+        features: {
+            context_length: 32000,
+            input_modality: ['text', 'audio', 'video'],
+            output_modality: ['text', 'audio'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'Gemini 2.0 Flash Live API for real-time multimodal interaction',
+    },
+    {
+        id: 'gpt-4o-transcribe',
+        provider: 'openai',
+        cost: {
+            input_per_million: {
+                audio: 6.0, // $0.06 per minute (converted to per million tokens estimate)
+            },
+            output_per_million: {
+                text: 0, // No separate output charge for transcription
+            },
+        },
+        features: {
+            context_length: 128000,
+            input_modality: ['audio'],
+            output_modality: ['text'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'GPT-4o transcription with incremental streaming output',
+    },
+    {
+        id: 'gpt-4o-mini-transcribe',
+        provider: 'openai',
+        cost: {
+            input_per_million: {
+                audio: 6.0, // $0.06 per minute (converted to per million tokens estimate)
+            },
+            output_per_million: {
+                text: 0, // No separate output charge for transcription
+            },
+        },
+        features: {
+            context_length: 128000,
+            input_modality: ['audio'],
+            output_modality: ['text'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'GPT-4o Mini transcription with incremental streaming output',
+    },
+    {
+        id: 'whisper-1',
+        provider: 'openai',
+        cost: {
+            input_per_million: {
+                audio: 6.0, // $6.00 per 1M input audio tokens (estimated based on $0.006/minute)
+            },
+            output_per_million: {
+                text: 0, // No separate charge for output
+            },
+        },
+        features: {
+            context_length: 25600, // ~25MB file size limit
+            input_modality: ['audio'],
+            output_modality: ['text'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'OpenAI Whisper transcription with full-turn output',
+    },
 ];
 
 /**

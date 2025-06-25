@@ -256,12 +256,18 @@
             font-weight: 500;
         }
 
-        .server-url-input {
+        .server-url-input,
+        .model-select {
             padding: 8px 12px;
             border: 1px solid #e0e0e0;
             border-radius: 6px;
             font-size: 14px;
             width: 300px;
+            background-color: var(--surface);
+        }
+        
+        .model-select optgroup {
+            font-weight: 600;
         }
     </style>
 </head>
@@ -344,6 +350,20 @@
                         placeholder="ws://localhost:3003"
                     >
                 </div>
+                <div class="setting-row">
+                    <span class="setting-label">Model:</span>
+                    <select id="modelSelect" class="model-select">
+                        <optgroup label="OpenAI Models">
+                            <option value="gpt-4o-transcribe">GPT-4o Transcribe (Streaming)</option>
+                            <option value="gpt-4o-mini-transcribe">GPT-4o Mini Transcribe (Streaming)</option>
+                            <option value="whisper-1">Whisper-1 (Complete at once)</option>
+                        </optgroup>
+                        <optgroup label="Gemini Models">
+                            <option value="gemini-live-2.5-flash-preview" selected>Gemini Live 2.5 Flash Preview</option>
+                            <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
+                        </optgroup>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -417,8 +437,12 @@
                         this.startAudioCapture();
                         this.startStatsUpdate();
                         
-                        // Send start message
-                        this.ws.send(JSON.stringify({ type: 'start' }));
+                        // Send start message with selected model
+                        const model = document.getElementById('modelSelect').value;
+                        this.ws.send(JSON.stringify({ 
+                            type: 'start',
+                            model: model 
+                        }));
                         
                         // Update UI
                         document.getElementById('connectBtn').disabled = true;

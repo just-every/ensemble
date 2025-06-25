@@ -21,6 +21,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Load .env from root directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
+// Debug: Log which API keys were loaded
+console.log('🔐 Environment variables loaded:');
+console.log('   GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✅ Set' : '❌ Not set');
+console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
+
 const app = express();
 const server = createServer(app);
 const PORT = process.env.TRANSCRIPTION_PORT || process.env.PORT || 3003;
@@ -74,8 +79,9 @@ wss.on('connection', ws => {
             try {
                 const message = JSON.parse(data.toString());
                 if (message.type === 'start') {
-                    console.log(`📢 Starting transcription for ${connectionId}`);
-                    startTranscription(connectionId, ws);
+                    const model = message.model || process.env.LIVE_MODEL || 'gemini-live-2.5-flash-preview';
+                    console.log(`📢 Starting transcription for ${connectionId} with model: ${model}`);
+                    startTranscription(connectionId, ws, model);
                 }
             } catch (err) {
                 console.error('Invalid control message:', err);
@@ -113,16 +119,29 @@ wss.on('connection', ws => {
 });
 
 // Start transcription for a connection
-async function startTranscription(connectionId: string, ws: any) {
+async function startTranscription(connectionId: string, ws: any, model: string) {
     const connInfo = activeConnections.get(connectionId);
     if (!connInfo) return;
 
     try {
+        // Check if API key is available for the selected model
+        if (model.includes('gpt-4o') || model === 'whisper-1') {
+            if (!process.env.OPENAI_API_KEY) {
+                throw new Error('OpenAI API key not found. Please set OPENAI_API_KEY environment variable.');
+            }
+        } else if (model.includes('gemini')) {
+            if (!process.env.GOOGLE_API_KEY) {
+                throw new Error('Google API key not found. Please set GOOGLE_API_KEY environment variable.');
+            }
+        }
+
+        console.log(`🎙️ [${connectionId}] Starting transcription with model: ${model}`);
+
         // Start transcription using ensembleListen
         for await (const event of ensembleListen(
             connInfo.audioStream,
             {
-                model: process.env.LIVE_MODEL || 'gemini-live-2.5-flash-preview',
+                model: model,
             },
             {
                 audioFormat: {
@@ -181,7 +200,7 @@ app.get('/health', (req, res) => {
         status: 'ok',
         message: 'Transcription server running',
         activeConnections: activeConnections.size,
-        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? 'configured' : 'missing',
+        apiKey: process.env.GOOGLE_API_KEY ? 'configured' : 'missing',
     });
 });
 
@@ -193,7 +212,7 @@ app.get('/', (req, res) => {
         <p>Active connections: ${activeConnections.size}</p>
         <p>Open <a href="/transcription-client.html">transcription-client.html</a> to start</p>
         <hr>
-        <p>API Key Status: ${process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? '✅ Configured' : '❌ Missing'}</p>
+        <p>API Key Status: ${process.env.GOOGLE_API_KEY ? '✅ Configured' : '❌ Missing'}</p>
         <p>WebSocket endpoint: ws://localhost:${PORT}</p>
     `);
 });
@@ -206,19 +225,21 @@ server.listen(PORT, () => {
 
 📡 Server running at: http://localhost:${PORT}
 🌐 Client URL: http://localhost:${PORT}/transcription-client.html
-🔑 API Key: ${process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
+🔑 API Keys:
+   Gemini: ${process.env.GOOGLE_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
+   OpenAI: ${process.env.OPENAI_API_KEY ? '✅ Found' : '❌ Missing (set OPENAI_API_KEY)'}
 
 📝 Features:
   • Real-time audio streaming via WebSocket
-  • Gemini Live API integration
+  • Multiple model support (Gemini & OpenAI)
   • Automatic buffering and chunk management
   • Cost tracking per session
 
 💡 Usage:
-  1. Set your GOOGLE_API_KEY environment variable
-  2. Run: npm run example:transcription-server
+  1. Set your API keys (GOOGLE_API_KEY and/or OPENAI_API_KEY)
+  2. Run: npm run demo:transcription
   3. Open the client URL in your browser
-  4. Allow microphone access and start speaking
+  4. Select a model and allow microphone access
 `);
 });
 

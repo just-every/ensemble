@@ -35,7 +35,7 @@ const demos: Demo[] = [
         name: 'ensembleListen',
         file: 'ensemble-listen-demo.ts',
         description: 'Speech-to-text transcription',
-        requiredKeys: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'],
+        requiredKeys: ['GOOGLE_API_KEY'],
     },
     {
         name: 'ensembleVoice',
@@ -62,7 +62,6 @@ function checkApiKeys(): { available: string[]; missing: string[] } {
         'OPENAI_API_KEY',
         'ANTHROPIC_API_KEY',
         'GOOGLE_API_KEY',
-        'GEMINI_API_KEY',
         'DEEPSEEK_API_KEY',
         'XAI_API_KEY',
         'OPENROUTER_API_KEY',

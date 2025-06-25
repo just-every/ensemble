@@ -1,6 +1,6 @@
 # Ensemble Transcription Examples
 
-This directory contains examples demonstrating real-time audio transcription using the `ensembleListen` API with Gemini Live.
+This directory contains examples demonstrating real-time audio transcription using the `ensembleListen` API with both Gemini Live and OpenAI transcription models.
 
 ## Overview
 
@@ -12,11 +12,13 @@ The transcription feature provides:
 
 ## Prerequisites
 
-1. **Gemini API Key**: Set your Google API key as an environment variable:
+1. **API Keys**: Set your API keys as environment variables:
    ```bash
+   # For Gemini models
    export GOOGLE_API_KEY="your-api-key-here"
-   # or
-   export GEMINI_API_KEY="your-api-key-here"
+   
+   # For OpenAI models
+   export OPENAI_API_KEY="your-api-key-here"
    ```
 
 2. **Dependencies**: Ensure the ensemble package is built:
@@ -30,7 +32,7 @@ The transcription feature provides:
 
 A complete Express + WebSocket server that:
 - Accepts audio streams from browser clients
-- Processes audio using `ensembleListen` with Gemini Live
+- Processes audio using `ensembleListen` with Gemini Live or OpenAI models
 - Returns real-time transcripts and cost data
 
 **Run the server:**

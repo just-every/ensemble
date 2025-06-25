@@ -14,11 +14,11 @@ const nodeVersion = process.version;
 console.log(`✓ Node.js version: ${nodeVersion}`);
 
 // Check if API key is set
-const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+const apiKey = process.env.GOOGLE_API_KEY;
 if (apiKey) {
     console.log(`✓ API Key found: ${apiKey.substring(0, 8)}...`);
 } else {
-    console.log('❌ API Key missing! Set GOOGLE_API_KEY or GEMINI_API_KEY');
+    console.log('❌ API Key missing! Set GOOGLE_API_KEY');
 }
 
 // Check if dist directory exists

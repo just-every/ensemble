@@ -977,6 +977,18 @@ export interface TranscriptionOpts {
 
     /** Whether to stream transcription results */
     stream?: boolean;
+
+    /** Transcription prompt/context (OpenAI) */
+    prompt?: string;
+
+    /** Language code (e.g., 'en', 'fr') for better accuracy (OpenAI) */
+    language?: string;
+
+    /** Voice Activity Detection - false to disable (OpenAI) */
+    vad?: boolean;
+
+    /** Noise reduction type (OpenAI) */
+    noiseReduction?: 'near_field' | 'far_field' | null;
 }
 
 /**
@@ -1050,7 +1062,7 @@ export interface TranscriptionTurnEvent extends TranscriptionEventBase {
  */
 export interface TranscriptionCompleteEvent extends TranscriptionEventBase {
     type: 'transcription_complete';
-    text: string;
+    text?: string;
     duration?: number;
 }
 

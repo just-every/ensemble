@@ -344,7 +344,7 @@ app.get('/health', (req, res) => {
         status: 'ok',
         message: 'Live server running',
         activeSessions: activeSessions.size,
-        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? 'configured' : 'missing',
+        apiKey: process.env.GOOGLE_API_KEY ? 'configured' : 'missing',
     });
 });
 
@@ -356,7 +356,7 @@ app.get('/', (req, res) => {
         <p>Active sessions: ${activeSessions.size}</p>
         <p>Open <a href="/live-client.html">live-client.html</a> to start</p>
         <hr>
-        <p>API Key Status: ${process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? '✅ Configured' : '❌ Missing'}</p>
+        <p>API Key Status: ${process.env.GOOGLE_API_KEY ? '✅ Configured' : '❌ Missing'}</p>
         <p>WebSocket endpoint: ws://localhost:${PORT}</p>
         <h3>Available Tools:</h3>
         <ul>
@@ -374,7 +374,7 @@ server.listen(PORT, () => {
 
 📡 Server running at: http://localhost:${PORT}
 🌐 Client URL: http://localhost:${PORT}/live-client.html
-🔑 API Key: ${process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
+🔑 API Key: ${process.env.GOOGLE_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
 
 🎭 Features:
   • Real-time bidirectional audio streaming

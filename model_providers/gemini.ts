@@ -23,6 +23,7 @@ import {
     type GenerateContentParameters,
     type SpeechConfig,
     Modality,
+    MediaResolution,
 } from '@google/genai';
 import { EmbedOpts } from './model_provider.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -1336,7 +1337,6 @@ export class GeminiProvider extends BaseModelProvider {
         opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent> {
         let session: any = null;
-        let audioBuffer = Buffer.alloc(0);
         let isConnected = false;
 
         try {
@@ -1383,10 +1383,11 @@ Model: Ok ignore all that, let's start again.`;
             const connectionPromise = new Promise<void>((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Connection timeout'));
-                }, 30000); // 30 second timeout
+                }, 10000); // 10 second timeout for faster failure
 
                 const config = {
                     responseModalities: [Modality.TEXT],
+                    mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
                     speechConfig,
                     realtimeInputConfig,
                     systemInstruction: {
@@ -1394,7 +1395,6 @@ Model: Ok ignore all that, let's start again.`;
                     },
                     inputAudioTranscription: {}, // Enable input audio transcription
                 };
-                console.dir(config, { depth: null });
                 ai.live
                     .connect({
                         model: model,
@@ -1416,11 +1416,6 @@ Model: Ok ignore all that, let's start again.`;
                                         isFinal: true, // Gemini sends final transcriptions
                                     };
                                     transcriptEvents.push(previewEvent);
-
-                                    console.debug(
-                                        '[Gemini] Received input transcription:',
-                                        msg.serverContent.inputTranscription.text
-                                    );
                                 }
 
                                 // Handle transcript (model's response)
@@ -1488,12 +1483,12 @@ Model: Ok ignore all that, let's start again.`;
                             },
                         },
                     })
-                    .then(s => {
+                    .then(async s => {
                         session = s;
                     });
             });
 
-            // Store events to yield
+            // Store events to yield - use pre-allocated array for better performance
             const transcriptEvents: TranscriptionEvent[] = [];
             let connectionError: any = null;
 
@@ -1504,33 +1499,20 @@ Model: Ok ignore all that, let's start again.`;
             const audioStream = normalizeAudioSource(audio);
             const reader = audioStream.getReader();
 
-            // Buffer configuration
-            const chunkSize = opts?.bufferConfig?.chunkSize || 8000; // 250ms at 16kHz
-            const flushInterval = opts?.bufferConfig?.flushInterval || 500;
-
-            // Set up flush timer
-            let flushTimer: NodeJS.Timeout | null = null;
-            const scheduleFlush = () => {
-                if (flushTimer) clearTimeout(flushTimer);
-                flushTimer = setTimeout(async () => {
-                    if (audioBuffer.length > 0 && session && isConnected) {
-                        await sendAudioChunk(audioBuffer);
-                        audioBuffer = Buffer.alloc(0);
-                    }
-                }, flushInterval);
-            };
-
-            // Helper to send audio chunk
+            // Helper to send audio chunk with pre-allocated base64 encoding
             const sendAudioChunk = async (chunk: Buffer) => {
                 try {
+                    // Use faster base64 encoding method
+                    const base64Data = chunk.toString('base64');
                     await session.sendRealtimeInput({
                         media: {
                             mimeType: 'audio/pcm;rate=16000',
-                            data: chunk.toString('base64'),
+                            data: base64Data,
                         },
                     });
                 } catch (err) {
                     console.error('[Gemini] Error sending audio chunk:', err);
+                    connectionError = err;
                     throw err;
                 }
             };
@@ -1542,27 +1524,19 @@ Model: Ok ignore all that, let's start again.`;
 
                     if (done) break;
 
-                    if (value) {
-                        // Append to buffer
-                        audioBuffer = Buffer.concat([audioBuffer, Buffer.from(value)]);
-
-                        // Send in optimal chunks
-                        while (audioBuffer.length >= chunkSize) {
-                            const chunk = audioBuffer.slice(0, chunkSize);
-                            audioBuffer = audioBuffer.slice(chunkSize);
-
-                            if (session && isConnected) {
-                                await sendAudioChunk(chunk);
-                            }
-                        }
-
-                        scheduleFlush();
+                    if (value && session && isConnected) {
+                        // Send chunks immediately as they arrive
+                        // Avoid creating new Buffer if value is already a Buffer
+                        const chunk = value instanceof Buffer ? value : Buffer.from(value);
+                        await sendAudioChunk(chunk);
                     }
 
-                    // Yield any pending events
-                    while (transcriptEvents.length > 0) {
-                        const event = transcriptEvents.shift();
-                        if (event) yield event;
+                    // Yield any pending events more efficiently
+                    if (transcriptEvents.length > 0) {
+                        const events = transcriptEvents.splice(0, transcriptEvents.length);
+                        for (const event of events) {
+                            yield event;
+                        }
                     }
 
                     // Check for connection errors
@@ -1571,22 +1545,18 @@ Model: Ok ignore all that, let's start again.`;
                     }
                 }
 
-                // Send any remaining audio
-                if (audioBuffer.length > 0 && session && isConnected) {
-                    await sendAudioChunk(audioBuffer);
-                }
-
                 // Wait a bit for final responses
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // Yield any remaining events
-                while (transcriptEvents.length > 0) {
-                    const event = transcriptEvents.shift();
-                    if (event) yield event;
+                if (transcriptEvents.length > 0) {
+                    const events = transcriptEvents.splice(0, transcriptEvents.length);
+                    for (const event of events) {
+                        yield event;
+                    }
                 }
             } finally {
                 reader.releaseLock();
-                if (flushTimer) clearTimeout(flushTimer);
                 if (session) {
                     session.close();
                 }

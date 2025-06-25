@@ -14,6 +14,9 @@ import {
     AgentDefinition,
     ImageGenerationOpts,
     VoiceGenerationOpts,
+    TranscriptionEvent,
+    TranscriptionAudioSource,
+    TranscriptionOpts,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
@@ -26,6 +29,7 @@ import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_bu
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort } from 'openai/resources/shared.js';
+import type { WebSocket } from 'ws';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
@@ -1321,6 +1325,282 @@ export class OpenAIProvider extends BaseModelProvider {
             };
         }
     }
+
+    /**
+     * Create transcription from audio stream using OpenAI Realtime API
+     * Supports gpt-4o-transcribe, gpt-4o-mini-transcribe, and whisper-1
+     */
+    async *createTranscription(
+        audio: TranscriptionAudioSource,
+        agent: AgentDefinition,
+        model: string,
+        opts?: TranscriptionOpts
+    ): AsyncGenerator<TranscriptionEvent> {
+        const transcriptionModels = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
+        if (!transcriptionModels.includes(model)) {
+            throw new Error(
+                `Model ${model} does not support transcription. Supported models: ${transcriptionModels.join(', ')}`
+            );
+        }
+
+        let ws: WebSocket | null = null;
+        let isConnected = false;
+        let connectionError: any = null;
+
+        try {
+            const { WebSocket } = await import('ws');
+
+            // Get API key at runtime, not construction time
+            const apiKey = this.apiKey || process.env.OPENAI_API_KEY;
+            if (!apiKey) {
+                throw new Error('Failed to initialize OpenAI transcription. Make sure OPENAI_API_KEY is set.');
+            }
+
+            // Create WebSocket connection to OpenAI Realtime API
+            // For transcription, use intent=transcription instead of model parameter
+            const wsUrl = 'wss://api.openai.com/v1/realtime?intent=transcription';
+            ws = new WebSocket(wsUrl, {
+                headers: {
+                    Authorization: 'Bearer ' + apiKey,
+                    'OpenAI-Beta': 'realtime=v1',
+                },
+            });
+
+            // Store events to yield
+            const transcriptEvents: TranscriptionEvent[] = [];
+
+            // Set up connection promise
+            const connectionPromise = new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Connection timeout'));
+                }, 10000);
+
+                ws!.on('open', () => {
+                    clearTimeout(timeout);
+                    console.log('[OpenAI] WebSocket connected for transcription');
+                    isConnected = true;
+                    resolve();
+                });
+
+                ws!.on('error', error => {
+                    clearTimeout(timeout);
+                    connectionError = error;
+                    reject(error);
+                });
+            });
+
+            // Handle incoming messages
+            ws.on('message', (data: any) => {
+                try {
+                    const event = JSON.parse(data.toString());
+
+                    switch (event.type) {
+                        case 'transcription_session.created':
+                        case 'session.created': {
+                            // Update session for transcription-only mode
+                            const sessionUpdate = {
+                                type: 'transcription_session.update',
+                                input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
+                                input_audio_transcription: {
+                                    model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
+                                    prompt: opts?.prompt || '',
+                                    language: opts?.language || '',
+                                },
+                                turn_detection:
+                                    opts?.vad === false
+                                        ? null
+                                        : {
+                                              type: 'server_vad',
+                                              threshold: 0.5,
+                                              prefix_padding_ms: 300,
+                                              silence_duration_ms: 500,
+                                          },
+                                input_audio_noise_reduction:
+                                    opts?.noiseReduction === null
+                                        ? null
+                                        : {
+                                              type: opts?.noiseReduction || 'near_field',
+                                          },
+                            };
+                            ws!.send(JSON.stringify(sessionUpdate));
+                            break;
+                        }
+
+                        case 'conversation.item.input_audio_transcription.delta': {
+                            // Handle incremental transcriptions (gpt-4o models)
+                            if (model !== 'whisper-1') {
+                                const deltaEvent: TranscriptionEvent = {
+                                    type: 'transcription_delta',
+                                    timestamp: new Date().toISOString(),
+                                    delta: event.delta,
+                                    partial: true,
+                                };
+                                transcriptEvents.push(deltaEvent);
+                            }
+                            break;
+                        }
+
+                        case 'conversation.item.input_audio_transcription.completed': {
+                            // Handle completed transcription
+                            const completeText = event.transcript;
+
+                            // For whisper-1, this is the only event we get
+                            if (model === 'whisper-1') {
+                                const deltaEvent: TranscriptionEvent = {
+                                    type: 'transcription_delta',
+                                    timestamp: new Date().toISOString(),
+                                    delta: completeText,
+                                    partial: false,
+                                };
+                                transcriptEvents.push(deltaEvent);
+                            }
+
+                            // Emit turn complete event
+                            const turnEvent: TranscriptionEvent = {
+                                type: 'transcription_turn',
+                                timestamp: new Date().toISOString(),
+                                text: completeText,
+                            };
+                            transcriptEvents.push(turnEvent);
+                            break;
+                        }
+
+                        case 'input_audio_buffer.speech_started': {
+                            // User started speaking
+                            const previewEvent: TranscriptionEvent = {
+                                type: 'transcription_preview',
+                                timestamp: new Date().toISOString(),
+                                text: '',
+                                isFinal: false,
+                            };
+                            transcriptEvents.push(previewEvent);
+                            break;
+                        }
+
+                        case 'input_audio_buffer.speech_stopped': {
+                            // User stopped speaking
+                            break;
+                        }
+
+                        case 'error': {
+                            const errorEvent: TranscriptionEvent = {
+                                type: 'error',
+                                timestamp: new Date().toISOString(),
+                                error: event.error?.message || 'Unknown error',
+                            };
+                            transcriptEvents.push(errorEvent);
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.error('[OpenAI] Error processing message:', error);
+                }
+            });
+
+            ws.on('close', () => {
+                console.log('[OpenAI] WebSocket closed');
+                isConnected = false;
+            });
+
+            // Wait for connection
+            await connectionPromise;
+
+            // Process audio stream
+            const audioStream = normalizeAudioSource(audio);
+            const reader = audioStream.getReader();
+
+            // Read and send audio chunks
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    if (value && ws && isConnected) {
+                        // Send audio data to OpenAI
+                        const audioEvent = {
+                            type: 'input_audio_buffer.append',
+                            audio: Buffer.from(value).toString('base64'),
+                        };
+                        ws.send(JSON.stringify(audioEvent));
+                    }
+
+                    // Yield any pending events
+                    if (transcriptEvents.length > 0) {
+                        const events = transcriptEvents.splice(0, transcriptEvents.length);
+                        for (const event of events) {
+                            yield event;
+                        }
+                    }
+
+                    // Check for connection errors
+                    if (connectionError) {
+                        throw connectionError;
+                    }
+                }
+
+                // If VAD is disabled, manually commit the buffer
+                if (opts?.vad === false && ws && isConnected) {
+                    ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+                }
+
+                // Wait a bit for final responses
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Yield any remaining events
+                if (transcriptEvents.length > 0) {
+                    const events = transcriptEvents.splice(0, transcriptEvents.length);
+                    for (const event of events) {
+                        yield event;
+                    }
+                }
+
+                // Send completion event
+                const completeEvent: TranscriptionEvent = {
+                    type: 'transcription_complete',
+                    timestamp: new Date().toISOString(),
+                };
+                yield completeEvent;
+            } finally {
+                reader.releaseLock();
+                if (ws && ws.readyState === ws.OPEN) {
+                    ws.close();
+                }
+            }
+        } catch (error) {
+            console.error('[OpenAI] Transcription error:', error);
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: error instanceof Error ? error.message : 'Transcription failed',
+            };
+            yield errorEvent;
+        }
+    }
+}
+
+// Helper to normalize audio source
+function normalizeAudioSource(source: TranscriptionAudioSource): ReadableStream<Uint8Array> {
+    if (source instanceof ReadableStream) {
+        return source;
+    }
+
+    if (typeof source === 'object' && source !== null && Symbol.asyncIterator in source) {
+        // Convert async iterable to ReadableStream
+        return new ReadableStream({
+            async start(controller) {
+                try {
+                    for await (const chunk of source as AsyncIterable<Uint8Array>) {
+                        controller.enqueue(chunk);
+                    }
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
+                }
+            },
+        });
+    }
+
+    throw new Error('Invalid audio source type');
 }
 
 // Export an instance of the provider
