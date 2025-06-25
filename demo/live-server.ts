@@ -301,11 +301,7 @@ Keep responses concise and natural for voice interaction.`,
                         console.log(`🔄 Turn ${session.stats.turns} complete`);
                         break;
 
-                    case 'transcription_preview':
-                        console.log(`🎤 User said: "${event.text}"`);
-                        break;
-
-                    case 'transcription_delta':
+                    case 'transcription_turn_delta':
                         console.log(`📝 Assistant: ${event.delta}`);
                         break;
 

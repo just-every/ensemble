@@ -71,7 +71,7 @@ function normalizeAudioSource(source: TranscriptionAudioSource): ReadableStream<
  * for await (const event of ensembleListen(audioStream, {
  *   model: 'gemini-live-2.5-flash-preview'
  * })) {
- *   if (event.type === 'transcription_delta') {
+ *   if (event.type === 'transcription_turn_delta') {
  *     console.log('New text:', event.delta);
  *   }
  * }
@@ -156,13 +156,13 @@ export async function* ensembleListen(
 
         for await (const event of transcriptionGenerator) {
             // Track full transcript for complete event
-            if (event.type === 'transcription_delta' && event.delta) {
+            if (event.type === 'transcription_turn_delta' && event.delta) {
                 fullTranscript += event.delta;
                 currentTurnText += event.delta;
             }
 
             // Handle turn complete
-            if (event.type === 'transcription_turn') {
+            if (event.type === 'transcription_turn_complete') {
                 // Add text to the turn event
                 const turnEvent: TranscriptionEvent = {
                     ...event,

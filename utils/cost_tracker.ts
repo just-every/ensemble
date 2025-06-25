@@ -215,10 +215,8 @@ class CostTracker {
                 const costUpdateEvent: CostUpdateEvent = {
                     type: 'cost_update',
                     usage: {
-                        input_tokens: usage.input_tokens || 0,
-                        output_tokens: usage.output_tokens || 0,
+                        ...usage,
                         total_tokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
-                        cached_tokens: usage.cached_tokens,
                     },
                     timestamp: new Date().toISOString(),
                 };

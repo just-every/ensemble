@@ -1360,21 +1360,7 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Extract custom instructions from agent if provided
             const systemInstruction =
-                agent.instructions ||
-                `You are a real-time transcription assistant. Your only task is to transcribe speech as you hear it. DO NOT ADD YOUR OWN RESPONSE OR COMMENTARY. TRANSCRIBE WHAT YOU HEAR ONLY.
-Respond immediately with transcribed text as you process the audio.
-If quick corrections are used e.g. "Let's go to Point A, no Point B" then just remove incorrect part e.g. respond with "Let's go to Point B".
-When it makes the transcription clearer, remove filler words (like "um") add punctuation, correct obvious grammar issues and add in missing words.
-
-EXAMPLES:
-User: What capital of France
-Model: What's the capital of France?
-
-User: How about um we then do no actually how about you tell me the weather
-Model: How about you tell me the weather?
-
-User: Ok ignore all that lets start again
-Model: Ok ignore all that, let's start again.`;
+                agent.instructions || `You should reply only "OK" to every single message from the user. Nothing else.`;
 
             // Connect to Gemini Live API
             console.log('[Gemini] Connecting to Live API for transcription...');
@@ -1410,35 +1396,17 @@ Model: Ok ignore all that, let's start again.`;
                                 // Handle input audio transcription (user's speech)
                                 if (msg.serverContent?.inputTranscription?.text) {
                                     const previewEvent: TranscriptionEvent = {
-                                        type: 'transcription_preview',
+                                        type: 'transcription_turn_delta',
                                         timestamp: new Date().toISOString(),
-                                        text: msg.serverContent.inputTranscription.text,
-                                        isFinal: true, // Gemini sends final transcriptions
+                                        delta: msg.serverContent.inputTranscription.text,
                                     };
                                     transcriptEvents.push(previewEvent);
-                                }
-
-                                // Handle transcript (model's response)
-                                if (msg.serverContent?.modelTurn?.parts) {
-                                    for (const part of msg.serverContent.modelTurn.parts) {
-                                        if (part.text && part.text.trim()) {
-                                            const deltaEvent: TranscriptionEvent = {
-                                                type: 'transcription_delta',
-                                                timestamp: new Date().toISOString(),
-                                                delta: part.text,
-                                                partial: false, // Gemini Live doesn't distinguish
-                                            };
-
-                                            // Store event to yield later
-                                            transcriptEvents.push(deltaEvent);
-                                        }
-                                    }
                                 }
 
                                 // Check for turn complete
                                 if (msg.serverContent?.turnComplete) {
                                     const turnEvent: TranscriptionEvent = {
-                                        type: 'transcription_turn',
+                                        type: 'transcription_turn_complete',
                                         timestamp: new Date().toISOString(),
                                         // text will be added by ensembleListen
                                     };
@@ -1448,18 +1416,73 @@ Model: Ok ignore all that, let's start again.`;
                                 // Handle usage metadata
                                 if (msg.usageMetadata) {
                                     // Track usage with modality information
-                                    // This will automatically emit a cost_update event
-                                    costTracker.addUsage({
-                                        model: model,
-                                        input_tokens: msg.usageMetadata.promptTokenCount || 0,
-                                        output_tokens: msg.usageMetadata.responseTokenCount || 0,
-                                        input_modality: 'audio', // Audio input for transcription
-                                        output_modality: 'text', // Text output for transcription
-                                        metadata: {
-                                            totalTokens: msg.usageMetadata.totalTokenCount || 0,
-                                            source: 'gemini-live-transcription',
-                                        },
-                                    });
+                                    // Handle prompt tokens (input) by modality
+                                    if (
+                                        msg.usageMetadata.promptTokensDetails &&
+                                        Array.isArray(msg.usageMetadata.promptTokensDetails)
+                                    ) {
+                                        for (const detail of msg.usageMetadata.promptTokensDetails) {
+                                            if (detail.modality && detail.tokenCount > 0) {
+                                                costTracker.addUsage({
+                                                    model: model,
+                                                    input_tokens: detail.tokenCount,
+                                                    output_tokens: 0,
+                                                    input_modality: detail.modality.toLowerCase(),
+                                                    // Don't set output_modality for input tokens
+                                                    metadata: {
+                                                        totalTokens: msg.usageMetadata.totalTokenCount || 0,
+                                                        source: 'gemini-live-transcription',
+                                                        modalityType: 'input',
+                                                        originalModality: detail.modality,
+                                                    },
+                                                });
+                                            }
+                                        }
+                                    }
+
+                                    // Handle response tokens (output) by modality
+                                    if (
+                                        msg.usageMetadata.responseTokensDetails &&
+                                        Array.isArray(msg.usageMetadata.responseTokensDetails)
+                                    ) {
+                                        for (const detail of msg.usageMetadata.responseTokensDetails) {
+                                            if (detail.modality && detail.tokenCount > 0) {
+                                                costTracker.addUsage({
+                                                    model: model,
+                                                    input_tokens: 0,
+                                                    output_tokens: detail.tokenCount,
+                                                    // Don't set input_modality for output tokens
+                                                    output_modality: detail.modality.toLowerCase(),
+                                                    metadata: {
+                                                        totalTokens: msg.usageMetadata.totalTokenCount || 0,
+                                                        source: 'gemini-live-transcription',
+                                                        modalityType: 'output',
+                                                        originalModality: detail.modality,
+                                                    },
+                                                });
+                                            }
+                                        }
+                                    }
+
+                                    // Fallback for cases without detailed modality breakdown
+                                    if (
+                                        (!msg.usageMetadata.promptTokensDetails ||
+                                            msg.usageMetadata.promptTokensDetails.length === 0) &&
+                                        (!msg.usageMetadata.responseTokensDetails ||
+                                            msg.usageMetadata.responseTokensDetails.length === 0)
+                                    ) {
+                                        costTracker.addUsage({
+                                            model: model,
+                                            input_tokens: msg.usageMetadata.promptTokenCount || 0,
+                                            output_tokens: msg.usageMetadata.responseTokenCount || 0,
+                                            input_modality: 'audio',
+                                            output_modality: 'text',
+                                            metadata: {
+                                                totalTokens: msg.usageMetadata.totalTokenCount || 0,
+                                                source: 'gemini-live-transcription',
+                                            },
+                                        });
+                                    }
                                 }
                             },
                             onerror: (err: any) => {

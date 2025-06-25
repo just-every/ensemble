@@ -97,7 +97,7 @@ for await (const event of ensembleListen(audioStream, {
     model: 'gemini-live-2.5-flash-preview'
 })) {
     switch (event.type) {
-        case 'transcription_delta':
+        case 'transcription_turn_delta':
             console.log('New text:', event.delta);
             break;
         case 'cost_update':

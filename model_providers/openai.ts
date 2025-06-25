@@ -1393,6 +1393,7 @@ export class OpenAIProvider extends BaseModelProvider {
             ws.on('message', (data: any) => {
                 try {
                     const event = JSON.parse(data.toString());
+                    console.dir(event, { depth: null });
 
                     switch (event.type) {
                         case 'transcription_session.created':
@@ -1404,23 +1405,20 @@ export class OpenAIProvider extends BaseModelProvider {
                                     input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
                                     input_audio_transcription: {
                                         model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
-                                        prompt: opts?.prompt || '',
-                                        language: opts?.language || '',
+                                        prompt: opts?.prompt || 'You are a helpful assistant.',
+                                        language: opts?.language || 'en',
                                     },
                                     turn_detection:
                                         opts?.vad === false
                                             ? null
                                             : {
-                                                  type: 'server_vad',
-                                                  threshold: 0.5,
-                                                  prefix_padding_ms: 300,
-                                                  silence_duration_ms: 500,
+                                                  type: 'semantic_vad',
                                               },
                                     input_audio_noise_reduction:
                                         opts?.noiseReduction === null
                                             ? null
                                             : {
-                                                  type: opts?.noiseReduction || 'near_field',
+                                                  type: opts?.noiseReduction || 'far_field',
                                               },
                                 },
                             };
@@ -1432,7 +1430,7 @@ export class OpenAIProvider extends BaseModelProvider {
                             // Handle incremental transcriptions (gpt-4o models)
                             if (model !== 'whisper-1') {
                                 const deltaEvent: TranscriptionEvent = {
-                                    type: 'transcription_delta',
+                                    type: 'transcription_turn_delta',
                                     timestamp: new Date().toISOString(),
                                     delta: event.delta,
                                     partial: true,
@@ -1446,20 +1444,9 @@ export class OpenAIProvider extends BaseModelProvider {
                             // Handle completed transcription
                             const completeText = event.transcript;
 
-                            // For whisper-1, this is the only event we get
-                            if (model === 'whisper-1') {
-                                const deltaEvent: TranscriptionEvent = {
-                                    type: 'transcription_delta',
-                                    timestamp: new Date().toISOString(),
-                                    delta: completeText,
-                                    partial: false,
-                                };
-                                transcriptEvents.push(deltaEvent);
-                            }
-
                             // Emit turn complete event
                             const turnEvent: TranscriptionEvent = {
-                                type: 'transcription_turn',
+                                type: 'transcription_turn_complete',
                                 timestamp: new Date().toISOString(),
                                 text: completeText,
                             };
@@ -1470,10 +1457,8 @@ export class OpenAIProvider extends BaseModelProvider {
                         case 'input_audio_buffer.speech_started': {
                             // User started speaking
                             const previewEvent: TranscriptionEvent = {
-                                type: 'transcription_preview',
+                                type: 'transcription_turn_start',
                                 timestamp: new Date().toISOString(),
-                                text: '',
-                                isFinal: false,
                             };
                             transcriptEvents.push(previewEvent);
                             break;

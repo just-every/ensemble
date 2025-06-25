@@ -370,12 +370,7 @@ export interface TaskEvent extends StreamEventBase {
  */
 export interface CostUpdateEvent extends StreamEventBase {
     type: 'cost_update';
-    usage: {
-        input_tokens: number;
-        output_tokens: number;
-        total_tokens?: number;
-        cached_tokens?: number;
-    };
+    usage: ModelUsage;
     thought_delay?: number;
 }
 
@@ -619,10 +614,11 @@ export interface ModelEntry {
 
 // Represents usage data for cost calculation
 export interface ModelUsage {
-    model: string; // The ID of the model used (e.g., 'gemini-2.0-flash')
+    model?: string; // The ID of the model used (e.g., 'gemini-2.0-flash')
     cost?: number; // Calculated cost (optional, will be calculated if missing)
     input_tokens?: number; // Number of input tokens
     output_tokens?: number; // Number of output tokens
+    total_tokens?: number; // Total number of tokens (input + output)
     cached_tokens?: number; // Number of cached input tokens
     image_count?: number; // Number of images generated (for models like Imagen)
     metadata?: Record<string, unknown>; // Additional metadata for usage tracking
@@ -1006,9 +1002,9 @@ export type TranscriptionAudioSource =
  */
 export type TranscriptionEventType =
     | 'transcription_start'
-    | 'transcription_delta'
-    | 'transcription_preview'
-    | 'transcription_turn'
+    | 'transcription_turn_delta'
+    | 'transcription_turn_start'
+    | 'transcription_turn_complete'
     | 'transcription_complete'
     | 'error';
 
@@ -1034,26 +1030,17 @@ export interface TranscriptionStartEvent extends TranscriptionEventBase {
 /**
  * Transcription delta event (for streaming)
  */
-export interface TranscriptionDeltaEvent extends TranscriptionEventBase {
-    type: 'transcription_delta';
+export interface TranscriptionTurnDeltaEvent extends TranscriptionEventBase {
+    type: 'transcription_turn_delta';
     delta: string;
     partial?: boolean; // Always false for Gemini Live
-}
-
-/**
- * Transcription preview event (Gemini's input audio transcription)
- */
-export interface TranscriptionPreviewEvent extends TranscriptionEventBase {
-    type: 'transcription_preview';
-    text: string; // The transcribed input audio text
-    isFinal?: boolean; // Whether this is the final transcription for this input
 }
 
 /**
  * Transcription turn event (indicates end of a speaking turn)
  */
 export interface TranscriptionTurnEvent extends TranscriptionEventBase {
-    type: 'transcription_turn';
+    type: 'transcription_turn_start' | 'transcription_turn_complete';
     text?: string; // Cumulative text for the completed turn (added by ensembleListen)
 }
 
@@ -1079,8 +1066,7 @@ export interface TranscriptionErrorEvent extends TranscriptionEventBase {
  */
 export type TranscriptionEvent =
     | TranscriptionStartEvent
-    | TranscriptionDeltaEvent
-    | TranscriptionPreviewEvent
+    | TranscriptionTurnDeltaEvent
     | TranscriptionTurnEvent
     | TranscriptionCompleteEvent
     | TranscriptionErrorEvent;

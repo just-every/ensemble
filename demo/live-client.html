@@ -361,21 +361,21 @@
             color: var(--text);
             cursor: pointer;
         }
-        
+
         .checkbox-label {
             display: flex;
             align-items: center;
             cursor: pointer;
             user-select: none;
         }
-        
+
         .checkbox-label input[type="checkbox"] {
             margin-right: 8px;
             width: 18px;
             height: 18px;
             cursor: pointer;
         }
-        
+
         .checkbox-label span {
             font-size: 14px;
         }
@@ -436,7 +436,7 @@
                     </svg>
                     Control Panel
                 </h2>
-                
+
                 <div class="control-section">
                     <div id="statusBar" class="status-bar">
                         <span class="status-indicator"></span>
@@ -480,7 +480,7 @@
                     </svg>
                     Conversation
                 </h2>
-                
+
                 <div id="conversation" class="conversation-container">
                     <div style="text-align: center; color: var(--text-secondary); padding: 40px;">
                         Start a conversation to see the transcript here...
@@ -524,10 +524,10 @@
             <div class="settings-section">
                 <div class="setting-row">
                     <span class="setting-label">Server URL:</span>
-                    <input 
-                        type="text" 
-                        id="serverUrl" 
-                        class="server-url-input" 
+                    <input
+                        type="text"
+                        id="serverUrl"
+                        class="server-url-input"
                         value="ws://localhost:3004"
                         placeholder="ws://localhost:3004"
                     >
@@ -588,11 +588,11 @@
                     audioBytesReceived: 0,
                     tokens: 0,
                 };
-                
+
                 // Audio visualization
                 this.analyser = null;
                 this.visualizerBars = [];
-                
+
                 // Setup UI event handlers
                 this.setupEventHandlers();
                 this.createVisualizer();
@@ -617,7 +617,7 @@
             async start() {
                 try {
                     this.updateStatus('connecting', 'Requesting microphone access...');
-                    
+
                     // Get microphone access
                     this.mediaStream = await navigator.mediaDevices.getUserMedia({
                         audio: {
@@ -630,7 +630,7 @@
                     });
 
                     this.updateStatus('connecting', 'Connecting to server...');
-                    
+
                     // Connect to WebSocket server
                     const serverUrl = document.getElementById('serverUrl').value;
                     this.ws = new WebSocket(serverUrl);
@@ -642,15 +642,15 @@
                         this.startTime = Date.now();
                         this.startAudioCapture();
                         this.startStatsUpdate();
-                        
+
                         // Get settings
                         const model = document.getElementById('modelSelect').value;
                         const voice = document.getElementById('voiceSelect').value;
                         const enableAffectiveDialog = document.getElementById('affectiveDialogToggle').checked;
                         const enableProactivity = document.getElementById('proactivityToggle').checked;
-                        
+
                         // Send start message with all settings
-                        this.ws.send(JSON.stringify({ 
+                        this.ws.send(JSON.stringify({
                             type: 'start',
                             mode: 'audio',
                             settings: {
@@ -660,7 +660,7 @@
                                 enableProactivity
                             }
                         }));
-                        
+
                         // Update UI
                         document.getElementById('startBtn').disabled = true;
                         document.getElementById('stopBtn').disabled = false;
@@ -695,20 +695,20 @@
             startAudioCapture() {
                 this.audioContext = new AudioContext({ sampleRate: 16000 });
                 this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
-                
+
                 // Create analyser for visualization
                 this.analyser = this.audioContext.createAnalyser();
                 this.analyser.fftSize = 128;
                 this.source.connect(this.analyser);
-                
+
                 // Create script processor for capturing audio
                 this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-                
+
                 this.processor.onaudioprocess = (e) => {
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                         const float32Audio = e.inputBuffer.getChannelData(0);
                         const int16Audio = this.convertFloat32ToInt16(float32Audio);
-                        
+
                         // Send audio data
                         this.ws.send(int16Audio.buffer);
                         this.stats.audioBytesSent += int16Audio.buffer.byteLength;
@@ -717,27 +717,27 @@
 
                 this.source.connect(this.processor);
                 this.processor.connect(this.audioContext.destination);
-                
+
                 // Start visualization
                 this.visualize();
             }
 
             visualize() {
                 if (!this.analyser) return;
-                
+
                 const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
                 this.analyser.getByteFrequencyData(dataArray);
-                
+
                 // Update bars
                 const barCount = this.visualizerBars.length;
                 const step = Math.floor(dataArray.length / barCount);
-                
+
                 for (let i = 0; i < barCount; i++) {
                     const value = dataArray[i * step];
                     const height = Math.max(4, (value / 255) * 100);
                     this.visualizerBars[i].style.height = `${height}px`;
                 }
-                
+
                 if (this.isConnected) {
                     requestAnimationFrame(() => this.visualize());
                 }
@@ -772,12 +772,7 @@
                         this.appendMessage('assistant', data.text);
                         break;
 
-                    case 'transcription_preview':
-                        // User's speech
-                        this.appendMessage('user', data.text);
-                        break;
-
-                    case 'transcription_delta':
+                    case 'transcription_turn_delta':
                         // Assistant's response text
                         this.updateLastAssistantMessage(data.delta);
                         break;
@@ -818,7 +813,7 @@
 
                 // Update stats displays
                 document.getElementById('toolCalls').textContent = this.stats.toolCalls;
-                document.getElementById('audioData').textContent = 
+                document.getElementById('audioData').textContent =
                     `${((this.stats.audioBytesSent + this.stats.audioBytesReceived) / 1024).toFixed(1)} KB`;
             }
 
@@ -869,7 +864,7 @@
 
             appendMessage(type, text) {
                 const container = document.getElementById('conversation');
-                
+
                 // Clear initial message if present
                 if (container.querySelector('div[style*="text-align: center"]')) {
                     container.innerHTML = '';
@@ -877,7 +872,7 @@
 
                 const message = document.createElement('div');
                 message.className = `conversation-message ${type}`;
-                
+
                 const content = document.createElement('div');
                 content.textContent = text;
                 message.appendChild(content);
@@ -894,7 +889,7 @@
             updateLastAssistantMessage(delta) {
                 const container = document.getElementById('conversation');
                 const messages = container.querySelectorAll('.conversation-message.assistant');
-                
+
                 if (messages.length === 0) {
                     this.appendMessage('assistant', delta);
                 } else {
@@ -908,7 +903,7 @@
                 if (usage) {
                     this.stats.tokens = usage.totalTokens || usage.total_tokens || 0;
                     document.getElementById('tokens').textContent = this.stats.tokens.toLocaleString();
-                    
+
                     if (usage.totalCost !== undefined) {
                         document.getElementById('cost').textContent = `$${usage.totalCost.toFixed(4)}`;
                     }
@@ -921,7 +916,7 @@
                         const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
                         const minutes = Math.floor(elapsed / 60);
                         const seconds = elapsed % 60;
-                        document.getElementById('duration').textContent = 
+                        document.getElementById('duration').textContent =
                             `${minutes}:${seconds.toString().padStart(2, '0')}`;
                     }
                 }, 1000);
@@ -943,7 +938,7 @@
                         ${message}
                     </div>
                 `;
-                
+
                 // Auto-hide after 5 seconds
                 setTimeout(() => {
                     container.innerHTML = '';
@@ -957,54 +952,54 @@
 
             cleanup() {
                 this.isConnected = false;
-                
+
                 // Clear audio queue
                 this.audioQueue = [];
                 this.isPlaying = false;
-                
+
                 // Close WebSocket
                 if (this.ws) {
                     this.ws.close();
                     this.ws = null;
                 }
-                
+
                 // Stop audio
                 if (this.processor) {
                     this.processor.disconnect();
                     this.processor = null;
                 }
-                
+
                 if (this.source) {
                     this.source.disconnect();
                     this.source = null;
                 }
-                
+
                 if (this.analyser) {
                     this.analyser.disconnect();
                     this.analyser = null;
                 }
-                
+
                 if (this.audioContext) {
                     this.audioContext.close();
                     this.audioContext = null;
                 }
-                
+
                 if (this.mediaStream) {
                     this.mediaStream.getTracks().forEach(track => track.stop());
                     this.mediaStream = null;
                 }
-                
+
                 // Clear stats interval
                 if (this.statsInterval) {
                     clearInterval(this.statsInterval);
                     this.statsInterval = null;
                 }
-                
+
                 // Reset visualizer
                 this.visualizerBars.forEach(bar => {
                     bar.style.height = '4px';
                 });
-                
+
                 // Update UI
                 document.getElementById('startBtn').disabled = false;
                 document.getElementById('stopBtn').disabled = true;

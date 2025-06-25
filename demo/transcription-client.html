@@ -265,7 +265,7 @@
             width: 300px;
             background-color: var(--surface);
         }
-        
+
         .model-select optgroup {
             font-weight: 600;
         }
@@ -342,10 +342,10 @@
                 <h3>Settings</h3>
                 <div class="setting-row">
                     <span class="setting-label">Server URL:</span>
-                    <input 
-                        type="text" 
-                        id="serverUrl" 
-                        class="server-url-input" 
+                    <input
+                        type="text"
+                        id="serverUrl"
+                        class="server-url-input"
                         value="ws://localhost:3003"
                         placeholder="ws://localhost:3003"
                     >
@@ -382,11 +382,11 @@
                 this.totalBytes = 0;
                 this.totalTokens = 0;
                 this.transcript = '';
-                
+
                 // Audio visualization
                 this.analyser = null;
                 this.visualizerBars = [];
-                
+
                 // Setup UI event handlers
                 this.setupEventHandlers();
                 this.createVisualizer();
@@ -411,7 +411,7 @@
             async connect() {
                 try {
                     this.updateStatus('connecting', 'Requesting microphone access...');
-                    
+
                     // Get microphone access
                     this.mediaStream = await navigator.mediaDevices.getUserMedia({
                         audio: {
@@ -424,7 +424,7 @@
                     });
 
                     this.updateStatus('connecting', 'Connecting to server...');
-                    
+
                     // Connect to WebSocket server
                     const serverUrl = document.getElementById('serverUrl').value;
                     this.ws = new WebSocket(serverUrl);
@@ -436,14 +436,14 @@
                         this.startTime = Date.now();
                         this.startAudioCapture();
                         this.startStatsUpdate();
-                        
+
                         // Send start message with selected model
                         const model = document.getElementById('modelSelect').value;
-                        this.ws.send(JSON.stringify({ 
+                        this.ws.send(JSON.stringify({
                             type: 'start',
-                            model: model 
+                            model: model
                         }));
-                        
+
                         // Update UI
                         document.getElementById('connectBtn').disabled = true;
                         document.getElementById('stopBtn').disabled = false;
@@ -475,53 +475,53 @@
             startAudioCapture() {
                 this.audioContext = new AudioContext({ sampleRate: 16000 });
                 this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
-                
+
                 // Create analyser for visualization
                 this.analyser = this.audioContext.createAnalyser();
                 this.analyser.fftSize = 64;
                 this.source.connect(this.analyser);
-                
+
                 // Create script processor for capturing audio
                 this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-                
+
                 this.processor.onaudioprocess = (e) => {
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                         const float32Audio = e.inputBuffer.getChannelData(0);
                         const int16Audio = this.convertFloat32ToInt16(float32Audio);
-                        
+
                         // Send audio data
                         this.ws.send(int16Audio.buffer);
                         this.totalBytes += int16Audio.buffer.byteLength;
-                        
+
                         // Update data size display
-                        document.getElementById('dataSize').textContent = 
+                        document.getElementById('dataSize').textContent =
                             `${(this.totalBytes / 1024).toFixed(1)} KB`;
                     }
                 };
 
                 this.source.connect(this.processor);
                 this.processor.connect(this.audioContext.destination);
-                
+
                 // Start visualization
                 this.visualize();
             }
 
             visualize() {
                 if (!this.analyser) return;
-                
+
                 const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
                 this.analyser.getByteFrequencyData(dataArray);
-                
+
                 // Update bars
                 const barCount = this.visualizerBars.length;
                 const step = Math.floor(dataArray.length / barCount);
-                
+
                 for (let i = 0; i < barCount; i++) {
                     const value = dataArray[i * step];
                     const height = Math.max(4, (value / 255) * 60);
                     this.visualizerBars[i].style.height = `${height}px`;
                 }
-                
+
                 if (this.isConnected) {
                     requestAnimationFrame(() => this.visualize());
                 }
@@ -541,35 +541,30 @@
                     case 'transcription_start':
                         console.log('Transcription started');
                         break;
-                        
-                    case 'transcription_delta':
-                        this.appendTranscript(data.delta);
+
+                    case 'transcription_turn_delta':
+                        this.appendTranscript(data.delta, 'preview');
                         break;
-                        
-                    case 'transcription_preview':
-                        console.log('User said:', data.text);
-                        // Show user's speech in a different style
-                        this.appendTranscript(`\n[You]: ${data.text}\n`, 'preview');
-                        break;
-                        
-                    case 'transcription_turn':
+
+                    case 'transcription_turn_complete':
                         console.log('Turn complete:', data.text);
+                        this.appendTranscript(data.text);
                         // Add a visual separator for turns
                         this.appendTranscript('\n--- Turn Complete ---\n');
                         break;
-                        
+
                     case 'cost_update':
                         this.updateCostInfo(data.usage);
                         break;
-                        
+
                     case 'transcription_complete':
                         console.log('Transcription complete:', data.text);
                         break;
-                        
+
                     case 'error':
                         this.showError(data.error);
                         break;
-                        
+
                     case 'status':
                         console.log('Server status:', data.message);
                         break;
@@ -578,22 +573,36 @@
 
             appendTranscript(text, type = 'default') {
                 const container = document.getElementById('transcript');
-                
+
                 // Remove empty state message if present
                 const emptyMsg = container.querySelector('.transcript-empty');
                 if (emptyMsg) {
                     emptyMsg.remove();
                 }
-                
+
+                // Check if we can append to existing preview line
+                if (type === 'preview') {
+                    const lastLine = container.lastElementChild;
+                    if (lastLine && lastLine.classList.contains('preview')) {
+                        // Append to existing preview line
+                        lastLine.textContent += text;
+                        // Update full transcript
+                        this.transcript += text;
+                        // Auto-scroll to bottom
+                        container.scrollTop = container.scrollHeight;
+                        return;
+                    }
+                }
+
                 // Add new transcript line
                 const line = document.createElement('div');
                 line.className = type === 'preview' ? 'transcript-line preview' : 'transcript-line';
                 line.textContent = text;
                 container.appendChild(line);
-                
+
                 // Update full transcript
                 this.transcript += text;
-                
+
                 // Auto-scroll to bottom
                 container.scrollTop = container.scrollHeight;
             }
@@ -602,12 +611,12 @@
                 if (usage) {
                     this.totalTokens = usage.total_tokens || 0;
                     document.getElementById('tokenCount').textContent = this.totalTokens.toLocaleString();
-                    
+
                     // Calculate cost (Gemini Live pricing)
                     const inputCost = (usage.input_tokens || 0) * 0.2 / 1_000_000;
                     const outputCost = (usage.output_tokens || 0) * 0.8 / 1_000_000;
                     const totalCost = inputCost + outputCost;
-                    
+
                     document.getElementById('cost').textContent = `$${totalCost.toFixed(4)}`;
                 }
             }
@@ -618,7 +627,7 @@
                         const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
                         const minutes = Math.floor(elapsed / 60);
                         const seconds = elapsed % 60;
-                        document.getElementById('duration').textContent = 
+                        document.getElementById('duration').textContent =
                             `${minutes}:${seconds.toString().padStart(2, '0')}`;
                     }
                 }, 1000);
@@ -640,7 +649,7 @@
                         ${message}
                     </div>
                 `;
-                
+
                 // Auto-hide after 5 seconds
                 setTimeout(() => {
                     container.innerHTML = '';
@@ -654,50 +663,50 @@
 
             cleanup() {
                 this.isConnected = false;
-                
+
                 // Close WebSocket
                 if (this.ws) {
                     this.ws.close();
                     this.ws = null;
                 }
-                
+
                 // Stop audio
                 if (this.processor) {
                     this.processor.disconnect();
                     this.processor = null;
                 }
-                
+
                 if (this.source) {
                     this.source.disconnect();
                     this.source = null;
                 }
-                
+
                 if (this.analyser) {
                     this.analyser.disconnect();
                     this.analyser = null;
                 }
-                
+
                 if (this.audioContext) {
                     this.audioContext.close();
                     this.audioContext = null;
                 }
-                
+
                 if (this.mediaStream) {
                     this.mediaStream.getTracks().forEach(track => track.stop());
                     this.mediaStream = null;
                 }
-                
+
                 // Clear stats interval
                 if (this.statsInterval) {
                     clearInterval(this.statsInterval);
                     this.statsInterval = null;
                 }
-                
+
                 // Reset visualizer
                 this.visualizerBars.forEach(bar => {
                     bar.style.height = '4px';
                 });
-                
+
                 // Update UI
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('stopBtn').disabled = true;

@@ -164,13 +164,13 @@ async function startTranscription(connectionId: string, ws: any, model: string) 
                     case 'transcription_start':
                         console.log(`🎯 Transcription started for ${connectionId}`);
                         break;
-                    case 'transcription_delta':
+                    case 'transcription_turn_delta':
                         console.log(`📝 [${connectionId}] Delta: ${event.delta}`);
                         break;
-                    case 'transcription_preview':
-                        console.log(`🎤 [${connectionId}] User said: "${event.text}"`);
+                    case 'transcription_turn_start':
+                        console.log(`🔄 [${connectionId}] Turn start`);
                         break;
-                    case 'transcription_turn':
+                    case 'transcription_turn_complete':
                         console.log(`🔄 [${connectionId}] Turn complete: "${event.text}"`);
                         break;
                     // Note: cost_update events are emitted globally by costTracker,
