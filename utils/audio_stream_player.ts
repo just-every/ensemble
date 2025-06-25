@@ -17,8 +17,7 @@ export class AudioStreamPlayer {
     private receivedFinalChunk = false;
     private pcmParameters: { sampleRate: number; channels: number; bitDepth: number } | null = null;
     private pcmDataQueue: ArrayBuffer[] = [];
-    private bufferDurationTarget = 0.2; // 200ms buffer before playing (needed for gpt-4o-mini-tts)
-    private minimumQueueDuration = 0.1; // Always keep 100ms in queue to prevent underruns
+    private bufferDurationTarget = 0.2; // 200ms buffer chunks for smooth playback
     private bytesPerSample = 2; // 16-bit
     private isFirstBuffer = true;
     private currentFormat: string | null = null;
@@ -146,15 +145,8 @@ export class AudioStreamPlayer {
             this.bytesPerSample *
             this.bufferDurationTarget;
 
-        // For non-first buffers, ensure minimum queue to prevent underruns
-        const minimumBytes = this.isFirstBuffer
-            ? requiredBytes
-            : this.pcmParameters.sampleRate *
-              this.pcmParameters.channels *
-              this.bytesPerSample *
-              this.minimumQueueDuration;
-
-        if (totalBytes < minimumBytes && !(this.receivedFinalChunk && totalBytes > 0)) {
+        // Always wait for full buffer size unless we've received the final chunk
+        if (totalBytes < requiredBytes && !(this.receivedFinalChunk && totalBytes > 0)) {
             return;
         }
 
