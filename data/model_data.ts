@@ -1510,13 +1510,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'google',
         cost: {
             input_per_million: {
-                text: 0.5, // $0.50 per 1M input text tokens
-                audio: 3.0, // $3.00 per 1M input audio tokens
-                video: 3.0, // $3.00 per 1M input video tokens
+                text: 0.35,
+                audio: 2.1,
+                video: 2.1,
             },
             output_per_million: {
-                text: 2.0, // $2.00 per 1M output text tokens
-                audio: 12.0, // $12.00 per 1M output audio tokens
+                text: 1.5,
+                audio: 8.5,
             },
         },
         features: {
