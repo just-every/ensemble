@@ -1400,27 +1400,29 @@ export class OpenAIProvider extends BaseModelProvider {
                             // Update session for transcription-only mode
                             const sessionUpdate = {
                                 type: 'transcription_session.update',
-                                input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
-                                input_audio_transcription: {
-                                    model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
-                                    prompt: opts?.prompt || '',
-                                    language: opts?.language || '',
+                                session: {
+                                    input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
+                                    input_audio_transcription: {
+                                        model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
+                                        prompt: opts?.prompt || '',
+                                        language: opts?.language || '',
+                                    },
+                                    turn_detection:
+                                        opts?.vad === false
+                                            ? null
+                                            : {
+                                                  type: 'server_vad',
+                                                  threshold: 0.5,
+                                                  prefix_padding_ms: 300,
+                                                  silence_duration_ms: 500,
+                                              },
+                                    input_audio_noise_reduction:
+                                        opts?.noiseReduction === null
+                                            ? null
+                                            : {
+                                                  type: opts?.noiseReduction || 'near_field',
+                                              },
                                 },
-                                turn_detection:
-                                    opts?.vad === false
-                                        ? null
-                                        : {
-                                              type: 'server_vad',
-                                              threshold: 0.5,
-                                              prefix_padding_ms: 300,
-                                              silence_duration_ms: 500,
-                                          },
-                                input_audio_noise_reduction:
-                                    opts?.noiseReduction === null
-                                        ? null
-                                        : {
-                                              type: opts?.noiseReduction || 'near_field',
-                                          },
                             };
                             ws!.send(JSON.stringify(sessionUpdate));
                             break;
