@@ -17,7 +17,7 @@ export class AudioStreamPlayer {
     private receivedFinalChunk = false;
     private pcmParameters: { sampleRate: number; channels: number; bitDepth: number } | null = null;
     private pcmDataQueue: ArrayBuffer[] = [];
-    private bufferDurationTarget = 0.1; // 100ms buffer before playing
+    private bufferDurationTarget = 0.15; // 150ms buffer before playing (slightly larger for gpt-4o-mini-tts)
     private bytesPerSample = 2; // 16-bit
     private isFirstBuffer = true;
     private currentFormat: string | null = null;

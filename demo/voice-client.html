@@ -580,7 +580,8 @@
                         <label class="setting-label">Model</label>
                         <select id="modelSelect">
                             <optgroup label="OpenAI Models">
-                                <option value="tts-1-hd" selected>TTS-1-HD (High Quality)</option>
+                                <option value="gpt-4o-mini-tts" selected>GPT-4o mini TTS (Latest)</option>
+                                <option value="tts-1-hd">TTS-1-HD (High Quality)</option>
                                 <option value="tts-1">TTS-1 (Standard)</option>
                             </optgroup>
                             <optgroup label="ElevenLabs Models">
@@ -747,6 +748,17 @@
     <script>
         // Voice options for different models
         const voiceOptions = {
+            'gpt-4o-mini-tts': [
+                { value: 'sage', label: 'Sage (Clear)' },
+                { value: 'echo', label: 'Echo (Male)' },
+                { value: 'alloy', label: 'Alloy (Neutral)' },
+                { value: 'ash', label: 'Ash (Conversational)' },
+                { value: 'coral', label: 'Coral (Pleasant)' },
+                { value: 'fable', label: 'Fable (British)' },
+                { value: 'nova', label: 'Nova (Friendly)' },
+                { value: 'onyx', label: 'Onyx (Deep)' },
+                { value: 'shimmer', label: 'Shimmer (Soft)' }
+            ],
             'tts-1-hd': [
                 { value: 'sage', label: 'Sage (Clear)' },
                 { value: 'echo', label: 'Echo (Male)' },
@@ -1361,13 +1373,16 @@
                 let costPerMillion = 15; // Default TTS-1 pricing
 
                 // Model-specific pricing
-                if (model === 'tts-1-hd') {
+                if (model === 'gpt-4o-mini-tts') {
+                    costPerMillion = 12;
+                } else if (model === 'tts-1-hd') {
                     costPerMillion = 30;
                 } else if (model === 'eleven_multilingual_v2') {
                     costPerMillion = 300;
                 } else if (model === 'eleven_turbo_v2_5') {
                     costPerMillion = 180;
                 }
+
 
                 const characters = document.getElementById('textInput').value.length;
                 const cost = (characters / 1_000_000) * costPerMillion;
@@ -1535,7 +1550,7 @@ wss.on('connection', (ws) => {
 
             if (message.type === 'generate') {
                 const { text } = message;
-                
+
                 if (!text || text.trim().length === 0) {
                     ws.send(JSON.stringify({
                         type: 'error',
@@ -1586,7 +1601,7 @@ server.listen(PORT, () => {
             generateClientCode(model, voice, format, speed) {
                 // Clean up the format to get base format
                 const baseFormat = format.split('_')[0];
-                
+
                 return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1698,7 +1713,7 @@ server.listen(PORT, () => {
         // Connect to WebSocket server
         function connect() {
             updateStatus('Connecting...', 'info');
-            
+
             ws = new WebSocket(CONFIG.WS_URL);
 
             ws.onopen = () => {
@@ -1762,7 +1777,7 @@ server.listen(PORT, () => {
             ws.onclose = () => {
                 updateStatus('Disconnected', 'error');
                 document.getElementById('generateBtn').disabled = true;
-                
+
                 // Attempt reconnection
                 if (reconnectAttempts < CONFIG.MAX_RECONNECT_ATTEMPTS) {
                     reconnectAttempts++;
@@ -1789,7 +1804,7 @@ server.listen(PORT, () => {
             document.getElementById('generateBtn').disabled = true;
             updateStatus('Generating...', 'info');
             audioChunks = [];
-            
+
             // Stop any existing playback
             if (audioPlayer) {
                 audioPlayer.stopStream();
