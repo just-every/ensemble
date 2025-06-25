@@ -118,13 +118,14 @@ class ElevenLabsProvider extends BaseModelProvider {
                 text,
                 model_id: modelId,
                 voice_settings: {
+                    speed: 0.9,
                     stability: 0.4,
                     similarity_boost: 0.5,
                     use_speaker_boost: true,
                     ...(opts?.voice_settings || {}),
                 },
             };
-            
+
             // Add speed to voice_settings if provided
             if (opts?.speed !== undefined) {
                 (requestBody.voice_settings as any).speed = opts.speed;
@@ -151,19 +152,11 @@ class ElevenLabsProvider extends BaseModelProvider {
 
             // Track usage for cost calculation
             const characterCount = text.length;
-            // Cost depends on the model tier
-            let costPerThousandChars = 0.3; // Default to standard tier
-            if (modelId.includes('multilingual_v2')) {
-                costPerThousandChars = 0.3;
-            } else if (modelId.includes('turbo')) {
-                costPerThousandChars = 0.18;
-            }
-
-            const cost = (characterCount / 1000) * costPerThousandChars;
 
             costTracker.addUsage({
                 model,
-                cost, // Pass cost directly, not in metadata
+                input_tokens: Math.ceil(characterCount / 4), // Approximate character count
+                output_tokens: 0,
                 metadata: {
                     character_count: characterCount,
                     voice: voiceId,

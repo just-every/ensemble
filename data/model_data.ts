@@ -213,6 +213,7 @@ export const MODEL_CLASSES = {
             'tts-1-hd', // OpenAI's high-quality TTS model
             'eleven_multilingual_v2', // ElevenLabs multilingual model
             'eleven_turbo_v2_5', // ElevenLabs turbo model for low latency
+            'eleven_flash_v2_5', // ElevenLabs turbo model for low latency
             'gemini-2.5-flash-preview-tts', // Gemini's flash TTS model
             'gemini-2.5-pro-preview-tts', // Gemini's pro TTS model
         ],
@@ -1180,7 +1181,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'eleven_multilingual_v2',
         provider: 'elevenlabs',
         cost: {
-            input_per_million: 300.0, // $0.30 per 1000 characters = $300 per million
+            input_per_million: 55, // Average $0.22 per 1000 characters = $220 per million characters = $55 per million tokens
             output_per_million: 0, // No output tokens for TTS
         },
         features: {
@@ -1190,13 +1191,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'voice',
         description:
-            "ElevenLabs' multilingual text-to-speech model supporting 29 languages with natural voice cloning capabilities.",
+            "ElevenLabs' multilingual high quality text-to-speech model supporting 29 languages with natural voice capabilities.",
     },
     {
         id: 'eleven_turbo_v2_5',
         provider: 'elevenlabs',
         cost: {
-            input_per_million: 180.0, // $0.18 per 1000 characters = $180 per million
+            input_per_million: 27.5, // Average $0.11 per 1000 characters = $110 per million characters = $27.5 per million tokens
             output_per_million: 0, // No output tokens for TTS
         },
         features: {
@@ -1206,6 +1207,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'voice',
         description: "ElevenLabs' turbo model optimized for low-latency text-to-speech with high quality output.",
+    },
+    {
+        id: 'eleven_flash_v2_5',
+        provider: 'elevenlabs',
+        cost: {
+            input_per_million: 27.5, // Average $0.11 per 1000 characters = $110 per million characters = $27.5 per million tokens
+            output_per_million: 0, // No output tokens for TTS
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+        },
+        class: 'voice',
+        description: "ElevenLabs' fastest model optimized for ultra low-latency text-to-speech.",
     },
     {
         id: 'gemini-2.5-flash-preview-tts',

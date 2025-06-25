@@ -585,8 +585,9 @@
                                 <option value="tts-1">TTS-1 (Standard)</option>
                             </optgroup>
                             <optgroup label="ElevenLabs Models">
-                                <option value="eleven_turbo_v2_5">Turbo V2.5 (Low Latency)</option>
-                                <option value="eleven_multilingual_v2">Multilingual V2</option>
+                                <option value="eleven_turbo_v2_5">Turbo V2.5 (Balanced)</option>
+                                <option value="eleven_flash_v2_5">Flash V2.5 (Ultra Low Latency)</option>
+                                <option value="eleven_multilingual_v2">Multilingual V2 (High Quality)</option>
                             </optgroup>
                             <optgroup label="Gemini Models">
                                 <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS (High Quality)</option>
@@ -746,9 +747,9 @@
     </script>
 
     <script>
-        // Voice options for different models
+        // Voice options for different providers
         const voiceOptions = {
-            'gpt-4o-mini-tts': [
+            'openai': [
                 { value: 'sage', label: 'Sage (Clear)' },
                 { value: 'echo', label: 'Echo (Male)' },
                 { value: 'alloy', label: 'Alloy (Neutral)' },
@@ -759,29 +760,7 @@
                 { value: 'onyx', label: 'Onyx (Deep)' },
                 { value: 'shimmer', label: 'Shimmer (Soft)' }
             ],
-            'tts-1-hd': [
-                { value: 'sage', label: 'Sage (Clear)' },
-                { value: 'echo', label: 'Echo (Male)' },
-                { value: 'alloy', label: 'Alloy (Neutral)' },
-                { value: 'ash', label: 'Ash (Conversational)' },
-                { value: 'coral', label: 'Coral (Pleasant)' },
-                { value: 'fable', label: 'Fable (British)' },
-                { value: 'nova', label: 'Nova (Friendly)' },
-                { value: 'onyx', label: 'Onyx (Deep)' },
-                { value: 'shimmer', label: 'Shimmer (Soft)' }
-            ],
-            'tts-1': [
-                { value: 'sage', label: 'Sage (Clear)' },
-                { value: 'echo', label: 'Echo (Male)' },
-                { value: 'alloy', label: 'Alloy (Neutral)' },
-                { value: 'ash', label: 'Ash (Conversational)' },
-                { value: 'coral', label: 'Coral (Pleasant)' },
-                { value: 'fable', label: 'Fable (British)' },
-                { value: 'nova', label: 'Nova (Friendly)' },
-                { value: 'onyx', label: 'Onyx (Deep)' },
-                { value: 'shimmer', label: 'Shimmer (Soft)' }
-            ],
-            'eleven_turbo_v2_5': [
+            'elevenlabs': [
                 { value: 'jessica', label: 'Jessica (Expressive female)' },
                 { value: 'james', label: 'James (Australian male)' },
                 { value: 'rachel', label: 'Rachel (Natural female)' },
@@ -799,57 +778,7 @@
                 { value: 'unreal', label: 'Unreal (Synthetic/Unique)' },
                 { value: 'blondie', label: 'Blondie (Bright female)' }
             ],
-            'eleven_multilingual_v2': [
-                { value: 'jessica', label: 'Jessica (Expressive female)' },
-                { value: 'james', label: 'James (Australian male)' },
-                { value: 'rachel', label: 'Rachel (Natural female)' },
-                { value: 'domi', label: 'Domi (Warm)' },
-                { value: 'bella', label: 'Bella (Youthful female)' },
-                { value: 'antoni', label: 'Antoni (Professional male)' },
-                { value: 'elli', label: 'Elli (Friendly)' },
-                { value: 'josh', label: 'Josh (Deep male)' },
-                { value: 'arnold', label: 'Arnold (Authoritative)' },
-                { value: 'adam', label: 'Adam (Narrative male)' },
-                { value: 'sam', label: 'Sam (Energetic male)' },
-                { value: 'george', label: 'George (Distinguished)' },
-                { value: 'laura', label: 'Laura (Sophisticated female)' },
-                { value: 'callum', label: 'Callum (British male)' },
-                { value: 'unreal', label: 'Unreal (Synthetic/Unique)' },
-                { value: 'blondie', label: 'Blondie (Bright female)' }
-            ],
-            'gemini-2.5-pro-preview-tts': [
-                { value: 'Aoede', label: 'Aoede (Breezy)' },
-                { value: 'Zephyr', label: 'Zephyr (Bright)' },
-                { value: 'Puck', label: 'Puck (Upbeat)' },
-                { value: 'Charon', label: 'Charon (Informative)' },
-                { value: 'Kore', label: 'Kore (Firm)' },
-                { value: 'Fenrir', label: 'Fenrir (Excitable)' },
-                { value: 'Leda', label: 'Leda (Youthful)' },
-                { value: 'Orus', label: 'Orus (Firm)' },
-                { value: 'Callirrhoe', label: 'Callirrhoe (Easy-going)' },
-                { value: 'Autonoe', label: 'Autonoe (Bright)' },
-                { value: 'Enceladus', label: 'Enceladus (Breathy)' },
-                { value: 'Iapetus', label: 'Iapetus (Clear)' },
-                { value: 'Umbriel', label: 'Umbriel (Easy-going)' },
-                { value: 'Algieba', label: 'Algieba (Smooth)' },
-                { value: 'Despina', label: 'Despina (Smooth)' },
-                { value: 'Erinome', label: 'Erinome (Clear)' },
-                { value: 'Algenib', label: 'Algenib (Gravelly)' },
-                { value: 'Rasalgethi', label: 'Rasalgethi (Informative)' },
-                { value: 'Laomedeia', label: 'Laomedeia (Upbeat)' },
-                { value: 'Achernar', label: 'Achernar (Soft)' },
-                { value: 'Alnilam', label: 'Alnilam (Firm)' },
-                { value: 'Schedar', label: 'Schedar (Even)' },
-                { value: 'Gacrux', label: 'Gacrux (Mature)' },
-                { value: 'Pulcherrima', label: 'Pulcherrima (Forward)' },
-                { value: 'Achird', label: 'Achird (Friendly)' },
-                { value: 'Zubenelgenubi', label: 'Zubenelgenubi (Casual)' },
-                { value: 'Vindemiatrix', label: 'Vindemiatrix (Gentle)' },
-                { value: 'Sadachbia', label: 'Sadachbia (Lively)' },
-                { value: 'Sadaltager', label: 'Sadaltager (Knowledgeable)' },
-                { value: 'Sulafat', label: 'Sulafat (Warm)' }
-            ],
-            'gemini-2.5-flash-preview-tts': [
+            'gemini': [
                 { value: 'Aoede', label: 'Aoede (Breezy)' },
                 { value: 'Zephyr', label: 'Zephyr (Bright)' },
                 { value: 'Puck', label: 'Puck (Upbeat)' },
@@ -988,7 +917,16 @@
             updateVoiceOptions() {
                 const model = document.getElementById('modelSelect').value;
                 const voiceSelect = document.getElementById('voiceSelect');
-                const voices = voiceOptions[model] || [];
+
+                // Determine provider from model
+                let provider = 'openai';
+                if (model.startsWith('eleven_')) {
+                    provider = 'elevenlabs';
+                } else if (model.startsWith('gemini')) {
+                    provider = 'gemini';
+                }
+
+                const voices = voiceOptions[provider] || [];
 
                 voiceSelect.innerHTML = '';
                 voices.forEach(voice => {
@@ -1385,25 +1323,7 @@
             updateCostInfo(usage) {
                 if (!usage) return;
 
-                const model = document.getElementById('modelSelect').value;
-                let costPerMillion = 15; // Default TTS-1 pricing
-
-                // Model-specific pricing
-                if (model === 'gpt-4o-mini-tts') {
-                    costPerMillion = 12;
-                } else if (model === 'tts-1-hd') {
-                    costPerMillion = 30;
-                } else if (model === 'eleven_multilingual_v2') {
-                    costPerMillion = 300;
-                } else if (model === 'eleven_turbo_v2_5') {
-                    costPerMillion = 180;
-                }
-
-
-                const characters = document.getElementById('textInput').value.length;
-                const cost = (characters / 1_000_000) * costPerMillion;
-
-                document.getElementById('cost').textContent = `$${cost.toFixed(4)}`;
+                document.getElementById('cost').textContent = `$${usage.cost.toFixed(4)}`;
             }
 
             downloadAudio() {
