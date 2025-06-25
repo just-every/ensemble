@@ -17,7 +17,8 @@ export class AudioStreamPlayer {
     private receivedFinalChunk = false;
     private pcmParameters: { sampleRate: number; channels: number; bitDepth: number } | null = null;
     private pcmDataQueue: ArrayBuffer[] = [];
-    private bufferDurationTarget = 0.15; // 150ms buffer before playing (slightly larger for gpt-4o-mini-tts)
+    private bufferDurationTarget = 0.2; // 200ms buffer before playing (needed for gpt-4o-mini-tts)
+    private minimumQueueDuration = 0.1; // Always keep 100ms in queue to prevent underruns
     private bytesPerSample = 2; // 16-bit
     private isFirstBuffer = true;
     private currentFormat: string | null = null;
@@ -145,7 +146,15 @@ export class AudioStreamPlayer {
             this.bytesPerSample *
             this.bufferDurationTarget;
 
-        if (totalBytes < requiredBytes && !(this.receivedFinalChunk && totalBytes > 0)) {
+        // For non-first buffers, ensure minimum queue to prevent underruns
+        const minimumBytes = this.isFirstBuffer
+            ? requiredBytes
+            : this.pcmParameters.sampleRate *
+              this.pcmParameters.channels *
+              this.bytesPerSample *
+              this.minimumQueueDuration;
+
+        if (totalBytes < minimumBytes && !(this.receivedFinalChunk && totalBytes > 0)) {
             return;
         }
 
@@ -237,12 +246,14 @@ export class AudioStreamPlayer {
             if (index > -1) {
                 this.sourceNodes.splice(index, 1);
             }
-            this._processPcmQueue();
+            // Add small delay to allow more data to accumulate
+            setTimeout(() => this._processPcmQueue(), 20);
         };
 
         // Continue processing if we have more data or are still receiving
         if (this.pcmDataQueue.length > 0 || !this.receivedFinalChunk) {
-            setTimeout(() => this._processPcmQueue(), 10);
+            // Check more frequently to ensure smooth playback
+            setTimeout(() => this._processPcmQueue(), 50);
         }
     }
 

@@ -910,9 +910,17 @@
                 this.audioFormat = 'mp3';
                 this.pcmParameters = null;
 
+                // Flag to prevent auto-generate during initialization
+                this.isInitializing = true;
+
                 this.setupEventHandlers();
                 this.updateVoiceOptions();
                 this.updateCharCounter();
+
+                // Allow auto-generate after initialization
+                setTimeout(() => {
+                    this.isInitializing = false;
+                }, 100);
             }
 
             setupEventHandlers() {
@@ -938,7 +946,7 @@
 
                 // Voice change - auto-generate
                 document.getElementById('voiceSelect').addEventListener('change', () => {
-                    if (this.isConnected && !this.isGenerating && document.getElementById('textInput').value.trim()) {
+                    if (!this.isInitializing && this.isConnected && !this.isGenerating && document.getElementById('textInput').value.trim()) {
                         this.generate();
                     }
                 });
@@ -1096,8 +1104,16 @@
                     return;
                 }
 
-                if (!this.isConnected || !this.ws) {
-                    this.showError('Not connected to server');
+                // Wait for connection if still connecting
+                if (!this.ws || this.ws.readyState === WebSocket.CONNECTING || !this.isConnected) {
+                    // Don't show error - just wait and retry
+                    setTimeout(() => this.generate(), 100);
+                    return;
+                }
+
+                if (this.ws.readyState !== WebSocket.OPEN) {
+                    this.showError('Connection lost, reconnecting...');
+                    this.connect();
                     return;
                 }
 
