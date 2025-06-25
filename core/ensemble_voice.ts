@@ -58,7 +58,7 @@ export async function* ensembleVoice(
     console.log(`[ensembleVoice] Starting TTS generation with model: ${model}`);
 
     // Emit initial event with format info
-    const isOpenAI = model.startsWith('tts-') || model.includes('-tts');
+    const isOpenAI = model === 'tts-1' || model === 'tts-1-hd' || model === 'gpt-4o-mini-tts';
     const isWav = format === 'wav';
 
     // Determine effective format after any conversions
