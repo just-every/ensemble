@@ -1,8 +1,4 @@
-import {
-    ensembleRequest,
-    ensembleResult,
-    type AgentDefinition,
-} from '../index.js';
+import { ensembleRequest, ensembleResult, type AgentDefinition } from '../index.js';
 
 async function example() {
     const messages = [
@@ -47,9 +43,7 @@ async function example() {
         message: result.message,
         cost: result.cost,
         completed: result.completed,
-        duration: result.endTime
-            ? result.endTime.getTime() - result.startTime.getTime()
-            : 0,
+        duration: result.endTime ? result.endTime.getTime() - result.startTime.getTime() : 0,
         messageIds: Array.from(result.messageIds),
     });
 }

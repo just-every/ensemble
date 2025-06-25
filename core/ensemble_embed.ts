@@ -1,8 +1,5 @@
 import type { AgentDefinition, EmbedOpts } from '../types/types.js';
-import {
-    getModelFromAgent,
-    getModelProvider,
-} from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
 
 const EMBEDDING_TTL_MS = 1000 * 60 * 60; // 1 hour
 const EMBEDDING_CACHE_MAX = 1000;
@@ -40,11 +37,7 @@ const embeddingCache = new Map<
  * });
  * ```
  */
-export async function ensembleEmbed(
-    text: string,
-    agent: AgentDefinition,
-    options?: EmbedOpts
-): Promise<number[]> {
+export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
     // Use a hash of the text and model as the cache key
     const cacheKey = `${agent.model || agent.modelClass}:${text}`;
 
@@ -64,18 +57,14 @@ export async function ensembleEmbed(
     const provider = getModelProvider(model);
 
     if (!provider.createEmbedding) {
-        throw new Error(
-            `Provider for model ${model} does not support embeddings`
-        );
+        throw new Error(`Provider for model ${model} does not support embeddings`);
     }
 
     // Generate the embedding using the provider
     const result = await provider.createEmbedding(text, model, options);
 
     // Handle array result (single text input should return single vector)
-    const embedding = Array.isArray(result[0])
-        ? result[0]
-        : (result as number[]);
+    const embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);
 
     // Cache the result with simple LRU eviction
     if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {

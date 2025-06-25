@@ -184,9 +184,7 @@ export class Agent implements AgentDefinition {
     constructor(definition: AgentDefinition) {
         // Validate that we received a proper AgentDefinition
         if (!definition || typeof definition !== 'object') {
-            throw new Error(
-                `Agent constructor expects an AgentDefinition object, but received: ${typeof definition}`
-            );
+            throw new Error(`Agent constructor expects an AgentDefinition object, but received: ${typeof definition}`);
         }
 
         this.agent_id = definition.agent_id || uuid();
@@ -235,16 +233,14 @@ export class Agent implements AgentDefinition {
         }
 
         if (definition.workers) {
-            this.workers = definition.workers.map(
-                (createAgentFn: WorkerFunction): WorkerFunction => {
-                    return () => {
-                        // Call the function with no arguments or adjust based on what ExecutableFunction expects
-                        const agent = createAgentFn() as Agent;
-                        agent.parent_id = this.agent_id;
-                        return agent;
-                    };
-                }
-            );
+            this.workers = definition.workers.map((createAgentFn: WorkerFunction): WorkerFunction => {
+                return () => {
+                    // Call the function with no arguments or adjust based on what ExecutableFunction expects
+                    const agent = createAgentFn() as Agent;
+                    agent.parent_id = this.agent_id;
+                    return agent;
+                };
+            });
             this.tools = this.tools.concat(
                 this.workers.map((createAgentFn: WorkerFunction) => {
                     // Call the function with no arguments or adjust based on what ExecutableFunction expects
@@ -273,8 +269,7 @@ export class Agent implements AgentDefinition {
             this.tools.forEach(tool => {
                 description += `- ${tool.definition.function.name}\n`;
             });
-            description +=
-                '\nUse this as a guide when to call the agent, but let the agent decide which tools to use.';
+            description += '\nUse this as a guide when to call the agent, but let the agent decide which tools to use.';
         }
         return createToolFunction(
             async (...args: any[]) => {
@@ -295,11 +290,7 @@ export class Agent implements AgentDefinition {
                     let paramsObj: Record<string, any>;
 
                     // Handle single object argument vs positional arguments
-                    if (
-                        args.length === 1 &&
-                        typeof args[0] === 'object' &&
-                        args[0] !== null
-                    ) {
+                    if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
                         // Already using named parameters
                         paramsObj = args[0] as Record<string, any>;
                     } else {
@@ -311,31 +302,20 @@ export class Agent implements AgentDefinition {
                         });
                     }
 
-                    const { prompt, intelligence } = await agent.processParams(
-                        agent,
-                        paramsObj
-                    );
+                    const { prompt, intelligence } = await agent.processParams(agent, paramsObj);
                     return runAgentTool(agent, prompt, intelligence);
                 }
 
                 // If we have standard positional arguments, convert them to a parameters object
                 let task: string = typeof args[0] === 'string' ? args[0] : '';
-                let context: string | undefined =
-                    typeof args[1] === 'string' ? args[1] : undefined;
-                let warnings: string | undefined =
-                    typeof args[2] === 'string' ? args[2] : undefined;
-                let goal: string | undefined =
-                    typeof args[3] === 'string' ? args[3] : undefined;
-                let intelligence: ('low' | 'standard' | 'high') | undefined =
-                    args[4] as any;
+                let context: string | undefined = typeof args[1] === 'string' ? args[1] : undefined;
+                let warnings: string | undefined = typeof args[2] === 'string' ? args[2] : undefined;
+                let goal: string | undefined = typeof args[3] === 'string' ? args[3] : undefined;
+                let intelligence: ('low' | 'standard' | 'high') | undefined = args[4] as any;
 
                 // If we have a single object argument with named parameters (from createToolFunction's validation),
                 // extract the parameters
-                if (
-                    args.length === 1 &&
-                    typeof args[0] === 'object' &&
-                    args[0] !== null
-                ) {
+                if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
                     const params = args[0] as Record<string, any>;
                     task = params.task || task;
                     context = params.context || context;
@@ -405,12 +385,7 @@ export class Agent implements AgentDefinition {
         // 1. Add statically assigned tools (from this.tools) or common tools as a base
         const baseTools = this.tools && this.tools.length > 0 ? this.tools : [];
         for (const tool of baseTools) {
-            if (
-                tool &&
-                tool.definition &&
-                tool.definition.function &&
-                tool.definition.function.name
-            ) {
+            if (tool && tool.definition && tool.definition.function && tool.definition.function.name) {
                 // Clone the tool to avoid modifying the original
                 const clonedTool = { ...tool };
                 clonedTool.definition = { ...tool.definition };
@@ -427,15 +402,9 @@ export class Agent implements AgentDefinition {
                 // Process dynamic properties in parameters
                 await this.processDynamicToolParameters(clonedTool);
 
-                combinedTools.set(
-                    clonedTool.definition.function.name,
-                    clonedTool
-                );
+                combinedTools.set(clonedTool.definition.function.name, clonedTool);
             } else {
-                console.warn(
-                    '[Agent.getTools] Encountered a base tool with missing definition or name:',
-                    tool
-                );
+                console.warn('[Agent.getTools] Encountered a base tool with missing definition or name:', tool);
             }
         }
 
@@ -443,12 +412,7 @@ export class Agent implements AgentDefinition {
         if (this.agent_id) {
             const cachedAgentTools = getAgentSpecificTools(this.agent_id);
             for (const tool of cachedAgentTools) {
-                if (
-                    tool &&
-                    tool.definition &&
-                    tool.definition.function &&
-                    tool.definition.function.name
-                ) {
+                if (tool && tool.definition && tool.definition.function && tool.definition.function.name) {
                     // Clone the tool to avoid modifying the original
                     const clonedTool = { ...tool };
                     clonedTool.definition = { ...tool.definition };
@@ -465,15 +429,9 @@ export class Agent implements AgentDefinition {
                     // Process dynamic properties in parameters
                     await this.processDynamicToolParameters(clonedTool);
 
-                    combinedTools.set(
-                        clonedTool.definition.function.name,
-                        clonedTool
-                    ); // Overwrites if name exists
+                    combinedTools.set(clonedTool.definition.function.name, clonedTool); // Overwrites if name exists
                 } else {
-                    console.warn(
-                        '[Agent.getTools] Encountered a cached tool with missing definition or name:',
-                        tool
-                    );
+                    console.warn('[Agent.getTools] Encountered a cached tool with missing definition or name:', tool);
                 }
             }
         }
@@ -484,9 +442,7 @@ export class Agent implements AgentDefinition {
      * Process dynamic tool parameters (descriptions and enums)
      * @param tool The tool to process
      */
-    private async processDynamicToolParameters(
-        tool: ToolFunction
-    ): Promise<void> {
+    private async processDynamicToolParameters(tool: ToolFunction): Promise<void> {
         const properties = tool.definition.function.parameters.properties;
 
         for (const paramName in properties) {
@@ -628,9 +584,7 @@ async function runAgentTool(
  * @param agent The agent or agent definition to get tools from
  * @returns Promise resolving to an array of tools
  */
-export async function getToolsFromAgent(
-    agent: AgentDefinition | Agent
-): Promise<ToolFunction[]> {
+export async function getToolsFromAgent(agent: AgentDefinition | Agent): Promise<ToolFunction[]> {
     // Check if it's an Agent instance with getTools method
     if (agent && typeof (agent as Agent).getTools === 'function') {
         return await (agent as Agent).getTools();

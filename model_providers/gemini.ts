@@ -38,19 +38,21 @@ import {
     TranscriptionOpts,
     TranscriptionAudioSource,
     TranscriptionEvent,
+    LiveConfig,
+    LiveOptions,
+    LiveSession,
+    LiveEvent,
+    LiveAudioBlob,
+    ToolCall,
+    ToolCallResult,
+    ResponseInputMessage,
+    ResponseOutputMessage,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../index.js';
-import {
-    log_llm_error,
-    log_llm_request,
-    log_llm_response,
-} from '../utils/llm_logger.js';
+import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import {
-    appendMessageWithImage,
-    resizeAndTruncateForGemini,
-} from '../utils/image_utils.js';
+import { appendMessageWithImage, resizeAndTruncateForGemini } from '../utils/image_utils.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -80,9 +82,7 @@ function convertParameterToGeminiFormat(param: any): any {
             console.warn("Mapping 'null' type to STRING");
             break;
         default:
-            console.warn(
-                `Unsupported parameter type '${param.type}'. Defaulting to STRING.`
-            );
+            console.warn(`Unsupported parameter type '${param.type}'. Defaulting to STRING.`);
             type = Type.STRING;
     }
 
@@ -135,9 +135,7 @@ function convertParameterToGeminiFormat(param: any): any {
                     // Handle enum - could be array or function
                     if (typeof itemEnum === 'function') {
                         // For now, we can't handle async enum functions in Gemini
-                        console.warn(
-                            'Gemini provider does not support async enum functions in array items'
-                        );
+                        console.warn('Gemini provider does not support async enum functions in array items');
                     } else {
                         result.items.enum = itemEnum;
                     }
@@ -155,11 +153,8 @@ function convertParameterToGeminiFormat(param: any): any {
         if (param.properties && typeof param.properties === 'object') {
             // Recursively convert nested properties
             result.properties = {};
-            for (const [propName, propSchema] of Object.entries(
-                param.properties
-            )) {
-                result.properties[propName] =
-                    convertParameterToGeminiFormat(propSchema);
+            for (const [propName, propSchema] of Object.entries(param.properties)) {
+                result.properties[propName] = convertParameterToGeminiFormat(propSchema);
             }
         } else {
             // No properties specified, add empty object
@@ -169,9 +164,7 @@ function convertParameterToGeminiFormat(param: any): any {
         // Handle enum - could be array or function
         if (typeof param.enum === 'function') {
             // For now, we can't handle async enum functions in Gemini at conversion time
-            console.warn(
-                'Gemini provider does not support async enum functions. Enum will be omitted.'
-            );
+            console.warn('Gemini provider does not support async enum functions. Enum will be omitted.');
             // We could potentially call sync functions here, but that would break async functions
             // For safety, we'll skip enum entirely when it's a function
         } else {
@@ -229,9 +222,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
     return resolved;
 }
 
-async function convertToGeminiFunctionDeclarations(
-    tools: ToolFunction[]
-): Promise<FunctionDeclaration[]> {
+async function convertToGeminiFunctionDeclarations(tools: ToolFunction[]): Promise<FunctionDeclaration[]> {
     const declarations = await Promise.all(
         tools.map(async tool => {
             // Special handling for Google web search
@@ -242,9 +233,7 @@ async function convertToGeminiFunctionDeclarations(
             }
 
             // First resolve async enums
-            const resolvedParams = await resolveAsyncEnums(
-                tool.definition?.function?.parameters
-            );
+            const resolvedParams = await resolveAsyncEnums(tool.definition?.function?.parameters);
             const toolParams = resolvedParams?.properties;
 
             const properties: Record<string, any> = {};
@@ -264,9 +253,7 @@ async function convertToGeminiFunctionDeclarations(
                 parameters: {
                     type: Type.OBJECT,
                     properties,
-                    required: Array.isArray(resolvedParams?.required)
-                        ? resolvedParams.required
-                        : [],
+                    required: Array.isArray(resolvedParams?.required) ? resolvedParams.required : [],
                 },
             };
         })
@@ -312,11 +299,7 @@ function formatGroundingChunks(chunks: any[]): string {
  * @param source - Description of where the images came from
  * @returns Updated input array with processed images
  */
-async function addImagesToInput(
-    input: Content[],
-    images: Record<string, string>,
-    source: string
-): Promise<Content[]> {
+async function addImagesToInput(input: Content[], images: Record<string, string>, source: string): Promise<Content[]> {
     // Add developer messages for each image
     for (const [image_id, imageData] of Object.entries(images)) {
         // Resize and split the image if needed
@@ -343,10 +326,7 @@ async function addImagesToInput(
 }
 
 // Convert message history to Gemini's content format
-async function convertToGeminiContents(
-    model: string,
-    messages: ResponseInput
-): Promise<Content[]> {
+async function convertToGeminiContents(model: string, messages: ResponseInput): Promise<Content[]> {
     let contents: Content[] = [];
 
     for (const msg of messages) {
@@ -355,16 +335,9 @@ async function convertToGeminiContents(
             let args: Record<string, unknown> = {};
             try {
                 const parsedArgs = JSON.parse(msg.arguments || '{}');
-                args =
-                    typeof parsedArgs === 'object' && parsedArgs !== null
-                        ? parsedArgs
-                        : { value: parsedArgs };
+                args = typeof parsedArgs === 'object' && parsedArgs !== null ? parsedArgs : { value: parsedArgs };
             } catch (e) {
-                console.error(
-                    `Failed to parse function call arguments for ${msg.name}:`,
-                    msg.arguments,
-                    e
-                );
+                console.error(`Failed to parse function call arguments for ${msg.name}:`, msg.arguments, e);
                 args = {
                     error: 'Invalid JSON arguments provided',
                     raw_args: msg.arguments,
@@ -409,8 +382,7 @@ async function convertToGeminiContents(
                 {
                     read: () => textOutput,
                     write: value => {
-                        message.parts[0].functionResponse.response.content =
-                            value;
+                        message.parts[0].functionResponse.response.content = value;
                         return message;
                     },
                 },
@@ -421,11 +393,7 @@ async function convertToGeminiContents(
             let textContent = '';
             if (typeof msg.content === 'string') {
                 textContent = msg.content;
-            } else if (
-                msg.content &&
-                typeof msg.content === 'object' &&
-                'text' in msg.content
-            ) {
+            } else if (msg.content && typeof msg.content === 'object' && 'text' in msg.content) {
                 textContent = msg.content.text as string;
             } else {
                 textContent = JSON.stringify(msg.content);
@@ -490,13 +458,12 @@ export class GeminiProvider extends BaseModelProvider {
             // Check for API key at runtime, not construction time
             const apiKey = this.apiKey || process.env.GOOGLE_API_KEY;
             if (!apiKey) {
-                throw new Error(
-                    'Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.'
-                );
+                throw new Error('Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.');
             }
             this._client = new GoogleGenAI({
                 apiKey: apiKey,
                 vertexai: false,
+                httpOptions: { apiVersion: 'v1alpha' },
             });
         }
         return this._client;
@@ -509,24 +476,16 @@ export class GeminiProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(
-        input: string | string[],
-        model: string,
-        opts?: EmbedOpts
-    ): Promise<number[] | number[][]> {
+    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
         try {
             // Handle 'gemini/' prefix if present
-            let actualModelId = model.startsWith('gemini/')
-                ? model.substring(7)
-                : model;
+            let actualModelId = model.startsWith('gemini/') ? model.substring(7) : model;
 
             // Check for suffix and remove it from actual model ID while setting thinking config
             let thinkingConfig: { thinkingBudget: number } | null = null;
 
             // Check if model has any of the defined suffixes
-            for (const [suffix, budget] of Object.entries(
-                THINKING_BUDGET_CONFIGS
-            )) {
+            for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
                 if (actualModelId.endsWith(suffix)) {
                     thinkingConfig = { thinkingBudget: budget };
                     actualModelId = actualModelId.slice(0, -suffix.length);
@@ -534,9 +493,7 @@ export class GeminiProvider extends BaseModelProvider {
                 }
             }
 
-            console.log(
-                `[Gemini] Generating embedding with model ${actualModelId}`
-            );
+            console.log(`[Gemini] Generating embedding with model ${actualModelId}`);
 
             // Prepare the embedding request payload
             const payload = {
@@ -561,9 +518,7 @@ export class GeminiProvider extends BaseModelProvider {
                 JSON.stringify(
                     response,
                     (key, value) =>
-                        key === 'values' &&
-                        Array.isArray(value) &&
-                        value.length > 10
+                        key === 'values' && Array.isArray(value) && value.length > 10
                             ? `[${value.length} items]`
                             : value,
                     2
@@ -573,13 +528,8 @@ export class GeminiProvider extends BaseModelProvider {
             // Extract the embedding values correctly
             // Check if response has the embedding field with values
             if (!response.embeddings || !Array.isArray(response.embeddings)) {
-                console.error(
-                    '[Gemini] Unexpected embedding response structure:',
-                    response
-                );
-                throw new Error(
-                    'Invalid embedding response structure from Gemini API'
-                );
+                console.error('[Gemini] Unexpected embedding response structure:', response);
+                throw new Error('Invalid embedding response structure from Gemini API');
             }
 
             // Track usage for cost calculation (Gemini embeddings are currently free)
@@ -587,10 +537,7 @@ export class GeminiProvider extends BaseModelProvider {
             const estimatedTokens =
                 typeof input === 'string'
                     ? Math.ceil(input.length / 4)
-                    : input.reduce(
-                          (sum, text) => sum + Math.ceil(text.length / 4),
-                          0
-                      );
+                    : input.reduce((sum, text) => sum + Math.ceil(text.length / 4), 0);
 
             // Extract the values from the correct path in the response
             let extractedValues: number[] | number[][] = [];
@@ -600,20 +547,13 @@ export class GeminiProvider extends BaseModelProvider {
             if (response.embeddings.length > 0) {
                 // Access the correct property path - in Gemini API it should be 'values'
                 if (response.embeddings[0].values) {
-                    extractedValues = response.embeddings.map(
-                        e => e.values as number[]
-                    );
+                    extractedValues = response.embeddings.map(e => e.values as number[]);
                     dimensions = (extractedValues[0] as number[]).length;
                 } else {
                     // Try direct embedding access if the expected property isn't found
-                    console.warn(
-                        '[Gemini] Could not find expected "values" property in embeddings response'
-                    );
-                    extractedValues =
-                        response.embeddings as unknown as number[][];
-                    dimensions = Array.isArray(extractedValues[0])
-                        ? extractedValues[0].length
-                        : 0;
+                    console.warn('[Gemini] Could not find expected "values" property in embeddings response');
+                    extractedValues = response.embeddings as unknown as number[][];
+                    dimensions = Array.isArray(extractedValues[0]) ? extractedValues[0].length : 0;
                 }
             }
 
@@ -634,20 +574,14 @@ export class GeminiProvider extends BaseModelProvider {
                 // Handle the single-input case - ensure we return a single array
                 let result: number[];
 
-                if (
-                    Array.isArray(extractedValues) &&
-                    extractedValues.length >= 1
-                ) {
+                if (Array.isArray(extractedValues) && extractedValues.length >= 1) {
                     const firstValue = extractedValues[0];
                     // Ensure we're returning a number[] and not a single number
                     if (Array.isArray(firstValue)) {
                         result = firstValue;
                     } else {
                         // If somehow we got a single number or non-array, return empty array
-                        console.error(
-                            '[Gemini] Unexpected format in embedding result:',
-                            firstValue
-                        );
+                        console.error('[Gemini] Unexpected format in embedding result:', firstValue);
                         result = [];
                     }
                 } else {
@@ -658,18 +592,13 @@ export class GeminiProvider extends BaseModelProvider {
                 // Ensure we truncate or pad to exactly 3072 dimensions for our halfvec database schema
                 let adjustedResult = result;
                 if (result.length !== 3072) {
-                    console.warn(
-                        `Gemini embedding returned ${result.length} dimensions, adjusting to 3072...`
-                    );
+                    console.warn(`Gemini embedding returned ${result.length} dimensions, adjusting to 3072...`);
                     if (result.length > 3072) {
                         // Truncate if too long
                         adjustedResult = result.slice(0, 3072);
                     } else {
                         // Pad with zeros if too short
-                        adjustedResult = [
-                            ...result,
-                            ...Array(3072 - result.length).fill(0),
-                        ];
+                        adjustedResult = [...result, ...Array(3072 - result.length).fill(0)];
                     }
                 }
                 return adjustedResult; // This is guaranteed to be number[] with exactly 3072 dimensions
@@ -703,21 +632,13 @@ export class GeminiProvider extends BaseModelProvider {
                 return; // Stream completed successfully
             } catch (error) {
                 attempts++;
-                const errorMsg =
-                    error instanceof Error ? error.message : String(error);
+                const errorMsg = error instanceof Error ? error.message : String(error);
 
                 // Only retry for incomplete JSON segment errors
-                if (
-                    errorMsg.includes('Incomplete JSON segment') &&
-                    attempts <= maxRetries
-                ) {
-                    console.warn(
-                        `[Gemini] Incomplete JSON segment error, retrying (${attempts}/${maxRetries})...`
-                    );
+                if (errorMsg.includes('Incomplete JSON segment') && attempts <= maxRetries) {
+                    console.warn(`[Gemini] Incomplete JSON segment error, retrying (${attempts}/${maxRetries})...`);
                     // Add a small delay before retry
-                    await new Promise(resolve =>
-                        setTimeout(resolve, 1000 * attempts)
-                    );
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
                     continue;
                 }
 
@@ -733,9 +654,7 @@ export class GeminiProvider extends BaseModelProvider {
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
         const { getToolsFromAgent } = await import('../utils/agent.js');
-        const tools: ToolFunction[] | undefined = agent
-            ? await getToolsFromAgent(agent)
-            : [];
+        const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
 
         let messageId = uuidv4();
@@ -770,18 +689,14 @@ export class GeminiProvider extends BaseModelProvider {
             // Check if the last message is from the user
             const lastContent = contents[contents.length - 1];
             if (lastContent.role !== 'user') {
-                console.warn(
-                    "Last message in history is not from 'user'. Gemini might not respond as expected."
-                );
+                console.warn("Last message in history is not from 'user'. Gemini might not respond as expected.");
             }
 
             // Handle model suffixes for thinking budget
             let thinkingBudget: number | null = null;
 
             // Check if model has any of the defined suffixes
-            for (const [suffix, budget] of Object.entries(
-                THINKING_BUDGET_CONFIGS
-            )) {
+            for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
                 if (model.endsWith(suffix)) {
                     thinkingBudget = budget;
                     model = model.slice(0, -suffix.length);
@@ -833,10 +748,7 @@ export class GeminiProvider extends BaseModelProvider {
                         }
 
                         // Process nested objects in properties
-                        if (
-                            obj.properties &&
-                            typeof obj.properties === 'object'
-                        ) {
+                        if (obj.properties && typeof obj.properties === 'object') {
                             Object.values(obj.properties).forEach(prop => {
                                 removeAdditionalProperties(prop);
                             });
@@ -865,14 +777,10 @@ export class GeminiProvider extends BaseModelProvider {
             let hasGoogleWebSearch = false;
             if (tools && tools.length > 0) {
                 // Check for Google web search tool
-                hasGoogleWebSearch = tools.some(
-                    tool =>
-                        tool.definition.function.name === 'google_web_search'
-                );
+                hasGoogleWebSearch = tools.some(tool => tool.definition.function.name === 'google_web_search');
 
                 // Configure standard function calling tools
-                const functionDeclarations =
-                    await convertToGeminiFunctionDeclarations(tools);
+                const functionDeclarations = await convertToGeminiFunctionDeclarations(tools);
                 let allowedFunctionNames: string[] = [];
 
                 if (functionDeclarations.length > 0) {
@@ -887,9 +795,7 @@ export class GeminiProvider extends BaseModelProvider {
                             settings.tool_choice?.function?.name
                         ) {
                             toolChoice = FunctionCallingConfigMode.ANY;
-                            allowedFunctionNames = [
-                                settings.tool_choice.function.name,
-                            ];
+                            allowedFunctionNames = [settings.tool_choice.function.name];
                         } else if (settings.tool_choice === 'required') {
                             toolChoice = FunctionCallingConfigMode.ANY;
                         } else if (settings.tool_choice === 'auto') {
@@ -905,15 +811,12 @@ export class GeminiProvider extends BaseModelProvider {
                                 },
                             };
                             if (allowedFunctionNames.length > 0) {
-                                config.toolConfig.functionCallingConfig.allowedFunctionNames =
-                                    allowedFunctionNames;
+                                config.toolConfig.functionCallingConfig.allowedFunctionNames = allowedFunctionNames;
                             }
                         }
                     }
                 } else if (!hasGoogleWebSearch) {
-                    console.warn(
-                        'Tools were provided but resulted in empty declarations after conversion.'
-                    );
+                    console.warn('Tools were provided but resulted in empty declarations after conversion.');
                 }
             }
 
@@ -936,22 +839,14 @@ export class GeminiProvider extends BaseModelProvider {
                 config,
             };
 
-            requestId = log_llm_request(
-                agent.agent_id,
-                'google',
-                model,
-                requestParams
-            );
+            requestId = log_llm_request(agent.agent_id, 'google', model, requestParams);
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import(
-                '../utils/pause_controller.js'
-            );
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
             await waitWhilePaused(100, agent.abortSignal);
 
             // --- Start streaming with retry logic ---
-            const getStreamFn = () =>
-                this.client.models.generateContentStream(requestParams);
+            const getStreamFn = () => this.client.models.generateContentStream(requestParams);
             const response = this.retryStreamOnIncompleteJson(getStreamFn);
 
             let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
@@ -968,17 +863,13 @@ export class GeminiProvider extends BaseModelProvider {
                 // console.debug('[Gemini] Raw chunk:', JSON.stringify(chunk));
                 // Check if the system was paused during the stream
                 if (isPaused()) {
-                    console.log(
-                        `[Gemini] System paused during stream for model ${model}. Waiting...`
-                    );
+                    console.log(`[Gemini] System paused during stream for model ${model}. Waiting...`);
 
                     // Wait while paused instead of aborting
                     await waitWhilePaused(100, agent.abortSignal);
 
                     // If we're resuming, continue processing
-                    console.log(
-                        `[Gemini] System resumed, continuing stream for model ${model}`
-                    );
+                    console.log(`[Gemini] System resumed, continuing stream for model ${model}`);
                 }
 
                 // Handle function calls (if present)
@@ -992,9 +883,7 @@ export class GeminiProvider extends BaseModelProvider {
                                     type: 'function',
                                     function: {
                                         name: fc.name,
-                                        arguments: JSON.stringify(
-                                            fc.args || {}
-                                        ),
+                                        arguments: JSON.stringify(fc.args || {}),
                                     },
                                 },
                             };
@@ -1042,34 +931,26 @@ export class GeminiProvider extends BaseModelProvider {
                                     type: 'file_complete',
                                     data_format: 'base64',
                                     data: part.inlineData.data,
-                                    mime_type:
-                                        part.inlineData.mimeType || 'image/png',
+                                    mime_type: part.inlineData.mimeType || 'image/png',
                                     message_id: uuidv4(),
                                     order: eventOrder++,
                                 };
                             }
                         }
                     }
-                    const gChunks =
-                        candidate.groundingMetadata?.groundingChunks;
+                    const gChunks = candidate.groundingMetadata?.groundingChunks;
                     if (Array.isArray(gChunks)) {
-                        const newChunks = gChunks.filter(
-                            c => c?.web?.uri && !shownGrounding.has(c.web.uri)
-                        );
+                        const newChunks = gChunks.filter(c => c?.web?.uri && !shownGrounding.has(c.web.uri));
                         if (newChunks.length) {
-                            newChunks.forEach(c =>
-                                shownGrounding.add(c.web.uri)
-                            );
+                            newChunks.forEach(c => shownGrounding.add(c.web.uri));
                             const formatted = formatGroundingChunks(newChunks);
                             yield {
                                 type: 'message_delta',
-                                content:
-                                    '\n\nSearch Results:\n' + formatted + '\n',
+                                content: '\n\nSearch Results:\n' + formatted + '\n',
                                 message_id: messageId,
                                 order: eventOrder++,
                             };
-                            contentBuffer +=
-                                '\n\nSearch Results:\n' + formatted + '\n';
+                            contentBuffer += '\n\nSearch Results:\n' + formatted + '\n';
                         }
                     }
                 }
@@ -1092,9 +973,7 @@ export class GeminiProvider extends BaseModelProvider {
                     },
                 });
             } else {
-                console.error(
-                    '[Gemini] No usage metadata found in the response. This may affect token tracking.'
-                );
+                console.error('[Gemini] No usage metadata found in the response. This may affect token tracking.');
                 costTracker.addUsage({
                     model,
                     input_tokens: 0, // Not provided in streaming response
@@ -1119,10 +998,7 @@ export class GeminiProvider extends BaseModelProvider {
         } catch (error) {
             log_llm_error(requestId, error);
             //console.error('Error during Gemini stream processing:', error);
-            const errorMessage =
-                error instanceof Error
-                    ? error.stack || error.message
-                    : String(error);
+            const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
 
             // Add special handling for incomplete JSON errors in logs
             if (errorMessage.includes('Incomplete JSON segment')) {
@@ -1137,9 +1013,7 @@ export class GeminiProvider extends BaseModelProvider {
 
             // 3️⃣  JSON-serialize every own property
             console.error('\n=== JSON dump of error ===');
-            console.error(
-                JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-            );
+            console.error(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
 
             // 5️⃣  Fallback: iterate keys manually (helps spot symbols, etc.)
             console.error('\n=== Manual property walk ===');
@@ -1172,11 +1046,7 @@ export class GeminiProvider extends BaseModelProvider {
      * @param opts Optional parameters for image generation
      * @returns Promise resolving to generated image data
      */
-    async createImage(
-        prompt: string,
-        model?: string,
-        opts?: ImageGenerationOpts
-    ): Promise<string[]> {
+    async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
         try {
             // Extract options with defaults
             model = model || 'imagen-3.0-generate-002';
@@ -1209,10 +1079,7 @@ export class GeminiProvider extends BaseModelProvider {
             // Process the response
             const images: string[] = [];
 
-            if (
-                response.generatedImages &&
-                response.generatedImages.length > 0
-            ) {
+            if (response.generatedImages && response.generatedImages.length > 0) {
                 for (const generatedImage of response.generatedImages) {
                     if (generatedImage.image?.imageBytes) {
                         // Convert to base64 data URL
@@ -1333,20 +1200,14 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             const candidate = response.candidates[0];
-            if (
-                !candidate.content.parts ||
-                candidate.content.parts.length === 0
-            ) {
+            if (!candidate.content.parts || candidate.content.parts.length === 0) {
                 throw new Error('No audio parts in Gemini TTS response');
             }
 
             // Find the audio part
             let audioData: string | undefined;
             for (const part of candidate.content.parts) {
-                if (
-                    part.inlineData &&
-                    part.inlineData.mimeType?.includes('audio')
-                ) {
+                if (part.inlineData && part.inlineData.mimeType?.includes('audio')) {
                     audioData = part.inlineData.data;
                     break;
                 }
@@ -1389,10 +1250,7 @@ export class GeminiProvider extends BaseModelProvider {
                             return;
                         }
 
-                        const chunk = bytes.slice(
-                            position,
-                            Math.min(position + chunkSize, bytes.length)
-                        );
+                        const chunk = bytes.slice(position, Math.min(position + chunkSize, bytes.length));
                         position += chunk.length;
                         controller.enqueue(chunk);
                     },
@@ -1464,9 +1322,7 @@ export class GeminiProvider extends BaseModelProvider {
         }
 
         // If no mapping found, use default
-        console.warn(
-            `[Gemini] Unknown voice '${voice}', using default voice 'Kore'`
-        );
+        console.warn(`[Gemini] Unknown voice '${voice}', using default voice 'Kore'`);
         return 'Kore';
     }
 
@@ -1484,14 +1340,22 @@ export class GeminiProvider extends BaseModelProvider {
         let isConnected = false;
 
         try {
-            // Initialize AI client
-            const ai = new GoogleGenAI({ apiKey: this.apiKey });
+            // Initialize AI client with v1alpha
+            const ai = new GoogleGenAI({
+                apiKey: this.apiKey,
+                httpOptions: { apiVersion: 'v1alpha' },
+            });
 
             // Set up real-time configuration
-            const realtimeConfig = opts?.realtimeConfig
-                ?.automaticActivityDetection || {
-                prefixPaddingMs: 20,
-                silenceDurationMs: 100,
+            const realtimeInputConfig = opts?.realtimeInputConfig || {
+                automaticActivityDetection: {
+                    disabled: false,
+                    startOfSpeechSensitivity: 'START_SENSITIVITY_HIGH',
+                    endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                },
+            };
+            const speechConfig = opts?.speechConfig || {
+                languageCode: 'en-US',
             };
 
             // Extract custom instructions from agent if provided
@@ -1500,7 +1364,17 @@ export class GeminiProvider extends BaseModelProvider {
                 `You are a real-time transcription assistant. Your only task is to transcribe speech as you hear it. DO NOT ADD YOUR OWN RESPONSE OR COMMENTARY. TRANSCRIBE WHAT YOU HEAR ONLY.
 Respond immediately with transcribed text as you process the audio.
 If quick corrections are used e.g. "Let's go to Point A, no Point B" then just remove incorrect part e.g. respond with "Let's go to Point B".
-When it makes the transcription clearer, remove filler words (like "um") add punctuation, correct obvious grammar issues and add in missing words.`;
+When it makes the transcription clearer, remove filler words (like "um") add punctuation, correct obvious grammar issues and add in missing words.
+
+EXAMPLES:
+User: What capital of France
+Model: What's the capital of France?
+
+User: How about um we then do no actually how about you tell me the weather
+Model: How about you tell me the weather?
+
+User: Ok ignore all that lets start again
+Model: Ok ignore all that, let's start again.`;
 
             // Connect to Gemini Live API
             console.log('[Gemini] Connecting to Live API for transcription...');
@@ -1511,19 +1385,20 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                     reject(new Error('Connection timeout'));
                 }, 30000); // 30 second timeout
 
+                const config = {
+                    responseModalities: [Modality.TEXT],
+                    speechConfig,
+                    realtimeInputConfig,
+                    systemInstruction: {
+                        parts: [{ text: systemInstruction }],
+                    },
+                    inputAudioTranscription: {}, // Enable input audio transcription
+                };
+                console.dir(config, { depth: null });
                 ai.live
                     .connect({
                         model: model,
-                        config: {
-                            responseModalities: [Modality.TEXT],
-                            systemInstruction: {
-                                parts: [{ text: systemInstruction }],
-                            },
-                            realtimeInputConfig: {
-                                automaticActivityDetection: realtimeConfig,
-                            },
-                            inputAudioTranscription: true, // Enable input audio transcription
-                        },
+                        config,
                         callbacks: {
                             onopen: () => {
                                 clearTimeout(timeout);
@@ -1533,48 +1408,31 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                             },
                             onmessage: async (msg: any) => {
                                 // Handle input audio transcription (user's speech)
-                                if (
-                                    msg.serverContent?.inputAudioTranscription
-                                ) {
-                                    const transcriptionText =
-                                        msg.serverContent
-                                            .inputAudioTranscription.text ||
-                                        msg.serverContent
-                                            .inputAudioTranscription
-                                            .transcript ||
-                                        '';
+                                if (msg.serverContent?.inputTranscription?.text) {
+                                    const previewEvent: TranscriptionEvent = {
+                                        type: 'transcription_preview',
+                                        timestamp: new Date().toISOString(),
+                                        text: msg.serverContent.inputTranscription.text,
+                                        isFinal: true, // Gemini sends final transcriptions
+                                    };
+                                    transcriptEvents.push(previewEvent);
 
-                                    if (transcriptionText) {
-                                        const previewEvent: TranscriptionEvent =
-                                            {
-                                                type: 'transcription_preview',
-                                                timestamp:
-                                                    new Date().toISOString(),
-                                                text: transcriptionText,
-                                                isFinal: true, // Gemini sends final transcriptions
-                                            };
-                                        transcriptEvents.push(previewEvent);
-
-                                        console.debug(
-                                            '[Gemini] Received input transcription:',
-                                            transcriptionText
-                                        );
-                                    }
+                                    console.debug(
+                                        '[Gemini] Received input transcription:',
+                                        msg.serverContent.inputTranscription.text
+                                    );
                                 }
 
                                 // Handle transcript (model's response)
                                 if (msg.serverContent?.modelTurn?.parts) {
-                                    for (const part of msg.serverContent
-                                        .modelTurn.parts) {
+                                    for (const part of msg.serverContent.modelTurn.parts) {
                                         if (part.text && part.text.trim()) {
-                                            const deltaEvent: TranscriptionEvent =
-                                                {
-                                                    type: 'transcription_delta',
-                                                    timestamp:
-                                                        new Date().toISOString(),
-                                                    delta: part.text,
-                                                    partial: false, // Gemini Live doesn't distinguish
-                                                };
+                                            const deltaEvent: TranscriptionEvent = {
+                                                type: 'transcription_delta',
+                                                timestamp: new Date().toISOString(),
+                                                delta: part.text,
+                                                partial: false, // Gemini Live doesn't distinguish
+                                            };
 
                                             // Store event to yield later
                                             transcriptEvents.push(deltaEvent);
@@ -1598,29 +1456,34 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
                                     // This will automatically emit a cost_update event
                                     costTracker.addUsage({
                                         model: model,
-                                        input_tokens:
-                                            msg.usageMetadata
-                                                .promptTokenCount || 0,
-                                        output_tokens:
-                                            msg.usageMetadata
-                                                .responseTokenCount || 0,
+                                        input_tokens: msg.usageMetadata.promptTokenCount || 0,
+                                        output_tokens: msg.usageMetadata.responseTokenCount || 0,
                                         input_modality: 'audio', // Audio input for transcription
                                         output_modality: 'text', // Text output for transcription
                                         metadata: {
-                                            totalTokens:
-                                                msg.usageMetadata
-                                                    .totalTokenCount || 0,
+                                            totalTokens: msg.usageMetadata.totalTokenCount || 0,
                                             source: 'gemini-live-transcription',
                                         },
                                     });
                                 }
                             },
                             onerror: (err: any) => {
-                                console.error('[Gemini] Live API error:', err);
+                                console.error('[Gemini] Live API error:', {
+                                    code: err.code,
+                                    reason: err.reason,
+                                    wasClean: err.wasClean,
+                                });
                                 connectionError = err;
                             },
-                            onclose: () => {
+                            onclose: (event?: any) => {
                                 console.log('[Gemini] Live session closed');
+                                if (event) {
+                                    console.log('[Gemini] Close event details:', {
+                                        code: event.code,
+                                        reason: event.reason,
+                                        wasClean: event.wasClean,
+                                    });
+                                }
                                 isConnected = false;
                             },
                         },
@@ -1681,10 +1544,7 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
 
                     if (value) {
                         // Append to buffer
-                        audioBuffer = Buffer.concat([
-                            audioBuffer,
-                            Buffer.from(value),
-                        ]);
+                        audioBuffer = Buffer.concat([audioBuffer, Buffer.from(value)]);
 
                         // Send in optimal chunks
                         while (audioBuffer.length >= chunkSize) {
@@ -1736,29 +1596,59 @@ When it makes the transcription clearer, remove filler words (like "um") add pun
             const errorEvent: TranscriptionEvent = {
                 type: 'error',
                 timestamp: new Date().toISOString(),
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Transcription failed',
+                error: error instanceof Error ? error.message : 'Transcription failed',
             };
             yield errorEvent;
         }
     }
+
+    /**
+     * Creates a Live API session for real-time interaction
+     * @param config Live API configuration
+     * @param agent Agent definition with tools and settings
+     * @param model Model ID for the live session
+     * @param opts Optional parameters for the live session
+     * @returns Promise resolving to a LiveSession object
+     */
+    async createLiveSession(
+        config: LiveConfig,
+        agent: AgentDefinition,
+        model: string,
+        opts?: LiveOptions
+    ): Promise<LiveSession> {
+        console.log(`[Gemini] Creating Live session with model ${model}`);
+
+        // Validate model supports Live API
+        const liveModels = [
+            'gemini-2.0-flash-live-001',
+            'gemini-live-2.5-flash-preview',
+            'gemini-2.5-flash-preview-native-audio-dialog',
+            'gemini-2.5-flash-exp-native-audio-thinking-dialog',
+            'gemini-2.0-flash-exp', // Experimental model that might support v1alpha
+        ];
+
+        if (!liveModels.some(m => model.includes(m))) {
+            throw new Error(`Model ${model} does not support Live API. Supported models: ${liveModels.join(', ')}`);
+        }
+
+        // Create session
+        const sessionId = uuidv4();
+        const liveSession = new GeminiLiveSession(sessionId, this.client, model, config, agent, opts);
+
+        // Initialize the session
+        await liveSession.initialize();
+
+        return liveSession;
+    }
 }
 
 // Helper to normalize audio source (local copy to avoid circular dependency)
-function normalizeAudioSource(
-    source: TranscriptionAudioSource
-): ReadableStream<Uint8Array> {
+function normalizeAudioSource(source: TranscriptionAudioSource): ReadableStream<Uint8Array> {
     if (source instanceof ReadableStream) {
         return source;
     }
 
-    if (
-        typeof source === 'object' &&
-        source !== null &&
-        Symbol.asyncIterator in source
-    ) {
+    if (typeof source === 'object' && source !== null && Symbol.asyncIterator in source) {
         return new ReadableStream({
             async start(controller) {
                 try {
@@ -1779,8 +1669,7 @@ function normalizeAudioSource(
     }
 
     if (source instanceof ArrayBuffer || source instanceof Uint8Array) {
-        const data =
-            source instanceof ArrayBuffer ? new Uint8Array(source) : source;
+        const data = source instanceof ArrayBuffer ? new Uint8Array(source) : source;
         return new ReadableStream({
             start(controller) {
                 controller.enqueue(data);
@@ -1790,6 +1679,487 @@ function normalizeAudioSource(
     }
 
     throw new Error(`Unsupported audio source type: ${typeof source}`);
+}
+
+/**
+ * Implementation of Gemini Live Session
+ */
+class GeminiLiveSession implements LiveSession {
+    private session: any | null = null; // GoogleLiveSession is not exported
+    private eventQueue: LiveEvent[] = [];
+    private eventResolvers: ((value: IteratorResult<LiveEvent>) => void)[] = [];
+    private _isActive = true;
+    private sessionClosed = false;
+    private messageHistory: (ResponseInputMessage | ResponseOutputMessage)[] = [];
+    private currentTurn: { role: 'user' | 'model'; text: string } | null = null;
+
+    constructor(
+        public sessionId: string,
+        private ai: GoogleGenAI,
+        private model: string,
+        private config: LiveConfig,
+        private agent: AgentDefinition,
+        private options?: LiveOptions
+    ) {}
+
+    async initialize(): Promise<void> {
+        const connectionPromise = new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Connection timeout'));
+            }, 30000);
+
+            // Convert tools to Gemini format
+            const tools: any[] = [];
+
+            // Function declarations
+            if (this.config.tools) {
+                for (const toolGroup of this.config.tools) {
+                    if (toolGroup.functionDeclarations) {
+                        const functionDeclarations = toolGroup.functionDeclarations.map(func => ({
+                            name: func.name,
+                            description: func.description,
+                            parameters: convertParameterToGeminiFormat(func.parameters),
+                        }));
+                        tools.push({ functionDeclarations });
+                    }
+                    if (toolGroup.codeExecution) {
+                        tools.push({ codeExecution: {} });
+                    }
+                    if (toolGroup.googleSearch) {
+                        tools.push({ googleSearch: {} });
+                    }
+                }
+            }
+
+            // Build system instruction from agent
+            let systemInstruction: any = undefined;
+            if (this.agent.instructions) {
+                systemInstruction = {
+                    parts: [{ text: this.agent.instructions }],
+                };
+            }
+
+            // Build generation config
+            const responseModalities =
+                this.config.responseModalities[0] === 'AUDIO' ? [Modality.AUDIO] : [Modality.TEXT];
+
+            // Build config object
+            const config: any = {
+                responseModalities,
+                systemInstruction,
+                tools: tools.length > 0 ? tools : undefined,
+            };
+
+            // Add speech config if audio output
+            if (this.config.responseModalities[0] === 'AUDIO' && this.config.speechConfig) {
+                config.speechConfig = {
+                    voiceConfig: this.config.speechConfig.voiceConfig,
+                };
+            }
+
+            // Tool choice configuration
+            // Note: functionCallingConfig is not available in GenerateContentConfig for Live API
+            // The Live API handles function calling differently
+
+            // Add other config options
+            if (this.config.realtimeInputConfig) {
+                config.realtimeInputConfig = {
+                    automaticActivityDetection: this.config.realtimeInputConfig.automaticActivityDetection
+                        ? {
+                              disabled: this.config.realtimeInputConfig.automaticActivityDetection.disabled,
+                              // Map string constants to proper enum values if needed
+                              // The actual enum values depend on the @google/genai package version
+                          }
+                        : undefined,
+                };
+            }
+
+            if (this.config.inputAudioTranscription) {
+                config.inputAudioTranscription = true;
+            }
+
+            if (this.config.outputAudioTranscription) {
+                config.outputAudioTranscription = true;
+            }
+
+            // Add affective dialog if enabled
+            if (this.config.enableAffectiveDialog) {
+                config.enableAffectiveDialog = true;
+            }
+
+            // Add proactivity settings
+            if (this.config.proactivity) {
+                config.proactivity = this.config.proactivity;
+            }
+
+            // Log the config being sent
+            console.log('[Gemini] Connecting with config:', JSON.stringify(config, null, 2));
+
+            // Create live connection
+            this.ai.live
+                .connect({
+                    model: this.model,
+                    config,
+                    callbacks: {
+                        onopen: () => {
+                            clearTimeout(timeout);
+                            console.log('[Gemini] Live session connected');
+                            this.pushEvent({
+                                type: 'live_ready',
+                                timestamp: new Date().toISOString(),
+                            });
+                            resolve();
+                        },
+                        onmessage: (msg: any) => {
+                            this.handleMessage(msg);
+                        },
+                        onerror: (err: any) => {
+                            console.error('[Gemini] Live API error:', err);
+                            console.error('[Gemini] Error details:', JSON.stringify(err, null, 2));
+                            this.pushEvent({
+                                type: 'error',
+                                timestamp: new Date().toISOString(),
+                                error: err.message || String(err),
+                                code: err.code,
+                                recoverable: true,
+                            });
+                        },
+                        onclose: (event?: any) => {
+                            console.log('[Gemini] Live session closed', event);
+                            if (event) {
+                                console.log('[Gemini] Close event details:', {
+                                    code: event.code,
+                                    reason: event.reason,
+                                    wasClean: event.wasClean,
+                                });
+                            }
+                            this._isActive = false;
+                            this.sessionClosed = true;
+                            this.resolveAllWaitingEvents();
+                        },
+                    },
+                })
+                .then(s => {
+                    this.session = s;
+                });
+        });
+
+        await connectionPromise;
+    }
+
+    private handleMessage(msg: any): void {
+        // Log all messages for debugging
+        console.log('[Gemini] Received message:', JSON.stringify(msg, null, 2));
+
+        // Check for errors in the message
+        if (msg.error) {
+            console.error('[Gemini] Error in message:', msg.error);
+            this.pushEvent({
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: msg.error.message || JSON.stringify(msg.error),
+                code: msg.error.code || 'UNKNOWN_ERROR',
+                recoverable: false,
+            });
+            return;
+        }
+
+        // Handle different message types from Gemini Live API
+
+        // Audio output
+        if (msg.serverContent?.modelTurn?.parts) {
+            for (const part of msg.serverContent.modelTurn.parts) {
+                if (part.inlineData?.mimeType?.startsWith('audio/')) {
+                    this.pushEvent({
+                        type: 'audio_output',
+                        timestamp: new Date().toISOString(),
+                        data: part.inlineData.data,
+                        format: {
+                            sampleRate: 24000, // Gemini default
+                            channels: 1,
+                            encoding: 'pcm',
+                        },
+                    });
+                }
+
+                // Text output
+                if (part.text) {
+                    if (!this.currentTurn || this.currentTurn.role !== 'model') {
+                        this.currentTurn = { role: 'model', text: '' };
+                        this.pushEvent({
+                            type: 'turn_start',
+                            timestamp: new Date().toISOString(),
+                            role: 'model',
+                        });
+                    }
+
+                    this.currentTurn.text += part.text;
+
+                    this.pushEvent({
+                        type: 'text_delta',
+                        timestamp: new Date().toISOString(),
+                        delta: part.text,
+                    });
+
+                    // Also emit message_delta for compatibility
+                    this.pushEvent({
+                        type: 'message_delta',
+                        timestamp: new Date().toISOString(),
+                        delta: part.text,
+                    });
+                }
+            }
+        }
+
+        // Tool calls
+        if (msg.serverContent?.modelTurn?.parts) {
+            for (const part of msg.serverContent.modelTurn.parts) {
+                if (part.functionCall) {
+                    const toolCall: ToolCall = {
+                        id: uuidv4(),
+                        type: 'function',
+                        function: {
+                            name: part.functionCall.name,
+                            arguments: JSON.stringify(part.functionCall.args),
+                        },
+                    };
+
+                    this.pushEvent({
+                        type: 'tool_call',
+                        timestamp: new Date().toISOString(),
+                        toolCalls: [toolCall],
+                    });
+                }
+            }
+        }
+
+        // Input transcription
+        if (msg.serverContent?.inputAudioTranscription) {
+            const text =
+                msg.serverContent.inputAudioTranscription.text ||
+                msg.serverContent.inputAudioTranscription.transcript ||
+                '';
+            if (text) {
+                this.pushEvent({
+                    type: 'transcription_input',
+                    timestamp: new Date().toISOString(),
+                    text,
+                });
+            }
+        }
+
+        // Output transcription
+        if (msg.serverContent?.outputTranscription) {
+            const text = msg.serverContent.outputTranscription.text || '';
+            if (text) {
+                this.pushEvent({
+                    type: 'transcription_output',
+                    timestamp: new Date().toISOString(),
+                    text,
+                });
+            }
+        }
+
+        // Turn complete
+        if (msg.serverContent?.turnComplete) {
+            if (this.currentTurn) {
+                // For message history, we need to use ResponseOutputMessage for assistant messages
+                const message =
+                    this.currentTurn.role === 'model'
+                        ? {
+                              type: 'message' as const,
+                              role: 'assistant' as const,
+                              content: this.currentTurn.text,
+                              status: 'completed' as const,
+                          }
+                        : ({
+                              type: 'message' as const,
+                              role: 'user' as const,
+                              content: this.currentTurn.text,
+                          } as ResponseInputMessage);
+
+                this.messageHistory.push(message);
+
+                this.pushEvent({
+                    type: 'turn_complete',
+                    timestamp: new Date().toISOString(),
+                    role: this.currentTurn.role,
+                    message,
+                });
+
+                this.currentTurn = null;
+            }
+        }
+
+        // Interrupted
+        if (msg.serverContent?.interrupted) {
+            const cancelledToolCalls: string[] = [];
+            if (msg.serverContent.cancelledFunctionCalls) {
+                cancelledToolCalls.push(...msg.serverContent.cancelledFunctionCalls.map((fc: any) => fc.id));
+            }
+
+            this.pushEvent({
+                type: 'interrupted',
+                timestamp: new Date().toISOString(),
+                cancelledToolCalls,
+            });
+        }
+
+        // Usage metadata (cost tracking)
+        if (msg.usageMetadata) {
+            const usage = msg.usageMetadata;
+            const inputTokens = usage.promptTokenCount || 0;
+            const outputTokens = usage.candidatesTokenCount || 0;
+            const totalTokens = usage.totalTokenCount || 0;
+
+            // Track with cost tracker
+            costTracker.addUsage({
+                model: this.model,
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cached_tokens: usage.cachedContentTokenCount || 0,
+                metadata: {
+                    total_tokens: totalTokens,
+                    source: 'gemini-live',
+                },
+            });
+
+            // Cost data is calculated internally by costTracker.addUsage
+            const inputCost = undefined;
+            const outputCost = undefined;
+            const totalCost = undefined;
+
+            this.pushEvent({
+                type: 'cost_update',
+                timestamp: new Date().toISOString(),
+                usage: {
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
+                    inputCost,
+                    outputCost,
+                    totalCost,
+                },
+            });
+        }
+    }
+
+    async sendAudio(audio: LiveAudioBlob): Promise<void> {
+        if (!this.session || !this._isActive) {
+            console.error(`[GeminiLiveSession ${this.sessionId}] Cannot send audio - session not active`);
+            throw new Error('Session is not active');
+        }
+
+        console.log(
+            `[GeminiLiveSession ${this.sessionId}] Sending audio: ${audio.data.length} chars (base64), mimeType: ${audio.mimeType}`
+        );
+
+        try {
+            await this.session.sendRealtimeInput({
+                media: {
+                    mimeType: audio.mimeType,
+                    data: audio.data,
+                },
+            });
+            console.log(`[GeminiLiveSession ${this.sessionId}] Audio sent successfully`);
+        } catch (error) {
+            console.error(`[GeminiLiveSession ${this.sessionId}] Error sending audio:`, error);
+            throw error;
+        }
+
+        // Calculate size for event
+        const size = Math.ceil((audio.data.length * 3) / 4); // Rough base64 to bytes
+        this.pushEvent({
+            type: 'audio_input',
+            timestamp: new Date().toISOString(),
+            size,
+        });
+    }
+
+    async sendText(text: string, role: 'user' | 'assistant' = 'user'): Promise<void> {
+        if (!this.session || !this._isActive) {
+            throw new Error('Session is not active');
+        }
+
+        // Send as client content
+        const message = {
+            role: role === 'assistant' ? 'model' : 'user',
+            parts: [{ text }],
+        };
+
+        await this.session.sendClientContent({
+            turns: [message],
+        });
+
+        // Track turn
+        this.pushEvent({
+            type: 'turn_start',
+            timestamp: new Date().toISOString(),
+            role: role === 'assistant' ? 'model' : 'user',
+        });
+    }
+
+    async sendToolResponse(toolResults: ToolCallResult[]): Promise<void> {
+        if (!this.session || !this._isActive) {
+            throw new Error('Session is not active');
+        }
+
+        // Convert to Gemini format
+        const functionResponses = toolResults.map(result => ({
+            id: result.call_id || result.id,
+            name: result.toolCall.function.name,
+            response: result.error ? { error: result.error } : { result: result.output },
+        }));
+
+        await this.session.sendToolResponse({ functionResponses });
+    }
+
+    async *getEventStream(): AsyncIterable<LiveEvent> {
+        while (this._isActive || this.eventQueue.length > 0) {
+            if (this.eventQueue.length > 0) {
+                yield this.eventQueue.shift()!;
+            } else {
+                // Wait for new events
+                const result = await new Promise<IteratorResult<LiveEvent>>(resolve => {
+                    if (this.sessionClosed && this.eventQueue.length === 0) {
+                        resolve({ done: true, value: undefined });
+                    } else {
+                        this.eventResolvers.push(resolve);
+                    }
+                });
+
+                if (result.done) break;
+                if (result.value) yield result.value;
+            }
+        }
+    }
+
+    async close(): Promise<void> {
+        if (this.session && this._isActive) {
+            this._isActive = false;
+            await this.session.close();
+        }
+    }
+
+    isActive(): boolean {
+        return this._isActive;
+    }
+
+    private pushEvent(event: LiveEvent): void {
+        if (this.eventResolvers.length > 0) {
+            const resolver = this.eventResolvers.shift()!;
+            resolver({ value: event, done: false });
+        } else {
+            this.eventQueue.push(event);
+        }
+    }
+
+    private resolveAllWaitingEvents(): void {
+        for (const resolver of this.eventResolvers) {
+            resolver({ done: true, value: undefined });
+        }
+        this.eventResolvers = [];
+    }
 }
 
 // Export an instance of the provider

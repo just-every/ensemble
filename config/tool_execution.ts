@@ -29,11 +29,7 @@ export const EXCLUDED_FROM_TIMEOUT_FUNCTIONS = new Set([
 /**
  * Tools that enable background status tracking for timeouts
  */
-export const STATUS_TRACKING_TOOLS = new Set([
-    'get_running_tools',
-    'wait_for_running_tool',
-    'get_tool_status',
-]);
+export const STATUS_TRACKING_TOOLS = new Set(['get_running_tools', 'wait_for_running_tool', 'get_tool_status']);
 
 /**
  * Maximum length for tool results before summarization
@@ -44,12 +40,7 @@ export const MAX_RESULT_LENGTH = 5000;
 /**
  * Tools that skip summarization (but still get truncated)
  */
-export const SKIP_SUMMARIZATION_TOOLS = new Set([
-    'read_source',
-    'get_page_content',
-    'read_file',
-    'list_files',
-]);
+export const SKIP_SUMMARIZATION_TOOLS = new Set(['read_source', 'get_page_content', 'read_file', 'list_files']);
 
 /**
  * Configuration for tool-specific handling

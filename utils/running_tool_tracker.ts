@@ -38,12 +38,7 @@ export class RunningToolTracker {
     /**
      * Add a new running tool
      */
-    addRunningTool(
-        id: string,
-        toolName: string,
-        agentName: string,
-        args: string
-    ): RunningTool {
+    addRunningTool(id: string, toolName: string, agentName: string, args: string): RunningTool {
         const abortController = new AbortController();
         const runningTool: RunningTool = {
             id,
@@ -156,9 +151,7 @@ export class RunningToolTracker {
      * Get running tools for a specific agent
      */
     getRunningToolsForAgent(agentName: string): RunningTool[] {
-        return this.getAllRunningTools().filter(
-            tool => tool.agentName === agentName
-        );
+        return this.getAllRunningTools().filter(tool => tool.agentName === agentName);
     }
 
     /**
@@ -196,9 +189,7 @@ export class RunningToolTracker {
      * Check if a specific tool type is currently running for an agent
      */
     isToolRunning(agentName: string, toolName: string): boolean {
-        return this.getAllRunningTools().some(
-            tool => tool.agentName === agentName && tool.toolName === toolName
-        );
+        return this.getAllRunningTools().some(tool => tool.agentName === agentName && tool.toolName === toolName);
     }
 
     /**
@@ -211,10 +202,7 @@ export class RunningToolTracker {
     /**
      * Wait for a specific tool to complete
      */
-    async waitForTool(
-        id: string,
-        timeout?: number
-    ): Promise<ToolCompletionEvent | null> {
+    async waitForTool(id: string, timeout?: number): Promise<ToolCompletionEvent | null> {
         return new Promise((resolve, reject) => {
             const tool = this.runningTools.get(id);
             if (!tool) {

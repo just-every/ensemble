@@ -152,9 +152,7 @@ describe('Automatic Cost Event Emission', () => {
 
     it('should handle errors in event emission gracefully', async () => {
         // Set up a failing event handler
-        const consoleSpy = vi
-            .spyOn(console, 'error')
-            .mockImplementation(() => {});
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         setEventHandler(() => {
             throw new Error('Event handler error');
         });
@@ -173,9 +171,7 @@ describe('Automatic Cost Event Emission', () => {
 
         // Error should be logged
         expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining(
-                '[EventController] Error in event handler:'
-            ),
+            expect.stringContaining('[EventController] Error in event handler:'),
             expect.any(Error)
         );
 

@@ -128,11 +128,7 @@ describe('Tool Execution Manager', () => {
                 abortController: mockAbortController,
             });
 
-            const result = await executeToolWithLifecycle(
-                mockToolCall,
-                mockTool,
-                mockAgent
-            );
+            const result = await executeToolWithLifecycle(mockToolCall, mockTool, mockAgent);
 
             expect(result).toBe('tool result');
             expect(runningToolTracker.addRunningTool).toHaveBeenCalledWith(
@@ -141,11 +137,7 @@ describe('Tool Execution Manager', () => {
                 'test-agent',
                 '{"param1": "value1"}'
             );
-            expect(runningToolTracker.completeRunningTool).toHaveBeenCalledWith(
-                'test-id',
-                'tool result',
-                mockAgent
-            );
+            expect(runningToolTracker.completeRunningTool).toHaveBeenCalledWith('test-id', 'tool result', mockAgent);
         });
 
         it('should handle tool execution failure', async () => {
@@ -162,15 +154,9 @@ describe('Tool Execution Manager', () => {
                 abortController: mockAbortController,
             });
 
-            await expect(
-                executeToolWithLifecycle(mockToolCall, failingTool, mockAgent)
-            ).rejects.toThrow('Tool failed');
+            await expect(executeToolWithLifecycle(mockToolCall, failingTool, mockAgent)).rejects.toThrow('Tool failed');
 
-            expect(runningToolTracker.failRunningTool).toHaveBeenCalledWith(
-                'test-id',
-                'Error: Tool failed',
-                mockAgent
-            );
+            expect(runningToolTracker.failRunningTool).toHaveBeenCalledWith('test-id', 'Error: Tool failed', mockAgent);
         });
     });
 
@@ -247,23 +233,15 @@ describe('Tool Execution Manager', () => {
             // Mock timeout to happen quickly
             vi.useFakeTimers();
 
-            const resultPromise = handleToolCall(
-                mockToolCall,
-                slowTool,
-                agentWithStatusTools
-            );
+            const resultPromise = handleToolCall(mockToolCall, slowTool, agentWithStatusTools);
 
             // Advance time to trigger timeout
             vi.advanceTimersByTime(30001);
 
             const result = await resultPromise;
 
-            expect(result).toBe(
-                'Tool test_tool is running in the background (RunningTool: test-id).'
-            );
-            expect(runningToolTracker.markTimedOut).toHaveBeenCalledWith(
-                'test-id'
-            );
+            expect(result).toBe('Tool test_tool is running in the background (RunningTool: test-id).');
+            expect(runningToolTracker.markTimedOut).toHaveBeenCalledWith('test-id');
 
             vi.useRealTimers();
         });
@@ -276,11 +254,7 @@ describe('Tool Execution Manager', () => {
                 },
             };
 
-            const result = await handleToolCall(
-                mockToolCall,
-                mockTool,
-                sequentialAgent
-            );
+            const result = await handleToolCall(mockToolCall, mockTool, sequentialAgent);
 
             expect(result).toBe('tool result');
         });
@@ -310,11 +284,7 @@ describe('Tool Execution Manager', () => {
                 },
             };
 
-            const result = await handleToolCall(
-                waitToolCall,
-                waitTool,
-                mockAgent
-            );
+            const result = await handleToolCall(waitToolCall, waitTool, mockAgent);
 
             expect(result).toBe('wait result');
         });
@@ -342,28 +312,18 @@ describe('Tool Execution Manager', () => {
         };
 
         it('should parse and prepare named arguments', () => {
-            const args = prepareToolArguments(
-                '{"param1": "value1", "param2": 42, "param3": true}',
-                mockTool
-            );
+            const args = prepareToolArguments('{"param1": "value1", "param2": 42, "param3": true}', mockTool);
 
             expect(args).toEqual(['value1', 42, true]);
         });
 
         it('should filter out unknown parameters', () => {
-            const consoleSpy = vi
-                .spyOn(console, 'warn')
-                .mockImplementation(() => {});
+            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-            const args = prepareToolArguments(
-                '{"param1": "value1", "param2": 42, "unknown": "value"}',
-                mockTool
-            );
+            const args = prepareToolArguments('{"param1": "value1", "param2": 42, "unknown": "value"}', mockTool);
 
             expect(args).toEqual(['value1', 42, undefined]);
-            expect(consoleSpy).toHaveBeenCalledWith(
-                'Removing unknown parameter "unknown" for tool "test_tool"'
-            );
+            expect(consoleSpy).toHaveBeenCalledWith('Removing unknown parameter "unknown" for tool "test_tool"');
 
             consoleSpy.mockRestore();
         });
@@ -374,9 +334,7 @@ describe('Tool Execution Manager', () => {
         });
 
         it('should handle invalid JSON', () => {
-            expect(() =>
-                prepareToolArguments('invalid json', mockTool)
-            ).toThrow('Invalid JSON in tool arguments');
+            expect(() => prepareToolArguments('invalid json', mockTool)).toThrow('Invalid JSON in tool arguments');
         });
 
         it('should handle positional arguments', () => {

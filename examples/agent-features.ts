@@ -67,9 +67,7 @@ function createFileSystemTools() {
                 },
             },
             function: async ({ text }: { text: string }) => {
-                console.log(
-                    `🔧 Tool: count_words("${text.substring(0, 20)}...")`
-                );
+                console.log(`🔧 Tool: count_words("${text.substring(0, 20)}...")`);
                 return `Word count: ${text.split(/\s+/).length}`;
             },
         },
@@ -81,9 +79,7 @@ async function main() {
 
     // Example 1: Tool Call Limits
     console.log('1. Testing maxToolCalls (limit: 3):');
-    console.log(
-        '   Request: "List files, read each one, and count words in each"\n'
-    );
+    console.log('   Request: "List files, read each one, and count words in each"\n');
 
     const agent1 = new Agent({
         name: 'file_analyzer',
@@ -98,8 +94,7 @@ async function main() {
         {
             type: 'message',
             role: 'user',
-            content:
-                'List all files, then read each file and count words in each.',
+            content: 'List all files, then read each file and count words in each.',
         },
     ];
 
@@ -139,8 +134,7 @@ async function main() {
         {
             type: 'message',
             role: 'assistant',
-            content:
-                'I can help you analyze files. What would you like to know?',
+            content: 'I can help you analyze files. What would you like to know?',
         },
         {
             type: 'message',
@@ -192,14 +186,11 @@ async function main() {
         {
             type: 'message',
             role: 'user',
-            content:
-                'Count the total number of words across all files. Be specific about the count.',
+            content: 'Count the total number of words across all files. Be specific about the count.',
         },
     ];
 
-    console.log(
-        '   (Verifier will check if the response includes specific word counts)\n'
-    );
+    console.log('   (Verifier will check if the response includes specific word counts)\n');
 
     const stream4 = ensembleRequest(messages4, agent4);
     const result4 = await convertStreamToMessages(stream4);

@@ -27,9 +27,7 @@ async function basicRetryExample() {
             maxRetries: 5,
             initialDelay: 2000, // Start with 2 second delay
             onRetry: (error, attempt) => {
-                console.log(
-                    `Retry attempt ${attempt} due to: ${error.message || error.code}`
-                );
+                console.log(`Retry attempt ${attempt} due to: ${error.message || error.code}`);
             },
         },
     };
@@ -66,9 +64,7 @@ async function aggressiveRetryExample() {
             maxDelay: 60000, // Max 1 minute between retries
             backoffMultiplier: 1.5, // Less aggressive backoff
             onRetry: (error, attempt) => {
-                console.log(
-                    `Critical operation retry ${attempt}/10: ${error.code || error.message}`
-                );
+                console.log(`Critical operation retry ${attempt}/10: ${error.code || error.message}`);
             },
         },
     };
@@ -104,11 +100,7 @@ async function customRetryableErrorsExample() {
         retryOptions: {
             maxRetries: 3,
             // Add custom error codes that should trigger retries
-            additionalRetryableErrors: [
-                'RATE_LIMIT_EXCEEDED',
-                'QUOTA_EXCEEDED',
-                'PROCESSING_ERROR',
-            ],
+            additionalRetryableErrors: ['RATE_LIMIT_EXCEEDED', 'QUOTA_EXCEEDED', 'PROCESSING_ERROR'],
             // Add custom status codes
             additionalRetryableStatusCodes: [
                 418, // I'm a teapot (custom error)
@@ -116,13 +108,9 @@ async function customRetryableErrorsExample() {
             ],
             onRetry: (error, attempt) => {
                 if (error.code === 'RATE_LIMIT_EXCEEDED') {
-                    console.log(
-                        `Rate limited, waiting before retry ${attempt}...`
-                    );
+                    console.log(`Rate limited, waiting before retry ${attempt}...`);
                 } else {
-                    console.log(
-                        `Retrying due to ${error.code || error.status}`
-                    );
+                    console.log(`Retrying due to ${error.code || error.status}`);
                 }
             },
         },
@@ -196,18 +184,13 @@ async function monitoringExample() {
                 retryMetrics.totalRetries++;
 
                 const errorCode = error.code || error.status || 'UNKNOWN';
-                retryMetrics.errorCodes.set(
-                    errorCode,
-                    (retryMetrics.errorCodes.get(errorCode) || 0) + 1
-                );
+                retryMetrics.errorCodes.set(errorCode, (retryMetrics.errorCodes.get(errorCode) || 0) + 1);
 
                 // Calculate actual delay for monitoring
                 const delay = Math.pow(2, attempt - 1) * 1000;
                 retryMetrics.retryDelays.push(delay);
 
-                console.log(
-                    `Retry ${attempt}: ${errorCode} (waiting ${delay}ms)`
-                );
+                console.log(`Retry ${attempt}: ${errorCode} (waiting ${delay}ms)`);
             },
         },
     };
@@ -222,14 +205,10 @@ async function monitoringExample() {
         // Log metrics regardless of success/failure
         console.log('\nRetry Metrics:');
         console.log(`Total retries: ${retryMetrics.totalRetries}`);
-        console.log(
-            'Error distribution:',
-            Object.fromEntries(retryMetrics.errorCodes)
-        );
+        console.log('Error distribution:', Object.fromEntries(retryMetrics.errorCodes));
         console.log(
             `Average retry delay: ${
-                retryMetrics.retryDelays.reduce((a, b) => a + b, 0) /
-                    retryMetrics.retryDelays.length || 0
+                retryMetrics.retryDelays.reduce((a, b) => a + b, 0) / retryMetrics.retryDelays.length || 0
             }ms`
         );
     }
@@ -239,9 +218,7 @@ async function monitoringExample() {
 async function perProviderRetryExample() {
     console.log('\nExample 6: Different retry strategies per provider');
 
-    const messages = [
-        { type: 'message' as const, role: 'user' as const, content: 'Hello' },
-    ];
+    const messages = [{ type: 'message' as const, role: 'user' as const, content: 'Hello' }];
 
     // More aggressive retries for stable providers
     const openAIAgent: AgentDefinition = {

@@ -19,26 +19,11 @@ import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
 import { costTracker } from '../index.js';
-import {
-    log_llm_request,
-    log_llm_response,
-    log_llm_error,
-} from '../utils/llm_logger.js';
+import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import {
-    appendMessageWithImage,
-    resizeAndSplitForOpenAI,
-} from '../utils/image_utils.js';
-import {
-    DeltaBuffer,
-    bufferDelta,
-    flushBufferedDeltas,
-} from '../utils/delta_buffer.js';
-import {
-    createCitationTracker,
-    formatCitation,
-    generateFootnotes,
-} from '../utils/citation_tracker.js';
+import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
+import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
+import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort } from 'openai/resources/shared.js';
 
@@ -100,17 +85,13 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
         });
 
         // Detect if it's an object-like schema
-        const isObject =
-            schema.type === 'object' ||
-            (schema.type === undefined && schema.properties !== undefined);
+        const isObject = schema.type === 'object' || (schema.type === undefined && schema.properties !== undefined);
 
         // 4. Recurse into nested structures first
         // Process variants (anyOf, allOf)
         for (const key of ['anyOf', 'allOf'] as const) {
             if (Array.isArray(schema[key])) {
-                schema[key].forEach((variantSchema: any) =>
-                    processSchemaRecursively(variantSchema)
-                );
+                schema[key].forEach((variantSchema: any) => processSchemaRecursively(variantSchema));
             }
         }
         // Process properties
@@ -123,9 +104,7 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
         if (schema.type === 'array' && schema.items !== undefined) {
             if (Array.isArray(schema.items)) {
                 // Tuple validation
-                schema.items.forEach((itemSchema: any) =>
-                    processSchemaRecursively(itemSchema)
-                );
+                schema.items.forEach((itemSchema: any) => processSchemaRecursively(itemSchema));
             } else if (typeof schema.items === 'object') {
                 // Single schema for all items
                 processSchemaRecursively(schema.items);
@@ -180,10 +159,7 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
     }
 
     // Ensure top-level is object with additionalProperties: false if it has properties
-    if (
-        processedSchema.properties &&
-        processedSchema.additionalProperties === undefined
-    ) {
+    if (processedSchema.properties && processedSchema.additionalProperties === undefined) {
         processedSchema.additionalProperties = false;
     }
 
@@ -239,10 +215,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
 /**
  * Convert our tool definition to OpenAI's format
  */
-async function convertToOpenAITools(
-    requestParams: any,
-    tools?: ToolFunction[] | undefined
-): Promise<any> {
+async function convertToOpenAITools(requestParams: any, tools?: ToolFunction[] | undefined): Promise<any> {
     requestParams.tools = await Promise.all(
         tools.map(async (tool: ToolFunction) => {
             if (tool.definition.function.name === 'openai_web_search') {
@@ -254,14 +227,9 @@ async function convertToOpenAITools(
             }
 
             // First resolve async enums, then process the schema
-            const resolvedParams = await resolveAsyncEnums(
-                tool.definition.function.parameters
-            );
+            const resolvedParams = await resolveAsyncEnums(tool.definition.function.parameters);
             const originalToolProperties = resolvedParams.properties;
-            const paramSchema = processSchemaForOpenAI(
-                resolvedParams,
-                originalToolProperties
-            );
+            const paramSchema = processSchemaForOpenAI(resolvedParams, originalToolProperties);
 
             return {
                 type: 'function',
@@ -384,9 +352,7 @@ export class OpenAIProvider extends BaseModelProvider {
             // Check for API key at runtime, not construction time
             const apiKey = this.apiKey || process.env.OPENAI_API_KEY;
             if (!apiKey) {
-                throw new Error(
-                    'Failed to initialize OpenAI client. Make sure OPENAI_API_KEY is set.'
-                );
+                throw new Error('Failed to initialize OpenAI client. Make sure OPENAI_API_KEY is set.');
             }
             this._client = new OpenAI({
                 apiKey: apiKey,
@@ -428,20 +394,14 @@ export class OpenAIProvider extends BaseModelProvider {
                 response.usage?.prompt_tokens ||
                 (typeof input === 'string'
                     ? Math.ceil(input.length / 4)
-                    : input.reduce(
-                          (sum, text) => sum + Math.ceil(text.length / 4),
-                          0
-                      ));
+                    : input.reduce((sum, text) => sum + Math.ceil(text.length / 4), 0));
 
             costTracker.addUsage({
                 model,
                 input_tokens: inputTokens,
                 output_tokens: 0, // No output tokens for embeddings
                 metadata: {
-                    dimensions:
-                        response.data[0]?.embedding.length ||
-                        opts?.dimensions ||
-                        1536,
+                    dimensions: response.data[0]?.embedding.length || opts?.dimensions || 1536,
                 },
             });
 
@@ -464,11 +424,7 @@ export class OpenAIProvider extends BaseModelProvider {
      * @param opts - Optional parameters for image generation
      * @returns A promise that resolves to
      */
-    async createImage(
-        prompt: string,
-        model?: string,
-        opts?: ImageGenerationOpts
-    ): Promise<string[]> {
+    async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
         try {
             // Extract options with defaults, mapping to the original function parameters
             model = model || 'gpt-image-1';
@@ -478,11 +434,7 @@ export class OpenAIProvider extends BaseModelProvider {
             let quality: 'low' | 'medium' | 'high' | 'auto' = 'auto';
             if (opts?.quality === 'standard') quality = 'medium';
             else if (opts?.quality === 'hd') quality = 'high';
-            else if (
-                opts?.quality === 'low' ||
-                opts?.quality === 'medium' ||
-                opts?.quality === 'high'
-            ) {
+            else if (opts?.quality === 'low' || opts?.quality === 'medium' || opts?.quality === 'high') {
                 quality = opts.quality;
             }
 
@@ -490,15 +442,9 @@ export class OpenAIProvider extends BaseModelProvider {
             let size: '1024x1024' | '1536x1024' | '1024x1536' | 'auto' = 'auto';
             if (opts?.size === 'square' || opts?.size === '1024x1024') {
                 size = '1024x1024';
-            } else if (
-                opts?.size === 'landscape' ||
-                opts?.size === '1536x1024'
-            ) {
+            } else if (opts?.size === 'landscape' || opts?.size === '1536x1024') {
                 size = '1536x1024';
-            } else if (
-                opts?.size === 'portrait' ||
-                opts?.size === '1024x1536'
-            ) {
+            } else if (opts?.size === 'portrait' || opts?.size === '1024x1536') {
                 size = '1024x1536';
             }
 
@@ -518,9 +464,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 console.log('[OpenAI] Using images.edit with source_images');
 
                 // Convert single string to array for consistent processing
-                const imageArray = Array.isArray(source_images)
-                    ? source_images
-                    : [source_images];
+                const imageArray = Array.isArray(source_images) ? source_images : [source_images];
                 const imageFiles = [];
 
                 // Process each image in the array
@@ -528,20 +472,15 @@ export class OpenAIProvider extends BaseModelProvider {
                     let imageFile;
 
                     // Check if source_image is a URL or base64 string
-                    if (
-                        sourceImg.startsWith('http://') ||
-                        sourceImg.startsWith('https://')
-                    ) {
+                    if (sourceImg.startsWith('http://') || sourceImg.startsWith('https://')) {
                         // Handle URL case - fetch the image
                         const imageResponse = await fetch(sourceImg);
                         const imageBuffer = await imageResponse.arrayBuffer();
 
                         // Convert to OpenAI file format
-                        imageFile = await toFile(
-                            new Uint8Array(imageBuffer),
-                            `image_${imageFiles.length}.png`,
-                            { type: 'image/png' }
-                        );
+                        imageFile = await toFile(new Uint8Array(imageBuffer), `image_${imageFiles.length}.png`, {
+                            type: 'image/png',
+                        });
                     } else {
                         // Handle base64 string case
                         // Check if it's a data URL and extract the base64 part if needed
@@ -554,11 +493,9 @@ export class OpenAIProvider extends BaseModelProvider {
                         const binaryData = Buffer.from(base64Data, 'base64');
 
                         // Convert to OpenAI file format
-                        imageFile = await toFile(
-                            new Uint8Array(binaryData),
-                            `image_${imageFiles.length}.png`,
-                            { type: 'image/png' }
-                        );
+                        imageFile = await toFile(new Uint8Array(binaryData), `image_${imageFiles.length}.png`, {
+                            type: 'image/png',
+                        });
                     }
 
                     imageFiles.push(imageFile);
@@ -572,13 +509,9 @@ export class OpenAIProvider extends BaseModelProvider {
                         maskBase64 = opts.mask.split(',')[1];
                     }
                     const maskBinary = Buffer.from(maskBase64, 'base64');
-                    maskFile = await toFile(
-                        new Uint8Array(maskBinary),
-                        'mask.png',
-                        {
-                            type: 'image/png',
-                        }
-                    );
+                    maskFile = await toFile(new Uint8Array(maskBinary), 'mask.png', {
+                        type: 'image/png',
+                    });
                 }
 
                 // Use the first image as the primary image and any additional ones as references
@@ -693,9 +626,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 response_format = 'mp3';
             }
 
-            console.log(
-                `[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`
-            );
+            console.log(`[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`);
 
             // Add in affect
             let instructions = opts?.instructions || undefined;
@@ -762,9 +693,7 @@ export class OpenAIProvider extends BaseModelProvider {
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
         const { getToolsFromAgent } = await import('../utils/agent.js');
-        const tools: ToolFunction[] | undefined = agent
-            ? await getToolsFromAgent(agent)
-            : [];
+        const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
         let requestId: string | undefined;
 
@@ -777,8 +706,7 @@ export class OpenAIProvider extends BaseModelProvider {
             for (const messageFull of messages) {
                 let message = { ...messageFull };
                 // Keep the original model for class comparison
-                const originalModel: string | undefined = (message as any)
-                    .model;
+                const originalModel: string | undefined = (message as any).model;
 
                 delete (message as any).timestamp;
                 delete (message as any).model;
@@ -793,27 +721,16 @@ export class OpenAIProvider extends BaseModelProvider {
                     // The OpenAI API expects a structure different from our ResponseInputItem types
 
                     // Only convert to reasoning if both current model and source model are o-class
-                    if (
-                        model.startsWith('o') &&
-                        message.thinking_id &&
-                        model === originalModel
-                    ) {
-                        console.log(
-                            `[OpenAI] Processing thinking message with ID: ${message.thinking_id}`,
-                            message
-                        );
-                        const match = message.thinking_id.match(
-                            /^(rs_[A-Za-z0-9]+)-(\d)$/
-                        );
+                    if (model.startsWith('o') && message.thinking_id && model === originalModel) {
+                        console.log(`[OpenAI] Processing thinking message with ID: ${message.thinking_id}`, message);
+                        const match = message.thinking_id.match(/^(rs_[A-Za-z0-9]+)-(\d)$/);
                         if (match) {
                             const reasoningId = match[1];
                             const summaryIndex = parseInt(match[2], 10);
 
                             // Format the summary text content
                             const summaryText =
-                                typeof message.content === 'string'
-                                    ? message.content
-                                    : JSON.stringify(message.content);
+                                typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
 
                             // Create the summary entry
                             const summaryEntry = {
@@ -823,17 +740,13 @@ export class OpenAIProvider extends BaseModelProvider {
 
                             // Look for existing reasoning item with matching ID - use any type to avoid TS errors
                             const existingIndex = input.findIndex(
-                                (item: any) =>
-                                    item.type === 'reasoning' &&
-                                    item.id === reasoningId
+                                (item: any) => item.type === 'reasoning' && item.id === reasoningId
                             );
 
                             if (existingIndex !== -1) {
                                 // Found existing reasoning item - update at the correct position
                                 // Use any type to avoid TypeScript errors with custom properties
-                                const existingItem = input[
-                                    existingIndex
-                                ] as any;
+                                const existingItem = input[existingIndex] as any;
 
                                 // Ensure summary array exists and is the right size
                                 if (!existingItem.summary) {
@@ -841,8 +754,7 @@ export class OpenAIProvider extends BaseModelProvider {
                                 }
 
                                 // Update the summary at the specified index
-                                existingItem.summary[summaryIndex] =
-                                    summaryEntry;
+                                existingItem.summary[summaryIndex] = summaryEntry;
 
                                 // Replace the item in the array (keeping the any type assertion)
                                 input[existingIndex] = existingItem;
@@ -878,11 +790,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 // Handle function call messages
                 if (message.type === 'function_call') {
                     // Check if id doesn't start with 'fc_', and remove it if so
-                    if (
-                        message.id &&
-                        (!message.id.startsWith('fc_') ||
-                            model !== originalModel)
-                    ) {
+                    if (message.id && (!message.id.startsWith('fc_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'fc_', remove it
                         // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { id, ...rest } = message;
@@ -914,16 +822,8 @@ export class OpenAIProvider extends BaseModelProvider {
 
                 // Handle standard message types (user, assistant, etc.)
                 // Also handle messages without a type property (treat as 'message' type)
-                if (
-                    (message.type ?? 'message') === 'message' &&
-                    'content' in message
-                ) {
-                    if (
-                        'id' in message &&
-                        message.id &&
-                        (!message.id.startsWith('msg_') ||
-                            model !== originalModel)
-                    ) {
+                if ((message.type ?? 'message') === 'message' && 'content' in message) {
+                    if ('id' in message && message.id && (!message.id.startsWith('msg_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'msg_', remove it
 
                         const { id, ...rest } = message;
@@ -974,11 +874,7 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // Define mapping for OpenAI reasoning effort configurations
-            const REASONING_EFFORT_CONFIGS: Array<ReasoningEffort> = [
-                'low',
-                'medium',
-                'high',
-            ];
+            const REASONING_EFFORT_CONFIGS: Array<ReasoningEffort> = ['low', 'medium', 'high'];
 
             // Check if model has any of the defined suffixes
             let hasEffortSuffix = false;
@@ -1025,8 +921,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
             // Set JSON response format if a schema is provided
             if (settings?.json_schema?.schema) {
-                const { schema, ...wrapperWithoutSchema } =
-                    settings.json_schema;
+                const { schema, ...wrapperWithoutSchema } = settings.json_schema;
 
                 requestParams.text = {
                     format: {
@@ -1039,24 +934,14 @@ export class OpenAIProvider extends BaseModelProvider {
             // Add tools if provided
             if (tools && tools.length > 0) {
                 // Convert our tools to OpenAI format
-                requestParams = await convertToOpenAITools(
-                    requestParams,
-                    tools
-                );
+                requestParams = await convertToOpenAITools(requestParams, tools);
             }
 
             // Log the request and save the requestId for later response logging
-            requestId = log_llm_request(
-                agent.agent_id,
-                'openai',
-                model,
-                requestParams
-            );
+            requestId = log_llm_request(agent.agent_id, 'openai', model, requestParams);
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import(
-                '../utils/pause_controller.js'
-            );
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
             await waitWhilePaused(100, agent.abortSignal);
 
             const stream = await this.client.responses.create(requestParams);
@@ -1080,71 +965,45 @@ export class OpenAIProvider extends BaseModelProvider {
 
                     // Check if the system was paused during the stream
                     if (isPaused()) {
-                        console.log(
-                            `[OpenAI] System paused during stream for model ${model}. Waiting...`
-                        );
+                        console.log(`[OpenAI] System paused during stream for model ${model}. Waiting...`);
 
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
 
                         // If we're resuming, continue processing
-                        console.log(
-                            `[OpenAI] System resumed, continuing stream for model ${model}`
-                        );
+                        console.log(`[OpenAI] System resumed, continuing stream for model ${model}`);
                     }
 
                     // --- Response Lifecycle Events ---
                     if (event.type === 'response.in_progress') {
                         // Optional: Log or update UI to indicate the response is starting/in progress
                         // console.log(`Response ${event.response.id} is in progress...`);
-                    } else if (
-                        event.type === 'response.completed' &&
-                        event.response?.usage
-                    ) {
+                    } else if (event.type === 'response.completed' && event.response?.usage) {
                         // Final usage information
                         costTracker.addUsage({
                             model, // Ensure 'model' variable is accessible here
-                            input_tokens:
-                                event.response.usage.input_tokens || 0,
-                            output_tokens:
-                                event.response.usage.output_tokens || 0,
-                            cached_tokens:
-                                event.response.usage.input_tokens_details
-                                    ?.cached_tokens || 0,
+                            input_tokens: event.response.usage.input_tokens || 0,
+                            output_tokens: event.response.usage.output_tokens || 0,
+                            cached_tokens: event.response.usage.input_tokens_details?.cached_tokens || 0,
                             metadata: {
-                                reasoning_tokens:
-                                    event.response.usage.output_tokens_details
-                                        ?.reasoning_tokens || 0,
+                                reasoning_tokens: event.response.usage.output_tokens_details?.reasoning_tokens || 0,
                             },
                         });
                         // console.log(`Response ${event.response.id} completed.`);
-                    } else if (
-                        event.type === 'response.failed' &&
-                        event.response?.error
-                    ) {
+                    } else if (event.type === 'response.failed' && event.response?.error) {
                         // Response failed entirely
                         const errorInfo = event.response.error;
                         log_llm_error(requestId, errorInfo);
-                        console.error(
-                            `Response ${event.response.id} failed: [${errorInfo.code}] ${errorInfo.message}`
-                        );
+                        console.error(`Response ${event.response.id} failed: [${errorInfo.code}] ${errorInfo.message}`);
                         yield {
                             type: 'error',
                             error: `OpenAI response  failed: [${errorInfo.code}] ${errorInfo.message}`,
                         };
-                    } else if (
-                        event.type === 'response.incomplete' &&
-                        event.response?.incomplete_details
-                    ) {
+                    } else if (event.type === 'response.incomplete' && event.response?.incomplete_details) {
                         // Response finished but is incomplete (e.g., max_tokens hit)
                         const reason = event.response.incomplete_details.reason;
-                        log_llm_error(
-                            requestId,
-                            'OpenAI response incomplete: ' + reason
-                        );
-                        console.warn(
-                            `Response ${event.response.id} incomplete: ${reason}`
-                        );
+                        log_llm_error(requestId, 'OpenAI response incomplete: ' + reason);
+                        console.warn(`Response ${event.response.id} incomplete: ${reason}`);
                         yield {
                             type: 'error', // Or a more general 'response_incomplete'
                             error: 'OpenAI response incomplete: ' + reason,
@@ -1152,10 +1011,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
 
                     // --- Output Item Lifecycle Events ---
-                    else if (
-                        event.type === 'response.output_item.added' &&
-                        event.item
-                    ) {
+                    else if (event.type === 'response.output_item.added' && event.item) {
                         // A new item (message, function call, etc.) started
                         // console.log(`Output item added: index ${event.output_index}, id ${event.item.id}, type ${event.item.type}`);
                         if (event.item.type === 'function_call') {
@@ -1176,19 +1032,13 @@ export class OpenAIProvider extends BaseModelProvider {
                                 );
                             }
                         }
-                    } else if (
-                        event.type === 'response.output_item.done' &&
-                        event.item
-                    ) {
+                    } else if (event.type === 'response.output_item.done' && event.item) {
                         // An output item finished
                         // console.log(`Output item done: index ${event.output_index}, id ${event.item.id}, type ${event.item.type}`);
                         // If it's a function call, we rely on 'function_call_arguments.done' to yield.
                         // This event could be used for cleanup if needed, but ensure no double-yielding.
                         // We already clean up state in 'function_call_arguments.done'.
-                        if (
-                            event.item.type === 'reasoning' &&
-                            !event.item.summary.length
-                        ) {
+                        if (event.item.type === 'reasoning' && !event.item.summary.length) {
                             // In this case we get a reasoning item with no summary
                             yield {
                                 type: 'message_complete',
@@ -1200,27 +1050,18 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
 
                     // --- Content Part Lifecycle Events ---
-                    else if (
-                        event.type === 'response.content_part.added' &&
-                        event.part
-                    ) {
+                    else if (event.type === 'response.content_part.added' && event.part) {
                         // A new part within a message content array started (e.g., text block, image)
                         // console.log(`Content part added: item_id ${event.item_id}, index ${event.content_index}, type ${event.part.type}`);
                         // Don't yield message_complete here, wait for deltas/done event.
-                    } else if (
-                        event.type === 'response.content_part.done' &&
-                        event.part
-                    ) {
+                    } else if (event.type === 'response.content_part.done' && event.part) {
                         // A content part finished
                         // console.log(`Content part done: item_id ${event.item_id}, index ${event.content_index}, type ${event.part.type}`);
                         // If type is output_text, final text is usually in 'response.output_text.done'.
                     }
 
                     // --- Text Output Events ---
-                    else if (
-                        event.type === 'response.output_text.delta' &&
-                        event.delta
-                    ) {
+                    else if (event.type === 'response.output_text.delta' && event.delta) {
                         // Streamed text chunk (buffered)
                         const itemId = event.item_id;
                         let position = messagePositions.get(itemId) ?? 0;
@@ -1242,25 +1083,18 @@ export class OpenAIProvider extends BaseModelProvider {
 
                         messagePositions.set(itemId, position);
                     } else if (
-                        (event as any).type ===
-                            'response.output_text.annotation.added' &&
+                        (event as any).type === 'response.output_text.annotation.added' &&
                         (event as any).annotation
                     ) {
                         // Handle URL citation annotations
                         const eventData = event as any;
-                        if (
-                            eventData.annotation?.type === 'url_citation' &&
-                            eventData.annotation.url
-                        ) {
+                        if (eventData.annotation?.type === 'url_citation' && eventData.annotation.url) {
                             const marker = formatCitation(citationTracker, {
-                                title:
-                                    eventData.annotation.title ||
-                                    eventData.annotation.url,
+                                title: eventData.annotation.title || eventData.annotation.url,
                                 url: eventData.annotation.url,
                             });
                             // Append to aggregate buffer for this item
-                            let position =
-                                messagePositions.get(eventData.item_id) ?? 0;
+                            let position = messagePositions.get(eventData.item_id) ?? 0;
                             yield {
                                 type: 'message_delta',
                                 content: marker,
@@ -1270,15 +1104,9 @@ export class OpenAIProvider extends BaseModelProvider {
                             messagePositions.set(eventData.item_id, position);
                         } else {
                             // Log other types of annotations
-                            console.log(
-                                'Annotation added:',
-                                eventData.annotation
-                            );
+                            console.log('Annotation added:', eventData.annotation);
                         }
-                    } else if (
-                        event.type === 'response.output_text.done' &&
-                        event.text !== undefined
-                    ) {
+                    } else if (event.type === 'response.output_text.done' && event.text !== undefined) {
                         // Check text exists
                         // Text block finalized
                         const itemId = event.item_id; // Use item_id from the event
@@ -1286,8 +1114,7 @@ export class OpenAIProvider extends BaseModelProvider {
                         // Add footnotes if we have citations
                         let finalText = event.text;
                         if (citationTracker.citations.size > 0) {
-                            const footnotes =
-                                generateFootnotes(citationTracker);
+                            const footnotes = generateFootnotes(citationTracker);
                             finalText += footnotes;
                         }
 
@@ -1303,28 +1130,15 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
 
                     // --- Refusal Events ---
-                    else if (
-                        event.type === 'response.refusal.delta' &&
-                        event.delta
-                    ) {
+                    else if (event.type === 'response.refusal.delta' && event.delta) {
                         // Streamed refusal text chunk
-                        console.log(
-                            `Refusal delta for item ${event.item_id}: ${event.delta}`
-                        );
+                        console.log(`Refusal delta for item ${event.item_id}: ${event.delta}`);
                         // Decide how to handle/yield refusal text (e.g., separate event type)
                         //yield { type: 'refusal_delta', message_id: event.item_id, content: event.delta };
-                    } else if (
-                        event.type === 'response.refusal.done' &&
-                        event.refusal
-                    ) {
+                    } else if (event.type === 'response.refusal.done' && event.refusal) {
                         // Refusal text finalized
-                        log_llm_error(
-                            requestId,
-                            'OpenAI refusal error: ' + event.refusal
-                        );
-                        console.log(
-                            `Refusal done for item ${event.item_id}: ${event.refusal}`
-                        );
+                        log_llm_error(requestId, 'OpenAI refusal error: ' + event.refusal);
+                        console.log(`Refusal done for item ${event.item_id}: ${event.refusal}`);
                         yield {
                             type: 'error',
                             error: 'OpenAI refusal error: ' + event.refusal,
@@ -1332,11 +1146,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
 
                     // --- Function Call Events (Based on Docs) ---
-                    else if (
-                        event.type ===
-                            'response.function_call_arguments.delta' &&
-                        event.delta
-                    ) {
+                    else if (event.type === 'response.function_call_arguments.delta' && event.delta) {
                         // Streamed arguments for a function call
                         const currentCall = toolCallStates.get(event.item_id);
                         if (currentCall) {
@@ -1349,8 +1159,7 @@ export class OpenAIProvider extends BaseModelProvider {
                             // Optional: Could attempt to create the state here if needed, but less ideal
                         }
                     } else if (
-                        event.type ===
-                            'response.function_call_arguments.done' &&
+                        event.type === 'response.function_call_arguments.done' &&
                         event.arguments !== undefined
                     ) {
                         // Check arguments exist
@@ -1372,85 +1181,49 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
 
                     // --- File Search Events ---
-                    else if (
-                        event.type === 'response.file_search_call.in_progress'
-                    ) {
-                        console.log(
-                            `File search in progress for item ${event.item_id}...`
-                        );
+                    else if (event.type === 'response.file_search_call.in_progress') {
+                        console.log(`File search in progress for item ${event.item_id}...`);
                         //yield { type: 'file_search_started', item_id: event.item_id };
-                    } else if (
-                        event.type === 'response.file_search_call.searching'
-                    ) {
-                        console.log(
-                            `File search searching for item ${event.item_id}...`
-                        );
+                    } else if (event.type === 'response.file_search_call.searching') {
+                        console.log(`File search searching for item ${event.item_id}...`);
                         //yield { type: 'file_search_pending', item_id: event.item_id };
-                    } else if (
-                        event.type === 'response.file_search_call.completed'
-                    ) {
-                        console.log(
-                            `File search completed for item ${event.item_id}.`
-                        );
+                    } else if (event.type === 'response.file_search_call.completed') {
+                        console.log(`File search completed for item ${event.item_id}.`);
                         //yield { type: 'file_search_completed', item_id: event.item_id };
                         // Note: Results are typically delivered via annotations in the text output.
                     }
 
                     // --- Web Search Events ---
-                    else if (
-                        event.type === 'response.web_search_call.in_progress'
-                    ) {
-                        console.log(
-                            `Web search in progress for item ${event.item_id}...`
-                        );
+                    else if (event.type === 'response.web_search_call.in_progress') {
+                        console.log(`Web search in progress for item ${event.item_id}...`);
                         //yield { type: 'web_search_started', item_id: event.item_id };
-                    } else if (
-                        event.type === 'response.web_search_call.searching'
-                    ) {
-                        console.log(
-                            `Web search searching for item ${event.item_id}...`
-                        );
+                    } else if (event.type === 'response.web_search_call.searching') {
+                        console.log(`Web search searching for item ${event.item_id}...`);
                         //yield { type: 'web_search_pending', item_id: event.item_id };
-                    } else if (
-                        event.type === 'response.web_search_call.completed'
-                    ) {
-                        console.log(
-                            `Web search completed for item ${event.item_id}.`
-                        );
+                    } else if (event.type === 'response.web_search_call.completed') {
+                        console.log(`Web search completed for item ${event.item_id}.`);
                         //yield { type: 'web_search_completed', item_id: event.item_id };
                         // Note: Results might be used internally by the model or delivered via annotations/text.
                     }
 
                     // --- Reasoning Summary Events ---
-                    else if (
-                        event.type === 'response.reasoning_summary_part.added'
-                    ) {
+                    else if (event.type === 'response.reasoning_summary_part.added') {
                         // A new reasoning summary part was added - we just log this
                         console.log(
                             `Reasoning summary part added for item ${event.item_id}, index ${event.summary_index}`
                         );
                         // We don't yield anything here, we wait for the text deltas
-                    } else if (
-                        event.type === 'response.reasoning_summary_part.done'
-                    ) {
+                    } else if (event.type === 'response.reasoning_summary_part.done') {
                         // A reasoning summary part was completed - we just log this
                         console.log(
                             `Reasoning summary part done for item ${event.item_id}, index ${event.summary_index}`
                         );
                         // We don't yield anything here, we rely on the text.done event
-                    } else if (
-                        event.type ===
-                            'response.reasoning_summary_text.delta' &&
-                        event.delta
-                    ) {
+                    } else if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
                         // A delta was added to a reasoning summary text
-                        const itemId =
-                            event.item_id + '-' + event.summary_index;
+                        const itemId = event.item_id + '-' + event.summary_index;
                         let position = reasoningPositions.get(itemId) ?? 0;
-                        reasoningAggregates.set(
-                            itemId,
-                            reasoningAggregates.get(itemId)! + event.delta
-                        );
+                        reasoningAggregates.set(itemId, reasoningAggregates.get(itemId)! + event.delta);
 
                         // Yield the delta as a message_delta with thinking_content
                         yield {
@@ -1461,13 +1234,9 @@ export class OpenAIProvider extends BaseModelProvider {
                             order: position++,
                         };
                         reasoningPositions.set(itemId, position);
-                    } else if (
-                        event.type === 'response.reasoning_summary_text.done' &&
-                        event.text !== undefined
-                    ) {
+                    } else if (event.type === 'response.reasoning_summary_text.done' && event.text !== undefined) {
                         // A reasoning summary text was completed
-                        const itemId =
-                            event.item_id + '-' + event.summary_index;
+                        const itemId = event.item_id + '-' + event.summary_index;
                         const aggregatedThinking = event.text;
 
                         // Yield the completed thinking content
@@ -1487,9 +1256,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     else if (event.type === 'error' && event.message) {
                         log_llm_error(requestId, event);
                         // An error reported by the API within the stream
-                        console.error(
-                            `API Stream Error (${model}): [${event.code || 'N/A'}] ${event.message}`
-                        );
+                        console.error(`API Stream Error (${model}): [${event.code || 'N/A'}] ${event.message}`);
                         yield {
                             type: 'error',
                             error: `OpenAI API error (${model}): [${event.code || 'N/A'}] ${event.message}`,
@@ -1512,9 +1279,7 @@ export class OpenAIProvider extends BaseModelProvider {
             } finally {
                 // Clean up: Check if any tool calls were started but not completed
                 if (toolCallStates.size > 0) {
-                    console.warn(
-                        `Stream ended with ${toolCallStates.size} incomplete tool call(s).`
-                    );
+                    console.warn(`Stream ended with ${toolCallStates.size} incomplete tool call(s).`);
                     for (const [, toolCall] of toolCallStates.entries()) {
                         // Optionally yield incomplete tool calls if appropriate for your application
                         if (toolCall.function.name) {
@@ -1528,20 +1293,17 @@ export class OpenAIProvider extends BaseModelProvider {
                     toolCallStates.clear(); // Clear the map
                 }
                 // Flush any buffered d
-                for (const ev of flushBufferedDeltas(
-                    deltaBuffers,
-                    (id, content) => {
-                        let position = messagePositions.get(id) ?? 0;
-                        position++;
-                        messagePositions.set(id, position);
-                        return {
-                            type: 'message_delta',
-                            content,
-                            message_id: id,
-                            order: position,
-                        } as ProviderStreamEvent;
-                    }
-                )) {
+                for (const ev of flushBufferedDeltas(deltaBuffers, (id, content) => {
+                    let position = messagePositions.get(id) ?? 0;
+                    position++;
+                    messagePositions.set(id, position);
+                    return {
+                        type: 'message_delta',
+                        content,
+                        message_id: id,
+                        order: position,
+                    } as ProviderStreamEvent;
+                })) {
                     yield ev;
                 }
                 messagePositions.clear(); // Clear positions map
@@ -1555,9 +1317,7 @@ export class OpenAIProvider extends BaseModelProvider {
             console.error('Error in OpenAI streaming response:', error);
             yield {
                 type: 'error',
-                error:
-                    'OpenAI streaming error: ' +
-                    (error instanceof Error ? error.stack : String(error)),
+                error: 'OpenAI streaming error: ' + (error instanceof Error ? error.stack : String(error)),
             };
         }
     }

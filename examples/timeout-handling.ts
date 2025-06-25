@@ -3,12 +3,7 @@
  * Demonstrates tool timeout and background execution tracking
  */
 
-import {
-    ensembleRequest,
-    ToolFunction,
-    runningToolTracker,
-    FUNCTION_TIMEOUT_MS,
-} from '../index.js';
+import { ensembleRequest, ToolFunction, runningToolTracker, FUNCTION_TIMEOUT_MS } from '../index.js';
 
 // Define tools including status tracking
 const tools: ToolFunction[] = [
@@ -118,9 +113,7 @@ const tools: ToolFunction[] = [
 
 async function main() {
     console.log('=== TIMEOUT HANDLING DEMONSTRATION ===\n');
-    console.log(
-        `Default timeout: ${FUNCTION_TIMEOUT_MS}ms (${FUNCTION_TIMEOUT_MS / 1000}s)\n`
-    );
+    console.log(`Default timeout: ${FUNCTION_TIMEOUT_MS}ms (${FUNCTION_TIMEOUT_MS / 1000}s)\n`);
 
     // Monitor background completions
     runningToolTracker.onCompletion(event => {
@@ -170,9 +163,7 @@ async function main() {
                             const lines = result.output.split('\n');
                             if (lines.length > 1) {
                                 console.log(`\n${i + 1}. Multi-line result:`);
-                                lines.forEach(line =>
-                                    console.log(`   ${line}`)
-                                );
+                                lines.forEach(line => console.log(`   ${line}`));
                             } else {
                                 console.log(`${i + 1}. ${result.output}`);
                             }
@@ -184,14 +175,10 @@ async function main() {
         }
 
         console.log('\n\n' + '='.repeat(60));
-        console.log(
-            'Demo complete! Check the background completion events above.'
-        );
+        console.log('Demo complete! Check the background completion events above.');
 
         // Give some time for background tasks to complete
-        console.log(
-            '\nWaiting 10 seconds for any remaining background tasks...'
-        );
+        console.log('\nWaiting 10 seconds for any remaining background tasks...');
         await new Promise(resolve => setTimeout(resolve, 10000));
     } catch (error) {
         console.error('Error:', error);

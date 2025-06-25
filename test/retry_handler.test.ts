@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-    isRetryableError,
-    calculateDelay,
-    retryWithBackoff,
-    retryStreamWithBackoff,
-} from '../utils/retry_handler.js';
+import { isRetryableError, calculateDelay, retryWithBackoff, retryStreamWithBackoff } from '../utils/retry_handler.js';
 
 describe('Retry Handler', () => {
     afterEach(() => {
@@ -47,9 +42,7 @@ describe('Retry Handler', () => {
                     message: 'Error: fetch failed sending request',
                 })
             ).toBe(true);
-            expect(
-                isRetryableError({ message: 'network error occurred' })
-            ).toBe(true);
+            expect(isRetryableError({ message: 'network error occurred' })).toBe(true);
             expect(
                 isRetryableError({
                     message: 'Connection reset by peer (ECONNRESET)',
@@ -58,15 +51,9 @@ describe('Retry Handler', () => {
         });
 
         it('should identify provider-specific errors as retryable', () => {
-            expect(
-                isRetryableError({ message: 'Incomplete JSON segment' })
-            ).toBe(true);
-            expect(
-                isRetryableError({ message: 'Connection error: timeout' })
-            ).toBe(true);
-            expect(
-                isRetryableError({ message: 'Request timeout exceeded' })
-            ).toBe(true);
+            expect(isRetryableError({ message: 'Incomplete JSON segment' })).toBe(true);
+            expect(isRetryableError({ message: 'Connection error: timeout' })).toBe(true);
+            expect(isRetryableError({ message: 'Request timeout exceeded' })).toBe(true);
         });
 
         it('should not identify non-retryable errors', () => {
@@ -75,9 +62,7 @@ describe('Retry Handler', () => {
             expect(isRetryableError({ status: 401 })).toBe(false);
             expect(isRetryableError({ status: 403 })).toBe(false);
             expect(isRetryableError({ status: 404 })).toBe(false);
-            expect(isRetryableError({ message: 'Invalid API key' })).toBe(
-                false
-            );
+            expect(isRetryableError({ message: 'Invalid API key' })).toBe(false);
         });
 
         it('should respect custom retryable errors', () => {
@@ -86,9 +71,7 @@ describe('Retry Handler', () => {
                 retryableStatusCodes: new Set([418]), // I'm a teapot
             };
 
-            expect(isRetryableError({ code: 'CUSTOM_ERROR' }, options)).toBe(
-                true
-            );
+            expect(isRetryableError({ code: 'CUSTOM_ERROR' }, options)).toBe(true);
             expect(isRetryableError({ status: 418 }, options)).toBe(true);
         });
     });
@@ -193,10 +176,7 @@ describe('Retry Handler', () => {
 
             const onRetry = vi.fn();
             const error = { code: 'ETIMEDOUT' };
-            const fn = vi
-                .fn()
-                .mockRejectedValueOnce(error)
-                .mockResolvedValue('success');
+            const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('success');
 
             const promise = retryWithBackoff(fn, { onRetry });
 
@@ -245,9 +225,7 @@ describe('Retry Handler', () => {
 
             const results: string[] = [];
             const streamPromise = (async () => {
-                for await (const value of retryStreamWithBackoff(
-                    createStreamFn
-                )) {
+                for await (const value of retryStreamWithBackoff(createStreamFn)) {
                     results.push(value);
                 }
             })();
@@ -269,9 +247,7 @@ describe('Retry Handler', () => {
 
             const results: string[] = [];
             await expect(async () => {
-                for await (const value of retryStreamWithBackoff(
-                    createStreamFn
-                )) {
+                for await (const value of retryStreamWithBackoff(createStreamFn)) {
                     results.push(value);
                 }
             }).rejects.toEqual({ code: 'ECONNRESET' });
@@ -286,9 +262,7 @@ describe('Retry Handler', () => {
 
             await expect(async () => {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                for await (const _value of retryStreamWithBackoff(
-                    createStreamFn
-                )) {
+                for await (const _value of retryStreamWithBackoff(createStreamFn)) {
                     // Should not reach here
                 }
             }).rejects.toEqual(error);

@@ -1,9 +1,5 @@
 import type { AgentDefinition, VoiceGenerationOpts } from '../types/types.js';
-import {
-    getModelFromAgent,
-    getModelProvider,
-    type ModelProvider,
-} from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider, type ModelProvider } from '../model_providers/model_provider.js';
 
 // Re-export for convenience
 export type { VoiceGenerationOpts };
@@ -86,9 +82,7 @@ export async function* ensembleVoice(
     }
 
     if (!provider.createVoice) {
-        throw new Error(
-            `Provider for model ${model} does not support voice generation`
-        );
+        throw new Error(`Provider for model ${model} does not support voice generation`);
     }
 
     // Get the audio stream
@@ -101,10 +95,7 @@ export async function* ensembleVoice(
             result instanceof ReadableStream ? 'ReadableStream' : 'ArrayBuffer'
         );
     } catch (error) {
-        console.error(
-            '[ensembleVoice] Error calling provider.createVoice:',
-            error
-        );
+        console.error('[ensembleVoice] Error calling provider.createVoice:', error);
         throw error;
     }
 

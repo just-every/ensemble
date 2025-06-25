@@ -222,8 +222,7 @@ export const MODEL_CLASSES = {
         models: [
             'gemini-live-2.5-flash-preview', // Gemini Live API for real-time transcription
         ],
-        description:
-            'Speech-to-Text models for audio transcription with real-time streaming',
+        description: 'Speech-to-Text models for audio transcription with real-time streaming',
     },
 };
 
@@ -251,8 +250,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         embedding: true,
         dim: 1536,
         class: 'embedding',
-        description:
-            "OpenAI's small embedding model, good balance of performance and cost",
+        description: "OpenAI's small embedding model, good balance of performance and cost",
     },
     {
         id: 'text-embedding-3-large',
@@ -268,8 +266,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         embedding: true,
         dim: 3072,
         class: 'embedding',
-        description:
-            "OpenAI's large embedding model, good balance of performance and cost",
+        description: "OpenAI's large embedding model, good balance of performance and cost",
     },
     {
         id: 'gemini-embedding-exp-03-07',
@@ -285,8 +282,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         embedding: true,
         dim: 768,
         class: 'embedding',
-        description:
-            "Google's experimental embedding model optimized for semantic similarity",
+        description: "Google's experimental embedding model optimized for semantic similarity",
     },
     // Models used via OpenRouter
     // Note: Specific pricing/features via OpenRouter can fluctuate. Validation based on general model info & provider docs.
@@ -433,8 +429,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 70, // HumanEval – xAI hasn’t published; estimate from AA
             reasoning: 65, // GPQA Diamond – estimate
         },
-        description:
-            'Flagship Grok-3 model for complex reasoning and generation',
+        description: 'Flagship Grok-3 model for complex reasoning and generation',
     },
 
     {
@@ -512,8 +507,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 55,
             reasoning: 50,
         },
-        description:
-            'Grok-3 Mini on accelerated hardware for latency-critical use',
+        description: 'Grok-3 Mini on accelerated hardware for latency-critical use',
     },
 
     //
@@ -704,12 +698,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // O series models
     {
         id: 'o4-mini',
-        aliases: [
-            'o4-mini-2025-04-16',
-            'o4-mini-low',
-            'o4-mini-medium',
-            'o4-mini-high',
-        ],
+        aliases: ['o4-mini-2025-04-16', 'o4-mini-low', 'o4-mini-medium', 'o4-mini-high'],
         provider: 'openai',
         cost: {
             input_per_million: 1.1,
@@ -822,8 +811,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 90, // Very high score for premium model
-        description:
-            'Premium O-series model from OpenAI, highest reasoning capability',
+        description: 'Premium O-series model from OpenAI, highest reasoning capability',
     },
     {
         id: 'o4-mini',
@@ -867,8 +855,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true, // Assumed
         },
         class: 'vision', // Changed class to 'agent' as it's more descriptive
-        description:
-            'Model that can understand and control computer interfaces',
+        description: 'Model that can understand and control computer interfaces',
     },
 
     //
@@ -901,8 +888,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 77, // HumanEval
             reasoning: 69, // GPQA Diamond
         },
-        description:
-            'Latest Claude model with strong reasoning capabilities (extended thinking internal)',
+        description: 'Latest Claude model with strong reasoning capabilities (extended thinking internal)',
     },
 
     // Claude 3.5 Haiku
@@ -954,8 +940,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'reasoning', // Assuming Sonnet backend
-        description:
-            'Claude accessed via CLI (likely uses latest Sonnet or Haiku model)',
+        description: 'Claude accessed via CLI (likely uses latest Sonnet or Haiku model)',
     },
 
     // Claude Opus 4
@@ -980,8 +965,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 95, // Highest tier model
-        description:
-            'Claude Opus 4 - Highest level of intelligence and capability with extended thinking',
+        description: 'Claude Opus 4 - Highest level of intelligence and capability with extended thinking',
     },
 
     // Claude Sonnet 4
@@ -1006,8 +990,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 90, // High tier model
-        description:
-            'Claude Sonnet 4 - High intelligence and balanced performance with extended thinking',
+        description: 'Claude Sonnet 4 - High intelligence and balanced performance with extended thinking',
     },
 
     //
@@ -1017,11 +1000,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Gemini 2.5 Pro
     {
         id: 'gemini-2.5-pro-preview-06-05',
-        aliases: [
-            'gemini-2.5-pro',
-            'gemini-2.5-pro-exp-03-25',
-            'gemini-2.5-pro-preview-05-06',
-        ],
+        aliases: ['gemini-2.5-pro', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-pro-preview-05-06'],
         provider: 'google',
         cost: {
             // Tiered pricing
@@ -1047,8 +1026,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 80, // High score for paid preview version
-        description:
-            'Paid preview of Gemini 2.5 Pro. State-of-the-art multipurpose model.',
+        description: 'Paid preview of Gemini 2.5 Pro. State-of-the-art multipurpose model.',
     },
     {
         id: 'gemini-2.5-flash-preview-05-20',
@@ -1074,8 +1052,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 63, // HumanEval
             reasoning: 78, // GPQA Diamond
         },
-        description:
-            'Balanced multimodal model with large context, built for Agents.',
+        description: 'Balanced multimodal model with large context, built for Agents.',
     },
 
     // Gemini 2.0 Flash Lite
@@ -1102,8 +1079,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 55, // HumanEval
             reasoning: 56, // GPQA Diamond
         },
-        description:
-            'Lite multimodal model with large context, built for Agents.',
+        description: 'Lite multimodal model with large context, built for Agents.',
     },
 
     // Gemini 2.0 Flash
@@ -1131,8 +1107,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 55, // HumanEval
             reasoning: 56, // GPQA Diamond
         },
-        description:
-            'Balanced multimodal model with large context, built for Agents.',
+        description: 'Balanced multimodal model with large context, built for Agents.',
     },
 
     // Image generation models
@@ -1230,8 +1205,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
         },
         class: 'voice',
-        description:
-            "ElevenLabs' turbo model optimized for low-latency text-to-speech with high quality output.",
+        description: "ElevenLabs' turbo model optimized for low-latency text-to-speech with high quality output.",
     },
     {
         id: 'gemini-2.5-flash-preview-tts',
@@ -1288,8 +1262,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning_output: true,
         },
         class: 'code',
-        description:
-            'Fine-tuned o4-mini model for Codex CLI with reasoning token support',
+        description: 'Fine-tuned o4-mini model for Codex CLI with reasoning token support',
     },
     // Perplexity Sonar models
     {
@@ -1308,8 +1281,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'search',
-        description:
-            'Lightweight, cost-effective search model designed for quick, grounded answers.',
+        description: 'Lightweight, cost-effective search model designed for quick, grounded answers.',
     },
     {
         id: 'perplexity/sonar-pro',
@@ -1327,8 +1299,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'search',
-        description:
-            'Advanced search model optimized for complex queries and deeper content understanding.',
+        description: 'Advanced search model optimized for complex queries and deeper content understanding.',
     },
     {
         id: 'perplexity/sonar-reasoning',
@@ -1346,8 +1317,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'reasoning_mini',
-        description:
-            'Quick problem-solving and reasoning model, ideal for evaluating complex queries.',
+        description: 'Quick problem-solving and reasoning model, ideal for evaluating complex queries.',
     },
     {
         id: 'perplexity/sonar-reasoning-pro',
@@ -1365,8 +1335,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'reasoning',
-        description:
-            'Enhanced reasoning model with multi-step problem-solving capabilities and real-time search.',
+        description: 'Enhanced reasoning model with multi-step problem-solving capabilities and real-time search.',
     },
     {
         id: 'perplexity/sonar-deep-research',
@@ -1384,8 +1353,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'search',
-        description:
-            'Best suited for exhaustive research, generating detailed reports and in-depth insights.',
+        description: 'Best suited for exhaustive research, generating detailed reports and in-depth insights.',
     },
     // Mistral models (via OpenRouter)
     {
@@ -1467,8 +1435,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description:
-            "OpenAI's DALL-E 3 model for high-quality image generation",
+        description: "OpenAI's DALL-E 3 model for high-quality image generation",
     },
     {
         id: 'dall-e-2',
@@ -1481,8 +1448,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description:
-            "OpenAI's DALL-E 2 model, supports image editing and variations",
+        description: "OpenAI's DALL-E 2 model, supports image editing and variations",
     },
     {
         id: 'imagen-3.0-generate-002',
@@ -1496,8 +1462,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description:
-            "Google's Imagen 3 model for high-quality image generation",
+        description: "Google's Imagen 3 model for high-quality image generation",
     },
     {
         id: 'imagen-2',
@@ -1538,8 +1503,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
         },
         class: 'transcription',
-        description:
-            'Gemini Live API for real-time multimodal interaction with modality-specific pricing',
+        description: 'Gemini Live API for real-time multimodal interaction with modality-specific pricing',
     },
 ];
 
@@ -1559,9 +1523,7 @@ export function findModel(modelId: string): ModelEntry | undefined {
     if (directMatch) return directMatch;
 
     // Check for alias match
-    const aliasMatch = MODEL_REGISTRY.find(model =>
-        model.aliases?.includes(modelId)
-    );
+    const aliasMatch = MODEL_REGISTRY.find(model => model.aliases?.includes(modelId));
     if (aliasMatch) return aliasMatch;
 
     // If model ends in -low, -medium, -high or -max, remove suffix and try again

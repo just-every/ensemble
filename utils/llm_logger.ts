@@ -21,32 +21,18 @@ export function log_llm_request(
     timestamp?: Date
 ): string {
     if (globalLogger) {
-        return globalLogger.log_llm_request(
-            agentId,
-            providerName,
-            model,
-            requestData,
-            timestamp
-        );
+        return globalLogger.log_llm_request(agentId, providerName, model, requestData, timestamp);
     }
     return '';
 }
 
-export function log_llm_response(
-    requestId: string | undefined,
-    responseData: unknown,
-    timestamp?: Date
-): void {
+export function log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void {
     if (globalLogger) {
         globalLogger.log_llm_response(requestId, responseData, timestamp);
     }
 }
 
-export function log_llm_error(
-    requestId: string | undefined,
-    errorData: unknown,
-    timestamp?: Date
-): void {
+export function log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void {
     if (globalLogger) {
         globalLogger.log_llm_error(requestId, errorData, timestamp);
     }

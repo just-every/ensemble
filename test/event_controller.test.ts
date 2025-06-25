@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { ProviderStreamEvent } from '../types/types.js';
-import {
-    getEventController,
-    setEventHandler,
-    emitEvent,
-    hasEventHandler,
-} from '../utils/event_controller.js';
+import { getEventController, setEventHandler, emitEvent, hasEventHandler } from '../utils/event_controller.js';
 
 describe('EventController', () => {
     beforeEach(() => {

@@ -28,9 +28,7 @@ export function timeoutPromise(ms: number): Promise<'TIMEOUT'> {
 export function agentHasStatusTracking(agent: AgentDefinition): boolean {
     if (!agent.tools) return false;
 
-    return agent.tools.some(tool =>
-        STATUS_TRACKING_TOOLS.has(tool.definition.function.name)
-    );
+    return agent.tools.some(tool => STATUS_TRACKING_TOOLS.has(tool.definition.function.name));
 }
 
 /**
@@ -55,12 +53,7 @@ export async function executeToolWithLifecycle(
     }
 
     // Register with tracker
-    const runningTool = runningToolTracker.addRunningTool(
-        fnId,
-        toolName,
-        agent.agent_id || 'unknown',
-        argsString
-    );
+    const runningTool = runningToolTracker.addRunningTool(fnId, toolName, agent.agent_id || 'unknown', argsString);
 
     // Use the signal from the tracker if not provided
     const abortSignal = signal || runningTool.abortController?.signal;
@@ -78,11 +71,7 @@ export async function executeToolWithLifecycle(
         const result = await tool.function(...args);
 
         // Mark as completed
-        await runningToolTracker.completeRunningTool(
-            fnId,
-            String(result),
-            agent
-        );
+        await runningToolTracker.completeRunningTool(fnId, String(result), agent);
 
         return String(result);
     } catch (error) {
@@ -95,11 +84,7 @@ export async function executeToolWithLifecycle(
 /**
  * Handle tool call with timeout and sequential execution support
  */
-export async function handleToolCall(
-    toolCall: ToolCall,
-    tool: ToolFunction,
-    agent: AgentDefinition
-): Promise<string> {
+export async function handleToolCall(toolCall: ToolCall, tool: ToolFunction, agent: AgentDefinition): Promise<string> {
     const fnId = toolCall.id || uuidv4();
     const toolName = toolCall.function.name;
 
@@ -134,9 +119,7 @@ export async function handleToolCall(
     const shouldTimeout = !excludedFromTimeout && hasStatusTools && !sequential;
 
     // Create the execute function
-    const execute = sequential
-        ? () => runSequential(agent.agent_id || 'unknown', executeFunction)
-        : executeFunction;
+    const execute = sequential ? () => runSequential(agent.agent_id || 'unknown', executeFunction) : executeFunction;
 
     if (!shouldTimeout) {
         return execute();
@@ -161,10 +144,7 @@ export async function handleToolCall(
 /**
  * Validate and prepare tool arguments
  */
-export function prepareToolArguments(
-    argsString: string,
-    tool: ToolFunction
-): any[] {
+export function prepareToolArguments(argsString: string, tool: ToolFunction): any[] {
     // Parse arguments
     let args: any;
     try {
@@ -179,16 +159,12 @@ export function prepareToolArguments(
 
     if (typeof args === 'object' && args !== null && !Array.isArray(args)) {
         // Extract parameter names from tool definition
-        const paramNames = Object.keys(
-            tool.definition.function.parameters.properties
-        );
+        const paramNames = Object.keys(tool.definition.function.parameters.properties);
 
         // Filter out unknown parameters
         Object.keys(args).forEach(key => {
             if (!paramNames.includes(key)) {
-                console.warn(
-                    `Removing unknown parameter "${key}" for tool "${tool.definition.function.name}"`
-                );
+                console.warn(`Removing unknown parameter "${key}" for tool "${tool.definition.function.name}"`);
                 delete args[key];
             }
         });
@@ -197,50 +173,32 @@ export function prepareToolArguments(
         if (paramNames.length > 0) {
             return paramNames.map(param => {
                 const value = args[param];
-                const paramSpec =
-                    tool.definition.function.parameters.properties[param];
+                const paramSpec = tool.definition.function.parameters.properties[param];
 
                 // Skip empty optional parameters
                 if (
                     (value === undefined || value === '') &&
-                    !tool.definition.function.parameters.required?.includes(
-                        param
-                    )
+                    !tool.definition.function.parameters.required?.includes(param)
                 ) {
                     return undefined;
                 }
 
                 // Apply type coercion
-                const [coercedValue, error] = coerceValue(
-                    value,
-                    paramSpec,
-                    param
-                );
+                const [coercedValue, error] = coerceValue(value, paramSpec, param);
 
-                if (
-                    error &&
-                    tool.definition.function.parameters.required?.includes(
-                        param
-                    )
-                ) {
+                if (error && tool.definition.function.parameters.required?.includes(param)) {
                     throw new Error(
                         JSON.stringify({
                             error: {
                                 param,
-                                expected:
-                                    paramSpec.type +
-                                    (paramSpec.items?.type
-                                        ? `<${paramSpec.items.type}>`
-                                        : ''),
+                                expected: paramSpec.type + (paramSpec.items?.type ? `<${paramSpec.items.type}>` : ''),
                                 received: String(value),
                                 message: error,
                             },
                         })
                     );
                 } else if (error) {
-                    console.warn(
-                        `Parameter coercion warning for ${param}: ${error}`
-                    );
+                    console.warn(`Parameter coercion warning for ${param}: ${error}`);
                 }
 
                 return coercedValue;

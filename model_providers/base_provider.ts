@@ -1,15 +1,8 @@
 import { ModelProvider } from './model_provider.js';
 import { ModelProviderID } from '../data/model_data.js';
-import {
-    ProviderStreamEvent,
-    ResponseInput,
-    AgentDefinition,
-} from '../types/types.js';
+import { ProviderStreamEvent, ResponseInput, AgentDefinition } from '../types/types.js';
 import { isValidBase64, detectImageType } from '../utils/image_validation.js';
-import {
-    retryStreamWithBackoff,
-    RetryOptions,
-} from '../utils/retry_handler.js';
+import { retryStreamWithBackoff, RetryOptions } from '../utils/retry_handler.js';
 
 /**
  * Abstract base class for model providers that implements common functionality
@@ -63,10 +56,7 @@ export abstract class BaseModelProvider implements ModelProvider {
             ]);
         }
 
-        yield* retryStreamWithBackoff(
-            () => this.createResponseStream(messages, model, agent),
-            retryOptions
-        );
+        yield* retryStreamWithBackoff(() => this.createResponseStream(messages, model, agent), retryOptions);
     }
 
     /**

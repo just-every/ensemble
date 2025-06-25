@@ -37,9 +37,7 @@ vi.mock('../model_providers/model_provider.js', () => ({
             };
         }),
     })),
-    getModelFromAgent: vi.fn(() =>
-        Promise.resolve('gemini-live-2.5-flash-preview')
-    ),
+    getModelFromAgent: vi.fn(() => Promise.resolve('gemini-live-2.5-flash-preview')),
 }));
 
 describe('ensembleListen', () => {
@@ -141,9 +139,7 @@ describe('ensembleListen', () => {
 
     it('should handle provider errors gracefully', async () => {
         // Mock provider to throw error
-        const { getModelProvider } = await import(
-            '../model_providers/model_provider.js'
-        );
+        const { getModelProvider } = await import('../model_providers/model_provider.js');
         (getModelProvider as any).mockImplementationOnce(() => {
             throw new Error('Provider not found');
         });
@@ -231,23 +227,15 @@ describe('ensembleListen', () => {
         expect(turnCount).toBe(1);
 
         // Turn event should come after deltas but before complete
-        const turnIndex = events.findIndex(
-            e => e.type === 'transcription_turn'
-        );
-        const firstDeltaIndex = events.findIndex(
-            e => e.type === 'transcription_delta'
-        );
-        const completeIndex = events.findIndex(
-            e => e.type === 'transcription_complete'
-        );
+        const turnIndex = events.findIndex(e => e.type === 'transcription_turn');
+        const firstDeltaIndex = events.findIndex(e => e.type === 'transcription_delta');
+        const completeIndex = events.findIndex(e => e.type === 'transcription_complete');
 
         expect(turnIndex).toBeGreaterThan(firstDeltaIndex);
         expect(turnIndex).toBeLessThan(completeIndex);
 
         // Complete event should have all turns joined
-        const completeEvent = events.find(
-            e => e.type === 'transcription_complete'
-        ) as any;
+        const completeEvent = events.find(e => e.type === 'transcription_complete') as any;
         expect(completeEvent.text).toBe('Hello, this is a test.');
     });
 
@@ -262,24 +250,16 @@ describe('ensembleListen', () => {
         }
 
         // Find preview event
-        const previewEvent = events.find(
-            e => e.type === 'transcription_preview'
-        ) as any;
+        const previewEvent = events.find(e => e.type === 'transcription_preview') as any;
 
         expect(previewEvent).toBeDefined();
         expect(previewEvent.text).toBe('User input preview');
         expect(previewEvent.isFinal).toBe(true);
 
         // Preview should come after turn but before complete
-        const previewIndex = events.findIndex(
-            e => e.type === 'transcription_preview'
-        );
-        const turnIndex = events.findIndex(
-            e => e.type === 'transcription_turn'
-        );
-        const completeIndex = events.findIndex(
-            e => e.type === 'transcription_complete'
-        );
+        const previewIndex = events.findIndex(e => e.type === 'transcription_preview');
+        const turnIndex = events.findIndex(e => e.type === 'transcription_turn');
+        const completeIndex = events.findIndex(e => e.type === 'transcription_complete');
 
         expect(previewIndex).toBeGreaterThan(turnIndex);
         expect(previewIndex).toBeLessThan(completeIndex);

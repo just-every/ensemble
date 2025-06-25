@@ -102,18 +102,14 @@ async function streamingExample() {
             if (event.type === 'audio_stream' && event.data) {
                 const chunk = Buffer.from(event.data, 'base64');
                 audioBuffer = Buffer.concat([audioBuffer, chunk]);
-                console.log(
-                    `Received chunk ${event.chunkIndex} (${chunk.length} bytes)`
-                );
+                console.log(`Received chunk ${event.chunkIndex} (${chunk.length} bytes)`);
             } else if (event.type === 'cost_update') {
                 console.log('Cost:', event.usage);
             }
         }
 
         await writeFile('output/gemini-voice-streaming.mp3', audioBuffer);
-        console.log(
-            '✓ Streaming audio saved to output/gemini-voice-streaming.mp3'
-        );
+        console.log('✓ Streaming audio saved to output/gemini-voice-streaming.mp3');
     } catch (error) {
         console.error('Streaming error:', error);
     }
@@ -243,12 +239,8 @@ async function main() {
     await expressionControlExample();
 
     console.log('\n✅ All examples completed!');
-    console.log(
-        '\nNote: Make sure you have set the GOOGLE_API_KEY environment variable.'
-    );
-    console.log(
-        'The generated audio files are saved in the ./output directory.'
-    );
+    console.log('\nNote: Make sure you have set the GOOGLE_API_KEY environment variable.');
+    console.log('The generated audio files are saved in the ./output directory.');
 }
 
 // Run the examples

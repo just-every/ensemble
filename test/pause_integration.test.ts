@@ -9,11 +9,7 @@ import { waitWhilePaused } from '../utils/pause_controller.js';
 // Mock the model provider to simulate streaming
 vi.mock('../model_providers/model_provider.js', () => ({
     getModelProvider: vi.fn(() => ({
-        createResponseStream: async function* mockStream(
-            messages: any,
-            model: any,
-            agent: any
-        ) {
+        createResponseStream: async function* mockStream(messages: any, model: any, agent: any) {
             // Wait while paused before starting (simulating real provider behavior)
             await waitWhilePaused(100, agent?.abortSignal);
 
@@ -104,9 +100,7 @@ describe('Pause Integration Tests', () => {
 
         const completeEvent = events.find(e => e.type === 'message_complete');
         expect(completeEvent).toBeDefined();
-        expect(completeEvent?.content).toBe(
-            'Chunk 0 Chunk 1 Chunk 2 Chunk 3 Chunk 4 '
-        );
+        expect(completeEvent?.content).toBe('Chunk 0 Chunk 1 Chunk 2 Chunk 3 Chunk 4 ');
     });
 
     it('should handle pause before request starts', async () => {
@@ -166,10 +160,7 @@ describe('Pause Integration Tests', () => {
             for await (const event of ensembleRequest(messages, agent)) {
                 events.push(event);
                 // Check if we got an error event due to abort
-                if (
-                    event.type === 'error' &&
-                    event.error?.includes('aborted')
-                ) {
+                if (event.type === 'error' && event.error?.includes('aborted')) {
                     return events;
                 }
             }

@@ -4,11 +4,7 @@
  * This module tracks quota usage across different model providers and their free/paid tiers
  */
 
-import {
-    ModelProviderID,
-    ModelSpecificQuota,
-    ProviderQuota,
-} from '../types/types.js';
+import { ModelProviderID, ModelSpecificQuota, ProviderQuota } from '../types/types.js';
 
 // Re-export for backward compatibility
 export type { ModelSpecificQuota, ProviderQuota };
@@ -64,13 +60,7 @@ export class QuotaTracker {
         // Models counting against the 1M token limit
         gpt4Models: ['gpt-4.5-preview', 'gpt-4.1', 'gpt-4o', 'o1', 'o3'],
         // Models counting against the 10M token limit
-        gptMiniModels: [
-            'gpt-4.1-mini',
-            'gpt-4.1-nano',
-            'gpt-4o-mini',
-            'o1-mini',
-            'o4-mini',
-        ],
+        gptMiniModels: ['gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o-mini', 'o1-mini', 'o4-mini'],
     };
 
     constructor(updateCallback?: QuotaUpdateCallback) {
@@ -193,10 +183,7 @@ export class QuotaTracker {
      * Get model-specific quota information
      * If model doesn't exist, returns null
      */
-    getModelQuota(
-        provider: ModelProviderID,
-        model: string
-    ): ModelSpecificQuota | null {
+    getModelQuota(provider: ModelProviderID, model: string): ModelSpecificQuota | null {
         const providerQuota = this.getProviderQuota(provider);
 
         // Return the specific model quota if it exists
@@ -212,12 +199,7 @@ export class QuotaTracker {
      * Track usage for a specific provider and model
      * Returns true if the quota is still available, false if exceeded
      */
-    trackUsage(
-        provider: ModelProviderID,
-        model: string,
-        inputTokens: number,
-        outputTokens: number
-    ): boolean {
+    trackUsage(provider: ModelProviderID, model: string, inputTokens: number, outputTokens: number): boolean {
         // Check if we have quota information for this provider
         if (!this.quotas[provider]) {
             return true; // Assume quota is available if we don't track it
@@ -233,10 +215,8 @@ export class QuotaTracker {
         if (
             providerQuota.lastResetDate &&
             (today.getUTCDate() !== providerQuota.lastResetDate.getUTCDate() ||
-                today.getUTCMonth() !==
-                    providerQuota.lastResetDate.getUTCMonth() ||
-                today.getUTCFullYear() !==
-                    providerQuota.lastResetDate.getUTCFullYear())
+                today.getUTCMonth() !== providerQuota.lastResetDate.getUTCMonth() ||
+                today.getUTCFullYear() !== providerQuota.lastResetDate.getUTCFullYear())
         ) {
             // Reset all model-specific quotas for this provider
             for (const modelKey in providerQuota.models) {
@@ -248,8 +228,7 @@ export class QuotaTracker {
 
             // Reset OpenAI free tier family quotas specifically
             if (provider === 'openai' && providerQuota.info?.freeQuota) {
-                const freeQuota = providerQuota.info
-                    .freeQuota as OpenAIFreeQuota;
+                const freeQuota = providerQuota.info.freeQuota as OpenAIFreeQuota;
                 freeQuota.gpt4Family.used = 0;
                 freeQuota.gptMiniFamily.used = 0;
             }
@@ -272,13 +251,8 @@ export class QuotaTracker {
                 );
 
                 // Check for significant changes in GPT-4 family usage
-                const prevPercent = Math.floor(
-                    (prevUsed / freeQuota.gpt4Family.limit) * 10
-                );
-                const currPercent = Math.floor(
-                    (freeQuota.gpt4Family.used / freeQuota.gpt4Family.limit) *
-                        10
-                );
+                const prevPercent = Math.floor((prevUsed / freeQuota.gpt4Family.limit) * 10);
+                const currPercent = Math.floor((freeQuota.gpt4Family.used / freeQuota.gpt4Family.limit) * 10);
                 if (prevPercent !== currPercent) {
                     significantChange = true;
                 }
@@ -303,23 +277,14 @@ export class QuotaTracker {
                 );
 
                 // Check for significant changes in Mini family usage
-                const prevPercent = Math.floor(
-                    (prevUsed / freeQuota.gptMiniFamily.limit) * 10
-                );
-                const currPercent = Math.floor(
-                    (freeQuota.gptMiniFamily.used /
-                        freeQuota.gptMiniFamily.limit) *
-                        10
-                );
+                const prevPercent = Math.floor((prevUsed / freeQuota.gptMiniFamily.limit) * 10);
+                const currPercent = Math.floor((freeQuota.gptMiniFamily.used / freeQuota.gptMiniFamily.limit) * 10);
                 if (prevPercent !== currPercent) {
                     significantChange = true;
                 }
 
                 // Check if exceeded limit
-                if (
-                    freeQuota.gptMiniFamily.used >=
-                    freeQuota.gptMiniFamily.limit
-                ) {
+                if (freeQuota.gptMiniFamily.used >= freeQuota.gptMiniFamily.limit) {
                     console.log(
                         `[QuotaTracker] OpenAI GPT-Mini family daily limit reached: ${freeQuota.gptMiniFamily.used} > ${freeQuota.gptMiniFamily.limit}`
                     );
@@ -350,13 +315,8 @@ export class QuotaTracker {
 
             // Check if this usage significantly changes our daily token usage percentage
             if (modelQuota.dailyTokenLimit > 0) {
-                const previousPercent = Math.floor(
-                    (previousDailyTokensUsed / modelQuota.dailyTokenLimit) * 10
-                ); // Percentage in tenths
-                const currentPercent = Math.floor(
-                    (modelQuota.dailyTokensUsed / modelQuota.dailyTokenLimit) *
-                        10
-                );
+                const previousPercent = Math.floor((previousDailyTokensUsed / modelQuota.dailyTokenLimit) * 10); // Percentage in tenths
+                const currentPercent = Math.floor((modelQuota.dailyTokensUsed / modelQuota.dailyTokenLimit) * 10);
 
                 if (previousPercent !== currentPercent) {
                     significantChange = true; // 10% increment in token usage
@@ -365,15 +325,8 @@ export class QuotaTracker {
 
             // Check if this usage significantly changes our daily request usage percentage
             if (modelQuota.dailyRequestLimit > 0) {
-                const previousPercent = Math.floor(
-                    (previousDailyRequestsUsed / modelQuota.dailyRequestLimit) *
-                        10
-                ); // Percentage in tenths
-                const currentPercent = Math.floor(
-                    (modelQuota.dailyRequestsUsed /
-                        modelQuota.dailyRequestLimit) *
-                        10
-                );
+                const previousPercent = Math.floor((previousDailyRequestsUsed / modelQuota.dailyRequestLimit) * 10); // Percentage in tenths
+                const currentPercent = Math.floor((modelQuota.dailyRequestsUsed / modelQuota.dailyRequestLimit) * 10);
 
                 if (previousPercent !== currentPercent) {
                     significantChange = true; // 10% increment in request usage
@@ -381,10 +334,7 @@ export class QuotaTracker {
             }
 
             // Check if we've exceeded daily token limit
-            if (
-                modelQuota.dailyTokenLimit > 0 &&
-                modelQuota.dailyTokensUsed >= modelQuota.dailyTokenLimit
-            ) {
+            if (modelQuota.dailyTokenLimit > 0 && modelQuota.dailyTokensUsed >= modelQuota.dailyTokenLimit) {
                 console.log(
                     `[QuotaTracker] ${provider} model ${model} daily token limit reached: ${modelQuota.dailyTokensUsed} > ${modelQuota.dailyTokenLimit}`
                 );
@@ -394,10 +344,7 @@ export class QuotaTracker {
             }
 
             // Check if we've exceeded daily request limit
-            if (
-                modelQuota.dailyRequestLimit > 0 &&
-                modelQuota.dailyRequestsUsed >= modelQuota.dailyRequestLimit
-            ) {
+            if (modelQuota.dailyRequestLimit > 0 && modelQuota.dailyRequestsUsed >= modelQuota.dailyRequestLimit) {
                 console.log(
                     `[QuotaTracker] ${provider} model ${model} daily request limit reached: ${modelQuota.dailyRequestsUsed} > ${modelQuota.dailyRequestLimit}`
                 );
@@ -430,10 +377,8 @@ export class QuotaTracker {
         if (modelQuota) {
             // Check both token and request limits if they exist
             return (
-                (modelQuota.dailyTokenLimit === 0 ||
-                    modelQuota.dailyTokensUsed < modelQuota.dailyTokenLimit) &&
-                (modelQuota.dailyRequestLimit === 0 ||
-                    modelQuota.dailyRequestsUsed < modelQuota.dailyRequestLimit)
+                (modelQuota.dailyTokenLimit === 0 || modelQuota.dailyTokensUsed < modelQuota.dailyTokenLimit) &&
+                (modelQuota.dailyRequestLimit === 0 || modelQuota.dailyRequestsUsed < modelQuota.dailyRequestLimit)
             );
         }
 
@@ -473,10 +418,7 @@ export class QuotaTracker {
         }
 
         if (providerQuota.creditBalance !== undefined) {
-            providerQuota.creditBalance = Math.max(
-                0,
-                providerQuota.creditBalance - creditAmount
-            );
+            providerQuota.creditBalance = Math.max(0, providerQuota.creditBalance - creditAmount);
         }
     }
 
@@ -502,9 +444,7 @@ export class QuotaTracker {
             };
 
             // Add model-specific quotas
-            for (const [modelName, modelQuota] of Object.entries(
-                providerQuota.models
-            )) {
+            for (const [modelName, modelQuota] of Object.entries(providerQuota.models)) {
                 // No need to skip _default as it's removed
                 summary[provider].models[modelName] = {
                     tokens: {
@@ -512,9 +452,7 @@ export class QuotaTracker {
                         limit: modelQuota.dailyTokenLimit,
                         percent:
                             modelQuota.dailyTokenLimit > 0
-                                ? (modelQuota.dailyTokensUsed /
-                                      modelQuota.dailyTokenLimit) *
-                                  100
+                                ? (modelQuota.dailyTokensUsed / modelQuota.dailyTokenLimit) * 100
                                 : 0,
                     },
                     requests: {
@@ -522,9 +460,7 @@ export class QuotaTracker {
                         limit: modelQuota.dailyRequestLimit,
                         percent:
                             modelQuota.dailyRequestLimit > 0
-                                ? (modelQuota.dailyRequestsUsed /
-                                      modelQuota.dailyRequestLimit) *
-                                  100
+                                ? (modelQuota.dailyRequestsUsed / modelQuota.dailyRequestLimit) * 100
                                 : 0,
                     },
                     lastReset: modelQuota.lastResetDate,
@@ -533,24 +469,17 @@ export class QuotaTracker {
 
             // Add OpenAI free tier details if available
             if (provider === 'openai' && providerQuota.info?.freeQuota) {
-                const freeQuota = providerQuota.info
-                    .freeQuota as OpenAIFreeQuota;
+                const freeQuota = providerQuota.info.freeQuota as OpenAIFreeQuota;
                 summary[provider].freeTier = {
                     gpt4Family: {
                         used: freeQuota.gpt4Family.used,
                         limit: freeQuota.gpt4Family.limit,
-                        percent:
-                            (freeQuota.gpt4Family.used /
-                                freeQuota.gpt4Family.limit) *
-                            100,
+                        percent: (freeQuota.gpt4Family.used / freeQuota.gpt4Family.limit) * 100,
                     },
                     gptMiniFamily: {
                         used: freeQuota.gptMiniFamily.used,
                         limit: freeQuota.gptMiniFamily.limit,
-                        percent:
-                            (freeQuota.gptMiniFamily.used /
-                                freeQuota.gptMiniFamily.limit) *
-                            100,
+                        percent: (freeQuota.gptMiniFamily.used / freeQuota.gptMiniFamily.limit) * 100,
                     },
                 };
             }

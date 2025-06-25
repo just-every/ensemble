@@ -40,7 +40,9 @@
         "test:coverage": "vitest run --coverage",
         "lint": "eslint '**/*.{ts,tsx}'",
         "lint:fix": "eslint '**/*.{ts,tsx}' --fix",
-        "docs": "typedoc"
+        "docs": "typedoc",
+        "demo:live": "npx tsx demo/live-server.ts",
+        "demo:transcription": "npx tsx demo/transcription-server.ts"
     },
     "exports": {
         ".": {

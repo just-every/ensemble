@@ -94,11 +94,7 @@ export class ModelNotFoundError extends EnsembleError {
         public model: string,
         message?: string
     ) {
-        super(
-            message || `Model '${model}' not found or not available`,
-            'MODEL_NOT_FOUND',
-            false
-        );
+        super(message || `Model '${model}' not found or not available`, 'MODEL_NOT_FOUND', false);
         this.name = 'ModelNotFoundError';
     }
 }

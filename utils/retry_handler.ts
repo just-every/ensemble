@@ -37,10 +37,7 @@ export const DEFAULT_RETRY_OPTIONS: Required<Omit<RetryOptions, 'onRetry'>> = {
     ]),
 };
 
-export function isRetryableError(
-    error: any,
-    options: RetryOptions = {}
-): boolean {
+export function isRetryableError(error: any, options: RetryOptions = {}): boolean {
     const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
 
     // Check for network errors
@@ -77,13 +74,9 @@ export function isRetryableError(
     return false;
 }
 
-export function calculateDelay(
-    attempt: number,
-    options: RetryOptions = {}
-): number {
+export function calculateDelay(attempt: number, options: RetryOptions = {}): number {
     const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
-    const baseDelay =
-        opts.initialDelay * Math.pow(opts.backoffMultiplier, attempt - 1);
+    const baseDelay = opts.initialDelay * Math.pow(opts.backoffMultiplier, attempt - 1);
     const delay = Math.min(baseDelay, opts.maxDelay);
 
     // Add jitter (±10%) to prevent thundering herd
@@ -91,10 +84,7 @@ export function calculateDelay(
     return Math.round(delay + jitter);
 }
 
-export async function retryWithBackoff<T>(
-    fn: () => Promise<T>,
-    options: RetryOptions = {}
-): Promise<T> {
+export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
     const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
     let lastError: any;
 

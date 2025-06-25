@@ -24,16 +24,12 @@ const tools: ToolFunction[] = [
             },
         },
         function: async (url: string, chunks: number, signal?: AbortSignal) => {
-            console.log(
-                `\n📥 Starting download from ${url} (${chunks} chunks)`
-            );
+            console.log(`\n📥 Starting download from ${url} (${chunks} chunks)`);
 
             for (let i = 1; i <= chunks; i++) {
                 // Check if we should abort
                 if (signal?.aborted) {
-                    console.log(
-                        `\n🛑 Download cancelled at chunk ${i}/${chunks}`
-                    );
+                    console.log(`\n🛑 Download cancelled at chunk ${i}/${chunks}`);
                     return `Download cancelled after ${i - 1} chunks`;
                 }
 
@@ -62,22 +58,14 @@ const tools: ToolFunction[] = [
                 },
             },
         },
-        function: async (
-            data: string,
-            iterations: number,
-            signal?: AbortSignal
-        ) => {
-            console.log(
-                `\n🔬 Starting analysis of "${data}" (${iterations} iterations)`
-            );
+        function: async (data: string, iterations: number, signal?: AbortSignal) => {
+            console.log(`\n🔬 Starting analysis of "${data}" (${iterations} iterations)`);
 
             const results = [];
             for (let i = 1; i <= iterations; i++) {
                 // Check abort signal
                 if (signal?.aborted) {
-                    console.log(
-                        `\n🛑 Analysis interrupted at iteration ${i}/${iterations}`
-                    );
+                    console.log(`\n🛑 Analysis interrupted at iteration ${i}/${iterations}`);
                     return `Analysis interrupted. Partial results: ${results.join(', ')}`;
                 }
 
@@ -138,12 +126,7 @@ const tools: ToolFunction[] = [
                 return 'No tools currently running';
             }
 
-            return tools
-                .map(
-                    t =>
-                        `${t.id}: ${t.toolName} (running for ${Date.now() - t.startTime}ms)`
-                )
-                .join('\n');
+            return tools.map(t => `${t.id}: ${t.toolName} (running for ${Date.now() - t.startTime}ms)`).join('\n');
         },
     },
 ];

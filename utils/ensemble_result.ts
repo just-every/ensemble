@@ -74,9 +74,7 @@ export interface EnsembleResult {
  * @param stream - The async generator stream from ensembleRequest or similar
  * @returns Promise resolving to the aggregated result
  */
-export async function ensembleResult(
-    stream: AsyncGenerator<ProviderStreamEvent>
-): Promise<EnsembleResult> {
+export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>): Promise<EnsembleResult> {
     const result: EnsembleResult = {
         message: '',
         completed: false,
@@ -86,10 +84,7 @@ export async function ensembleResult(
 
     // Track message deltas by message_id
     const messageDeltas = new Map<string, string[]>();
-    const thinkingDeltas = new Map<
-        string,
-        { content: string[]; signature?: string[] }
-    >();
+    const thinkingDeltas = new Map<string, { content: string[]; signature?: string[] }>();
     const toolCalls = new Map<string, ToolCallResult>();
     const files: EnsembleResult['files'] = [];
     const responseOutputs: ResponseInputItem[] = [];
@@ -102,10 +97,7 @@ export async function ensembleResult(
                     if (msgEvent.message_id) {
                         result.messageIds.add(msgEvent.message_id);
                         messageDeltas.set(msgEvent.message_id, []);
-                        if (
-                            msgEvent.thinking_content ||
-                            msgEvent.thinking_signature
-                        ) {
+                        if (msgEvent.thinking_content || msgEvent.thinking_signature) {
                             thinkingDeltas.set(msgEvent.message_id, {
                                 content: [],
                                 signature: [],
@@ -117,31 +109,14 @@ export async function ensembleResult(
 
                 case 'message_delta': {
                     const msgEvent = event as MessageEvent;
-                    if (
-                        msgEvent.message_id &&
-                        messageDeltas.has(msgEvent.message_id)
-                    ) {
-                        messageDeltas
-                            .get(msgEvent.message_id)!
-                            .push(msgEvent.content);
+                    if (msgEvent.message_id && messageDeltas.has(msgEvent.message_id)) {
+                        messageDeltas.get(msgEvent.message_id)!.push(msgEvent.content);
                     }
-                    if (
-                        msgEvent.thinking_content &&
-                        msgEvent.message_id &&
-                        thinkingDeltas.has(msgEvent.message_id)
-                    ) {
-                        thinkingDeltas
-                            .get(msgEvent.message_id)!
-                            .content.push(msgEvent.thinking_content);
+                    if (msgEvent.thinking_content && msgEvent.message_id && thinkingDeltas.has(msgEvent.message_id)) {
+                        thinkingDeltas.get(msgEvent.message_id)!.content.push(msgEvent.thinking_content);
                     }
-                    if (
-                        msgEvent.thinking_signature &&
-                        msgEvent.message_id &&
-                        thinkingDeltas.has(msgEvent.message_id)
-                    ) {
-                        thinkingDeltas
-                            .get(msgEvent.message_id)!
-                            .signature?.push(msgEvent.thinking_signature);
+                    if (msgEvent.thinking_signature && msgEvent.message_id && thinkingDeltas.has(msgEvent.message_id)) {
+                        thinkingDeltas.get(msgEvent.message_id)!.signature?.push(msgEvent.thinking_signature);
                     }
                     break;
                 }
@@ -153,26 +128,18 @@ export async function ensembleResult(
                         if (msgEvent.content) {
                             result.message = msgEvent.content;
                         } else if (messageDeltas.has(msgEvent.message_id)) {
-                            const deltas = messageDeltas.get(
-                                msgEvent.message_id
-                            )!;
+                            const deltas = messageDeltas.get(msgEvent.message_id)!;
                             result.message = deltas.join('');
                         }
 
                         // Handle thinking content
                         if (thinkingDeltas.has(msgEvent.message_id)) {
-                            const thinking = thinkingDeltas.get(
-                                msgEvent.message_id
-                            )!;
+                            const thinking = thinkingDeltas.get(msgEvent.message_id)!;
                             result.thinking = {
-                                content:
-                                    msgEvent.thinking_content ||
-                                    thinking.content.join(''),
+                                content: msgEvent.thinking_content || thinking.content.join(''),
                                 signature:
                                     msgEvent.thinking_signature ||
-                                    (thinking.signature?.length
-                                        ? thinking.signature.join('')
-                                        : undefined),
+                                    (thinking.signature?.length ? thinking.signature.join('') : undefined),
                             };
                         }
                     }
@@ -195,8 +162,7 @@ export async function ensembleResult(
 
                 case 'tool_start': {
                     const toolEvent = event as ToolEvent;
-                    const callId =
-                        toolEvent.tool_call.call_id || toolEvent.tool_call.id;
+                    const callId = toolEvent.tool_call.call_id || toolEvent.tool_call.id;
                     toolCalls.set(callId, {
                         toolCall: toolEvent.tool_call,
                         id: toolEvent.tool_call.id,
@@ -208,9 +174,7 @@ export async function ensembleResult(
                 case 'tool_done': {
                     const toolEvent = event as ToolEvent;
                     if (toolEvent.result) {
-                        const existing = toolCalls.get(
-                            toolEvent.result.call_id
-                        );
+                        const existing = toolCalls.get(toolEvent.result.call_id);
                         if (existing) {
                             existing.output = toolEvent.result.output;
                             existing.error = toolEvent.result.error;

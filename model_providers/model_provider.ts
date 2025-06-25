@@ -5,11 +5,7 @@
  * to get the appropriate provider implementation.
  */
 
-import {
-    ModelProvider as BaseModelProvider,
-    EmbedOpts,
-    AgentDefinition,
-} from '../types/types.js';
+import { ModelProvider as BaseModelProvider, EmbedOpts, AgentDefinition } from '../types/types.js';
 
 // Re-export for backward compatibility
 export type { EmbedOpts };
@@ -33,11 +29,7 @@ import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
 import { elevenLabsProvider } from './elevenlabs.js';
-import {
-    MODEL_CLASSES,
-    ModelClassID,
-    ModelProviderID,
-} from '../data/model_data.js';
+import { MODEL_CLASSES, ModelClassID, ModelProviderID } from '../data/model_data.js';
 
 // Provider mapping by model prefix
 const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
@@ -80,27 +72,15 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
     // Basic check to see if an API key exists with the expected format
     switch (provider) {
         case 'openai':
-            return (
-                !!process.env.OPENAI_API_KEY &&
-                process.env.OPENAI_API_KEY.startsWith('sk-')
-            );
+            return !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-');
         case 'anthropic':
-            return (
-                !!process.env.ANTHROPIC_API_KEY &&
-                process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-')
-            );
+            return !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-');
         case 'google':
             return !!process.env.GOOGLE_API_KEY;
         case 'xai':
-            return (
-                !!process.env.XAI_API_KEY &&
-                process.env.XAI_API_KEY.startsWith('xai-')
-            );
+            return !!process.env.XAI_API_KEY && process.env.XAI_API_KEY.startsWith('xai-');
         case 'deepseek':
-            return (
-                !!process.env.DEEPSEEK_API_KEY &&
-                process.env.DEEPSEEK_API_KEY.startsWith('sk-')
-            );
+            return !!process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.startsWith('sk-');
         case 'openrouter':
             return !!process.env.OPENROUTER_API_KEY;
         case 'elevenlabs':
@@ -161,11 +141,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
 /**
  * Filter models excluding specified models, with fallback to first excluded model if all are filtered out
  */
-function filterModelsWithFallback(
-    models: string[],
-    excludeModels?: string[],
-    disabledModels?: string[]
-): string[] {
+function filterModelsWithFallback(models: string[], excludeModels?: string[], disabledModels?: string[]): string[] {
     // Combine exclude and disabled models
     const allExcluded = [...(excludeModels || []), ...(disabledModels || [])];
 
@@ -185,9 +161,7 @@ function filterModelsWithFallback(
 
         if (lastUsedModel) {
             // Find the next model in the cycle, skipping disabled models if possible
-            let nextIndex =
-                (originalModels.indexOf(lastUsedModel) + 1) %
-                originalModels.length;
+            let nextIndex = (originalModels.indexOf(lastUsedModel) + 1) % originalModels.length;
             let attempts = 0;
             while (attempts < originalModels.length) {
                 const nextModel = originalModels[nextIndex];
@@ -200,9 +174,7 @@ function filterModelsWithFallback(
         }
 
         // If no valid last used model found, fall back to the first non-disabled model
-        const firstNonDisabled = originalModels.find(
-            m => !disabledModels?.includes(m)
-        );
+        const firstNonDisabled = originalModels.find(m => !disabledModels?.includes(m));
         if (firstNonDisabled) {
             return [firstNonDisabled];
         }
@@ -219,10 +191,7 @@ function filterModelsWithFallback(
 /**
  * Select a model using weighted randomization based on scores
  */
-function selectWeightedModel(
-    models: string[],
-    scores?: Record<string, number>
-): string {
+function selectWeightedModel(models: string[], scores?: Record<string, number>): string {
     if (!scores || models.length === 0) {
         // No scores provided, fall back to random selection
         return models[Math.floor(Math.random() * models.length)];
@@ -294,17 +263,13 @@ export async function getModelFromClass(
     const modelClassStr = modelClass as string;
 
     // Default to standard class if none specified or if the class doesn't exist in MODEL_CLASSES
-    const modelGroup =
-        modelClassStr && modelClassStr in MODEL_CLASSES
-            ? modelClassStr
-            : 'standard';
+    const modelGroup = modelClassStr && modelClassStr in MODEL_CLASSES ? modelClassStr : 'standard';
 
     // Try each model in the group until we find one with a valid API key and quota
     if (modelGroup in MODEL_CLASSES) {
         // Check for class override first
         const override = getModelClassOverride(modelGroup);
-        let modelClassConfig =
-            MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES];
+        let modelClassConfig = MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES];
 
         // Apply override if it exists
         if (override) {
@@ -317,16 +282,10 @@ export async function getModelFromClass(
         let models = [...(override?.models || modelClassConfig.models)];
 
         // Filter out excluded and disabled models
-        models = filterModelsWithFallback(
-            models,
-            excludeModels,
-            disabledModels
-        );
+        models = filterModelsWithFallback(models, excludeModels, disabledModels);
 
         // Only access the random property if it exists
-        const shouldRandomize =
-            override?.random ??
-            ('random' in modelClassConfig && modelClassConfig.random);
+        const shouldRandomize = override?.random ?? ('random' in modelClassConfig && modelClassConfig.random);
 
         // Store the original order for weighted selection
         const validModels = [...models];
@@ -334,24 +293,15 @@ export async function getModelFromClass(
         // First pass: Try all models checking both API key and quota
         const modelsWithKeyAndQuota = validModels.filter(model => {
             const provider = getProviderFromModel(model);
-            return (
-                isProviderKeyValid(provider) &&
-                quotaTracker.hasQuota(provider, model)
-            );
+            return isProviderKeyValid(provider) && quotaTracker.hasQuota(provider, model);
         });
 
         if (modelsWithKeyAndQuota.length > 0) {
             const selectedModel =
                 shouldRandomize && !modelScores
-                    ? modelsWithKeyAndQuota[
-                          Math.floor(
-                              Math.random() * modelsWithKeyAndQuota.length
-                          )
-                      ]
+                    ? modelsWithKeyAndQuota[Math.floor(Math.random() * modelsWithKeyAndQuota.length)]
                     : selectWeightedModel(modelsWithKeyAndQuota, modelScores);
-            console.log(
-                `Using model ${selectedModel} from class ${modelGroup} (has API key and quota)`
-            );
+            console.log(`Using model ${selectedModel} from class ${modelGroup} (has API key and quota)`);
             return selectedModel;
         }
 
@@ -365,13 +315,9 @@ export async function getModelFromClass(
         if (modelsWithKey.length > 0) {
             const selectedModel =
                 shouldRandomize && !modelScores
-                    ? modelsWithKey[
-                          Math.floor(Math.random() * modelsWithKey.length)
-                      ]
+                    ? modelsWithKey[Math.floor(Math.random() * modelsWithKey.length)]
                     : selectWeightedModel(modelsWithKey, modelScores);
-            console.log(
-                `Using model ${selectedModel} from class ${modelGroup} (has API key but may exceed quota)`
-            );
+            console.log(`Using model ${selectedModel} from class ${modelGroup} (has API key but may exceed quota)`);
             return selectedModel;
         }
     }
@@ -379,34 +325,21 @@ export async function getModelFromClass(
     // If we couldn't find a valid model in the specified class, try the standard class
     if (modelGroup !== 'standard' && 'standard' in MODEL_CLASSES) {
         // Use type assertion to tell TypeScript that 'standard' is a valid key
-        let standardModels =
-            MODEL_CLASSES['standard' as keyof typeof MODEL_CLASSES].models;
+        let standardModels = MODEL_CLASSES['standard' as keyof typeof MODEL_CLASSES].models;
 
         // Filter out excluded and disabled models
-        standardModels = filterModelsWithFallback(
-            standardModels,
-            excludeModels,
-            disabledModels
-        );
+        standardModels = filterModelsWithFallback(standardModels, excludeModels, disabledModels);
 
         // First check for models with both API key and quota
         const standardModelsWithKeyAndQuota = standardModels.filter(model => {
             const provider = getProviderFromModel(model);
-            return (
-                isProviderKeyValid(provider) &&
-                quotaTracker.hasQuota(provider, model)
-            );
+            return isProviderKeyValid(provider) && quotaTracker.hasQuota(provider, model);
         });
 
         if (standardModelsWithKeyAndQuota.length > 0) {
             // Use weighted selection for fallback too
-            const selectedModel = selectWeightedModel(
-                standardModelsWithKeyAndQuota,
-                modelScores
-            );
-            console.log(
-                `Falling back to standard class model ${selectedModel} (has API key and quota)`
-            );
+            const selectedModel = selectWeightedModel(standardModelsWithKeyAndQuota, modelScores);
+            console.log(`Falling back to standard class model ${selectedModel} (has API key and quota)`);
             return selectedModel;
         }
 
@@ -417,13 +350,8 @@ export async function getModelFromClass(
         });
 
         if (standardModelsWithKey.length > 0) {
-            const selectedModel = selectWeightedModel(
-                standardModelsWithKey,
-                modelScores
-            );
-            console.log(
-                `Falling back to standard class model ${selectedModel} (has API key but may exceed quota)`
-            );
+            const selectedModel = selectWeightedModel(standardModelsWithKey, modelScores);
+            console.log(`Falling back to standard class model ${selectedModel} (has API key but may exceed quota)`);
             return selectedModel;
         }
     }
@@ -434,16 +362,13 @@ export async function getModelFromClass(
 
     // Check if the model group exists in MODEL_CLASSES before trying to access it
     if (modelGroup in MODEL_CLASSES) {
-        const models =
-            MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES].models;
+        const models = MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES].models;
         if (models.length > 0) {
             defaultModel = models[0];
         }
     }
 
-    console.log(
-        `No valid API key found for any model in class ${modelGroup}, using default: ${defaultModel}`
-    );
+    console.log(`No valid API key found for any model in class ${modelGroup}, using default: ${defaultModel}`);
     return defaultModel;
 }
 
@@ -458,9 +383,7 @@ export function getModelProvider(model?: string): ModelProvider {
         if (isExternalModel(model)) {
             const externalModel = getExternalModel(model);
             if (externalModel) {
-                const externalProvider = getExternalProvider(
-                    externalModel.provider
-                );
+                const externalProvider = getExternalProvider(externalModel.provider);
                 if (externalProvider) {
                     return externalProvider;
                 }
@@ -482,9 +405,7 @@ export function getModelProvider(model?: string): ModelProvider {
 
     // Default to openRouter if no specific provider found
     if (!isProviderKeyValid(getProviderFromModel('openrouter'))) {
-        throw new Error(
-            `No valid provider found for the model ${model}. Please check your API keys.`
-        );
+        throw new Error(`No valid provider found for the model ${model}. Please check your API keys.`);
     }
     return openRouterProvider;
 }

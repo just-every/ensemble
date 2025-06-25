@@ -5,13 +5,7 @@
  * the full ensemble system integration (no streaming events or quota management).
  */
 
-import {
-    findModel,
-    ModelUsage,
-    TieredPrice,
-    TimeBasedPrice,
-    ModalityPrice,
-} from '../data/model_data.js';
+import { findModel, ModelUsage, TieredPrice, TimeBasedPrice, ModalityPrice } from '../data/model_data.js';
 import { emitEvent, hasEventHandler } from './event_controller.js';
 import { CostUpdateEvent } from '../types/types.js';
 
@@ -45,12 +39,8 @@ class CostTracker {
 
         const model = findModel(usage.model);
         if (!model) {
-            console.error(
-                `Model not found when recording usage: ${usage.model}`
-            );
-            throw new Error(
-                `Model not found when recording usage: ${usage.model}`
-            );
+            console.error(`Model not found when recording usage: ${usage.model}`);
+            throw new Error(`Model not found when recording usage: ${usage.model}`);
         }
 
         // If cost is already provided (e.g., for voice generation), use it directly
@@ -80,8 +70,7 @@ class CostTracker {
                 'peak_price_per_million' in model.cost.output_per_million) ||
             (typeof model.cost?.cached_input_per_million === 'object' &&
                 model.cost.cached_input_per_million !== null &&
-                'peak_price_per_million' in
-                    model.cost.cached_input_per_million);
+                'peak_price_per_million' in model.cost.cached_input_per_million);
 
         if (!usage.timestamp && usesTimeBasedPricing) {
             console.warn(
@@ -92,12 +81,7 @@ class CostTracker {
         // Helper function to get price per million based on token count and cost structure
         const getPrice = (
             tokensForTierCheck: number,
-            costStructure:
-                | number
-                | TieredPrice
-                | TimeBasedPrice
-                | ModalityPrice
-                | undefined,
+            costStructure: number | TieredPrice | TimeBasedPrice | ModalityPrice | undefined,
             modality?: 'text' | 'audio' | 'video' | 'image'
         ): number => {
             if (typeof costStructure === 'number') {
@@ -122,10 +106,7 @@ class CostTracker {
                     }
 
                     // Default to text if modality not found
-                    return getPrice(
-                        tokensForTierCheck,
-                        modalityPrice.text || 0
-                    );
+                    return getPrice(tokensForTierCheck, modalityPrice.text || 0);
                 }
 
                 if ('peak_price_per_million' in costStructure) {
@@ -135,26 +116,19 @@ class CostTracker {
                     const utcMinute = calculationTime.getUTCMinutes();
                     const currentTimeInMinutes = utcHour * 60 + utcMinute;
                     const peakStartInMinutes =
-                        timeBasedCost.peak_utc_start_hour * 60 +
-                        timeBasedCost.peak_utc_start_minute;
-                    const peakEndInMinutes =
-                        timeBasedCost.peak_utc_end_hour * 60 +
-                        timeBasedCost.peak_utc_end_minute;
+                        timeBasedCost.peak_utc_start_hour * 60 + timeBasedCost.peak_utc_start_minute;
+                    const peakEndInMinutes = timeBasedCost.peak_utc_end_hour * 60 + timeBasedCost.peak_utc_end_minute;
 
                     let isPeakTime: boolean;
                     if (peakStartInMinutes <= peakEndInMinutes) {
                         isPeakTime =
-                            currentTimeInMinutes >= peakStartInMinutes &&
-                            currentTimeInMinutes < peakEndInMinutes;
+                            currentTimeInMinutes >= peakStartInMinutes && currentTimeInMinutes < peakEndInMinutes;
                     } else {
                         isPeakTime =
-                            currentTimeInMinutes >= peakStartInMinutes ||
-                            currentTimeInMinutes < peakEndInMinutes;
+                            currentTimeInMinutes >= peakStartInMinutes || currentTimeInMinutes < peakEndInMinutes;
                     }
 
-                    return isPeakTime
-                        ? timeBasedCost.peak_price_per_million
-                        : timeBasedCost.off_peak_price_per_million;
+                    return isPeakTime ? timeBasedCost.peak_price_per_million : timeBasedCost.off_peak_price_per_million;
                 } else if ('threshold_tokens' in costStructure) {
                     // Token-Based Tiered Pricing
                     const tieredCost = costStructure as TieredPrice;
@@ -172,54 +146,33 @@ class CostTracker {
         let nonCachedInputTokens = 0;
         let actualCachedTokens = 0;
 
-        if (
-            cached_tokens > 0 &&
-            model.cost?.cached_input_per_million !== undefined
-        ) {
+        if (cached_tokens > 0 && model.cost?.cached_input_per_million !== undefined) {
             actualCachedTokens = cached_tokens;
-            nonCachedInputTokens = Math.max(
-                0,
-                original_input_tokens - cached_tokens
-            );
+            nonCachedInputTokens = Math.max(0, original_input_tokens - cached_tokens);
         } else {
             nonCachedInputTokens = original_input_tokens;
             actualCachedTokens = 0;
         }
 
         // Calculate Input Token Cost (Non-Cached Part)
-        if (
-            nonCachedInputTokens > 0 &&
-            model.cost?.input_per_million !== undefined
-        ) {
+        if (nonCachedInputTokens > 0 && model.cost?.input_per_million !== undefined) {
             const inputPricePerMillion = getPrice(
                 original_input_tokens,
                 model.cost.input_per_million,
                 usage.input_modality
             );
-            usage.cost +=
-                (nonCachedInputTokens / 1000000) * inputPricePerMillion;
+            usage.cost += (nonCachedInputTokens / 1000000) * inputPricePerMillion;
         }
 
         // Calculate Cached Token Cost (If applicable and cost defined)
-        if (
-            actualCachedTokens > 0 &&
-            model.cost?.cached_input_per_million !== undefined
-        ) {
-            const cachedPricePerMillion = getPrice(
-                actualCachedTokens,
-                model.cost.cached_input_per_million
-            );
-            usage.cost +=
-                (actualCachedTokens / 1000000) * cachedPricePerMillion;
+        if (actualCachedTokens > 0 && model.cost?.cached_input_per_million !== undefined) {
+            const cachedPricePerMillion = getPrice(actualCachedTokens, model.cost.cached_input_per_million);
+            usage.cost += (actualCachedTokens / 1000000) * cachedPricePerMillion;
         }
 
         // Calculate Output Token Cost
         if (output_tokens > 0 && model.cost?.output_per_million !== undefined) {
-            const outputPricePerMillion = getPrice(
-                output_tokens,
-                model.cost.output_per_million,
-                usage.output_modality
-            );
+            const outputPricePerMillion = getPrice(output_tokens, model.cost.output_per_million, usage.output_modality);
             usage.cost += (output_tokens / 1000000) * outputPricePerMillion;
         }
 
@@ -264,9 +217,7 @@ class CostTracker {
                     usage: {
                         input_tokens: usage.input_tokens || 0,
                         output_tokens: usage.output_tokens || 0,
-                        total_tokens:
-                            (usage.input_tokens || 0) +
-                            (usage.output_tokens || 0),
+                        total_tokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
                         cached_tokens: usage.cached_tokens,
                     },
                     timestamp: new Date().toISOString(),
@@ -329,9 +280,7 @@ class CostTracker {
 
         const totalCost = this.getTotalCost();
         const costsByModel = this.getCostsByModel();
-        const runtime = Math.round(
-            (new Date().getTime() - this.started.getTime()) / 1000
-        );
+        const runtime = Math.round((new Date().getTime() - this.started.getTime()) / 1000);
 
         console.log('\n\nCOST SUMMARY');
         console.log(`Runtime: ${runtime} seconds`);
@@ -339,9 +288,7 @@ class CostTracker {
 
         console.log('\nModels:');
         for (const [model, modelData] of Object.entries(costsByModel)) {
-            console.log(
-                `\t${model}:\t$${modelData.cost.toFixed(6)} (${modelData.calls} calls)`
-            );
+            console.log(`\t${model}:\t$${modelData.cost.toFixed(6)} (${modelData.calls} calls)`);
         }
 
         this.reset();

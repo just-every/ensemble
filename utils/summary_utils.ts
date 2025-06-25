@@ -35,19 +35,13 @@ async function loadHashMap(file_path: string): Promise<SummaryHashMap> {
             // File doesn't exist, return empty map
             return {};
         }
-        console.error(
-            `Error loading summary hash map from ${file_path}:`,
-            error
-        );
+        console.error(`Error loading summary hash map from ${file_path}:`, error);
         // In case of other errors, return empty map to avoid blocking
         return {};
     }
 }
 
-async function saveHashMap(
-    file_path: string,
-    map: SummaryHashMap
-): Promise<void> {
+async function saveHashMap(file_path: string, map: SummaryHashMap): Promise<void> {
     try {
         const data = JSON.stringify(map, null, 2);
         await fs.writeFile(file_path, data, 'utf-8');
@@ -66,11 +60,7 @@ function truncate(
     if (text.length <= length) {
         return text;
     }
-    return (
-        text.substring(0, length * 0.3) +
-        separator +
-        text.substring(text.length - length * 0.7 + separator.length)
-    );
+    return text.substring(0, length * 0.3) + separator + text.substring(text.length - length * 0.7 + separator.length);
 }
 
 /**
@@ -102,22 +92,13 @@ export async function createSummary(
 
     // --- Persistent Summary Logic ---
     const hashMapPath = path.join(finalSummariesDir, HASH_MAP_FILENAME);
-    const documentHash = crypto
-        .createHash('sha256')
-        .update(document)
-        .digest('hex');
+    const documentHash = crypto.createHash('sha256').update(document).digest('hex');
     const hashMap = await loadHashMap(hashMapPath);
 
     if (hashMap[documentHash]) {
         const summaryId = hashMap[documentHash];
-        const summaryFilePath = path.join(
-            finalSummariesDir,
-            `summary-${summaryId}.txt`
-        );
-        const originalFilePath = path.join(
-            finalSummariesDir,
-            `original-${summaryId}.txt`
-        );
+        const summaryFilePath = path.join(finalSummariesDir, `summary-${summaryId}.txt`);
+        const originalFilePath = path.join(finalSummariesDir, `original-${summaryId}.txt`);
 
         try {
             // Read existing summary and original document
@@ -135,15 +116,10 @@ export async function createSummary(
                 ? `\n\nSummarized large output to avoid excessive tokens (${originalLines} -> ${summaryLines} lines, ${originalChars} -> ${summaryChars} chars) [Write to file with write_source(${summaryId}, file_path) or read with read_source(${summaryId}, line_start, line_end)]`
                 : `\n\nSummarized large output to avoid excessive tokens (${originalLines} -> ${summaryLines} lines, ${originalChars} -> ${summaryChars} chars)`;
 
-            console.log(
-                `Retrieved summary from cache for hash: ${documentHash.substring(0, 8)}...`
-            );
+            console.log(`Retrieved summary from cache for hash: ${documentHash.substring(0, 8)}...`);
             return existingSummary.trim() + metadata;
         } catch (error) {
-            console.error(
-                `Error reading cached summary files for ID ${summaryId}:`,
-                error
-            );
+            console.error(`Error reading cached summary files for ID ${summaryId}:`, error);
             // If reading fails, proceed to generate a new summary, removing the broken entry
             delete hashMap[documentHash];
             await saveHashMap(hashMapPath, hashMap);
@@ -165,14 +141,8 @@ export async function createSummary(
 
     // --- Save new summary and update hash map ---
     const newSummaryId = crypto.randomUUID();
-    const summaryFilePath = path.join(
-        finalSummariesDir,
-        `summary-${newSummaryId}.txt`
-    );
-    const originalFilePath = path.join(
-        finalSummariesDir,
-        `original-${newSummaryId}.txt`
-    );
+    const summaryFilePath = path.join(finalSummariesDir, `summary-${newSummaryId}.txt`);
+    const originalFilePath = path.join(finalSummariesDir, `original-${newSummaryId}.txt`);
 
     try {
         await Promise.all([
@@ -183,14 +153,9 @@ export async function createSummary(
         // Update and save the hash map
         hashMap[documentHash] = newSummaryId;
         await saveHashMap(hashMapPath, hashMap);
-        console.log(
-            `Saved new summary with ID: ${newSummaryId} for hash: ${documentHash.substring(0, 8)}...`
-        );
+        console.log(`Saved new summary with ID: ${newSummaryId} for hash: ${documentHash.substring(0, 8)}...`);
     } catch (error) {
-        console.error(
-            `Error saving new summary files for ID ${newSummaryId}:`,
-            error
-        );
+        console.error(`Error saving new summary files for ID ${newSummaryId}:`, error);
         // Log error but proceed, returning the summary without the metadata link if saving failed
         return trimmedSummary;
     }
@@ -223,10 +188,7 @@ export async function read_source(
     summariesDir?: string
 ): Promise<string> {
     const finalSummariesDir = summariesDir || './summaries';
-    const originalFilePath = path.join(
-        finalSummariesDir,
-        `original-${summary_id}.txt`
-    );
+    const originalFilePath = path.join(finalSummariesDir, `original-${summary_id}.txt`);
 
     try {
         let content = await fs.readFile(originalFilePath, 'utf-8');
@@ -248,10 +210,7 @@ export async function read_source(
         if (error.code === 'ENOENT') {
             return `Error: Original document for summary ID '${summary_id}' not found at ${originalFilePath}.`;
         }
-        console.error(
-            `Error reading original summary source for ID ${summary_id}:`,
-            error
-        );
+        console.error(`Error reading original summary source for ID ${summary_id}:`, error);
         return `Error: Could not retrieve original document for summary ID '${summary_id}'.`;
     }
 }
@@ -264,16 +223,9 @@ export async function read_source(
  * @param summariesDir Optional directory where summaries are stored (defaults to './summaries')
  * @returns Confirmation or an error message.
  */
-export async function write_source(
-    summary_id: string,
-    file_path: string,
-    summariesDir?: string
-): Promise<string> {
+export async function write_source(summary_id: string, file_path: string, summariesDir?: string): Promise<string> {
     const finalSummariesDir = summariesDir || './summaries';
-    const originalFilePath = path.join(
-        finalSummariesDir,
-        `original-${summary_id}.txt`
-    );
+    const originalFilePath = path.join(finalSummariesDir, `original-${summary_id}.txt`);
 
     try {
         const content = await fs.readFile(originalFilePath, 'utf-8');
@@ -290,20 +242,14 @@ export async function write_source(
             console.log(`Summary written to file: ${file_path}`);
             return `Successfully wrote ${content.length} chars to file: ${file_path}\n\nStart of content:\n\n${content.substring(0, 400)}...`;
         } catch (writeError) {
-            console.error(
-                `Error writing summary to file ${file_path}:`,
-                writeError
-            );
+            console.error(`Error writing summary to file ${file_path}:`, writeError);
             return `Error: Could not write summary to file ${file_path}.`;
         }
     } catch (error: any) {
         if (error.code === 'ENOENT') {
             return `Error: Original document for summary ID '${summary_id}' not found at ${originalFilePath}.`;
         }
-        console.error(
-            `Error reading original summary source for ID ${summary_id}:`,
-            error
-        );
+        console.error(`Error reading original summary source for ID ${summary_id}:`, error);
         return `Error: Could not retrieve original document for summary ID '${summary_id}'.`;
     }
 }
@@ -316,18 +262,11 @@ export async function write_source(
  * @returns Array of ToolFunction definitions for read_source and write_source
  */
 export function getSummaryTools(summariesDir?: string): ToolFunction[] {
-    const readSourceWrapper = async (
-        summary_id: string,
-        line_start?: number,
-        line_end?: number
-    ) => {
+    const readSourceWrapper = async (summary_id: string, line_start?: number, line_end?: number) => {
         return read_source(summary_id, line_start, line_end, summariesDir);
     };
 
-    const writeSourceWrapper = async (
-        summary_id: string,
-        file_path: string
-    ) => {
+    const writeSourceWrapper = async (summary_id: string, file_path: string) => {
         return write_source(summary_id, file_path, summariesDir);
     };
 
@@ -342,8 +281,7 @@ export function getSummaryTools(summariesDir?: string): ToolFunction[] {
                 },
                 line_start: {
                     type: 'number',
-                    description:
-                        'Starting line to retrieve (0-based). Optional.',
+                    description: 'Starting line to retrieve (0-based). Optional.',
                     optional: true,
                 },
                 line_end: {
@@ -353,21 +291,16 @@ export function getSummaryTools(summariesDir?: string): ToolFunction[] {
                 },
             }
         ),
-        createToolFunction(
-            writeSourceWrapper,
-            'Write the original (not summarized) document to a file.',
-            {
-                summary_id: {
-                    type: 'string',
-                    description: 'The unique ID of the summary.',
-                },
-                file_path: {
-                    type: 'string',
-                    description:
-                        'Relative or absolute path to write the document to.',
-                },
-            }
-        ),
+        createToolFunction(writeSourceWrapper, 'Write the original (not summarized) document to a file.', {
+            summary_id: {
+                type: 'string',
+                description: 'The unique ID of the summary.',
+            },
+            file_path: {
+                type: 'string',
+                description: 'Relative or absolute path to write the document to.',
+            },
+        }),
     ];
 }
 
@@ -378,7 +311,5 @@ export function getSummaryTools(summariesDir?: string): ToolFunction[] {
  * @returns true if the agent has both write_source and read_source tools
  */
 export function hasExpansionTools(toolNames: string[]): boolean {
-    return (
-        toolNames.includes('write_source') && toolNames.includes('read_source')
-    );
+    return toolNames.includes('write_source') && toolNames.includes('read_source');
 }

@@ -55,18 +55,10 @@ describe('runAgentTool Event Context', () => {
         expect(capturedEvents.length).toBeGreaterThan(0);
 
         // Find different event types
-        const agentStartEvent = capturedEvents.find(
-            e => e.type === 'agent_start'
-        );
-        const messageDeltas = capturedEvents.filter(
-            e => e.type === 'message_delta'
-        );
-        const messageComplete = capturedEvents.find(
-            e => e.type === 'message_complete'
-        );
-        const agentDoneEvent = capturedEvents.find(
-            e => e.type === 'agent_done'
-        );
+        const agentStartEvent = capturedEvents.find(e => e.type === 'agent_start');
+        const messageDeltas = capturedEvents.filter(e => e.type === 'message_delta');
+        const messageComplete = capturedEvents.find(e => e.type === 'message_complete');
+        const agentDoneEvent = capturedEvents.find(e => e.type === 'agent_done');
 
         // Verify agent_start has correct context
         expect(agentStartEvent).toBeDefined();
@@ -132,9 +124,7 @@ describe('runAgentTool Event Context', () => {
         });
 
         // Find a message delta event
-        const messageDelta = capturedEvents.find(
-            e => e.type === 'message_delta'
-        );
+        const messageDelta = capturedEvents.find(e => e.type === 'message_delta');
 
         if (messageDelta) {
             // Verify original properties are preserved

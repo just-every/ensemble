@@ -22,8 +22,7 @@ const scoredAgent: AgentDefinition = {
         'grok-3-mini-fast': 20, // 20 weight - least preferred
         'deepseek-chat': 0, // 0 weight - will never be selected
     },
-    instructions:
-        'You are a helpful assistant. When asked about which model you are, please state your model name.',
+    instructions: 'You are a helpful assistant. When asked about which model you are, please state your model name.',
 };
 
 // Example 2: Disabling specific models
@@ -54,8 +53,7 @@ const combinedAgent: AgentDefinition = {
         'claude-opus-4-20250514', // Disable expensive Opus model
         'claude-sonnet-4-20250514', // Disable another Claude model
     ],
-    instructions:
-        'You are an advanced reasoning assistant with model preferences.',
+    instructions: 'You are an advanced reasoning assistant with model preferences.',
 };
 
 // Example usage
@@ -71,8 +69,7 @@ async function demonstrateModelScoring() {
                 {
                     type: 'message',
                     role: 'user',
-                    content:
-                        'Which model are you? (Please just state the model name)',
+                    content: 'Which model are you? (Please just state the model name)',
                 },
             ],
         });
@@ -94,15 +91,12 @@ async function demonstrateModelScoring() {
             {
                 type: 'message',
                 role: 'user',
-                content:
-                    'Hello! Can you tell me about your model restrictions?',
+                content: 'Hello! Can you tell me about your model restrictions?',
             },
         ],
     });
 
-    console.log(
-        'Restricted agent response (will not use deepseek-chat or grok-3-mini-fast):'
-    );
+    console.log('Restricted agent response (will not use deepseek-chat or grok-3-mini-fast):');
     for await (const event of restrictedResponse) {
         if (event.type === 'message_delta') {
             process.stdout.write(event.content);

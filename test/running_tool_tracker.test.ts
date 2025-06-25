@@ -10,12 +10,7 @@ describe('RunningToolTracker', () => {
 
     describe('addRunningTool', () => {
         it('should add a new running tool', () => {
-            const tool = tracker.addRunningTool(
-                'test-id',
-                'testTool',
-                'testAgent',
-                '{"arg": "value"}'
-            );
+            const tool = tracker.addRunningTool('test-id', 'testTool', 'testAgent', '{"arg": "value"}');
 
             expect(tool.id).toBe('test-id');
             expect(tool.toolName).toBe('testTool');
@@ -122,12 +117,7 @@ describe('RunningToolTracker', () => {
 
     describe('abortRunningTool', () => {
         it('should abort a running tool', () => {
-            const tool = tracker.addRunningTool(
-                'test-id',
-                'testTool',
-                'testAgent',
-                '{}'
-            );
+            const tool = tracker.addRunningTool('test-id', 'testTool', 'testAgent', '{}');
             const abortSpy = vi.spyOn(tool.abortController!, 'abort');
 
             tracker.abortRunningTool('test-id');
@@ -166,9 +156,7 @@ describe('RunningToolTracker', () => {
         it('should timeout when waiting too long', async () => {
             tracker.addRunningTool('test-id', 'testTool', 'testAgent', '{}');
 
-            await expect(tracker.waitForTool('test-id', 100)).rejects.toThrow(
-                'Timeout waiting for tool test-id'
-            );
+            await expect(tracker.waitForTool('test-id', 100)).rejects.toThrow('Timeout waiting for tool test-id');
         });
 
         it('should return null for non-existent tool', async () => {
@@ -179,18 +167,8 @@ describe('RunningToolTracker', () => {
 
     describe('clear', () => {
         it('should clear all running tools and abort them', () => {
-            const tool1 = tracker.addRunningTool(
-                'id1',
-                'tool1',
-                'agent1',
-                '{}'
-            );
-            const tool2 = tracker.addRunningTool(
-                'id2',
-                'tool2',
-                'agent2',
-                '{}'
-            );
+            const tool1 = tracker.addRunningTool('id1', 'tool1', 'agent1', '{}');
+            const tool2 = tracker.addRunningTool('id2', 'tool2', 'agent2', '{}');
 
             const abort1Spy = vi.spyOn(tool1.abortController!, 'abort');
             const abort2Spy = vi.spyOn(tool2.abortController!, 'abort');

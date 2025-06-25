@@ -16,10 +16,7 @@ import {
     type ResponseInputFunctionCallOutput,
     type ToolEvent,
 } from '../types/types.js';
-import {
-    getModelFromAgent,
-    getModelProvider,
-} from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
 import { MessageHistory } from '../utils/message_history.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
@@ -99,13 +96,7 @@ export async function* ensembleRequest(
             modelHistory.push(model);
 
             // Execute one round
-            const stream = executeRound(
-                model,
-                agent,
-                history,
-                totalToolCalls,
-                maxToolCalls
-            );
+            const stream = executeRound(model, agent, history, totalToolCalls, maxToolCalls);
 
             // Yield all events from this round
             for await (const event of stream) {
@@ -146,9 +137,7 @@ export async function* ensembleRequest(
             }
         } while (
             (hasError && errorRounds < MAX_ERROR_ATTEMPTS) ||
-            (hasToolCalls &&
-                toolCallRounds < maxRounds &&
-                totalToolCalls < maxToolCalls)
+            (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls)
         );
 
         // If we hit limits, add a notification
@@ -211,10 +200,7 @@ async function* executeRound(
         {
             type: 'agent_start',
             input:
-                'content' in messages[0] &&
-                typeof messages[0].content === 'string'
-                    ? messages[0].content
-                    : undefined,
+                'content' in messages[0] && typeof messages[0].content === 'string' ? messages[0].content : undefined,
             timestamp: new Date().toISOString(),
         },
         agent,
@@ -235,11 +221,7 @@ async function* executeRound(
     // Stream the response with retry support if available
     const stream =
         'createResponseStreamWithRetry' in provider
-            ? (provider as any).createResponseStreamWithRetry(
-                  messages,
-                  model,
-                  agent
-              )
+            ? (provider as any).createResponseStreamWithRetry(messages, model, agent)
             : provider.createResponseStream(messages, model, agent);
 
     const toolPromises: Promise<ToolCallResult>[] = [];
@@ -267,25 +249,13 @@ async function* executeRound(
                 let argumentsFormatted: string | undefined;
                 try {
                     // Find the tool definition to get parameter order
-                    const tool = agent.tools?.find(
-                        t =>
-                            t.definition.function.name ===
-                            toolCall.function.name
-                    );
+                    const tool = agent.tools?.find(t => t.definition.function.name === toolCall.function.name);
 
                     if (tool && 'definition' in tool) {
-                        const parsedArgs = JSON.parse(
-                            toolCall.function.arguments || '{}'
-                        );
-                        if (
-                            typeof parsedArgs === 'object' &&
-                            parsedArgs !== null &&
-                            !Array.isArray(parsedArgs)
-                        ) {
+                        const parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
+                        if (typeof parsedArgs === 'object' && parsedArgs !== null && !Array.isArray(parsedArgs)) {
                             // Get parameter names in the correct order
-                            const paramNames = Object.keys(
-                                tool.definition.function.parameters.properties
-                            );
+                            const paramNames = Object.keys(tool.definition.function.parameters.properties);
 
                             // Create ordered object
                             const orderedArgs: Record<string, any> = {};
@@ -295,11 +265,7 @@ async function* executeRound(
                                 }
                             }
 
-                            argumentsFormatted = JSON.stringify(
-                                orderedArgs,
-                                null,
-                                2
-                            );
+                            argumentsFormatted = JSON.stringify(orderedArgs, null, 2);
                         }
                     }
                 } catch (error) {
@@ -394,9 +360,7 @@ async function* executeRound(
                 // Check if we'll exceed the limit
                 const remainingCalls = maxToolCalls - currentToolCalls;
                 if (remainingCalls <= 0) {
-                    console.warn(
-                        `Tool call limit reached (${maxToolCalls}). Skipping tool calls.`
-                    );
+                    console.warn(`Tool call limit reached (${maxToolCalls}). Skipping tool calls.`);
                     // Don't count this as having tool calls if we're at the limit
                     break;
                 }
@@ -427,10 +391,7 @@ async function* executeRound(
 
             case 'error': {
                 // Log errors but don't add them to messages
-                console.error(
-                    '[executeRound] Error event:',
-                    (event as any).error
-                );
+                console.error('[executeRound] Error event:', (event as any).error);
                 break;
             }
         }
@@ -568,12 +529,7 @@ async function* performVerification(
 
         // Verify the retry
         if (retryOutput) {
-            yield* performVerification(
-                agent,
-                retryOutput,
-                messages,
-                attempt + 1
-            );
+            yield* performVerification(agent, retryOutput, messages, attempt + 1);
         }
     } else {
         // Max attempts reached
@@ -587,10 +543,7 @@ async function* performVerification(
 /**
  * Process tool calls with enhanced features
  */
-async function processToolCall(
-    toolCall: ToolCall,
-    agent: AgentDefinition
-): Promise<ToolCallResult> {
+async function processToolCall(toolCall: ToolCall, agent: AgentDefinition): Promise<ToolCallResult> {
     // Process all tool calls in parallel
 
     // Apply tool handler lifecycle if available
@@ -605,9 +558,7 @@ async function processToolCall(
         }
 
         // Find the tool
-        const tool = agent.tools.find(
-            t => t.definition.function.name === toolCall.function.name
-        );
+        const tool = agent.tools.find(t => t.definition.function.name === toolCall.function.name);
 
         if (!tool || !('function' in tool)) {
             throw new Error(`Tool ${toolCall.function.name} not found`);
@@ -617,11 +568,7 @@ async function processToolCall(
         const rawResult = await handleToolCall(toolCall, tool, agent);
 
         // Process the result (summarization, truncation, etc.)
-        const processedResult = await processToolResult(
-            toolCall,
-            rawResult,
-            agent
-        );
+        const processedResult = await processToolResult(toolCall, rawResult, agent);
 
         const toolCallResult: ToolCallResult = {
             toolCall,
@@ -661,11 +608,7 @@ async function processToolCall(
 /**
  * Merge history thread back to main history
  */
-export function mergeHistoryThread(
-    mainHistory: ResponseInput,
-    thread: ResponseInput,
-    startIndex: number
-): void {
+export function mergeHistoryThread(mainHistory: ResponseInput, thread: ResponseInput, startIndex: number): void {
     const newMessages = thread.slice(startIndex);
     mainHistory.push(...newMessages);
 }

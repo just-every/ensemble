@@ -2,13 +2,7 @@
 // Types for the Ensemble package - Self-contained
 // ================================================================
 
-export type ToolParameterType =
-    | 'string'
-    | 'number'
-    | 'boolean'
-    | 'object'
-    | 'array'
-    | 'null';
+export type ToolParameterType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
 
 /**
  * Tool parameter type definitions using strict schema format for OpenAI function calling
@@ -37,9 +31,7 @@ export interface ToolParameter {
     pattern?: string;
 }
 
-export type ExecutableFunction = (
-    ...args: unknown[]
-) => Promise<string> | string;
+export type ExecutableFunction = (...args: unknown[]) => Promise<string> | string;
 
 /**
  * Definition for a tool that can be used by an agent
@@ -112,11 +104,7 @@ export interface ModelSettings {
     stop_sequence?: string;
     seed?: number;
     text?: { format: string };
-    tool_choice?:
-        | 'auto'
-        | 'none'
-        | 'required'
-        | { type: string; function: { name: string } };
+    tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
     force_json?: boolean; // Force JSON output even if model doesn't natively support it
@@ -177,11 +165,7 @@ export interface ResponseContentFileInput {
 /**
  * ResponseContent
  */
-export type ResponseContent =
-    | string
-    | Array<
-          ResponseContentText | ResponseContentImage | ResponseContentFileInput
-      >;
+export type ResponseContent = string | Array<ResponseContentText | ResponseContentImage | ResponseContentFileInput>;
 
 /**
  * ResponseInput
@@ -447,11 +431,7 @@ export interface ModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    createEmbedding?(
-        input: string | string[],
-        model: string,
-        opts?: EmbedOpts
-    ): Promise<number[] | number[][]>;
+    createEmbedding?(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]>;
 
     /**
      * Generates images from text prompts
@@ -459,11 +439,7 @@ export interface ModelProvider {
      * @param opts Optional parameters for image generation
      * @returns Promise resolving to generated image data
      */
-    createImage?(
-        prompt: string,
-        model?: string,
-        opts?: ImageGenerationOpts
-    ): Promise<string[]>;
+    createImage?(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]>;
 
     /**
      * Generates speech audio from text (Text-to-Speech)
@@ -491,6 +467,46 @@ export interface ModelProvider {
         model: string,
         opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent>;
+
+    /**
+     * Creates a Live API session for real-time interaction
+     * @param config Live API configuration
+     * @param agent Agent definition with tools and settings
+     * @param opts Optional parameters for the live session
+     * @returns Promise resolving to a LiveSession object
+     */
+    createLiveSession?(
+        config: LiveConfig,
+        agent: AgentDefinition,
+        model: string,
+        opts?: LiveOptions
+    ): Promise<LiveSession>;
+}
+
+/**
+ * Live API session interface
+ */
+export interface LiveSession {
+    /** Unique session ID */
+    sessionId: string;
+
+    /** Send audio input to the session */
+    sendAudio(audio: LiveAudioBlob): Promise<void>;
+
+    /** Send text content to the session */
+    sendText(text: string, role?: 'user' | 'assistant'): Promise<void>;
+
+    /** Send tool response to the session */
+    sendToolResponse(toolResults: ToolCallResult[]): Promise<void>;
+
+    /** Get event stream from the session */
+    getEventStream(): AsyncIterable<LiveEvent>;
+
+    /** Close the session */
+    close(): Promise<void>;
+
+    /** Check if session is active */
+    isActive(): boolean;
 }
 
 /**
@@ -671,16 +687,8 @@ export interface EnsembleLogger {
         requestData: unknown,
         timestamp?: Date
     ): string;
-    log_llm_response(
-        requestId: string | undefined,
-        responseData: unknown,
-        timestamp?: Date
-    ): void;
-    log_llm_error(
-        requestId: string | undefined,
-        errorData: unknown,
-        timestamp?: Date
-    ): void;
+    log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void;
+    log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void;
 }
 
 // ================================================================
@@ -954,15 +962,10 @@ export interface TranscriptionOpts {
     };
 
     /** Gemini-specific real-time configuration */
-    realtimeConfig?: {
-        /** Voice Activity Detection configuration */
-        automaticActivityDetection?: {
-            /** Milliseconds of audio to include before speech detection */
-            prefixPaddingMs?: number;
-            /** Milliseconds of silence before considering speech ended */
-            silenceDurationMs?: number;
-        };
-    };
+    realtimeInputConfig?: any;
+
+    /** Gemini-specific real-time configuration */
+    speechConfig?: any;
 
     /** Buffering configuration */
     bufferConfig?: {
@@ -1069,3 +1072,326 @@ export type TranscriptionEvent =
     | TranscriptionTurnEvent
     | TranscriptionCompleteEvent
     | TranscriptionErrorEvent;
+
+// ================================================================
+// Live API Types
+// ================================================================
+
+/**
+ * Response modality for Live API
+ */
+export type LiveResponseModality = 'TEXT' | 'AUDIO';
+
+/**
+ * Voice configuration for Live API
+ */
+export interface LiveVoiceConfig {
+    /** Voice name to use for synthesis */
+    voiceName?: string;
+}
+
+/**
+ * Speech configuration for Live API
+ */
+export interface LiveSpeechConfig {
+    /** Voice configuration */
+    voiceConfig?: {
+        prebuiltVoiceConfig?: LiveVoiceConfig;
+    };
+    /** Language code (e.g., 'en-US') */
+    languageCode?: string;
+}
+
+/**
+ * Voice Activity Detection configuration
+ */
+export interface LiveVADConfig {
+    /** Whether VAD is disabled */
+    disabled?: boolean;
+    /** Sensitivity for detecting start of speech */
+    startOfSpeechSensitivity?: 'START_SENSITIVITY_LOW' | 'START_SENSITIVITY_MEDIUM' | 'START_SENSITIVITY_HIGH';
+    /** Sensitivity for detecting end of speech */
+    endOfSpeechSensitivity?: 'END_SENSITIVITY_LOW' | 'END_SENSITIVITY_MEDIUM' | 'END_SENSITIVITY_HIGH';
+    /** Milliseconds of audio to include before speech detection */
+    prefixPaddingMs?: number;
+    /** Milliseconds of silence before considering speech ended */
+    silenceDurationMs?: number;
+}
+
+/**
+ * Real-time input configuration for Live API
+ */
+export interface LiveRealtimeInputConfig {
+    /** Voice Activity Detection configuration */
+    automaticActivityDetection?: LiveVADConfig;
+}
+
+/**
+ * Configuration for Live API session
+ */
+export interface LiveConfig {
+    /** Response modality (TEXT or AUDIO) */
+    responseModalities: [LiveResponseModality];
+    /** Speech configuration for audio output */
+    speechConfig?: LiveSpeechConfig;
+    /** Real-time input configuration */
+    realtimeInputConfig?: LiveRealtimeInputConfig;
+    /** Whether to enable audio transcription for model output */
+    outputAudioTranscription?: boolean | Record<string, never>;
+    /** Whether to enable audio transcription for user input */
+    inputAudioTranscription?: boolean | Record<string, never>;
+    /** Tools available for the session */
+    tools?: Array<{
+        functionDeclarations?: ToolDefinition['function'][];
+        codeExecution?: boolean | Record<string, never>;
+        googleSearch?: boolean | Record<string, never>;
+    }>;
+    /** Media resolution for video input */
+    mediaResolution?: 'MEDIA_RESOLUTION_LOW' | 'MEDIA_RESOLUTION_MEDIUM' | 'MEDIA_RESOLUTION_HIGH';
+    /** Whether to enable affective dialog (native audio only) */
+    enableAffectiveDialog?: boolean;
+    /** Proactivity configuration (native audio only) */
+    proactivity?: {
+        proactiveAudio?: boolean;
+    };
+}
+
+/**
+ * Options for Live API
+ */
+export interface LiveOptions {
+    /** Initial message history to establish context */
+    messageHistory?: ResponseInput;
+    /** Abort signal for cancelling the session */
+    abortSignal?: AbortSignal;
+    /** Whether to use sequential tool execution */
+    sequentialTools?: boolean;
+    /** Maximum number of tool calls allowed */
+    maxToolCalls?: number;
+    /** Maximum number of tool call rounds per turn */
+    maxToolCallRoundsPerTurn?: number;
+    /** API version (e.g., 'v1alpha' for experimental features) */
+    apiVersion?: string;
+}
+
+/**
+ * Audio blob for Live API
+ */
+export interface LiveAudioBlob {
+    /** Base64-encoded audio data */
+    data: string;
+    /** MIME type with sample rate (e.g., 'audio/pcm;rate=16000') */
+    mimeType: string;
+}
+
+/**
+ * Live event types
+ */
+export type LiveEventType =
+    | 'live_start'
+    | 'live_ready'
+    | 'audio_input'
+    | 'audio_output'
+    | 'text_delta'
+    | 'message_delta'
+    | 'tool_start'
+    | 'tool_call'
+    | 'tool_result'
+    | 'tool_done'
+    | 'turn_start'
+    | 'turn_complete'
+    | 'interrupted'
+    | 'transcription_input'
+    | 'transcription_output'
+    | 'cost_update'
+    | 'error'
+    | 'live_end';
+
+/**
+ * Base Live event
+ */
+export interface LiveEventBase {
+    type: LiveEventType;
+    timestamp: string;
+}
+
+/**
+ * Live start event
+ */
+export interface LiveStartEvent extends LiveEventBase {
+    type: 'live_start';
+    sessionId: string;
+    config: LiveConfig;
+}
+
+/**
+ * Live ready event (connection established)
+ */
+export interface LiveReadyEvent extends LiveEventBase {
+    type: 'live_ready';
+}
+
+/**
+ * Audio input event
+ */
+export interface LiveAudioInputEvent extends LiveEventBase {
+    type: 'audio_input';
+    /** Audio chunk size in bytes */
+    size: number;
+}
+
+/**
+ * Audio output event
+ */
+export interface LiveAudioOutputEvent extends LiveEventBase {
+    type: 'audio_output';
+    /** Base64-encoded audio data */
+    data: string;
+    /** Audio format info */
+    format?: {
+        sampleRate: number;
+        channels: number;
+        encoding: string;
+    };
+}
+
+/**
+ * Text delta event (for streaming text responses)
+ */
+export interface LiveTextDeltaEvent extends LiveEventBase {
+    type: 'text_delta';
+    delta: string;
+}
+
+/**
+ * Message delta event (wrapper for compatibility)
+ */
+export interface LiveMessageDeltaEvent extends LiveEventBase {
+    type: 'message_delta';
+    delta: string;
+}
+
+/**
+ * Turn start event
+ */
+export interface LiveTurnStartEvent extends LiveEventBase {
+    type: 'turn_start';
+    role: 'user' | 'model';
+}
+
+/**
+ * Turn complete event
+ */
+export interface LiveTurnCompleteEvent extends LiveEventBase {
+    type: 'turn_complete';
+    role: 'user' | 'model';
+    /** Complete message for the turn */
+    message?: ResponseInputMessage | ResponseOutputMessage;
+}
+
+/**
+ * Interrupted event (when user interrupts model)
+ */
+export interface LiveInterruptedEvent extends LiveEventBase {
+    type: 'interrupted';
+    /** IDs of cancelled tool calls */
+    cancelledToolCalls?: string[];
+}
+
+/**
+ * Input transcription event
+ */
+export interface LiveTranscriptionInputEvent extends LiveEventBase {
+    type: 'transcription_input';
+    text: string;
+}
+
+/**
+ * Output transcription event
+ */
+export interface LiveTranscriptionOutputEvent extends LiveEventBase {
+    type: 'transcription_output';
+    text: string;
+}
+
+/**
+ * Live tool events (reuse existing tool event types)
+ */
+export interface LiveToolStartEvent extends LiveEventBase {
+    type: 'tool_start';
+    toolCall: ToolCall;
+}
+
+export interface LiveToolCallEvent extends LiveEventBase {
+    type: 'tool_call';
+    toolCalls: ToolCall[];
+}
+
+export interface LiveToolResultEvent extends LiveEventBase {
+    type: 'tool_result';
+    toolCallResult: ToolCallResult;
+}
+
+export interface LiveToolDoneEvent extends LiveEventBase {
+    type: 'tool_done';
+    totalCalls: number;
+}
+
+/**
+ * Live cost update event
+ */
+export interface LiveCostUpdateEvent extends LiveEventBase {
+    type: 'cost_update';
+    usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+        inputCost?: number;
+        outputCost?: number;
+        totalCost?: number;
+    };
+}
+
+/**
+ * Live error event
+ */
+export interface LiveErrorEvent extends LiveEventBase {
+    type: 'error';
+    error: string;
+    code?: string;
+    recoverable?: boolean;
+}
+
+/**
+ * Live end event
+ */
+export interface LiveEndEvent extends LiveEventBase {
+    type: 'live_end';
+    reason?: string;
+    duration?: number;
+    totalTokens?: number;
+    totalCost?: number;
+}
+
+/**
+ * Union type for all Live events
+ */
+export type LiveEvent =
+    | LiveStartEvent
+    | LiveReadyEvent
+    | LiveAudioInputEvent
+    | LiveAudioOutputEvent
+    | LiveTextDeltaEvent
+    | LiveMessageDeltaEvent
+    | LiveTurnStartEvent
+    | LiveTurnCompleteEvent
+    | LiveInterruptedEvent
+    | LiveTranscriptionInputEvent
+    | LiveTranscriptionOutputEvent
+    | LiveToolStartEvent
+    | LiveToolCallEvent
+    | LiveToolResultEvent
+    | LiveToolDoneEvent
+    | LiveCostUpdateEvent
+    | LiveErrorEvent
+    | LiveEndEvent;

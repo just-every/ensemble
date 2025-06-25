@@ -93,11 +93,7 @@ export {
     RunningTool,
     ToolCompletionEvent,
 } from './utils/running_tool_tracker.js';
-export {
-    sequentialQueue,
-    SequentialQueue,
-    runSequential,
-} from './utils/sequential_queue.js';
+export { sequentialQueue, SequentialQueue, runSequential } from './utils/sequential_queue.js';
 export {
     executeToolWithLifecycle,
     handleToolCall,
@@ -115,12 +111,7 @@ export {
 } from './utils/tool_result_processor.js';
 
 // Export summary utilities for expandable summaries
-export {
-    getSummaryTools,
-    hasExpansionTools,
-    read_source,
-    write_source,
-} from './utils/summary_utils.js';
+export { getSummaryTools, hasExpansionTools, read_source, write_source } from './utils/summary_utils.js';
 export * from './config/tool_execution.js';
 
 // Export verification utilities
@@ -130,12 +121,7 @@ export { verifyOutput, VerificationResult } from './utils/verification.js';
 export { mergeHistoryThread } from './core/ensemble_request.js';
 
 // Export Agent class and utilities
-export {
-    Agent,
-    cloneAgent,
-    getAgentSpecificTools,
-    agentToolCache,
-} from './utils/agent.js';
+export { Agent, cloneAgent, getAgentSpecificTools, agentToolCache } from './utils/agent.js';
 
 // Export model configuration utilities
 export {
@@ -162,13 +148,8 @@ export { ensembleRequest } from './core/ensemble_request.js';
 export { ensembleEmbed } from './core/ensemble_embed.js';
 export { ensembleImage } from './core/ensemble_image.js';
 export { ensembleVoice } from './core/ensemble_voice.js';
-export {
-    ensembleListen,
-    createAudioStreamFromMediaStream,
-} from './core/ensemble_listen.js';
+export { ensembleListen, createAudioStreamFromMediaStream } from './core/ensemble_listen.js';
+export { ensembleLive, ensembleLiveAudio, ensembleLiveText } from './core/ensemble_live.js';
 
 // Export ensemble result aggregator
-export {
-    ensembleResult,
-    type EnsembleResult,
-} from './utils/ensemble_result.js';
+export { ensembleResult, type EnsembleResult } from './utils/ensemble_result.js';

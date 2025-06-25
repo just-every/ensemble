@@ -97,9 +97,7 @@ const tools: ToolFunction[] = [
 
 async function main() {
     // Test both parallel and sequential execution
-    console.log(
-        '=== DEMONSTRATION: Sequential vs Parallel Tool Execution ===\n'
-    );
+    console.log('=== DEMONSTRATION: Sequential vs Parallel Tool Execution ===\n');
 
     const messages = [
         {
@@ -121,9 +119,7 @@ async function main() {
     (global as any).files = {};
 
     // Then show sequential execution
-    console.log(
-        '\n\n2️⃣  SEQUENTIAL EXECUTION (Safe for dependent operations):\n'
-    );
+    console.log('\n\n2️⃣  SEQUENTIAL EXECUTION (Safe for dependent operations):\n');
     await runExample(messages, true);
 }
 
@@ -147,9 +143,7 @@ async function runExample(messages: any[], sequential: boolean) {
                     break;
 
                 case 'tool_start':
-                    console.log(
-                        `\n🔧 Starting tool execution (${sequential ? 'SEQUENTIAL' : 'PARALLEL'} mode):`
-                    );
+                    console.log(`\n🔧 Starting tool execution (${sequential ? 'SEQUENTIAL' : 'PARALLEL'} mode):`);
                     console.log(event.tool_call);
                     break;
 

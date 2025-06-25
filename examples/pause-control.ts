@@ -5,13 +5,7 @@
  * across the entire ensemble system.
  */
 
-import {
-    ensembleRequest,
-    pause,
-    resume,
-    isPaused,
-    getPauseController,
-} from '../index.js';
+import { ensembleRequest, pause, resume, isPaused, getPauseController } from '../index.js';
 
 async function main() {
     console.log('=== Pause Control Example ===\n');
@@ -32,8 +26,7 @@ async function main() {
         {
             type: 'message' as const,
             role: 'user' as const,
-            content:
-                'Count from 1 to 10 slowly, with a brief description for each number.',
+            content: 'Count from 1 to 10 slowly, with a brief description for each number.',
         },
     ];
 
@@ -75,13 +68,9 @@ async function main() {
     console.log(`System paused status: ${isPaused()}`);
 
     // Start multiple requests while paused
-    const request1 = ensembleRequest([
-        { type: 'message', role: 'user', content: 'Say "Request 1 completed"' },
-    ]);
+    const request1 = ensembleRequest([{ type: 'message', role: 'user', content: 'Say "Request 1 completed"' }]);
 
-    const request2 = ensembleRequest([
-        { type: 'message', role: 'user', content: 'Say "Request 2 completed"' },
-    ]);
+    const request2 = ensembleRequest([{ type: 'message', role: 'user', content: 'Say "Request 2 completed"' }]);
 
     console.log('Started 2 requests while paused - they are waiting...');
 

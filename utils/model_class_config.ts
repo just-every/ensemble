@@ -7,10 +7,7 @@ import { MODEL_CLASSES, findModel } from '../data/model_data.js';
 import { ModelClass } from '../types/types.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { ModelClassID } from '../types/types.js';
-import {
-    overrideModelClass as _overrideModelClass,
-    getModelClassOverride,
-} from './external_models.js';
+import { overrideModelClass as _overrideModelClass, getModelClassOverride } from './external_models.js';
 
 /**
  * Get the effective model class configuration (with overrides applied)
@@ -56,10 +53,7 @@ export function getModelClassNames(): string[] {
  * @param className The model class name
  * @param config The new configuration (can be partial)
  */
-export function overrideModelClass(
-    className: string,
-    config: Partial<ModelClass>
-): void {
+export function overrideModelClass(className: string, config: Partial<ModelClass>): void {
     // Validate that the class exists
     if (!(className in MODEL_CLASSES)) {
         throw new Error(`Model class '${className}' does not exist`);
@@ -69,9 +63,7 @@ export function overrideModelClass(
     if (config.models) {
         for (const modelId of config.models) {
             if (!findModel(modelId)) {
-                console.warn(
-                    `Model '${modelId}' not found in registry, but adding to class '${className}' anyway`
-                );
+                console.warn(`Model '${modelId}' not found in registry, but adding to class '${className}' anyway`);
             }
         }
     }
@@ -85,11 +77,7 @@ export function overrideModelClass(
  * @param models Array of model IDs
  * @param random Optional - whether to use random selection (preserves existing value if not specified)
  */
-export function setModelClassModels(
-    className: string,
-    models: string[],
-    random?: boolean
-): void {
+export function setModelClassModels(className: string, models: string[], random?: boolean): void {
     const currentConfig = getModelClass(className);
     if (!currentConfig) {
         throw new Error(`Model class '${className}' does not exist`);
@@ -190,9 +178,7 @@ export function getAllModelClasses(): Record<string, ModelClass> {
  * Bulk update multiple model classes at once
  * @param updates Object mapping class names to their new configurations
  */
-export function updateModelClasses(
-    updates: Record<string, Partial<ModelClass>>
-): void {
+export function updateModelClasses(updates: Record<string, Partial<ModelClass>>): void {
     for (const [className, config] of Object.entries(updates)) {
         overrideModelClass(className, config);
     }

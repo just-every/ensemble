@@ -43,9 +43,7 @@ describe('Agent Events for Workers', () => {
     it('should emit agent_start event when worker begins execution', async () => {
         // Get the worker tool
         const tools = await parentAgent.getTools();
-        const workerTool = tools.find(tool =>
-            tool.definition.function.name.includes('TestWorker')
-        );
+        const workerTool = tools.find(tool => tool.definition.function.name.includes('TestWorker'));
 
         expect(workerTool).toBeDefined();
 
@@ -63,36 +61,26 @@ describe('Agent Events for Workers', () => {
     it('should forward all streaming events from worker execution', async () => {
         // Get the worker tool
         const tools = await parentAgent.getTools();
-        const workerTool = tools.find(tool =>
-            tool.definition.function.name.includes('TestWorker')
-        );
+        const workerTool = tools.find(tool => tool.definition.function.name.includes('TestWorker'));
 
         // Execute the worker tool
         await workerTool!.function('Test task');
 
         // Check that message events were forwarded
-        const deltaEvents = capturedEvents.filter(
-            e => e.type === 'message_delta'
-        );
+        const deltaEvents = capturedEvents.filter(e => e.type === 'message_delta');
         expect(deltaEvents.length).toBe(13);
         expect(deltaEvents[0].content).toBe('This ');
         expect(deltaEvents[1].content).toBe('is a ');
 
-        const completeEvent = capturedEvents.find(
-            e => e.type === 'message_complete'
-        );
+        const completeEvent = capturedEvents.find(e => e.type === 'message_complete');
         expect(completeEvent).toBeDefined();
-        expect(completeEvent?.content).toBe(
-            'This is a test response. The test provider is working correctly!'
-        );
+        expect(completeEvent?.content).toBe('This is a test response. The test provider is working correctly!');
     });
 
     it('should emit agent_done event when worker completes successfully', async () => {
         // Get the worker tool
         const tools = await parentAgent.getTools();
-        const workerTool = tools.find(tool =>
-            tool.definition.function.name.includes('TestWorker')
-        );
+        const workerTool = tools.find(tool => tool.definition.function.name.includes('TestWorker'));
 
         // Execute the worker tool
         await workerTool!.function('Test task');
@@ -109,9 +97,7 @@ describe('Agent Events for Workers', () => {
     it('should preserve event order: start -> streaming events -> done', async () => {
         // Get the worker tool
         const tools = await parentAgent.getTools();
-        const workerTool = tools.find(tool =>
-            tool.definition.function.name.includes('TestWorker')
-        );
+        const workerTool = tools.find(tool => tool.definition.function.name.includes('TestWorker'));
 
         // Execute the worker tool
         await workerTool!.function('Test task');
@@ -154,12 +140,8 @@ describe('Agent Events for Workers', () => {
         });
 
         const tools = await multiWorkerAgent.getTools();
-        const worker1Tool = tools.find(tool =>
-            tool.definition.function.name.includes('FirstWorker')
-        );
-        const worker2Tool = tools.find(tool =>
-            tool.definition.function.name.includes('SecondWorker')
-        );
+        const worker1Tool = tools.find(tool => tool.definition.function.name.includes('FirstWorker'));
+        const worker2Tool = tools.find(tool => tool.definition.function.name.includes('SecondWorker'));
 
         expect(worker1Tool).toBeDefined();
         expect(worker2Tool).toBeDefined();
@@ -175,9 +157,7 @@ describe('Agent Events for Workers', () => {
         expect(capturedEvents.length).toBeGreaterThan(firstWorkerEventCount);
 
         // Check that we have separate agent_start events
-        const startEvents = capturedEvents.filter(
-            e => e.type === 'agent_start'
-        );
+        const startEvents = capturedEvents.filter(e => e.type === 'agent_start');
         expect(startEvents.length).toBe(2);
         expect(startEvents[0].agent?.name).toBe('FirstWorker');
         expect(startEvents[1].agent?.name).toBe('SecondWorker');
@@ -232,9 +212,7 @@ describe('Agent Events for Workers', () => {
     it('should pass complex parameters correctly to worker', async () => {
         // Test with complex parameters
         const tools = await parentAgent.getTools();
-        const workerTool = tools.find(tool =>
-            tool.definition.function.name.includes('TestWorker')
-        );
+        const workerTool = tools.find(tool => tool.definition.function.name.includes('TestWorker'));
 
         // Execute with multiple parameters
         await workerTool!.function({

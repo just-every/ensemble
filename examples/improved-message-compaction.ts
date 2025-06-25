@@ -20,8 +20,7 @@ async function demonstrateImprovedCompaction() {
     await history.add({
         type: 'message',
         role: 'system',
-        content:
-            'You are a helpful coding assistant specializing in TypeScript.',
+        content: 'You are a helpful coding assistant specializing in TypeScript.',
     });
 
     // Simulate a conversation about building a web app
@@ -31,8 +30,7 @@ async function demonstrateImprovedCompaction() {
     await history.add({
         type: 'message',
         role: 'user',
-        content:
-            'I want to build a web app with React and TypeScript. What files do I need?',
+        content: 'I want to build a web app with React and TypeScript. What files do I need?',
     });
 
     await history.add({
@@ -51,8 +49,7 @@ async function demonstrateImprovedCompaction() {
     await history.add({
         type: 'message',
         role: 'user',
-        content:
-            'IMPORTANT: The app must work offline and sync when online. Use IndexedDB for storage.',
+        content: 'IMPORTANT: The app must work offline and sync when online. Use IndexedDB for storage.',
     });
     history.pinMessage(history.count() - 1); // Pin the last message
 

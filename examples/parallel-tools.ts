@@ -30,9 +30,7 @@ const tools: ToolFunction[] = [
             await new Promise(resolve => setTimeout(resolve, 3000));
 
             const duration = Date.now() - startTime;
-            console.log(
-                `✅ Slow API call to ${endpoint} completed in ${duration}ms`
-            );
+            console.log(`✅ Slow API call to ${endpoint} completed in ${duration}ms`);
 
             return `Data from ${endpoint} (took ${duration}ms)`;
         },
@@ -92,9 +90,7 @@ const tools: ToolFunction[] = [
             await new Promise(resolve => setTimeout(resolve, 1500));
 
             const duration = Date.now() - startTime;
-            console.log(
-                `✅ Medium task ${taskName} completed in ${duration}ms`
-            );
+            console.log(`✅ Medium task ${taskName} completed in ${duration}ms`);
 
             return `Task ${taskName} result (took ${duration}ms)`;
         },
@@ -135,9 +131,7 @@ These should run in parallel.`,
 
                 case 'tool_start':
                     console.log('🚀 Starting parallel tool execution...');
-                    console.log(
-                        `   Tools to execute: ${event.tool_calls.length}`
-                    );
+                    console.log(`   Tools to execute: ${event.tool_calls.length}`);
                     event.tool_calls.forEach((call, i) => {
                         console.log(`   ${i + 1}. ${call.function.name}`);
                     });
@@ -147,12 +141,8 @@ These should run in parallel.`,
                 case 'tool_done': {
                     const totalDuration = Date.now() - overallStart;
                     console.log('\n--- Execution Complete ---');
-                    console.log(
-                        `\n⏱️  Total time for all tools: ${totalDuration}ms`
-                    );
-                    console.log(
-                        '   (Note: Tools ran in parallel, not sequentially)\n'
-                    );
+                    console.log(`\n⏱️  Total time for all tools: ${totalDuration}ms`);
+                    console.log('   (Note: Tools ran in parallel, not sequentially)\n');
 
                     if (event.result) {
                         console.log('📊 Results:', event.result);

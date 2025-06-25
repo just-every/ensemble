@@ -8,11 +8,7 @@ import { ToolParameter } from '../types/types.js';
  * Coerce a value to match the expected parameter type
  * Returns [coercedValue, error] tuple
  */
-export function coerceValue(
-    value: any,
-    paramSpec: ToolParameter,
-    paramName: string
-): [any, string | null] {
+export function coerceValue(value: any, paramSpec: ToolParameter, paramName: string): [any, string | null] {
     const expectedType = paramSpec.type || 'string';
 
     // Handle undefined/null
@@ -183,9 +179,7 @@ export function mapNamedToPositionalArgs(
     // Filter out unknown parameters
     Object.keys(namedArgs).forEach(key => {
         if (!paramNames.includes(key)) {
-            console.warn(
-                `Removing unknown parameter "${key}" for tool "${tool.definition.function.name}"`
-            );
+            console.warn(`Removing unknown parameter "${key}" for tool "${tool.definition.function.name}"`);
             delete namedArgs[key];
         }
     });
@@ -198,10 +192,7 @@ export function mapNamedToPositionalArgs(
         const paramSpec = paramSpecs[paramName] || { type: 'string' };
 
         // Skip empty values for optional params
-        if (
-            (value === undefined || value === '') &&
-            !requiredParams.includes(paramName)
-        ) {
+        if ((value === undefined || value === '') && !requiredParams.includes(paramName)) {
             positionalArgs.push(undefined);
             continue;
         }
@@ -214,20 +205,14 @@ export function mapNamedToPositionalArgs(
                 JSON.stringify({
                     error: {
                         param: paramName,
-                        expected:
-                            paramSpec.type +
-                            (paramSpec.items?.type
-                                ? `<${paramSpec.items.type}>`
-                                : ''),
+                        expected: paramSpec.type + (paramSpec.items?.type ? `<${paramSpec.items.type}>` : ''),
                         received: String(value),
                         message: error,
                     },
                 })
             );
         } else if (error) {
-            console.warn(
-                `Parameter coercion warning for ${paramName}: ${error}`
-            );
+            console.warn(`Parameter coercion warning for ${paramName}: ${error}`);
         }
 
         positionalArgs.push(coercedValue);

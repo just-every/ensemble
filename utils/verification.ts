@@ -63,10 +63,7 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
     };
 
     try {
-        const stream = ensembleRequest(
-            verificationMessages,
-            verifierWithSchema
-        );
+        const stream = ensembleRequest(verificationMessages, verifierWithSchema);
         let fullResponse = '';
 
         for await (const event of stream) {

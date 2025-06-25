@@ -20,9 +20,7 @@ export class GrokProvider extends OpenAIChat {
     ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
         if (Array.isArray(requestParams.tools)) {
             const index = requestParams.tools.findIndex(
-                t =>
-                    t.type === 'function' &&
-                    (t as any).function?.name === 'grok_web_search'
+                t => t.type === 'function' && (t as any).function?.name === 'grok_web_search'
             );
             if (index !== -1) {
                 requestParams.tools.splice(index, 1);

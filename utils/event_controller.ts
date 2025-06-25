@@ -59,10 +59,7 @@ class EventControllerImpl implements EventController {
             try {
                 await Promise.resolve(this.eventHandler(event));
             } catch (error) {
-                console.error(
-                    '[EventController] Error in event handler:',
-                    error
-                );
+                console.error('[EventController] Error in event handler:', error);
             }
         }
     }
@@ -94,11 +91,7 @@ export function setEventHandler(handler: EventHandler | null): void {
  * @param agent - Optional agent to add to the event
  * @param model - Optional model to use when exporting the agent
  */
-export async function emitEvent(
-    event: ProviderStreamEvent,
-    agent?: AgentDefinition,
-    model?: string
-): Promise<void> {
+export async function emitEvent(event: ProviderStreamEvent, agent?: AgentDefinition, model?: string): Promise<void> {
     let eventToEmit = event;
 
     // If agent is provided, add it to the event

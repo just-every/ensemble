@@ -40,10 +40,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            const result = await provider.createVoice(
-                'Hello world',
-                'eleven_multilingual_v2'
-            );
+            const result = await provider.createVoice('Hello world', 'eleven_multilingual_v2');
 
             expect(global.fetch).toHaveBeenCalledWith(
                 expect.stringContaining('/text-to-speech/'),
@@ -74,11 +71,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            const result = await provider.createVoice(
-                'Hello world',
-                'eleven_turbo_v2_5',
-                { stream: true }
-            );
+            const result = await provider.createVoice('Hello world', 'eleven_turbo_v2_5', { stream: true });
 
             expect(result).toBeInstanceOf(ReadableStream);
         });
@@ -134,38 +127,32 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            await expect(
-                provider.createVoice('Test', 'eleven_multilingual_v2')
-            ).rejects.toThrow('ElevenLabs API error: 400');
+            await expect(provider.createVoice('Test', 'eleven_multilingual_v2')).rejects.toThrow(
+                'ElevenLabs API error: 400'
+            );
         });
 
         it('should throw error when API key is missing', async () => {
             delete process.env.ELEVENLABS_API_KEY;
             const providerNoKey = new ElevenLabsProvider();
 
-            await expect(
-                providerNoKey.createVoice('Test', 'eleven_multilingual_v2')
-            ).rejects.toThrow('ElevenLabs API key is required');
+            await expect(providerNoKey.createVoice('Test', 'eleven_multilingual_v2')).rejects.toThrow(
+                'ElevenLabs API key is required'
+            );
         });
     });
 
     describe('unsupported methods', () => {
         it('should throw error for request method', async () => {
-            await expect(provider.request()).rejects.toThrow(
-                'ElevenLabs provider only supports voice generation'
-            );
+            await expect(provider.request()).rejects.toThrow('ElevenLabs provider only supports voice generation');
         });
 
         it('should throw error for embed method', async () => {
-            await expect(provider.embed()).rejects.toThrow(
-                'ElevenLabs provider does not support embeddings'
-            );
+            await expect(provider.embed()).rejects.toThrow('ElevenLabs provider does not support embeddings');
         });
 
         it('should throw error for image method', async () => {
-            await expect(provider.image()).rejects.toThrow(
-                'ElevenLabs provider does not support image generation'
-            );
+            await expect(provider.image()).rejects.toThrow('ElevenLabs provider does not support image generation');
         });
 
         it('should throw error for createResponseStream', async () => {
@@ -177,9 +164,7 @@ describe('ElevenLabsProvider', () => {
             expect(done).toBe(false);
 
             // Second next() should throw
-            await expect(generator.next()).rejects.toThrow(
-                'ElevenLabs provider only supports voice generation'
-            );
+            await expect(generator.next()).rejects.toThrow('ElevenLabs provider only supports voice generation');
         });
     });
 

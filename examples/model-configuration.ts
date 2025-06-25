@@ -44,21 +44,13 @@ setModelClassRandom('reasoning', false);
 
 // Example 6: Set specific models for a class
 // Use only fast models for the mini class
-setModelClassModels(
-    'mini',
-    ['gpt-4.1-nano', 'claude-3-5-haiku-latest', 'gemini-2.0-flash-lite'],
-    true
-); // Keep random selection
+setModelClassModels('mini', ['gpt-4.1-nano', 'claude-3-5-haiku-latest', 'gemini-2.0-flash-lite'], true); // Keep random selection
 
 // Example 7: Bulk update multiple classes
 updateModelClasses({
     // Use only the best models for reasoning
     reasoning: {
-        models: [
-            'o3-high',
-            'claude-opus-4-20250514-max',
-            'gemini-2.5-pro-preview-06-05',
-        ],
+        models: ['o3-high', 'claude-opus-4-20250514-max', 'gemini-2.5-pro-preview-06-05'],
         random: true,
     },
     // Use fastest models for summaries
@@ -72,9 +64,7 @@ updateModelClasses({
 console.log('\nAll model class configurations:');
 const allClasses = getAllModelClasses();
 for (const [className, config] of Object.entries(allClasses)) {
-    console.log(
-        `${className}: ${config.models.length} models, random: ${config.random}`
-    );
+    console.log(`${className}: ${config.models.length} models, random: ${config.random}`);
 }
 
 // Example 9: Use with an agent
@@ -113,11 +103,7 @@ if (process.env.NODE_ENV === 'production') {
     // Experiment with newer models in development
     updateModelClasses({
         standard: {
-            models: [
-                'gpt-4.5-preview',
-                'claude-sonnet-4-20250514',
-                'gemini-2.5-pro-preview-06-05',
-            ],
+            models: ['gpt-4.5-preview', 'claude-sonnet-4-20250514', 'gemini-2.5-pro-preview-06-05'],
             random: true, // Test different models
         },
     });

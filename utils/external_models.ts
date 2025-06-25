@@ -3,12 +3,7 @@
  * Allows external code to register custom model providers without modifying ensemble's core.
  */
 
-import {
-    ModelEntry,
-    ModelProvider,
-    ModelProviderID,
-    ModelClass,
-} from '../types/types.js';
+import { ModelEntry, ModelProvider, ModelProviderID, ModelClass } from '../types/types.js';
 
 // Map of external models that have been registered
 const externalModels = new Map<string, ModelEntry>();
@@ -46,10 +41,7 @@ const modelClassOverrides = new Map<string, Partial<ModelClass>>();
  * }, myProvider);
  * ```
  */
-export function registerExternalModel(
-    model: ModelEntry,
-    provider: ModelProvider
-): void {
+export function registerExternalModel(model: ModelEntry, provider: ModelProvider): void {
     const modelId = model.id;
 
     // Store the model entry
@@ -60,9 +52,7 @@ export function registerExternalModel(
         externalProviders.set(model.provider, provider);
     }
 
-    console.log(
-        `[Ensemble] Registered external model: ${modelId} with provider: ${model.provider}`
-    );
+    console.log(`[Ensemble] Registered external model: ${modelId} with provider: ${model.provider}`);
 }
 
 /**
@@ -78,9 +68,7 @@ export function getExternalModel(modelId: string): ModelEntry | undefined {
 /**
  * Get an external provider by ID
  */
-export function getExternalProvider(
-    providerId: ModelProviderID
-): ModelProvider | undefined {
+export function getExternalProvider(providerId: ModelProviderID): ModelProvider | undefined {
     return externalProviders.get(providerId);
 }
 
@@ -105,14 +93,9 @@ export function clearExternalRegistrations(): void {
  * @param className The name of the model class to override (e.g., 'code', 'standard')
  * @param modelClass The new model class configuration (can be partial)
  */
-export function overrideModelClass(
-    className: string,
-    modelClass: Partial<ModelClass>
-): void {
+export function overrideModelClass(className: string, modelClass: Partial<ModelClass>): void {
     modelClassOverrides.set(className, modelClass);
-    console.log(
-        `[Ensemble] Overrode model class: ${className} with models: ${modelClass.models?.join(', ')}`
-    );
+    console.log(`[Ensemble] Overrode model class: ${className} with models: ${modelClass.models?.join(', ')}`);
 }
 
 /**
@@ -120,8 +103,6 @@ export function overrideModelClass(
  * @param className The name of the model class
  * @returns The override configuration or undefined
  */
-export function getModelClassOverride(
-    className: string
-): Partial<ModelClass> | undefined {
+export function getModelClassOverride(className: string): Partial<ModelClass> | undefined {
     return modelClassOverrides.get(className);
 }

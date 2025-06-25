@@ -60,10 +60,7 @@ function generateImageHash(imageData: string): string {
  * @param modelId - ID of the model being used (for logging)
  * @returns The image description
  */
-export async function convertImageToText(
-    imageData: string,
-    modelId: string
-): Promise<string> {
+export async function convertImageToText(imageData: string, modelId: string): Promise<string> {
     // Skip if not an image
     if (!imageData.startsWith('data:image/')) {
         return imageData;
@@ -121,20 +118,14 @@ export async function convertImageToText(
  * @param modelId - ID of the model being used
  * @returns The image description or original image data if model supports images
  */
-export async function convertImageToTextIfNeeded(
-    imageData: string,
-    modelId?: string
-): Promise<string | boolean> {
+export async function convertImageToTextIfNeeded(imageData: string, modelId?: string): Promise<string | boolean> {
     // Skip if not an image
     if (!imageData.startsWith('data:image/')) {
         return false;
     }
 
     // Check if model supports image input (if modelId provided)
-    if (
-        modelId &&
-        findModel(modelId)?.features?.input_modality?.includes('image')
-    ) {
+    if (modelId && findModel(modelId)?.features?.input_modality?.includes('image')) {
         // Model supports images, return original
         return false;
     }

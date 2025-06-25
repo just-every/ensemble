@@ -5,12 +5,7 @@
  * whenever token usage is recorded by the costTracker.
  */
 
-import {
-    ensembleRequest,
-    setEventHandler,
-    CostUpdateEvent,
-    ProviderStreamEvent,
-} from '@just-every/ensemble';
+import { ensembleRequest, setEventHandler, CostUpdateEvent, ProviderStreamEvent } from '@just-every/ensemble';
 
 async function main() {
     console.log('=== Automatic Cost Event Tracking Example ===\n');
@@ -34,13 +29,9 @@ async function main() {
             console.log(`  Output tokens: ${costEvent.usage.output_tokens}`);
             console.log(`  Total tokens: ${costEvent.usage.total_tokens}`);
             if (costEvent.usage.cached_tokens) {
-                console.log(
-                    `  Cached tokens: ${costEvent.usage.cached_tokens}`
-                );
+                console.log(`  Cached tokens: ${costEvent.usage.cached_tokens}`);
             }
-            console.log(
-                `  Running totals - Input: ${totalInputTokens}, Output: ${totalOutputTokens}\n`
-            );
+            console.log(`  Running totals - Input: ${totalInputTokens}, Output: ${totalOutputTokens}\n`);
         }
     });
 
@@ -115,10 +106,7 @@ async function main() {
 // Advanced example: Building a cost monitoring service
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 class CostMonitor {
-    private costs: Map<
-        string,
-        { input: number; output: number; count: number }
-    > = new Map();
+    private costs: Map<string, { input: number; output: number; count: number }> = new Map();
 
     constructor() {
         // Set up event handler in constructor
@@ -158,9 +146,7 @@ class CostMonitor {
                 totalOutputTokens: stats.output,
                 totalTokens: stats.input + stats.output,
                 requestCount: stats.count,
-                averageTokensPerRequest: Math.round(
-                    (stats.input + stats.output) / stats.count
-                ),
+                averageTokensPerRequest: Math.round((stats.input + stats.output) / stats.count),
             };
         }
 

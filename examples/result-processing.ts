@@ -48,8 +48,7 @@ const tools: ToolFunction[] = [
             type: 'function',
             function: {
                 name: 'read_source',
-                description:
-                    'Simulates reading source code (skip summarization)',
+                description: 'Simulates reading source code (skip summarization)',
                 parameters: {
                     type: 'object',
                     properties: {
@@ -66,9 +65,7 @@ const tools: ToolFunction[] = [
                 code += `${i.toString().padStart(3, ' ')}: function example${i}() { return "This is line ${i} of the source code"; }\n`;
             }
 
-            console.log(
-                `\n📄 Generated ${lines} lines of code (${code.length} chars)`
-            );
+            console.log(`\n📄 Generated ${lines} lines of code (${code.length} chars)`);
             return code;
         },
     },
@@ -178,16 +175,12 @@ async function demonstrateProcessing() {
     }
 
     const processed2 = await processToolResult(toolCall2, sourceCode);
-    console.log(
-        `   Result ends with: ...${processed2.substring(processed2.length - 100)}`
-    );
+    console.log(`   Result ends with: ...${processed2.substring(processed2.length - 100)}`);
 }
 
 async function main() {
     console.log('=== RESULT PROCESSING DEMONSTRATION ===\n');
-    console.log(
-        `Default max length before processing: ${MAX_RESULT_LENGTH} characters`
-    );
+    console.log(`Default max length before processing: ${MAX_RESULT_LENGTH} characters`);
     console.log(
         '\nTools configured to skip summarization:',
         Array.from(Object.entries(TOOL_CONFIGS))
@@ -229,22 +222,16 @@ async function main() {
                         console.log('\n\n📊 Processed Results:');
                         event.results.forEach((result, i) => {
                             const lines = result.output.split('\n');
-                            console.log(
-                                `\n${i + 1}. Tool output (${result.output.length} chars):`
-                            );
+                            console.log(`\n${i + 1}. Tool output (${result.output.length} chars):`);
 
                             if (result.output.startsWith('data:image/')) {
-                                console.log(
-                                    '   [Base64 image data - returned unchanged]'
-                                );
+                                console.log('   [Base64 image data - returned unchanged]');
                             } else if (lines.length > 5) {
                                 console.log('   First 3 lines:');
                                 lines
                                     .slice(0, 3)
                                     .forEach(line =>
-                                        console.log(
-                                            `   ${line.substring(0, 80)}${line.length > 80 ? '...' : ''}`
-                                        )
+                                        console.log(`   ${line.substring(0, 80)}${line.length > 80 ? '...' : ''}`)
                                     );
                                 console.log('   ...');
                                 console.log('   Last line:');
@@ -253,9 +240,7 @@ async function main() {
                                 );
                             } else {
                                 lines.forEach(line =>
-                                    console.log(
-                                        `   ${line.substring(0, 100)}${line.length > 100 ? '...' : ''}`
-                                    )
+                                    console.log(`   ${line.substring(0, 100)}${line.length > 100 ? '...' : ''}`)
                                 );
                             }
                         });
@@ -270,12 +255,8 @@ async function main() {
 
         console.log('\n' + '='.repeat(60));
         console.log('\nKey takeaways:');
-        console.log(
-            '- Long general outputs are automatically summarized using LLM'
-        );
-        console.log(
-            '- Code and specific tools are just truncated to preserve accuracy'
-        );
+        console.log('- Long general outputs are automatically summarized using LLM');
+        console.log('- Code and specific tools are just truncated to preserve accuracy');
         console.log('- Images and binary data pass through unchanged');
         console.log('- Custom configurations can be added for any tool');
     } catch (error) {

@@ -14,10 +14,7 @@ describe('Empty History Thread Handling', () => {
 
         try {
             for await (const event of ensembleRequest([], agent)) {
-                if (
-                    event.type === 'message_delta' ||
-                    event.type === 'message_complete'
-                ) {
+                if (event.type === 'message_delta' || event.type === 'message_complete') {
                     responseReceived = true;
                 } else if (event.type === 'error') {
                     errorOccurred = true;
@@ -43,9 +40,7 @@ describe('Empty History Thread Handling', () => {
         // const messages: any[] = [];
 
         // Intercept the messages by using a custom test provider
-        const { testProviderConfig } = await import(
-            '../model_providers/test_provider.js'
-        );
+        const { testProviderConfig } = await import('../model_providers/test_provider.js');
         testProviderConfig.fixedResponse = 'Hello!';
 
         for await (const event of ensembleRequest([], agent)) {
@@ -74,10 +69,7 @@ describe('Empty History Thread Handling', () => {
             let handled = false;
             try {
                 for await (const event of ensembleRequest([], agent)) {
-                    if (
-                        event.type === 'message_delta' ||
-                        event.type === 'message_complete'
-                    ) {
+                    if (event.type === 'message_delta' || event.type === 'message_complete') {
                         handled = true;
                         break;
                     }

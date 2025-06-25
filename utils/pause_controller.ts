@@ -28,10 +28,7 @@ export interface PauseController {
      * @param checkInterval - How often to check pause status (ms)
      * @param abortSignal - Optional abort signal to cancel waiting
      */
-    waitWhilePaused(
-        checkInterval?: number,
-        abortSignal?: AbortSignal
-    ): Promise<void>;
+    waitWhilePaused(checkInterval?: number, abortSignal?: AbortSignal): Promise<void>;
 
     /**
      * Subscribe to pause state changes
@@ -69,10 +66,7 @@ class PauseControllerImpl extends EventEmitter implements PauseController {
         }
     }
 
-    async waitWhilePaused(
-        checkInterval = 100,
-        abortSignal?: AbortSignal
-    ): Promise<void> {
+    async waitWhilePaused(checkInterval = 100, abortSignal?: AbortSignal): Promise<void> {
         while (this._isPaused && !abortSignal?.aborted) {
             await new Promise(resolve => setTimeout(resolve, checkInterval));
         }
@@ -121,9 +115,6 @@ export function resume(): void {
 /**
  * Convenience function to wait while paused
  */
-export async function waitWhilePaused(
-    checkInterval?: number,
-    abortSignal?: AbortSignal
-): Promise<void> {
+export async function waitWhilePaused(checkInterval?: number, abortSignal?: AbortSignal): Promise<void> {
     return getPauseController().waitWhilePaused(checkInterval, abortSignal);
 }

@@ -6,19 +6,24 @@
  * where audio is captured on the client and streamed via WebSocket.
  */
 
+import dotenv from 'dotenv';
+import { join } from 'path';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { Readable } from 'stream';
-import { ensembleListen, setGlobalEventHandler } from '../dist/index.js';
+import { ensembleListen } from '../dist/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Load .env from root directory
+dotenv.config({ path: join(__dirname, '..', '.env') });
+
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.TRANSCRIPTION_PORT || process.env.PORT || 3003;
 
 // Serve static files (including the client HTML)
 app.use(express.static(__dirname));
@@ -36,22 +41,6 @@ const activeConnections = new Map<
         ws?: any; // WebSocket connection
     }
 >();
-
-// Set up global event handler to forward cost_update events to clients
-setGlobalEventHandler(event => {
-    if (event.type === 'cost_update') {
-        // Forward cost_update events to all active connections
-        activeConnections.forEach((connInfo, connectionId) => {
-            if (connInfo.ws && connInfo.ws.readyState === connInfo.ws.OPEN) {
-                connInfo.ws.send(JSON.stringify(event));
-                console.log(
-                    `💰 [${connectionId}] Forwarded cost update:`,
-                    event.usage
-                );
-            }
-        });
-    }
-});
 
 // Handle WebSocket connections
 wss.on('connection', ws => {
@@ -85,9 +74,7 @@ wss.on('connection', ws => {
             try {
                 const message = JSON.parse(data.toString());
                 if (message.type === 'start') {
-                    console.log(
-                        `📢 Starting transcription for ${connectionId}`
-                    );
+                    console.log(`📢 Starting transcription for ${connectionId}`);
                     startTranscription(connectionId, ws);
                 }
             } catch (err) {
@@ -135,9 +122,7 @@ async function startTranscription(connectionId: string, ws: any) {
         for await (const event of ensembleListen(
             connInfo.audioStream,
             {
-                model: 'gemini-live-2.5-flash-preview',
-                instructions:
-                    'Transcribe speech accurately with proper punctuation and grammar corrections.',
+                model: process.env.LIVE_MODEL || 'gemini-live-2.5-flash-preview',
             },
             {
                 audioFormat: {
@@ -158,32 +143,21 @@ async function startTranscription(connectionId: string, ws: any) {
                 // Log significant events
                 switch (event.type) {
                     case 'transcription_start':
-                        console.log(
-                            `🎯 Transcription started for ${connectionId}`
-                        );
+                        console.log(`🎯 Transcription started for ${connectionId}`);
                         break;
                     case 'transcription_delta':
-                        console.log(
-                            `📝 [${connectionId}] Delta: ${event.delta}`
-                        );
+                        console.log(`📝 [${connectionId}] Delta: ${event.delta}`);
                         break;
                     case 'transcription_preview':
-                        console.log(
-                            `🎤 [${connectionId}] User said: "${event.text}"`
-                        );
+                        console.log(`🎤 [${connectionId}] User said: "${event.text}"`);
                         break;
                     case 'transcription_turn':
-                        console.log(
-                            `🔄 [${connectionId}] Turn complete: "${event.text}"`
-                        );
+                        console.log(`🔄 [${connectionId}] Turn complete: "${event.text}"`);
                         break;
                     // Note: cost_update events are emitted globally by costTracker,
                     // not by ensembleListen directly
                     case 'error':
-                        console.error(
-                            `❌ [${connectionId}] Error:`,
-                            event.error
-                        );
+                        console.error(`❌ [${connectionId}] Error:`, event.error);
                         break;
                 }
             }
@@ -194,10 +168,7 @@ async function startTranscription(connectionId: string, ws: any) {
             ws.send(
                 JSON.stringify({
                     type: 'error',
-                    error:
-                        error instanceof Error
-                            ? error.message
-                            : 'Transcription failed',
+                    error: error instanceof Error ? error.message : 'Transcription failed',
                 })
             );
         }
@@ -210,10 +181,7 @@ app.get('/health', (req, res) => {
         status: 'ok',
         message: 'Transcription server running',
         activeConnections: activeConnections.size,
-        apiKey:
-            process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
-                ? 'configured'
-                : 'missing',
+        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY ? 'configured' : 'missing',
     });
 });
 

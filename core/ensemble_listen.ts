@@ -4,11 +4,7 @@ import type {
     TranscriptionAudioSource,
     TranscriptionEvent,
 } from '../types/types.js';
-import {
-    getModelFromAgent,
-    getModelProvider,
-    type ModelProvider,
-} from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider, type ModelProvider } from '../model_providers/model_provider.js';
 
 // Re-export for convenience
 export type { TranscriptionOpts, TranscriptionAudioSource, TranscriptionEvent };
@@ -16,20 +12,14 @@ export type { TranscriptionOpts, TranscriptionAudioSource, TranscriptionEvent };
 /**
  * Normalize various audio source types to a ReadableStream
  */
-function normalizeAudioSource(
-    source: TranscriptionAudioSource
-): ReadableStream<Uint8Array> {
+function normalizeAudioSource(source: TranscriptionAudioSource): ReadableStream<Uint8Array> {
     // Already a ReadableStream
     if (source instanceof ReadableStream) {
         return source;
     }
 
     // AsyncIterable (including async generators)
-    if (
-        typeof source === 'object' &&
-        source !== null &&
-        Symbol.asyncIterator in source
-    ) {
+    if (typeof source === 'object' && source !== null && Symbol.asyncIterator in source) {
         return new ReadableStream({
             async start(controller) {
                 try {
@@ -52,8 +42,7 @@ function normalizeAudioSource(
 
     // ArrayBuffer or Uint8Array
     if (source instanceof ArrayBuffer || source instanceof Uint8Array) {
-        const data =
-            source instanceof ArrayBuffer ? new Uint8Array(source) : source;
+        const data = source instanceof ArrayBuffer ? new Uint8Array(source) : source;
         return new ReadableStream({
             start(controller) {
                 controller.enqueue(data);
@@ -149,9 +138,7 @@ export async function* ensembleListen(
         const errorEvent: TranscriptionEvent = {
             type: 'error',
             timestamp: new Date().toISOString(),
-            error: `Failed to normalize audio source: ${
-                error instanceof Error ? error.message : 'Unknown error'
-            }`,
+            error: `Failed to normalize audio source: ${error instanceof Error ? error.message : 'Unknown error'}`,
         };
         yield errorEvent;
         return;
@@ -165,12 +152,7 @@ export async function* ensembleListen(
 
     try {
         // Pass audio stream and options to provider
-        const transcriptionGenerator = provider.createTranscription(
-            audioStream,
-            agent,
-            model,
-            streamOptions
-        );
+        const transcriptionGenerator = provider.createTranscription(audioStream, agent, model, streamOptions);
 
         for await (const event of transcriptionGenerator) {
             // Track full transcript for complete event
@@ -218,8 +200,7 @@ export async function* ensembleListen(
         const errorEvent: TranscriptionEvent = {
             type: 'error',
             timestamp: new Date().toISOString(),
-            error:
-                error instanceof Error ? error.message : 'Transcription failed',
+            error: error instanceof Error ? error.message : 'Transcription failed',
         };
         yield errorEvent;
     }

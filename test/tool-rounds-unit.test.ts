@@ -5,10 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Agent, ensembleRequest, createToolFunction } from '../index.js';
 import type { ResponseInput } from '../types/types.js';
-import {
-    testProviderConfig,
-    resetTestProviderConfig,
-} from '../model_providers/test_provider.js';
+import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
 
 describe('Tool Rounds Infinite Loop Prevention', () => {
     beforeEach(() => {

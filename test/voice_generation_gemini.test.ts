@@ -113,14 +113,10 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock an error response
-        const mockGenAI = vi.mocked(
-            (provider as any).client.models.generateContent
-        );
+        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
         mockGenAI.mockRejectedValueOnce(new Error('API Error'));
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow(
-            'API Error'
-        );
+        await expect(provider.createVoice(text, model)).rejects.toThrow('API Error');
     });
 
     test('should handle empty response', async () => {
@@ -128,14 +124,10 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock empty response
-        const mockGenAI = vi.mocked(
-            (provider as any).client.models.generateContent
-        );
+        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
         mockGenAI.mockResolvedValueOnce({ candidates: [] });
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow(
-            'No audio generated from Gemini TTS'
-        );
+        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio generated from Gemini TTS');
     });
 
     test('should handle response without audio parts', async () => {
@@ -143,9 +135,7 @@ describe('Gemini Voice Generation', () => {
         const model = 'gemini-2.5-flash-preview-tts';
 
         // Mock response without audio parts
-        const mockGenAI = vi.mocked(
-            (provider as any).client.models.generateContent
-        );
+        const mockGenAI = vi.mocked((provider as any).client.models.generateContent);
         mockGenAI.mockResolvedValueOnce({
             candidates: [
                 {
@@ -160,8 +150,6 @@ describe('Gemini Voice Generation', () => {
             ],
         });
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow(
-            'No audio data found in Gemini TTS response'
-        );
+        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data found in Gemini TTS response');
     });
 });

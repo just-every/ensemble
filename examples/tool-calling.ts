@@ -18,8 +18,7 @@ const tools: ToolFunction[] = [
                     properties: {
                         location: {
                             type: 'string',
-                            description:
-                                'City and state, e.g. San Francisco, CA',
+                            description: 'City and state, e.g. San Francisco, CA',
                         },
                         unit: {
                             type: 'string',
@@ -35,8 +34,7 @@ const tools: ToolFunction[] = [
             // Simulate weather API call
             const temp = Math.floor(Math.random() * 30) + 50;
             const conditions = ['sunny', 'cloudy', 'rainy', 'partly cloudy'];
-            const condition =
-                conditions[Math.floor(Math.random() * conditions.length)];
+            const condition = conditions[Math.floor(Math.random() * conditions.length)];
 
             return JSON.stringify({
                 location,
@@ -82,8 +80,7 @@ async function main() {
         {
             type: 'message' as const,
             role: 'user' as const,
-            content:
-                "What's the weather like in New York? Also, what's 25 * 4?",
+            content: "What's the weather like in New York? Also, what's 25 * 4?",
         },
     ];
 

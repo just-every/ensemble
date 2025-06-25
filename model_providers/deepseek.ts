@@ -36,16 +36,10 @@ function formatToolsForPrompt(tools: OpenAITool[]): string {
             }
             const func = tool.function;
             // Safely access parameters and properties
-            const parameters =
-                func.parameters && typeof func.parameters === 'object'
-                    ? func.parameters
-                    : {};
-            const properties =
-                'properties' in parameters ? parameters.properties : {};
+            const parameters = func.parameters && typeof func.parameters === 'object' ? func.parameters : {};
+            const properties = 'properties' in parameters ? parameters.properties : {};
             const requiredParams =
-                'required' in parameters && Array.isArray(parameters.required)
-                    ? parameters.required
-                    : [];
+                'required' in parameters && Array.isArray(parameters.required) ? parameters.required : [];
 
             const paramsJson = JSON.stringify(properties, null, 2);
 
@@ -64,11 +58,7 @@ function formatToolsForPrompt(tools: OpenAITool[]): string {
 export class DeepSeekProvider extends OpenAIChat {
     constructor() {
         // Call the parent constructor with provider name, API key, and base URL
-        super(
-            'deepseek',
-            process.env.DEEPSEEK_API_KEY,
-            'https://api.deepseek.com/v1'
-        );
+        super('deepseek', process.env.DEEPSEEK_API_KEY, 'https://api.deepseek.com/v1');
     }
 
     /**
@@ -114,12 +104,9 @@ export class DeepSeekProvider extends OpenAIChat {
                             if (toolCall.type === 'function') {
                                 // Ensure arguments are stringified if they aren't already
                                 const args =
-                                    typeof toolCall.function.arguments ===
-                                    'string'
+                                    typeof toolCall.function.arguments === 'string'
                                         ? toolCall.function.arguments
-                                        : JSON.stringify(
-                                              toolCall.function.arguments
-                                          );
+                                        : JSON.stringify(toolCall.function.arguments);
                                 return `Called function '${toolCall.function.name}' with arguments: ${args}`;
                             }
                             return `(Unsupported tool call type: ${toolCall.type})`;
@@ -134,12 +121,8 @@ export class DeepSeekProvider extends OpenAIChat {
                 // Transform 'tool' message into a 'user' message
                 else if (message.role === 'tool') {
                     const contentString =
-                        typeof message.content === 'string'
-                            ? message.content
-                            : JSON.stringify(message.content);
-                    const toolCallIdInfo = message.tool_call_id
-                        ? ` for call ID ${message.tool_call_id}`
-                        : '';
+                        typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+                    const toolCallIdInfo = message.tool_call_id ? ` for call ID ${message.tool_call_id}` : '';
                     // Replace the original tool message with a user message containing the result
                     message = {
                         role: 'user',
@@ -156,10 +139,7 @@ export class DeepSeekProvider extends OpenAIChat {
             });
 
             // Ensure the last message is 'user'
-            if (
-                messages.length === 0 ||
-                messages[messages.length - 1].role !== 'user'
-            ) {
+            if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
                 // Handle cases where the list is empty or ends with non-user
                 const aiName = process.env.AI_NAME || 'Magi'; // Use environment variable or default
                 messages.push({
@@ -180,10 +160,7 @@ export class DeepSeekProvider extends OpenAIChat {
                         try {
                             systemContents.push(JSON.stringify(msg.content));
                         } catch (e) {
-                            console.error(
-                                `(${this.provider}) Failed to stringify system message content:`,
-                                e
-                            );
+                            console.error(`(${this.provider}) Failed to stringify system message content:`, e);
                         }
                     }
                 } else {
@@ -193,25 +170,18 @@ export class DeepSeekProvider extends OpenAIChat {
             });
 
             // Merge consecutive messages of the same role
-            finalMessages = finalMessages.reduce(
-                (acc: MessageParam[], currentMessage) => {
-                    const lastMessage =
-                        acc.length > 0 ? acc[acc.length - 1] : null;
+            finalMessages = finalMessages.reduce((acc: MessageParam[], currentMessage) => {
+                const lastMessage = acc.length > 0 ? acc[acc.length - 1] : null;
 
-                    // Check if the last message exists and has the same role as the current one.
-                    if (
-                        lastMessage &&
-                        lastMessage.role === currentMessage.role
-                    ) {
-                        lastMessage.content = `${lastMessage.content ?? ''}\n\n${currentMessage.content ?? ''}`;
-                    } else {
-                        acc.push({ ...currentMessage });
-                    }
+                // Check if the last message exists and has the same role as the current one.
+                if (lastMessage && lastMessage.role === currentMessage.role) {
+                    lastMessage.content = `${lastMessage.content ?? ''}\n\n${currentMessage.content ?? ''}`;
+                } else {
+                    acc.push({ ...currentMessage });
+                }
 
-                    return acc;
-                },
-                []
-            );
+                return acc;
+            }, []);
 
             if (systemContents.length > 0) {
                 // Add the consolidated system message at the start

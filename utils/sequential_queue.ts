@@ -115,9 +115,6 @@ export const sequentialQueue = new SequentialQueue();
 /**
  * Helper function to run a function sequentially for an agent
  */
-export async function runSequential<T>(
-    agentId: string,
-    fn: () => Promise<T>
-): Promise<T> {
+export async function runSequential<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
     return sequentialQueue.runSequential(agentId, fn);
 }

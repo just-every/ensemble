@@ -53,9 +53,7 @@ describe('Message Sequence Fix for Tool Calls', () => {
         const messages = await history.getMessages();
 
         // Find the function call
-        const functionCallIndex = messages.findIndex(
-            m => m.type === 'function_call' && m.call_id === 'call_123'
-        );
+        const functionCallIndex = messages.findIndex(m => m.type === 'function_call' && m.call_id === 'call_123');
 
         expect(functionCallIndex).toBeGreaterThan(-1);
 
@@ -85,15 +83,9 @@ describe('Message Sequence Fix for Tool Calls', () => {
         expect(messages.length).toBe(1);
         expect(messages[0].type).toBe('message');
         expect((messages[0] as ResponseInputMessage).role).toBe('user');
-        expect((messages[0] as ResponseInputMessage).content).toContain(
-            'Tool result'
-        );
-        expect((messages[0] as ResponseInputMessage).content).toContain(
-            'some_tool'
-        );
-        expect((messages[0] as ResponseInputMessage).content).toContain(
-            'Some result'
-        );
+        expect((messages[0] as ResponseInputMessage).content).toContain('Tool result');
+        expect((messages[0] as ResponseInputMessage).content).toContain('some_tool');
+        expect((messages[0] as ResponseInputMessage).content).toContain('Some result');
     });
 
     it('should create error output for function calls without results', async () => {
@@ -169,16 +161,12 @@ describe('Message Sequence Fix for Tool Calls', () => {
         const messages = await history.getMessages();
 
         // Find first function call and verify its output follows immediately
-        const call1Index = messages.findIndex(
-            m => m.type === 'function_call' && m.call_id === 'call_1'
-        );
+        const call1Index = messages.findIndex(m => m.type === 'function_call' && m.call_id === 'call_1');
         expect(messages[call1Index + 1].type).toBe('function_call_output');
         expect(messages[call1Index + 1].call_id).toBe('call_1');
 
         // Find second function call and verify its output follows immediately
-        const call2Index = messages.findIndex(
-            m => m.type === 'function_call' && m.call_id === 'call_2'
-        );
+        const call2Index = messages.findIndex(m => m.type === 'function_call' && m.call_id === 'call_2');
         expect(messages[call2Index + 1].type).toBe('function_call_output');
         expect(messages[call2Index + 1].call_id).toBe('call_2');
     });

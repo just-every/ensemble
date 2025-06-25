@@ -6,13 +6,7 @@
  * and response patterns without needing real API calls.
  */
 
-import {
-    ResponseInput,
-    ProviderStreamEvent,
-    ToolCall,
-    ResponseInputItem,
-    AgentDefinition,
-} from '../types/types.js';
+import { ResponseInput, ProviderStreamEvent, ToolCall, ResponseInputItem, AgentDefinition } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
@@ -122,14 +116,10 @@ export class TestProvider extends BaseModelProvider {
         model: string,
         agent: AgentDefinition
     ): AsyncGenerator<ProviderStreamEvent> {
-        console.log(
-            `[TestProvider] Creating response stream for model: ${model}`
-        );
+        console.log(`[TestProvider] Creating response stream for model: ${model}`);
 
         // Record the input messages for cost tracking
-        const lastUserMessage = messages
-            .filter(m => 'role' in m && m.role === 'user')
-            .pop() as ResponseInputItem;
+        const lastUserMessage = messages.filter(m => 'role' in m && m.role === 'user').pop() as ResponseInputItem;
 
         const userMessageContent =
             lastUserMessage && 'content' in lastUserMessage
@@ -139,8 +129,7 @@ export class TestProvider extends BaseModelProvider {
                 : '';
 
         const inputTokenCount =
-            this.config.tokenUsage?.inputTokens ||
-            Math.max(50, Math.ceil(userMessageContent.length / 4));
+            this.config.tokenUsage?.inputTokens || Math.max(50, Math.ceil(userMessageContent.length / 4));
 
         // Generate a response based on config
         let response: string;
@@ -160,9 +149,7 @@ export class TestProvider extends BaseModelProvider {
         if (this.config.shouldError) {
             yield {
                 type: 'error',
-                error:
-                    this.config.errorMessage ||
-                    'Simulated error from test provider',
+                error: this.config.errorMessage || 'Simulated error from test provider',
             };
             return; // End the generator
         }
@@ -207,10 +194,7 @@ export class TestProvider extends BaseModelProvider {
                 if (toolArray.length > 0) {
                     // Use execute_command as a well-known tool
                     const availableTool = toolArray.find(tool =>
-                        this.config.toolName
-                            ? tool.definition.function.name ===
-                              this.config.toolName
-                            : true
+                        this.config.toolName ? tool.definition.function.name === this.config.toolName : true
                     );
 
                     if (availableTool) {
@@ -270,9 +254,7 @@ export class TestProvider extends BaseModelProvider {
         };
 
         // Emit usage/cost event
-        const outputTokenCount =
-            this.config.tokenUsage?.outputTokens ||
-            Math.ceil(response.length / 4);
+        const outputTokenCount = this.config.tokenUsage?.outputTokens || Math.ceil(response.length / 4);
         yield {
             type: 'cost_update',
             usage: {
@@ -301,15 +283,9 @@ export class TestProvider extends BaseModelProvider {
             return "Hello! I'm a test AI model. How can I help you today?";
         } else if (lowercaseInput.includes('help')) {
             return "I'm here to help! What do you need assistance with?";
-        } else if (
-            lowercaseInput.includes('error') ||
-            lowercaseInput.includes('problem')
-        ) {
+        } else if (lowercaseInput.includes('error') || lowercaseInput.includes('problem')) {
             return "I understand you're experiencing an issue. Let me help troubleshoot the problem.";
-        } else if (
-            lowercaseInput.includes('json') ||
-            lowercaseInput.includes('person')
-        ) {
+        } else if (lowercaseInput.includes('json') || lowercaseInput.includes('person')) {
             return '{"name": "John Doe", "age": 30}';
         } else if (lowercaseInput.includes('test')) {
             return 'This is a test response. The test provider is working correctly!';
@@ -329,11 +305,7 @@ export class TestProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(
-        input: string | string[],
-        model: string,
-        opts?: any
-    ): Promise<number[] | number[][]> {
+    async createEmbedding(input: string | string[], model: string, opts?: any): Promise<number[] | number[][]> {
         // Simulate embedding generation with deterministic values based on input
         const generateVector = (text: string): number[] => {
             const dimension = opts?.dimension || 384; // Default dimension

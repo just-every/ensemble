@@ -37,11 +37,7 @@ export async function appendMessageWithImage(
               read: () => string;
               write: (value: string) => any;
           },
-    addImagesToInput: (
-        input: any[],
-        images: Record<string, string>,
-        source: string
-    ) => Promise<any[]>,
+    addImagesToInput: (input: any[], images: Record<string, string>, source: string) => Promise<any[]>,
     source?: string
 ): Promise<any> {
     const content =
@@ -63,10 +59,7 @@ export async function appendMessageWithImage(
     for (const [image_id, imageData] of Object.entries(extracted.images)) {
         const imageToText = await convertImageToTextIfNeeded(imageData, model);
         if (imageToText && typeof imageToText === 'string') {
-            extracted.replaceContent.replaceAll(
-                `[image #${image_id}]`,
-                `[image #${image_id}: ${imageToText}]`
-            );
+            extracted.replaceContent.replaceAll(`[image #${image_id}]`, `[image #${image_id}: ${imageToText}]`);
             imagesConverted = true;
         }
     }
@@ -82,11 +75,7 @@ export async function appendMessageWithImage(
 
     if (!imagesConverted) {
         // Process the images and wait for the result
-        input = await addImagesToInput(
-            input,
-            extracted.images,
-            source || `${message.role} message`
-        );
+        input = await addImagesToInput(input, extracted.images, source || `${message.role} message`);
     }
 
     return input;
@@ -154,9 +143,7 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
  * @param imageData - Base64 encoded image data (with data URL prefix)
  * @returns Array of base64 image strings, split into sections if needed
  */
-export async function resizeAndSplitForOpenAI(
-    imageData: string
-): Promise<string[]> {
+export async function resizeAndSplitForOpenAI(imageData: string): Promise<string[]> {
     const MAX_WIDTH = 1024;
     const MAX_HEIGHT = 768;
 
@@ -168,8 +155,7 @@ export async function resizeAndSplitForOpenAI(
     const imageBuffer = Buffer.from(base64Image, 'base64');
 
     // Quick-exit if already small enough
-    const { width: origW = 0, height: origH = 0 } =
-        await sharp(imageBuffer).metadata();
+    const { width: origW = 0, height: origH = 0 } = await sharp(imageBuffer).metadata();
     if (origW <= MAX_WIDTH && origH <= MAX_HEIGHT) {
         return [imageData];
     }
@@ -219,12 +205,7 @@ function stripDataUrl(dataUrl: string) {
     return { format: match[1], base64: match[2] };
 }
 
-async function processAndTruncate(
-    imageBuffer: Buffer,
-    format: string,
-    maxW: number,
-    maxH: number
-): Promise<Buffer> {
+async function processAndTruncate(imageBuffer: Buffer, format: string, maxW: number, maxH: number): Promise<Buffer> {
     // 1) Auto-orient, resize to max width, flatten transparency
     const resized = await sharp(imageBuffer)
         .rotate()
@@ -250,9 +231,7 @@ async function processAndTruncate(
 /**
  * Claude: resize to ≤1024px wide, then truncate at 1120px tall.
  */
-export async function resizeAndTruncateForClaude(
-    imageData: string
-): Promise<string> {
+export async function resizeAndTruncateForClaude(imageData: string): Promise<string> {
     const { format, base64 } = stripDataUrl(imageData);
     const buf = Buffer.from(base64, 'base64');
 
@@ -262,21 +241,14 @@ export async function resizeAndTruncateForClaude(
         return imageData;
     }
 
-    const outBuf = await processAndTruncate(
-        buf,
-        format,
-        CLAUDE_MAX_WIDTH,
-        CLAUDE_MAX_HEIGHT
-    );
+    const outBuf = await processAndTruncate(buf, format, CLAUDE_MAX_WIDTH, CLAUDE_MAX_HEIGHT);
     return `data:image/${format};base64,${outBuf.toString('base64')}`;
 }
 
 /**
  * Gemini: resize to ≤1024px wide, then truncate at 1536px tall.
  */
-export async function resizeAndTruncateForGemini(
-    imageData: string
-): Promise<string> {
+export async function resizeAndTruncateForGemini(imageData: string): Promise<string> {
     const { format, base64 } = stripDataUrl(imageData);
     const buf = Buffer.from(base64, 'base64');
 
@@ -286,11 +258,6 @@ export async function resizeAndTruncateForGemini(
         return imageData;
     }
 
-    const outBuf = await processAndTruncate(
-        buf,
-        format,
-        GEMINI_MAX_WIDTH,
-        GEMINI_MAX_HEIGHT
-    );
+    const outBuf = await processAndTruncate(buf, format, GEMINI_MAX_WIDTH, GEMINI_MAX_HEIGHT);
     return `data:image/${format};base64,${outBuf.toString('base64')}`;
 }

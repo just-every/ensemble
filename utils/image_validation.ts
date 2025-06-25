@@ -19,9 +19,7 @@ export function isValidBase64(str: string): boolean {
 export function detectImageType(base64Data: string): string | null {
     try {
         const decoded = atob(base64Data.slice(0, 16));
-        const bytes = new Uint8Array(
-            decoded.split('').map(char => char.charCodeAt(0))
-        );
+        const bytes = new Uint8Array(decoded.split('').map(char => char.charCodeAt(0)));
 
         // Check magic numbers
         if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';

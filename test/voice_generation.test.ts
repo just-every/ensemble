@@ -42,20 +42,14 @@ describe('Voice Generation', () => {
     let getModelProvider: any;
 
     beforeAll(async () => {
-        const modelProviderModule = await import(
-            '../model_providers/model_provider.js'
-        );
+        const modelProviderModule = await import('../model_providers/model_provider.js');
         getModelProvider = modelProviderModule.getModelProvider;
         mockProvider = getModelProvider('tts-1');
     });
 
     describe('ensembleVoice', () => {
         it('should yield audio stream events', async () => {
-            const mockChunks = [
-                new Uint8Array([1, 2, 3]),
-                new Uint8Array([4, 5, 6]),
-                new Uint8Array([7, 8, 9]),
-            ];
+            const mockChunks = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6]), new Uint8Array([7, 8, 9])];
 
             const mockStream = new ReadableStream<Uint8Array>({
                 start(controller) {
@@ -79,9 +73,7 @@ describe('Voice Generation', () => {
             expect(events.length).toBeGreaterThanOrEqual(1);
 
             // Find actual chunk events
-            const chunkEvents = events.filter(
-                e => e.type === 'audio_stream' && e.data
-            );
+            const chunkEvents = events.filter(e => e.type === 'audio_stream' && e.data);
             expect(chunkEvents.length).toBeGreaterThan(0);
         });
 
@@ -104,11 +96,7 @@ describe('Voice Generation', () => {
             }
 
             // Check that stream: true was passed
-            expect(mockProvider.createVoice).toHaveBeenCalledWith(
-                'Force stream',
-                'tts-1',
-                { stream: true }
-            );
+            expect(mockProvider.createVoice).toHaveBeenCalledWith('Force stream', 'tts-1', { stream: true });
         });
 
         it('should throw error if buffer is returned instead of stream', async () => {
@@ -124,9 +112,7 @@ describe('Voice Generation', () => {
                     events.push(event);
                 }
             } catch (error) {
-                expect(error.message).toContain(
-                    'Expected streaming response but got buffer'
-                );
+                expect(error.message).toContain('Expected streaming response but got buffer');
                 return;
             }
 
@@ -159,9 +145,7 @@ describe('Voice Generation', () => {
                 createResponseStream: vi.fn(),
                 // createVoice is missing
             };
-            vi.mocked(getModelProvider).mockReturnValueOnce(
-                providerWithoutVoice as any
-            );
+            vi.mocked(getModelProvider).mockReturnValueOnce(providerWithoutVoice as any);
 
             const events = [];
             try {
@@ -171,9 +155,7 @@ describe('Voice Generation', () => {
                     events.push(event);
                 }
             } catch (error) {
-                expect(error.message).toContain(
-                    'Provider for model tts-1 does not support voice generation'
-                );
+                expect(error.message).toContain('Provider for model tts-1 does not support voice generation');
                 return;
             }
 
@@ -187,9 +169,7 @@ describe('Voice Generation', () => {
             vi.mocked(getModelProvider).mockImplementation(model => {
                 if (model?.startsWith('eleven_')) {
                     return {
-                        createVoice: vi
-                            .fn()
-                            .mockResolvedValue(new ArrayBuffer(2048)),
+                        createVoice: vi.fn().mockResolvedValue(new ArrayBuffer(2048)),
                     };
                 }
                 return mockProvider;
@@ -207,15 +187,9 @@ describe('Voice Generation', () => {
                 createVoice: vi.fn().mockResolvedValue(mockStream),
             };
 
-            vi.mocked(getModelProvider).mockReturnValueOnce(
-                elevenLabsProvider as any
-            );
-            const { getModelFromAgent } = await import(
-                '../model_providers/model_provider.js'
-            );
-            vi.mocked(getModelFromAgent).mockResolvedValueOnce(
-                'eleven_multilingual_v2'
-            );
+            vi.mocked(getModelProvider).mockReturnValueOnce(elevenLabsProvider as any);
+            const { getModelFromAgent } = await import('../model_providers/model_provider.js');
+            vi.mocked(getModelFromAgent).mockResolvedValueOnce('eleven_multilingual_v2');
 
             const events = [];
             for await (const event of ensembleVoice(
@@ -233,18 +207,14 @@ describe('Voice Generation', () => {
             }
 
             expect(events.length).toBeGreaterThan(0);
-            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
-                'Test ElevenLabs',
-                'eleven_multilingual_v2',
-                {
-                    voice: 'adam',
-                    voice_settings: {
-                        stability: 0.5,
-                        similarity_boost: 0.75,
-                    },
-                    stream: true,
-                }
-            );
+            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith('Test ElevenLabs', 'eleven_multilingual_v2', {
+                voice: 'adam',
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75,
+                },
+                stream: true,
+            });
         });
 
         it('should handle ElevenLabs streaming', async () => {
@@ -259,15 +229,9 @@ describe('Voice Generation', () => {
                 createVoice: vi.fn().mockResolvedValue(mockStream),
             };
 
-            vi.mocked(getModelProvider).mockReturnValueOnce(
-                elevenLabsProvider as any
-            );
-            const { getModelFromAgent } = await import(
-                '../model_providers/model_provider.js'
-            );
-            vi.mocked(getModelFromAgent).mockResolvedValueOnce(
-                'eleven_turbo_v2_5'
-            );
+            vi.mocked(getModelProvider).mockReturnValueOnce(elevenLabsProvider as any);
+            const { getModelFromAgent } = await import('../model_providers/model_provider.js');
+            vi.mocked(getModelFromAgent).mockResolvedValueOnce('eleven_turbo_v2_5');
 
             const events = [];
             for await (const event of ensembleVoice(
@@ -281,11 +245,11 @@ describe('Voice Generation', () => {
             }
 
             expect(events.length).toBeGreaterThan(0);
-            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
-                'ElevenLabs stream',
-                'eleven_turbo_v2_5',
-                { voice: 'rachel', response_format: 'mp3_high', stream: true }
-            );
+            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith('ElevenLabs stream', 'eleven_turbo_v2_5', {
+                voice: 'rachel',
+                response_format: 'mp3_high',
+                stream: true,
+            });
         });
     });
 });

@@ -3,13 +3,7 @@
  * Demonstrates tool lifecycle callbacks (onToolCall, onToolResult, onToolError)
  */
 
-import {
-    ensembleRequest,
-    ToolFunction,
-    ToolCall,
-    ToolCallResult,
-    AgentDefinition,
-} from '../index.js';
+import { ensembleRequest, ToolFunction, ToolCall, ToolCallResult, AgentDefinition } from '../index.js';
 
 // Define tools with various behaviors
 const tools: ToolFunction[] = [
@@ -114,16 +108,12 @@ async function main() {
 
         // Called before each tool execution
         onToolCall: async (toolCall: ToolCall) => {
-            log(
-                `📞 onToolCall: ${toolCall.function.name}(${toolCall.function.arguments})`
-            );
+            log(`📞 onToolCall: ${toolCall.function.name}(${toolCall.function.arguments})`);
         },
 
         // Called after successful tool execution
         onToolResult: async (result: ToolCallResult) => {
-            log(
-                `✅ onToolResult: ${result.toolCall.function.name} => ${result.output}`
-            );
+            log(`✅ onToolResult: ${result.toolCall.function.name} => ${result.output}`);
 
             // You could log to a database, send metrics, etc.
             if (result.output.length > 50) {
@@ -133,9 +123,7 @@ async function main() {
 
         // Called when a tool fails
         onToolError: async (result: ToolCallResult) => {
-            log(
-                `❌ onToolError: ${result.toolCall.function.name} => ${result.output}`
-            );
+            log(`❌ onToolError: ${result.toolCall.function.name} => ${result.output}`);
 
             // You could implement retry logic, alerting, etc.
             log('  🔄 Could implement retry logic here');
@@ -181,17 +169,11 @@ async function main() {
         // Analyze the lifecycle log
         const skipped = lifecycleLog.filter(l => l.includes('SKIPPING')).length;
         const halted = lifecycleLog.filter(l => l.includes('HALTING')).length;
-        const errors = lifecycleLog.filter(l =>
-            l.includes('onToolError')
-        ).length;
-        const successes = lifecycleLog.filter(l =>
-            l.includes('onToolResult')
-        ).length;
+        const errors = lifecycleLog.filter(l => l.includes('onToolError')).length;
+        const successes = lifecycleLog.filter(l => l.includes('onToolResult')).length;
 
         console.log(`📊 Lifecycle Statistics:`);
-        console.log(
-            `   - Tool calls initiated: ${lifecycleLog.filter(l => l.includes('onToolCall')).length}`
-        );
+        console.log(`   - Tool calls initiated: ${lifecycleLog.filter(l => l.includes('onToolCall')).length}`);
         console.log(`   - Successful executions: ${successes}`);
         console.log(`   - Failed executions: ${errors}`);
         console.log(`   - Skipped tools: ${skipped}`);

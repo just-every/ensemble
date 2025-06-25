@@ -64,51 +64,39 @@ class ConfigManager {
         if (process.env.ENSEMBLE_TOOL_TIMEOUT) {
             const timeout = parseInt(process.env.ENSEMBLE_TOOL_TIMEOUT, 10);
             if (isNaN(timeout) || timeout <= 0) {
-                throw new ConfigurationError(
-                    'ENSEMBLE_TOOL_TIMEOUT must be a positive number',
-                    { value: process.env.ENSEMBLE_TOOL_TIMEOUT }
-                );
+                throw new ConfigurationError('ENSEMBLE_TOOL_TIMEOUT must be a positive number', {
+                    value: process.env.ENSEMBLE_TOOL_TIMEOUT,
+                });
             }
             this.config.defaultToolTimeout = timeout;
         }
 
         if (process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS) {
-            const maxTools = parseInt(
-                process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS,
-                10
-            );
+            const maxTools = parseInt(process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS, 10);
             if (isNaN(maxTools) || maxTools <= 0) {
-                throw new ConfigurationError(
-                    'ENSEMBLE_MAX_CONCURRENT_TOOLS must be a positive number',
-                    { value: process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS }
-                );
+                throw new ConfigurationError('ENSEMBLE_MAX_CONCURRENT_TOOLS must be a positive number', {
+                    value: process.env.ENSEMBLE_MAX_CONCURRENT_TOOLS,
+                });
             }
             this.config.maxConcurrentTools = maxTools;
         }
 
         if (process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL) {
-            const interval = parseInt(
-                process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL,
-                10
-            );
+            const interval = parseInt(process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL, 10);
             if (isNaN(interval) || interval <= 0) {
-                throw new ConfigurationError(
-                    'ENSEMBLE_PAUSE_CHECK_INTERVAL must be a positive number',
-                    { value: process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL }
-                );
+                throw new ConfigurationError('ENSEMBLE_PAUSE_CHECK_INTERVAL must be a positive number', {
+                    value: process.env.ENSEMBLE_PAUSE_CHECK_INTERVAL,
+                });
             }
             this.config.pauseCheckInterval = interval;
         }
 
         if (process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD) {
-            const threshold = parseFloat(
-                process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD
-            );
+            const threshold = parseFloat(process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD);
             if (isNaN(threshold) || threshold <= 0 || threshold > 1) {
-                throw new ConfigurationError(
-                    'ENSEMBLE_HISTORY_COMPACTION_THRESHOLD must be a number between 0 and 1',
-                    { value: process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD }
-                );
+                throw new ConfigurationError('ENSEMBLE_HISTORY_COMPACTION_THRESHOLD must be a number between 0 and 1', {
+                    value: process.env.ENSEMBLE_HISTORY_COMPACTION_THRESHOLD,
+                });
             }
             this.config.historyCompactionThreshold = threshold;
         }
@@ -186,8 +174,6 @@ export function getConfig(): EnsembleConfig {
 /**
  * Convenience function to get a specific config value
  */
-export function getConfigValue<K extends keyof EnsembleConfig>(
-    key: K
-): EnsembleConfig[K] {
+export function getConfigValue<K extends keyof EnsembleConfig>(key: K): EnsembleConfig[K] {
     return getConfigManager().get(key);
 }

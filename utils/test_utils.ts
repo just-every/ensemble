@@ -46,23 +46,16 @@ export class EnhancedRequestMock {
     /**
      * Create async generator that yields events
      */
-    private async *createAsyncGenerator(
-        options?: MockStreamOptions
-    ): AsyncGenerator<ProviderStreamEvent> {
+    private async *createAsyncGenerator(options?: MockStreamOptions): AsyncGenerator<ProviderStreamEvent> {
         for (const response of this.responses) {
             // Handle delay
             if (response.delay) {
-                await new Promise(resolve =>
-                    setTimeout(resolve, response.delay)
-                );
+                await new Promise(resolve => setTimeout(resolve, response.delay));
             }
 
             // Handle error
             if (response.error) {
-                const error =
-                    typeof response.error === 'string'
-                        ? new Error(response.error)
-                        : response.error;
+                const error = typeof response.error === 'string' ? new Error(response.error) : response.error;
                 yield {
                     type: 'error',
                     error: error.message,
@@ -121,16 +114,14 @@ export class EnhancedRequestMock {
 
             // Handle tool calls
             if (response.toolCalls && response.toolCalls.length > 0) {
-                const toolCallEvents: ToolCall[] = response.toolCalls.map(
-                    (call, index) => ({
-                        id: `call_${Date.now()}_${index}`,
-                        type: 'function' as const,
-                        function: {
-                            name: call.name,
-                            arguments: JSON.stringify(call.arguments),
-                        },
-                    })
-                );
+                const toolCallEvents: ToolCall[] = response.toolCalls.map((call, index) => ({
+                    id: `call_${Date.now()}_${index}`,
+                    type: 'function' as const,
+                    function: {
+                        name: call.name,
+                        arguments: JSON.stringify(call.arguments),
+                    },
+                }));
 
                 yield {
                     type: 'tool_start',

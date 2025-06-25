@@ -24,6 +24,7 @@
         "dist",
         "node_modules",
         "examples",
+        "demo",
         "test",
         "scripts",
         "**/*.test.ts",

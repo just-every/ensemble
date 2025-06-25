@@ -15,8 +15,7 @@ async function runLongConversation() {
     const agent = new Agent({
         name: 'ConversationAgent',
         model: 'gpt-4.1-mini', // Has 1M context, will compact at 700k tokens
-        instructions:
-            'You are a helpful assistant engaged in a long conversation.',
+        instructions: 'You are a helpful assistant engaged in a long conversation.',
     });
 
     // Initialize conversation history
@@ -24,15 +23,12 @@ async function runLongConversation() {
         {
             type: 'message',
             role: 'system',
-            content:
-                'You are a helpful assistant. Keep your responses concise.',
+            content: 'You are a helpful assistant. Keep your responses concise.',
         },
     ];
 
     // Simulate a long conversation
-    console.log(
-        'Starting long conversation that will trigger automatic compaction...\n'
-    );
+    console.log('Starting long conversation that will trigger automatic compaction...\n');
 
     for (let i = 0; i < 100; i++) {
         // Add user message
@@ -58,9 +54,7 @@ async function runLongConversation() {
         // Show progress
         if ((i + 1) % 10 === 0) {
             console.log(`✓ Completed ${i + 1} Q&A exchanges`);
-            console.log(
-                `  Current history size: ${conversationHistory.length} messages`
-            );
+            console.log(`  Current history size: ${conversationHistory.length} messages`);
 
             // Estimate tokens (rough approximation)
             const totalChars = conversationHistory.reduce((sum, msg) => {
@@ -70,9 +64,7 @@ async function runLongConversation() {
                 return sum;
             }, 0);
             const estimatedTokens = Math.ceil(totalChars / 4);
-            console.log(
-                `  Estimated tokens: ${estimatedTokens.toLocaleString()}\n`
-            );
+            console.log(`  Estimated tokens: ${estimatedTokens.toLocaleString()}\n`);
         }
 
         // For demo purposes, break after some iterations
@@ -87,16 +79,10 @@ async function runLongConversation() {
     // Show a sample of the conversation
     console.log('Sample from conversation history:');
     console.log('First user message:', conversationHistory[1].content);
-    console.log(
-        'Last user message:',
-        conversationHistory[conversationHistory.length - 2].content
-    );
+    console.log('Last user message:', conversationHistory[conversationHistory.length - 2].content);
     console.log(
         'Last assistant response:',
-        conversationHistory[conversationHistory.length - 1].content?.substring(
-            0,
-            200
-        ) + '...\n'
+        conversationHistory[conversationHistory.length - 1].content?.substring(0, 200) + '...\n'
     );
 }
 

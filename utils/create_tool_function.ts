@@ -1,18 +1,6 @@
-import {
-    ToolFunction,
-    ToolParameter,
-    ToolParameterType,
-    ToolParameterMap,
-} from '../types/types.js';
+import { ToolFunction, ToolParameter, ToolParameterType, ToolParameterMap } from '../types/types.js';
 
-const validToolParameterTypes: ToolParameterType[] = [
-    'string',
-    'number',
-    'boolean',
-    'array',
-    'object',
-    'null',
-];
+const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boolean', 'array', 'object', 'null'];
 
 /**
  * Create a tool definition from a function
@@ -121,9 +109,7 @@ export function createToolFunction(
 
     for (const paramUnknown of params) {
         if (typeof paramUnknown !== 'string') {
-            console.warn(
-                `Skipping non-string parameter in function signature analysis: ${paramUnknown}`
-            );
+            console.warn(`Skipping non-string parameter in function signature analysis: ${paramUnknown}`);
             continue;
         }
         const param = paramUnknown as string;
@@ -131,8 +117,7 @@ export function createToolFunction(
         // Extract parameter name and default value
         const paramParts = param.split('=').map(p => p.trim());
         let paramName = paramParts[0].trim();
-        const defaultValue =
-            paramParts.length > 1 ? paramParts[1].trim() : undefined;
+        const defaultValue = paramParts.length > 1 ? paramParts[1].trim() : undefined;
 
         // Handle TypeScript type annotations (e.g., "city: string" -> "city")
         if (paramName.includes(':')) {
@@ -155,8 +140,7 @@ export function createToolFunction(
         }
 
         // Check if we have custom mapping for this parameter
-        const paramInfoRaw: ToolParameter | string | undefined =
-            paramMap?.[cleanParamName];
+        const paramInfoRaw: ToolParameter | string | undefined = paramMap?.[cleanParamName];
         let paramInfoObj: ToolParameter | undefined = undefined;
         let paramInfoDesc: string | undefined = undefined;
 
@@ -166,9 +150,7 @@ export function createToolFunction(
         } else if (typeof paramInfoRaw === 'object' && paramInfoRaw !== null) {
             paramInfoObj = paramInfoRaw;
             paramInfoDesc =
-                typeof paramInfoRaw.description === 'function'
-                    ? paramInfoRaw.description()
-                    : paramInfoRaw.description;
+                typeof paramInfoRaw.description === 'function' ? paramInfoRaw.description() : paramInfoRaw.description;
         }
 
         const apiParamName = cleanParamName;
@@ -177,10 +159,7 @@ export function createToolFunction(
         let paramType: ToolParameterType = 'string'; // Default type
 
         // Check type from paramInfoObj first
-        if (
-            paramInfoObj?.type &&
-            validToolParameterTypes.includes(paramInfoObj.type)
-        ) {
+        if (paramInfoObj?.type && validToolParameterTypes.includes(paramInfoObj.type)) {
             paramType = paramInfoObj.type;
         } else if (isRestParam) {
             // Rest parameters are arrays
@@ -189,11 +168,7 @@ export function createToolFunction(
             // Infer type from default value
             if (defaultValue === 'false' || defaultValue === 'true') {
                 paramType = 'boolean';
-            } else if (
-                !isNaN(Number(defaultValue)) &&
-                !defaultValue.startsWith('"') &&
-                !defaultValue.startsWith("'")
-            ) {
+            } else if (!isNaN(Number(defaultValue)) && !defaultValue.startsWith('"') && !defaultValue.startsWith("'")) {
                 paramType = 'number';
             } else if (defaultValue === '[]' || defaultValue.startsWith('[')) {
                 paramType = 'array';
@@ -203,8 +178,7 @@ export function createToolFunction(
         }
 
         // Use description from paramInfo if available, otherwise default
-        const finalDescription =
-            paramInfoDesc || `The ${cleanParamName} parameter`;
+        const finalDescription = paramInfoDesc || `The ${cleanParamName} parameter`;
 
         // Create parameter definition
         const paramDef: any = {

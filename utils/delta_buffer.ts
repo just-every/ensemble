@@ -27,9 +27,7 @@ export class DeltaBuffer {
         if (this.startTimestamp === null) this.startTimestamp = Date.now();
 
         const shouldFlushBySize = this.buffer.length >= this.threshold;
-        const shouldFlushByTime =
-            this.startTimestamp !== null &&
-            Date.now() - this.startTimestamp >= this.timeLimitMs;
+        const shouldFlushByTime = this.startTimestamp !== null && Date.now() - this.startTimestamp >= this.timeLimitMs;
 
         if (shouldFlushBySize || shouldFlushByTime) {
             const out = this.buffer;

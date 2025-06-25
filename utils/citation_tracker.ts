@@ -24,10 +24,7 @@ export function createCitationTracker(): CitationTracker {
 /**
  * Format citation as a footnote and return a reference marker
  */
-export function formatCitation(
-    tracker: CitationTracker,
-    citation: Citation
-): string {
+export function formatCitation(tracker: CitationTracker, citation: Citation): string {
     if (!tracker.citations.has(citation.url)) {
         tracker.citations.set(citation.url, citation);
     }

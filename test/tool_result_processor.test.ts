@@ -32,10 +32,7 @@ describe('Tool Result Processor', () => {
     describe('createSummary', () => {
         it('should not summarize short content', async () => {
             const shortContent = 'This is short content';
-            const summary = await createSummary(
-                shortContent,
-                'Summarize this content'
-            );
+            const summary = await createSummary(shortContent, 'Summarize this content');
 
             // Content below 5000 chars should not be summarized
             expect(summary).toBe(shortContent);
@@ -54,10 +51,7 @@ describe('Tool Result Processor', () => {
 
             // Create content > 5000 chars to trigger summarization
             const longContent = 'x'.repeat(6000);
-            const summary = await createSummary(
-                longContent,
-                'Summarize this content'
-            );
+            const summary = await createSummary(longContent, 'Summarize this content');
 
             expect(summary).toContain('This is a summary');
             expect(summary).toContain('[Summarized output');
@@ -73,9 +67,7 @@ describe('Tool Result Processor', () => {
             const summary = await createSummary(longContent, 'Summarize');
 
             expect(summary).toContain('[truncated for summary]');
-            expect(summary).toContain(
-                '[Summary generation failed, output truncated]'
-            );
+            expect(summary).toContain('[Summary generation failed, output truncated]');
         });
 
         it('should handle empty response from LLM', async () => {
@@ -88,9 +80,7 @@ describe('Tool Result Processor', () => {
             const summary = await createSummary(content, 'Summarize');
 
             expect(summary).toContain('[truncated for summary]');
-            expect(summary).toContain(
-                '[Summary generation failed, output truncated]'
-            );
+            expect(summary).toContain('[Summary generation failed, output truncated]');
         });
     });
 
@@ -126,9 +116,7 @@ describe('Tool Result Processor', () => {
         });
 
         it('should summarize long results for non-skip tools', async () => {
-            const { ensembleRequest } = await import(
-                '../core/ensemble_request.js'
-            );
+            const { ensembleRequest } = await import('../core/ensemble_request.js');
             const mockEnsembleRequest = ensembleRequest as any;
             mockEnsembleRequest.mockImplementation(async function* () {
                 yield {
@@ -192,15 +180,11 @@ describe('Tool Result Processor', () => {
         });
 
         it('should return default message for other tools', () => {
-            expect(getTruncationMessage('test_tool')).toBe(
-                '... Output truncated to 5000 characters'
-            );
+            expect(getTruncationMessage('test_tool')).toBe('... Output truncated to 5000 characters');
         });
 
         it('should include custom max length in default message', () => {
-            expect(getTruncationMessage('get_page_content')).toBe(
-                '... Output truncated to 10000 characters'
-            );
+            expect(getTruncationMessage('get_page_content')).toBe('... Output truncated to 10000 characters');
         });
     });
 });

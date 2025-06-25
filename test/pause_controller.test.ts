@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-    getPauseController,
-    isPaused,
-    pause,
-    resume,
-    waitWhilePaused,
-} from '../utils/pause_controller.js';
+import { getPauseController, isPaused, pause, resume, waitWhilePaused } from '../utils/pause_controller.js';
 
 describe('PauseController', () => {
     beforeEach(() => {
@@ -101,9 +95,7 @@ describe('PauseController', () => {
             setTimeout(() => controller.abort(), 100);
 
             // Should throw when aborted
-            await expect(waitPromise).rejects.toThrow(
-                'Operation aborted while waiting for pause'
-            );
+            await expect(waitPromise).rejects.toThrow('Operation aborted while waiting for pause');
         });
 
         it('should handle multiple concurrent waiters', async () => {

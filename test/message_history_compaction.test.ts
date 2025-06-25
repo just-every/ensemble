@@ -254,8 +254,7 @@ describe('MessageHistory Automatic Compaction', () => {
         await history.add({
             type: 'message',
             role: 'assistant',
-            content:
-                'I can help you check the weather. Let me look that up for you.',
+            content: 'I can help you check the weather. Let me look that up for you.',
         });
 
         await history.add({
@@ -269,9 +268,7 @@ describe('MessageHistory Automatic Compaction', () => {
 
         expect(microLog).toHaveLength(3);
         expect(microLog[0].summary).toBe('What is the weather like?');
-        expect(microLog[1].summary).toBe(
-            'I can help you check the weather. Let me look that up for you.'
-        );
+        expect(microLog[1].summary).toBe('I can help you check the weather. Let me look that up for you.');
         expect(microLog[2].summary).toBe('Called get_weather()');
     });
 
@@ -294,20 +291,14 @@ describe('MessageHistory Automatic Compaction', () => {
         const extractedInfo = history.getExtractedInfo();
 
         // Should extract file paths
-        expect(Array.from(extractedInfo.entities)).toContain(
-            '/home/user/project/main.py'
-        );
+        expect(Array.from(extractedInfo.entities)).toContain('/home/user/project/main.py');
 
         // Should extract decisions (may be truncated by regex)
-        const hasDecision = extractedInfo.decisions.some(d =>
-            d.includes('update the file')
-        );
+        const hasDecision = extractedInfo.decisions.some(d => d.includes('update the file'));
         expect(hasDecision).toBe(true);
 
         // Should extract todos
-        expect(extractedInfo.todos).toContainEqual(
-            expect.stringContaining('Add error handling after updating')
-        );
+        expect(extractedInfo.todos).toContainEqual(expect.stringContaining('Add error handling after updating'));
     });
 
     it('should create hybrid summary with all components', async () => {
@@ -320,15 +311,13 @@ describe('MessageHistory Automatic Compaction', () => {
         await history.add({
             type: 'message',
             role: 'user',
-            content:
-                'I need to analyze the data at https://example.com/data.json',
+            content: 'I need to analyze the data at https://example.com/data.json',
         });
 
         await history.add({
             type: 'message',
             role: 'assistant',
-            content:
-                "I'll analyze the data from that URL. The approach is to fetch and parse the JSON data.",
+            content: "I'll analyze the data from that URL. The approach is to fetch and parse the JSON data.",
         });
 
         await history.add({
@@ -365,9 +354,7 @@ describe('MessageHistory Automatic Compaction', () => {
             expect(summaryMessage.content).toContain('## Key Information');
 
             // Should mention the URL entity
-            expect(summaryMessage.content).toContain(
-                'https://example.com/data.json'
-            );
+            expect(summaryMessage.content).toContain('https://example.com/data.json');
 
             // Should mention the tool used
             expect(summaryMessage.content).toContain('fetch_url');

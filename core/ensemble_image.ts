@@ -1,8 +1,5 @@
 import type { AgentDefinition, ImageGenerationOpts } from '../types/types.js';
-import {
-    getModelFromAgent,
-    getModelProvider,
-} from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
 
 /**
  * Generate images from text prompts
@@ -34,9 +31,7 @@ export async function ensembleImage(
     const provider = getModelProvider(model);
 
     if (!provider.createImage) {
-        throw new Error(
-            `Provider for model ${model} does not support image generation`
-        );
+        throw new Error(`Provider for model ${model} does not support image generation`);
     }
 
     return provider.createImage(prompt, model, options);

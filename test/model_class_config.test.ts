@@ -39,10 +39,7 @@ describe('Model Class Configuration', () => {
             });
 
             const config = getModelClass('standard');
-            expect(config?.models).toEqual([
-                'gpt-4.1',
-                'claude-3-5-haiku-latest',
-            ]);
+            expect(config?.models).toEqual(['gpt-4.1', 'claude-3-5-haiku-latest']);
             expect(config?.random).toBe(MODEL_CLASSES.standard.random); // Preserved
         });
     });
@@ -76,17 +73,13 @@ describe('Model Class Configuration', () => {
         });
 
         it('should warn for non-existent models but still add them', () => {
-            const consoleSpy = vi
-                .spyOn(console, 'warn')
-                .mockImplementation(() => {});
+            const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
             overrideModelClass('standard', {
                 models: ['non-existent-model'],
             });
 
-            expect(consoleSpy).toHaveBeenCalledWith(
-                expect.stringContaining("Model 'non-existent-model' not found")
-            );
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Model 'non-existent-model' not found"));
 
             const config = getModelClass('standard');
             expect(config?.models).toEqual(['non-existent-model']);
@@ -97,16 +90,10 @@ describe('Model Class Configuration', () => {
 
     describe('setModelClassModels', () => {
         it('should set models for a class', () => {
-            setModelClassModels('mini', [
-                'gpt-4.1-nano',
-                'claude-3-5-haiku-latest',
-            ]);
+            setModelClassModels('mini', ['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
 
             const config = getModelClass('mini');
-            expect(config?.models).toEqual([
-                'gpt-4.1-nano',
-                'claude-3-5-haiku-latest',
-            ]);
+            expect(config?.models).toEqual(['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
         });
 
         it('should preserve random setting when not specified', () => {
@@ -201,9 +188,7 @@ describe('Model Class Configuration', () => {
             expect(allClasses).toHaveProperty('standard');
             expect(allClasses).toHaveProperty('mini');
             expect(allClasses).toHaveProperty('reasoning');
-            expect(allClasses.standard.models).toEqual(
-                MODEL_CLASSES.standard.models
-            );
+            expect(allClasses.standard.models).toEqual(MODEL_CLASSES.standard.models);
         });
 
         it('should include overrides in the result', () => {

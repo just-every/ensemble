@@ -68,9 +68,7 @@ describe('Voice Cost Tracking', () => {
         const expectedCost = (text.length / 1000) * 0.03; // tts-1-hd pricing
 
         // Mock for HD model
-        const { getModelFromAgent } = await import(
-            '../model_providers/model_provider.js'
-        );
+        const { getModelFromAgent } = await import('../model_providers/model_provider.js');
         vi.mocked(getModelFromAgent).mockResolvedValueOnce('tts-1-hd');
 
         // Generate voice

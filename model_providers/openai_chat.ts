@@ -18,32 +18,16 @@ import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { APIError } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import { costTracker } from '../index.js';
-import {
-    log_llm_error,
-    log_llm_request,
-    log_llm_response,
-} from '../utils/llm_logger.js';
+import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
-import {
-    appendMessageWithImage,
-    resizeAndSplitForOpenAI,
-} from '../utils/image_utils.js';
+import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
 // import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
-import {
-    DeltaBuffer,
-    bufferDelta,
-    flushBufferedDeltas,
-} from '../utils/delta_buffer.js';
-import {
-    createCitationTracker,
-    formatCitation,
-    generateFootnotes,
-} from '../utils/citation_tracker.js';
+import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
+import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 
 // Extended types for Perplexity/OpenRouter response formats
-interface ExtendedDelta
-    extends OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta {
+interface ExtendedDelta extends OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta {
     reasoning?: string;
     annotations?: Array<{
         type: string;
@@ -61,10 +45,8 @@ interface ExtendedChunk extends OpenAI.Chat.Completions.ChatCompletionChunk {
 // --- Constants for Simulated Tool Call Handling ---
 // Regex to find the MULTIPLE simulated tool call pattern (TOOL_CALLS: [ ... ]) at the end
 // Also detects when pattern is inside code blocks with backticks
-const SIMULATED_TOOL_CALL_REGEX =
-    /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*(\[.*\])(?:\s*```)?/gs; // Use greedy .*
-const TOOL_CALL_CLEANUP_REGEX =
-    /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*\[.*\](?:\s*```)?/gms; // Use greedy .* here too for consistency
+const SIMULATED_TOOL_CALL_REGEX = /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*(\[.*\])(?:\s*```)?/gs; // Use greedy .*
+const TOOL_CALL_CLEANUP_REGEX = /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*\[.*\](?:\s*```)?/gms; // Use greedy .* here too for consistency
 const CLEANUP_PLACEHOLDER = '[Simulated Tool Calls Removed]';
 
 // --- Helper Functions ---
@@ -114,9 +96,7 @@ async function resolveAsyncEnums(params: any): Promise<any> {
 }
 
 /** Converts internal ToolFunction definitions to OpenAI format. */
-async function convertToOpenAITools(
-    tools: ToolFunction[]
-): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
+async function convertToOpenAITools(tools: ToolFunction[]): Promise<OpenAI.Chat.Completions.ChatCompletionTool[]> {
     // Map tools and resolve async enums
     return await Promise.all(
         tools.map(async (tool: ToolFunction) => ({
@@ -124,9 +104,7 @@ async function convertToOpenAITools(
             function: {
                 name: tool.definition.function.name,
                 description: tool.definition.function.description,
-                parameters: await resolveAsyncEnums(
-                    tool.definition.function.parameters
-                ),
+                parameters: await resolveAsyncEnums(tool.definition.function.parameters),
             },
         }))
     );
@@ -217,8 +195,7 @@ async function mapMessagesToOpenAI(
     let result: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
     // Check if this is a Mistral model via OpenRouter (which doesn't support tool roles)
-    const isMistralViaOpenRouter =
-        model.includes('mistral') || model.includes('magistral');
+    const isMistralViaOpenRouter = model.includes('mistral') || model.includes('magistral');
 
     for (const msg of messages) {
         // Create a clean copy without non-standard properties
@@ -232,13 +209,7 @@ async function mapMessagesToOpenAI(
                     role: 'user',
                     content: `[Function Response]\nFunction: ${msg.name || 'unknown'}\nResult: ${msg.output || 'No output'}`,
                 } as OpenAI.Chat.Completions.ChatCompletionUserMessageParam;
-                result = await appendMessageWithImage(
-                    model,
-                    result,
-                    userMessage,
-                    'content',
-                    addImagesToInput
-                );
+                result = await appendMessageWithImage(model, result, userMessage, 'content', addImagesToInput);
             } else {
                 // For other providers, use standard tool message format
                 const toolMessage = {
@@ -246,13 +217,7 @@ async function mapMessagesToOpenAI(
                     tool_call_id: msg.call_id,
                     content: msg.output || '',
                 } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
-                result = await appendMessageWithImage(
-                    model,
-                    result,
-                    toolMessage,
-                    'content',
-                    addImagesToInput
-                );
+                result = await appendMessageWithImage(model, result, toolMessage, 'content', addImagesToInput);
             }
         }
         // Handle function call messages
@@ -288,11 +253,7 @@ async function mapMessagesToOpenAI(
             }
         }
         // Handle standard message types
-        else if (
-            !msg.type ||
-            msg.type === 'message' ||
-            msg.type === 'thinking'
-        ) {
+        else if (!msg.type || msg.type === 'message' || msg.type === 'thinking') {
             // Extract content from the message
             if ('content' in message) {
                 // Clean up non-standard fields before sending
@@ -309,20 +270,12 @@ async function mapMessagesToOpenAI(
                 if (!['system', 'user', 'assistant'].includes(message.role)) {
                     message.role = 'user';
                 }
-                result = await appendMessageWithImage(
-                    model,
-                    result,
-                    message,
-                    'content',
-                    addImagesToInput
-                );
+                result = await appendMessageWithImage(model, result, message, 'content', addImagesToInput);
             }
         }
     }
 
-    return result.filter(
-        Boolean
-    ) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    return result.filter(Boolean) as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
 }
 
 /** Type definition for the result of parsing simulated tool calls. */
@@ -386,9 +339,7 @@ export class OpenAIChat extends BaseModelProvider {
             // Check for API key at runtime
             const apiKey = this.apiKey || process.env[this.getEnvVarName()];
             if (!apiKey) {
-                throw new Error(
-                    `Failed to initialize OpenAI client for ${this.provider}. API key is missing.`
-                );
+                throw new Error(`Failed to initialize OpenAI client for ${this.provider}. API key is missing.`);
             }
             this._client = new OpenAI({
                 apiKey: apiKey,
@@ -418,9 +369,7 @@ export class OpenAIChat extends BaseModelProvider {
         messageId: string
     ): SimulatedToolCallParseResult {
         // Use matchAll to find all occurrences of the pattern
-        const matches = Array.from(
-            aggregatedContent.matchAll(SIMULATED_TOOL_CALL_REGEX)
-        );
+        const matches = Array.from(aggregatedContent.matchAll(SIMULATED_TOOL_CALL_REGEX));
         let jsonArrayString: string | null = null;
         let matchIndex: number = -1; // Store the start index of the last match
 
@@ -431,9 +380,7 @@ export class OpenAIChat extends BaseModelProvider {
                 // lastMatch[1] captures the array string "[...]"
                 jsonArrayString = lastMatch[1];
                 matchIndex = lastMatch.index ?? -1; // Store the index where the last match started
-                console.log(
-                    `(${this.provider}) Found ${matches.length} TOOL_CALLS patterns. Processing the last one.`
-                );
+                console.log(`(${this.provider}) Found ${matches.length} TOOL_CALLS patterns. Processing the last one.`);
             }
         } else {
             // Optional: Add your debugging for when no matches are found at all
@@ -441,34 +388,20 @@ export class OpenAIChat extends BaseModelProvider {
                 console.log(
                     `(${this.provider}) TOOL_CALLS found but regex didn't match globally. Content snippet:`,
                     aggregatedContent.substring(
-                        Math.max(
-                            0,
-                            aggregatedContent.indexOf('TOOL_CALLS') - 20
-                        ),
-                        Math.min(
-                            aggregatedContent.length,
-                            aggregatedContent.indexOf('TOOL_CALLS') + 300
-                        )
+                        Math.max(0, aggregatedContent.indexOf('TOOL_CALLS') - 20),
+                        Math.min(aggregatedContent.length, aggregatedContent.indexOf('TOOL_CALLS') + 300)
                     )
                 ); // Increased snippet length
             } else {
-                console.log(
-                    `(${this.provider}) No TOOL_CALLS found in response.`
-                );
+                console.log(`(${this.provider}) No TOOL_CALLS found in response.`);
             }
-            console.debug(
-                `(${this.provider}) Full response content:`,
-                aggregatedContent
-            );
+            console.debug(`(${this.provider}) Full response content:`, aggregatedContent);
         }
 
         // Proceed only if a JSON string was extracted from the last match
         if (jsonArrayString !== null && matchIndex !== -1) {
             try {
-                console.log(
-                    `(${this.provider}) Processing last TOOL_CALLS JSON string:`,
-                    jsonArrayString
-                );
+                console.log(`(${this.provider}) Processing last TOOL_CALLS JSON string:`, jsonArrayString);
 
                 // Try to parse the potentially complete JSON string
                 let parsedToolCallArray;
@@ -492,28 +425,18 @@ export class OpenAIChat extends BaseModelProvider {
 
                 // Validate that it's an array
                 if (!Array.isArray(parsedToolCallArray)) {
-                    if (
-                        typeof parsedToolCallArray === 'object' &&
-                        parsedToolCallArray !== null
-                    ) {
-                        console.log(
-                            `(${this.provider}) Parsed JSON is not an array but an object, wrapping in array`
-                        );
+                    if (typeof parsedToolCallArray === 'object' && parsedToolCallArray !== null) {
+                        console.log(`(${this.provider}) Parsed JSON is not an array but an object, wrapping in array`);
                         parsedToolCallArray = [parsedToolCallArray];
                     } else {
-                        throw new Error(
-                            'Parsed JSON is not an array or object.'
-                        );
+                        throw new Error('Parsed JSON is not an array or object.');
                     }
                 }
 
                 const validSimulatedCalls: ToolCall[] = [];
                 // Iterate through the parsed array - THIS HANDLES MULTIPLE CALLS within the block
                 for (const callData of parsedToolCallArray) {
-                    console.log(
-                        `(${this.provider}) Processing tool call object:`,
-                        callData
-                    );
+                    console.log(`(${this.provider}) Processing tool call object:`, callData);
 
                     // Flexible validation to handle different formats
                     if (callData && typeof callData === 'object') {
@@ -531,10 +454,7 @@ export class OpenAIChat extends BaseModelProvider {
 
                         // Extract function details
                         const funcDetails = callData.function;
-                        if (
-                            typeof funcDetails === 'object' &&
-                            funcDetails !== null
-                        ) {
+                        if (typeof funcDetails === 'object' && funcDetails !== null) {
                             if (typeof funcDetails.name === 'string') {
                                 toolCall.function.name = funcDetails.name;
                             }
@@ -543,22 +463,17 @@ export class OpenAIChat extends BaseModelProvider {
                                 if (typeof funcDetails.arguments === 'string') {
                                     try {
                                         JSON.parse(funcDetails.arguments); // Validate JSON string
-                                        toolCall.function.arguments =
-                                            funcDetails.arguments;
+                                        toolCall.function.arguments = funcDetails.arguments;
                                     } catch {
                                         console.warn(
                                             `(${this.provider}) Argument string is not valid JSON, wrapping in quotes:`,
                                             funcDetails.arguments
                                         );
                                         // If it's meant to be a plain string, JSON stringify it
-                                        toolCall.function.arguments =
-                                            JSON.stringify(
-                                                funcDetails.arguments
-                                            );
+                                        toolCall.function.arguments = JSON.stringify(funcDetails.arguments);
                                     }
                                 } else {
-                                    toolCall.function.arguments =
-                                        JSON.stringify(funcDetails.arguments);
+                                    toolCall.function.arguments = JSON.stringify(funcDetails.arguments);
                                 }
                             }
                         } else if (typeof callData.name === 'string') {
@@ -568,59 +483,39 @@ export class OpenAIChat extends BaseModelProvider {
                                 if (typeof callData.arguments === 'string') {
                                     try {
                                         JSON.parse(callData.arguments); // Validate JSON string
-                                        toolCall.function.arguments =
-                                            callData.arguments;
+                                        toolCall.function.arguments = callData.arguments;
                                     } catch {
                                         console.warn(
                                             `(${this.provider}) Argument string is not valid JSON, wrapping in quotes:`,
                                             callData.arguments
                                         );
-                                        toolCall.function.arguments =
-                                            JSON.stringify(callData.arguments);
+                                        toolCall.function.arguments = JSON.stringify(callData.arguments);
                                     }
                                 } else {
-                                    toolCall.function.arguments =
-                                        JSON.stringify(callData.arguments);
+                                    toolCall.function.arguments = JSON.stringify(callData.arguments);
                                 }
                             }
                         }
 
                         // Only add the tool call if it has a valid name
-                        if (
-                            toolCall.function.name &&
-                            toolCall.function.name.length > 0
-                        ) {
+                        if (toolCall.function.name && toolCall.function.name.length > 0) {
                             validSimulatedCalls.push(toolCall);
                         } else {
-                            console.warn(
-                                `(${this.provider}) Invalid tool call object, missing name:`,
-                                callData
-                            );
+                            console.warn(`(${this.provider}) Invalid tool call object, missing name:`, callData);
                         }
                     } else {
-                        console.warn(
-                            `(${this.provider}) Skipping invalid item in tool call array:`,
-                            callData
-                        );
+                        console.warn(`(${this.provider}) Skipping invalid item in tool call array:`, callData);
                     }
                 }
 
-                console.log(
-                    `(${this.provider}) Valid simulated calls extracted:`,
-                    validSimulatedCalls
-                );
+                console.log(`(${this.provider}) Valid simulated calls extracted:`, validSimulatedCalls);
 
                 // Proceed only if at least one valid call was parsed from the last match
                 if (validSimulatedCalls.length > 0) {
                     // Extract and clean text *before* the *last* marker
-                    let textBeforeToolCall = aggregatedContent
-                        .substring(0, matchIndex)
-                        .trim();
+                    let textBeforeToolCall = aggregatedContent.substring(0, matchIndex).trim();
                     // Clean up *all* markers potentially before the last one too
-                    textBeforeToolCall = textBeforeToolCall.replaceAll(
-                        TOOL_CALL_CLEANUP_REGEX,
-                        CLEANUP_PLACEHOLDER
-                    );
+                    textBeforeToolCall = textBeforeToolCall.replaceAll(TOOL_CALL_CLEANUP_REGEX, CLEANUP_PLACEHOLDER);
 
                     const eventsToYield: ProviderStreamEvent[] = [];
                     if (textBeforeToolCall) {
@@ -653,13 +548,8 @@ export class OpenAIChat extends BaseModelProvider {
         }
 
         // If no match, or parsing/validation failed for the last match
-        console.log(
-            `(${this.provider}) No valid tool calls processed from TOOL_CALLS markers.`
-        );
-        const cleanedContent = aggregatedContent.replaceAll(
-            TOOL_CALL_CLEANUP_REGEX,
-            CLEANUP_PLACEHOLDER
-        );
+        console.log(`(${this.provider}) No valid tool calls processed from TOOL_CALLS markers.`);
+        const cleanedContent = aggregatedContent.replaceAll(TOOL_CALL_CLEANUP_REGEX, CLEANUP_PLACEHOLDER);
         return { handled: false, cleanedContent: cleanedContent };
     }
 
@@ -671,9 +561,7 @@ export class OpenAIChat extends BaseModelProvider {
     ): AsyncGenerator<ProviderStreamEvent> {
         // Get tools asynchronously (getTools now returns a Promise)
         const { getToolsFromAgent } = await import('../utils/agent.js');
-        const toolsPromise = agent
-            ? getToolsFromAgent(agent)
-            : Promise.resolve([]);
+        const toolsPromise = agent ? getToolsFromAgent(agent) : Promise.resolve([]);
         const tools = await toolsPromise;
         const settings: ModelSettings | undefined = agent?.modelSettings;
         let requestId: string | undefined;
@@ -690,15 +578,15 @@ export class OpenAIChat extends BaseModelProvider {
                 });
             }
 
-            let requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming =
-                { model, messages: chatMessages, stream: true };
+            let requestParams: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming = {
+                model,
+                messages: chatMessages,
+                stream: true,
+            };
             // ... (parameter setup unchanged) ...
-            if (settings?.temperature !== undefined)
-                requestParams.temperature = settings.temperature;
-            if (settings?.top_p !== undefined)
-                requestParams.top_p = settings.top_p;
-            if (settings?.max_tokens)
-                requestParams.max_tokens = settings.max_tokens;
+            if (settings?.temperature !== undefined) requestParams.temperature = settings.temperature;
+            if (settings?.top_p !== undefined) requestParams.top_p = settings.top_p;
+            if (settings?.max_tokens) requestParams.max_tokens = settings.max_tokens;
             if (settings?.tool_choice)
                 requestParams.tool_choice =
                     settings.tool_choice as OpenAI.Chat.Completions.ChatCompletionToolChoiceOption;
@@ -709,8 +597,7 @@ export class OpenAIChat extends BaseModelProvider {
                 };
             }
             // Check if this is a Mistral model that doesn't support tools
-            const isMistralModel =
-                model.includes('mistral') || model.includes('magistral');
+            const isMistralModel = model.includes('mistral') || model.includes('magistral');
 
             if (tools && tools.length > 0 && !isMistralModel) {
                 requestParams.tools = await convertToOpenAITools(tools);
@@ -724,11 +611,7 @@ export class OpenAIChat extends BaseModelProvider {
 
             // Define mapping for OpenAI style reasoning effort configurations
             // Works for OpenRouter
-            const REASONING_EFFORT_CONFIGS: Array<string> = [
-                'low',
-                'medium',
-                'high',
-            ];
+            const REASONING_EFFORT_CONFIGS: Array<string> = ['low', 'medium', 'high'];
 
             for (const effort of REASONING_EFFORT_CONFIGS) {
                 const suffix = `-${effort}`;
@@ -749,22 +632,14 @@ export class OpenAIChat extends BaseModelProvider {
             };
 
             requestParams = this.prepareParameters(requestParams);
-            requestId = log_llm_request(
-                agent.agent_id,
-                this.provider,
-                model,
-                requestParams
-            );
+            requestId = log_llm_request(agent.agent_id, this.provider, model, requestParams);
 
             // Wait while system is paused before making the API request
-            const { waitWhilePaused } = await import(
-                '../utils/pause_controller.js'
-            );
+            const { waitWhilePaused } = await import('../utils/pause_controller.js');
             await waitWhilePaused(100, agent.abortSignal);
 
             // --- Process Stream ---
-            const stream =
-                await this.client.chat.completions.create(requestParams);
+            const stream = await this.client.chat.completions.create(requestParams);
             let aggregatedContent = '';
             let aggregatedThinking = '';
             const messageId = uuidv4();
@@ -784,17 +659,13 @@ export class OpenAIChat extends BaseModelProvider {
 
                     // Check if the system was paused during the stream
                     if (isPaused()) {
-                        console.log(
-                            `[${this.provider}] System paused during stream for model ${model}. Waiting...`
-                        );
+                        console.log(`[${this.provider}] System paused during stream for model ${model}. Waiting...`);
 
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
 
                         // If we're resuming, continue processing
-                        console.log(
-                            `[${this.provider}] System resumed, continuing stream for model ${model}`
-                        );
+                        console.log(`[${this.provider}] System resumed, continuing stream for model ${model}`);
                     }
 
                     // ... (stream aggregation logic unchanged) ...
@@ -843,14 +714,9 @@ export class OpenAIChat extends BaseModelProvider {
                     // Handle annotations (citations in Perplexity/OpenRouter format)
                     if (Array.isArray(extendedDelta.annotations)) {
                         for (const ann of extendedDelta.annotations) {
-                            if (
-                                ann.type === 'url_citation' &&
-                                ann.url_citation?.url
-                            ) {
+                            if (ann.type === 'url_citation' && ann.url_citation?.url) {
                                 const marker = formatCitation(citationTracker, {
-                                    title:
-                                        ann.url_citation.title ||
-                                        ann.url_citation.url,
+                                    title: ann.url_citation.title || ann.url_citation.url,
                                     url: ann.url_citation.url,
                                 });
                                 aggregatedContent += marker;
@@ -866,15 +732,9 @@ export class OpenAIChat extends BaseModelProvider {
 
                     // Handle citations array at chunk level (another format variant)
                     const extendedChunk = chunk as ExtendedChunk;
-                    if (
-                        Array.isArray(extendedChunk.citations) &&
-                        extendedChunk.citations.length > 0
-                    ) {
+                    if (Array.isArray(extendedChunk.citations) && extendedChunk.citations.length > 0) {
                         for (const url of extendedChunk.citations) {
-                            if (
-                                typeof url === 'string' &&
-                                !citationTracker.citations.has(url)
-                            ) {
+                            if (typeof url === 'string' && !citationTracker.citations.has(url)) {
                                 const title = url.split('/').pop() || url;
                                 const marker = formatCitation(citationTracker, {
                                     title,
@@ -894,8 +754,7 @@ export class OpenAIChat extends BaseModelProvider {
                         }
                     }
                     if ('reasoning_content' in delta) {
-                        const thinking_content =
-                            delta.reasoning_content as string;
+                        const thinking_content = delta.reasoning_content as string;
                         if (thinking_content) {
                             aggregatedThinking += thinking_content;
                             yield {
@@ -908,8 +767,7 @@ export class OpenAIChat extends BaseModelProvider {
                         }
                     }
                     if ('thinking_content' in delta) {
-                        const thinking_content =
-                            delta.thinking_content as string;
+                        const thinking_content = delta.thinking_content as string;
                         if (thinking_content) {
                             aggregatedThinking += thinking_content;
                             yield {
@@ -937,51 +795,39 @@ export class OpenAIChat extends BaseModelProvider {
                             const index = typedDelta.index;
                             if (typeof index !== 'number') continue;
 
-                            let partialCall =
-                                partialToolCallsByIndex.get(index);
+                            let partialCall = partialToolCallsByIndex.get(index);
                             if (!partialCall) {
                                 partialCall = {
                                     id: typedDelta.id || '',
                                     type: 'function',
                                     function: {
                                         name: typedDelta.function?.name || '',
-                                        arguments:
-                                            typedDelta.function?.arguments ||
-                                            '',
+                                        arguments: typedDelta.function?.arguments || '',
                                     },
                                 };
                                 partialToolCallsByIndex.set(index, partialCall);
                             } else {
-                                if (typedDelta.id)
-                                    partialCall.id = typedDelta.id;
-                                if (typedDelta.function?.name)
-                                    partialCall.function.name =
-                                        typedDelta.function.name;
+                                if (typedDelta.id) partialCall.id = typedDelta.id;
+                                if (typedDelta.function?.name) partialCall.function.name = typedDelta.function.name;
                                 if (typedDelta.function?.arguments) {
                                     // For xAI/Grok, validate accumulated arguments to prevent JSON errors
-                                    const newArgs =
-                                        typedDelta.function.arguments;
-                                    const accumulatedArgs =
-                                        partialCall.function.arguments +
-                                        newArgs;
+                                    const newArgs = typedDelta.function.arguments;
+                                    const accumulatedArgs = partialCall.function.arguments + newArgs;
 
                                     // Try to parse to check if we have valid JSON so far
                                     try {
                                         JSON.parse(accumulatedArgs);
-                                        partialCall.function.arguments =
-                                            accumulatedArgs;
+                                        partialCall.function.arguments = accumulatedArgs;
                                     } catch {
                                         // If parsing fails, it might be incomplete JSON
                                         // For xAI, we'll just accumulate and validate later
-                                        partialCall.function.arguments =
-                                            accumulatedArgs;
+                                        partialCall.function.arguments = accumulatedArgs;
                                     }
                                 }
                             }
                         }
                     }
-                    if (choice.finish_reason)
-                        finishReason = choice.finish_reason;
+                    if (choice.finish_reason) finishReason = choice.finish_reason;
                     if (chunk.usage) usage = chunk.usage;
                 } // End stream loop
 
@@ -1004,19 +850,14 @@ export class OpenAIChat extends BaseModelProvider {
                         model: model,
                         input_tokens: usage.prompt_tokens || 0,
                         output_tokens: usage.completion_tokens || 0,
-                        cached_tokens:
-                            usage.prompt_tokens_details?.cached_tokens || 0,
+                        cached_tokens: usage.prompt_tokens_details?.cached_tokens || 0,
                         metadata: {
                             total_tokens: usage.total_tokens || 0,
-                            reasoning_tokens:
-                                usage.completion_tokens_details
-                                    ?.reasoning_tokens || 0,
+                            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens || 0,
                         },
                     });
                 } else {
-                    console.warn(
-                        `(${this.provider}) Usage info not found in stream for cost tracking.`
-                    );
+                    console.warn(`(${this.provider}) Usage info not found in stream for cost tracking.`);
                 }
 
                 // Flush any remaining buffered deltas and yield them
@@ -1036,10 +877,7 @@ export class OpenAIChat extends BaseModelProvider {
                 // --- Handle Final State Based on Finish Reason ---
                 if (finishReason === 'stop') {
                     // Use the updated helper function for parsing TOOL_CALLS: [...]
-                    const parseResult = this._parseAndPrepareSimulatedToolCalls(
-                        aggregatedContent,
-                        messageId
-                    );
+                    const parseResult = this._parseAndPrepareSimulatedToolCalls(aggregatedContent, messageId);
                     if (parseResult.handled && parseResult.eventsToYield) {
                         for (const event of parseResult.eventsToYield) {
                             yield event;
@@ -1055,55 +893,42 @@ export class OpenAIChat extends BaseModelProvider {
                     }
                 } else if (finishReason === 'tool_calls') {
                     // Handle NATIVE tool calls (unchanged)
-                    const completedToolCalls: ToolCall[] = Array.from(
-                        partialToolCallsByIndex.values()
-                    ).filter(call => call.id && call.function.name);
+                    const completedToolCalls: ToolCall[] = Array.from(partialToolCallsByIndex.values()).filter(
+                        call => call.id && call.function.name
+                    );
                     if (completedToolCalls.length > 0) {
                         for (const completedToolCall of completedToolCalls) {
                             // Validate and fix JSON arguments before yielding
                             if (completedToolCall.function.arguments) {
                                 try {
                                     // Try to parse to validate JSON
-                                    const parsed = JSON.parse(
-                                        completedToolCall.function.arguments
-                                    );
+                                    const parsed = JSON.parse(completedToolCall.function.arguments);
                                     // Re-stringify to ensure clean format
-                                    completedToolCall.function.arguments =
-                                        JSON.stringify(parsed);
+                                    completedToolCall.function.arguments = JSON.stringify(parsed);
                                 } catch (error) {
                                     console.warn(
                                         `(${this.provider}) Invalid JSON in tool arguments for ${completedToolCall.function.name}, attempting to fix: ${error}`
                                     );
 
                                     // For xAI/Grok, try to extract valid JSON
-                                    const argStr =
-                                        completedToolCall.function.arguments;
+                                    const argStr = completedToolCall.function.arguments;
 
                                     // Try to find a complete JSON object
-                                    const matches = argStr.match(
-                                        /\{(?:[^{}]|(?:\{[^{}]*\}))*\}/
-                                    );
+                                    const matches = argStr.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/);
                                     if (matches && matches[0]) {
                                         try {
-                                            const parsed = JSON.parse(
-                                                matches[0]
-                                            );
-                                            completedToolCall.function.arguments =
-                                                JSON.stringify(parsed);
-                                            console.log(
-                                                `(${this.provider}) Successfully extracted valid JSON`
-                                            );
+                                            const parsed = JSON.parse(matches[0]);
+                                            completedToolCall.function.arguments = JSON.stringify(parsed);
+                                            console.log(`(${this.provider}) Successfully extracted valid JSON`);
                                         } catch {
                                             // If all else fails, use empty object
-                                            completedToolCall.function.arguments =
-                                                '{}';
+                                            completedToolCall.function.arguments = '{}';
                                             console.error(
                                                 `(${this.provider}) Could not parse arguments, using empty object`
                                             );
                                         }
                                     } else {
-                                        completedToolCall.function.arguments =
-                                            '{}';
+                                        completedToolCall.function.arguments = '{}';
                                     }
                                 }
                             }
@@ -1159,11 +984,7 @@ export class OpenAIChat extends BaseModelProvider {
                             `(${this.provider}) Stream finished without finish_reason, yielding cleaned content.`
                         );
                         // Attempt to parse simulated calls even without finish reason 'stop'
-                        const parseResult =
-                            this._parseAndPrepareSimulatedToolCalls(
-                                aggregatedContent,
-                                messageId
-                            );
+                        const parseResult = this._parseAndPrepareSimulatedToolCalls(aggregatedContent, messageId);
                         if (parseResult.handled && parseResult.eventsToYield) {
                             for (const event of parseResult.eventsToYield) {
                                 yield event;
@@ -1191,10 +1012,7 @@ export class OpenAIChat extends BaseModelProvider {
                         };
                     } else {
                         // ... (unchanged empty stream error handling) ...
-                        log_llm_error(
-                            requestId,
-                            `Error (${this.provider}): Stream finished unexpectedly empty.`
-                        );
+                        log_llm_error(requestId, `Error (${this.provider}): Stream finished unexpectedly empty.`);
                         console.warn(
                             `(${this.provider}) Stream finished empty without reason, content, or tool calls.`
                         );
@@ -1206,22 +1024,16 @@ export class OpenAIChat extends BaseModelProvider {
                 }
             } catch (streamError) {
                 log_llm_error(requestId, streamError);
-                console.error(
-                    `(${this.provider}) Error processing chat completions stream:`,
-                    streamError
-                );
+                console.error(`(${this.provider}) Error processing chat completions stream:`, streamError);
                 yield {
                     type: 'error',
                     error:
                         `Stream processing error (${this.provider} ${model}): ` +
-                        (streamError instanceof OpenAI.APIError ||
-                        streamError instanceof APIError
+                        (streamError instanceof OpenAI.APIError || streamError instanceof APIError
                             ? `${streamError.status} ${streamError.name} ${streamError.message} ${JSON.stringify(streamError.error)}`
                             : streamError instanceof Error
                               ? streamError.stack
-                              : Object.getPrototypeOf(streamError) +
-                                ' ' +
-                                String(streamError)),
+                              : Object.getPrototypeOf(streamError) + ' ' + String(streamError)),
                 };
             } finally {
                 partialToolCallsByIndex.clear();
@@ -1231,16 +1043,12 @@ export class OpenAIChat extends BaseModelProvider {
             }
         } catch (error) {
             log_llm_error(requestId, error);
-            console.error(
-                `Error running ${this.provider} chat completions stream:`,
-                error
-            );
+            console.error(`Error running ${this.provider} chat completions stream:`, error);
             yield {
                 type: 'error',
                 error:
                     `API Error (${this.provider} - ${model}): ` +
-                    (error instanceof OpenAI.APIError ||
-                    error instanceof APIError
+                    (error instanceof OpenAI.APIError || error instanceof APIError
                         ? `${error.status} ${error.name} ${error.message}`
                         : error instanceof Error
                           ? error.stack

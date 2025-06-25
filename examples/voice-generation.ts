@@ -34,9 +34,7 @@ async function generateSpeechBuffer() {
         }
 
         outputStream.end();
-        console.log(
-            `✓ Saved speech to output-buffer.mp3 (${totalChunks} chunks)`
-        );
+        console.log(`✓ Saved speech to output-buffer.mp3 (${totalChunks} chunks)`);
     } catch (error) {
         console.error('Error generating speech:', error);
     }
@@ -72,17 +70,13 @@ async function streamSpeechToFile() {
                 outputStream.write(buffer);
 
                 if (event.chunkIndex % 5 === 0) {
-                    console.log(
-                        `  Processing... ${bytesReceived} bytes received`
-                    );
+                    console.log(`  Processing... ${bytesReceived} bytes received`);
                 }
             }
         }
 
         outputStream.end();
-        console.log(
-            `✓ Streamed speech to output-stream.mp3 (${bytesReceived} bytes total)`
-        );
+        console.log(`✓ Streamed speech to output-stream.mp3 (${bytesReceived} bytes total)`);
     } catch (error) {
         console.error('Error streaming speech:', error);
     }
@@ -93,8 +87,7 @@ async function processAudioEvents() {
     console.log('\n=== Example 3: Process audio events ===');
 
     try {
-        const text =
-            'This example shows how to process audio chunks as they arrive.';
+        const text = 'This example shows how to process audio chunks as they arrive.';
 
         const outputStream = createWriteStream('output-events.mp3');
         let totalChunks = 0;
@@ -118,9 +111,7 @@ async function processAudioEvents() {
                     const buffer = Buffer.from(event.data, 'base64');
                     totalBytes += buffer.length;
                     outputStream.write(buffer);
-                    console.log(
-                        `Received chunk ${event.chunkIndex} (${buffer.length} bytes)`
-                    );
+                    console.log(`Received chunk ${event.chunkIndex} (${buffer.length} bytes)`);
                 } else if (event.format) {
                     console.log(`Audio format: ${event.format}`);
                 }
@@ -128,9 +119,7 @@ async function processAudioEvents() {
         }
 
         outputStream.end();
-        console.log(
-            `✓ Processed ${totalChunks} audio chunks to output-events.mp3 (${totalBytes} bytes)`
-        );
+        console.log(`✓ Processed ${totalChunks} audio chunks to output-events.mp3 (${totalBytes} bytes)`);
     } catch (error) {
         console.error('Error processing audio events:', error);
     }
@@ -141,14 +130,7 @@ async function compareVoices() {
     console.log('\n=== Example 4: Compare different voices ===');
 
     const text = 'Each voice has its own unique characteristics.';
-    const voices = [
-        'alloy',
-        'echo',
-        'fable',
-        'onyx',
-        'nova',
-        'shimmer',
-    ] as const;
+    const voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 
     for (const voice of voices) {
         try {
@@ -220,8 +202,7 @@ async function elevenLabsExample() {
     console.log('\n=== Example 6: ElevenLabs voice generation ===');
 
     try {
-        const text =
-            'This is a test of the ElevenLabs text-to-speech API with high-quality voices.';
+        const text = 'This is a test of the ElevenLabs text-to-speech API with high-quality voices.';
 
         // Generate with ElevenLabs multilingual model
         const outputStream = createWriteStream('elevenlabs-output.mp3');
@@ -250,9 +231,7 @@ async function elevenLabsExample() {
 
 // Example 7: ElevenLabs streaming with custom voice settings
 async function elevenLabsStreamingExample() {
-    console.log(
-        '\n=== Example 7: ElevenLabs streaming with custom settings ==='
-    );
+    console.log('\n=== Example 7: ElevenLabs streaming with custom settings ===');
 
     try {
         const text =
@@ -288,9 +267,7 @@ async function elevenLabsStreamingExample() {
                     console.log(`✓ Completed streaming ${totalChunks} chunks`);
                 }
             } else if (event.type === 'cost_update') {
-                console.log(
-                    `Cost: $${event.usage.cost?.toFixed(4) || '0.0000'}`
-                );
+                console.log(`Cost: $${event.usage.cost?.toFixed(4) || '0.0000'}`);
             }
         }
 
@@ -305,17 +282,14 @@ async function elevenLabsStreamingExample() {
 async function compareElevenLabsVoices() {
     console.log('\n=== Example 8: Compare ElevenLabs voices ===');
 
-    const text =
-        'Each ElevenLabs voice has unique characteristics and speaking style.';
+    const text = 'Each ElevenLabs voice has unique characteristics and speaking style.';
     const voices = ['rachel', 'adam', 'bella', 'josh', 'sam'];
 
     for (const voice of voices) {
         try {
             console.log(`Generating with ElevenLabs voice: ${voice}...`);
 
-            const outputStream = createWriteStream(
-                `elevenlabs-voice-${voice}.mp3`
-            );
+            const outputStream = createWriteStream(`elevenlabs-voice-${voice}.mp3`);
 
             for await (const event of ensembleVoice(
                 text,
@@ -360,9 +334,7 @@ async function main() {
         await elevenLabsStreamingExample();
         await compareElevenLabsVoices();
     } else {
-        console.log(
-            '\n⚠️  Skipping ElevenLabs examples (no ELEVENLABS_API_KEY found)'
-        );
+        console.log('\n⚠️  Skipping ElevenLabs examples (no ELEVENLABS_API_KEY found)');
     }
 
     console.log('\n✓ All examples completed!');

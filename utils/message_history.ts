@@ -50,13 +50,8 @@ export class MessageHistory {
         tools: [],
     };
 
-    constructor(
-        initialMessages: ResponseInput = [],
-        options: MessageHistoryOptions = {}
-    ) {
-        this.messages = initialMessages.map(
-            msg => ({ ...msg }) as PinnableMessage
-        );
+    constructor(initialMessages: ResponseInput = [], options: MessageHistoryOptions = {}) {
+        this.messages = initialMessages.map(msg => ({ ...msg }) as PinnableMessage);
         this.options = {
             maxMessages: options.maxMessages,
             maxTokens: options.maxTokens,
@@ -66,9 +61,7 @@ export class MessageHistory {
         };
 
         // Pin the first system message by default
-        const firstSystemMsg = this.messages.find(
-            m => m.type === 'message' && m.role === 'system'
-        );
+        const firstSystemMsg = this.messages.find(m => m.type === 'message' && m.role === 'system');
         if (firstSystemMsg) {
             (firstSystemMsg as PinnableMessage).pinned = true;
         }
@@ -224,9 +217,7 @@ export class MessageHistory {
             }
         } else if (msg.type === 'function_call') {
             // Track tool usage
-            const existingTool = this.extractedInfo.tools.find(
-                t => t.name === msg.name
-            );
+            const existingTool = this.extractedInfo.tools.find(t => t.name === msg.name);
             if (!existingTool) {
                 this.extractedInfo.tools.push({
                     name: msg.name,
@@ -313,20 +304,11 @@ export class MessageHistory {
             // Common patterns
             if (toolName.includes('read') || toolName.includes('get')) {
                 return 'Information retrieval';
-            } else if (
-                toolName.includes('write') ||
-                toolName.includes('create')
-            ) {
+            } else if (toolName.includes('write') || toolName.includes('create')) {
                 return 'Content creation';
-            } else if (
-                toolName.includes('search') ||
-                toolName.includes('find')
-            ) {
+            } else if (toolName.includes('search') || toolName.includes('find')) {
                 return 'Search operation';
-            } else if (
-                toolName.includes('execute') ||
-                toolName.includes('run')
-            ) {
+            } else if (toolName.includes('execute') || toolName.includes('run')) {
                 return 'Code execution';
             }
 
@@ -344,9 +326,7 @@ export class MessageHistory {
             if (typeof msg.content === 'string') {
                 return msg.content;
             } else if (Array.isArray(msg.content)) {
-                return msg.content
-                    .map(item => ('text' in item ? item.text : ''))
-                    .join(' ');
+                return msg.content.map(item => ('text' in item ? item.text : '')).join(' ');
             }
         }
         return '';
@@ -364,9 +344,7 @@ export class MessageHistory {
      */
     clear(): void {
         const systemMessages = this.options.preserveSystemMessages
-            ? this.messages.filter(
-                  m => m.type === 'message' && m.role === 'system'
-              )
+            ? this.messages.filter(m => m.type === 'message' && m.role === 'system')
             : [];
         this.messages = systemMessages;
     }
@@ -375,22 +353,13 @@ export class MessageHistory {
      * Trim history based on options
      */
     private trim(): void {
-        if (
-            this.options.maxMessages &&
-            this.messages.length > this.options.maxMessages
-        ) {
+        if (this.options.maxMessages && this.messages.length > this.options.maxMessages) {
             const systemMessages = this.options.preserveSystemMessages
-                ? this.messages.filter(
-                      m => m.type === 'message' && m.role === 'system'
-                  )
+                ? this.messages.filter(m => m.type === 'message' && m.role === 'system')
                 : [];
 
-            const nonSystemMessages = this.messages.filter(
-                m => !(m.type === 'message' && m.role === 'system')
-            );
-            const trimmedMessages = nonSystemMessages.slice(
-                -this.options.maxMessages
-            );
+            const nonSystemMessages = this.messages.filter(m => !(m.type === 'message' && m.role === 'system'));
+            const trimmedMessages = nonSystemMessages.slice(-this.options.maxMessages);
 
             this.messages = [...systemMessages, ...trimmedMessages];
         }
@@ -420,8 +389,7 @@ export class MessageHistory {
                 const toolCalls = [];
                 while (
                     i < this.messages.length &&
-                    (this.messages[i].type === 'function_call' ||
-                        this.messages[i].type === 'function_call_output')
+                    (this.messages[i].type === 'function_call' || this.messages[i].type === 'function_call_output')
                 ) {
                     toolCalls.push(this.messages[i]);
                     i++;
@@ -618,10 +586,7 @@ export class MessageHistory {
         }
 
         // Ensure we keep at least 2 recent messages
-        tailStartIndex = Math.max(
-            0,
-            Math.min(tailStartIndex, unpinnedMessages.length - 2)
-        );
+        tailStartIndex = Math.max(0, Math.min(tailStartIndex, unpinnedMessages.length - 2));
 
         const messagesToCompact = unpinnedMessages.slice(0, tailStartIndex);
         const tailMessages = unpinnedMessages.slice(tailStartIndex);
@@ -645,11 +610,8 @@ export class MessageHistory {
         this.messages = [...pinnedMessages, summaryMessage, ...tailMessages];
 
         // 7. Update micro-log to only include recent entries
-        const recentTimestamp =
-            tailMessages[0]?.timestamp || Date.now() - 3600000;
-        this.microLog = this.microLog.filter(
-            entry => (entry.timestamp || 0) >= recentTimestamp
-        );
+        const recentTimestamp = tailMessages[0]?.timestamp || Date.now() - 3600000;
+        this.microLog = this.microLog.filter(entry => (entry.timestamp || 0) >= recentTimestamp);
 
         this.updateTokenEstimate();
 
@@ -661,9 +623,7 @@ export class MessageHistory {
     /**
      * Create a hybrid summary combining micro-log and structured info
      */
-    private async createHybridSummary(
-        messages: PinnableMessage[]
-    ): Promise<string> {
+    private async createHybridSummary(messages: PinnableMessage[]): Promise<string> {
         const sections: string[] = [];
 
         // 1. Chronological micro-log section
@@ -704,9 +664,7 @@ export class MessageHistory {
             return '';
         }
 
-        return relevantLogs
-            .map(entry => `- ${entry.role}: ${entry.summary}`)
-            .join('\n');
+        return relevantLogs.map(entry => `- ${entry.role}: ${entry.summary}`).join('\n');
     }
 
     /**
@@ -718,32 +676,24 @@ export class MessageHistory {
         // Entities
         if (this.extractedInfo.entities.size > 0) {
             const entities = Array.from(this.extractedInfo.entities).slice(-20); // Keep last 20
-            parts.push(
-                `### Entities\n${entities.map(e => `- ${e}`).join('\n')}`
-            );
+            parts.push(`### Entities\n${entities.map(e => `- ${e}`).join('\n')}`);
         }
 
         // Recent decisions
         if (this.extractedInfo.decisions.length > 0) {
             const decisions = this.extractedInfo.decisions.slice(-10); // Keep last 10
-            parts.push(
-                `### Decisions\n${decisions.map(d => `- ${d}`).join('\n')}`
-            );
+            parts.push(`### Decisions\n${decisions.map(d => `- ${d}`).join('\n')}`);
         }
 
         // Pending todos
         if (this.extractedInfo.todos.length > 0) {
             const todos = this.extractedInfo.todos.slice(-10); // Keep last 10
-            parts.push(
-                `### Pending Tasks\n${todos.map(t => `- ${t}`).join('\n')}`
-            );
+            parts.push(`### Pending Tasks\n${todos.map(t => `- ${t}`).join('\n')}`);
         }
 
         // Tools used
         if (this.extractedInfo.tools.length > 0) {
-            parts.push(
-                `### Tools Used\n${this.extractedInfo.tools.map(t => `- ${t.name}: ${t.purpose}`).join('\n')}`
-            );
+            parts.push(`### Tools Used\n${this.extractedInfo.tools.map(t => `- ${t.name}: ${t.purpose}`).join('\n')}`);
         }
 
         return parts.join('\n\n');
@@ -752,9 +702,7 @@ export class MessageHistory {
     /**
      * Create detailed summary using AI
      */
-    private async createDetailedSummary(
-        messages: PinnableMessage[]
-    ): Promise<string> {
+    private async createDetailedSummary(messages: PinnableMessage[]): Promise<string> {
         // Create a condensed representation for AI summarization
         let conversationText = '';
         let tokenCount = 0;
@@ -785,9 +733,7 @@ export class MessageHistory {
         }
 
         try {
-            const { createSummary } = await import(
-                './tool_result_processor.js'
-            );
+            const { createSummary } = await import('./tool_result_processor.js');
             const summaryPrompt = `Create a concise summary of this conversation, focusing on:
 1. Main objectives and goals
 2. Key decisions and outcomes
@@ -834,10 +780,7 @@ Keep the summary focused and relevant for continuing the conversation.`;
                 // Search for the output in the remaining messages
                 for (let j = i + 1; j < this.messages.length; j++) {
                     const potentialOutput = this.messages[j];
-                    if (
-                        potentialOutput.type === 'function_call_output' &&
-                        potentialOutput.call_id === callId
-                    ) {
+                    if (potentialOutput.type === 'function_call_output' && potentialOutput.call_id === callId) {
                         // Found the output, add it immediately after the call
                         reorderedMessages.push(potentialOutput);
                         // Remove the output from its original position
@@ -874,10 +817,7 @@ Keep the summary focused and relevant for continuing the conversation.`;
                 // Check if we already processed its matching call
                 for (let j = reorderedMessages.length - 1; j >= 0; j--) {
                     const msg = reorderedMessages[j];
-                    if (
-                        msg.type === 'function_call' &&
-                        msg.call_id === callId
-                    ) {
+                    if (msg.type === 'function_call' && msg.call_id === callId) {
                         hasMatchingCall = true;
                         break;
                     }

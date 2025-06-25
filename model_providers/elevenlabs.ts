@@ -75,9 +75,7 @@ class ElevenLabsProvider extends BaseModelProvider {
      * Not implemented for voice-only provider
      */
     async image(): Promise<any> {
-        throw new Error(
-            'ElevenLabs provider does not support image generation'
-        );
+        throw new Error('ElevenLabs provider does not support image generation');
     }
 
     /**
@@ -95,16 +93,11 @@ class ElevenLabsProvider extends BaseModelProvider {
             // Map voice to voice ID if it's a preset name
             let voiceId = opts?.voice || 'adam';
             if (voiceId in ELEVENLABS_VOICES) {
-                voiceId =
-                    ELEVENLABS_VOICES[
-                        voiceId as keyof typeof ELEVENLABS_VOICES
-                    ];
+                voiceId = ELEVENLABS_VOICES[voiceId as keyof typeof ELEVENLABS_VOICES];
             }
 
             // Convert our format options to ElevenLabs format
-            const outputFormat = this.mapOutputFormat(
-                opts?.response_format || 'mp3_44100_128'
-            );
+            const outputFormat = this.mapOutputFormat(opts?.response_format || 'mp3_44100_128');
 
             console.log(
                 `[ElevenLabs] Generating speech with model ${modelId}, voice: ${voiceId}, format: ${outputFormat}`
@@ -126,8 +119,7 @@ class ElevenLabsProvider extends BaseModelProvider {
             };
             if (requestBody.voice_settings.speed > 1) {
                 // To try to keep similar to other providers
-                requestBody.voice_settings.speed =
-                    requestBody.voice_settings.speed / 2;
+                requestBody.voice_settings.speed = requestBody.voice_settings.speed / 2;
             }
 
             const url = `${this.baseUrl}/text-to-speech/${voiceId}?output_format=${outputFormat}`;
@@ -137,18 +129,14 @@ class ElevenLabsProvider extends BaseModelProvider {
                 headers: {
                     'xi-api-key': this.apiKey,
                     'Content-Type': 'application/json',
-                    Accept: opts?.stream
-                        ? 'application/octet-stream'
-                        : 'audio/mpeg',
+                    Accept: opts?.stream ? 'application/octet-stream' : 'audio/mpeg',
                 },
                 body: JSON.stringify(requestBody),
             });
 
             if (!response.ok) {
                 const error = await response.text();
-                throw new Error(
-                    `ElevenLabs API error: ${response.status} - ${error}`
-                );
+                throw new Error(`ElevenLabs API error: ${response.status} - ${error}`);
             }
 
             // Track usage for cost calculation
