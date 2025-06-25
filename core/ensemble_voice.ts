@@ -1,5 +1,6 @@
 import type { AgentDefinition, VoiceGenerationOpts } from '../types/types.js';
 import { getModelFromAgent, getModelProvider, type ModelProvider } from '../model_providers/model_provider.js';
+import { findModel } from '../data/model_data.js';
 
 // Re-export for convenience
 export type { VoiceGenerationOpts };
@@ -58,7 +59,8 @@ export async function* ensembleVoice(
     console.log(`[ensembleVoice] Starting TTS generation with model: ${model}`);
 
     // Emit initial event with format info
-    const isOpenAI = model === 'tts-1' || model === 'tts-1-hd' || model === 'gpt-4o-mini-tts';
+    const modelInfo = findModel(model);
+    const isOpenAI = modelInfo?.provider === 'openai';
     const isWav = format === 'wav';
 
     // Determine effective format after any conversions
