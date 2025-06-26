@@ -22,25 +22,27 @@ vi.mock('@google/genai', () => ({
                     },
                 ],
             }),
-            generateContentStream: vi.fn().mockImplementation(() => 
-                Promise.resolve((async function* () {
-                    yield {
-                        candidates: [
-                            {
-                                content: {
-                                    parts: [
-                                        {
-                                            inlineData: {
-                                                mimeType: 'audio/wav',
-                                                data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+            generateContentStream: vi.fn().mockImplementation(() =>
+                Promise.resolve(
+                    (async function* () {
+                        yield {
+                            candidates: [
+                                {
+                                    content: {
+                                        parts: [
+                                            {
+                                                inlineData: {
+                                                    mimeType: 'audio/wav',
+                                                    data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+                                                },
                                             },
-                                        },
-                                    ],
+                                        ],
+                                    },
                                 },
-                            },
-                        ],
-                    };
-                })())
+                            ],
+                        };
+                    })()
+                )
             ),
         },
     })),
@@ -145,9 +147,11 @@ describe('Gemini Voice Generation', () => {
 
         // Mock empty response
         const mockGenAI = vi.mocked((provider as any).client.models.generateContentStream);
-        mockGenAI.mockResolvedValueOnce((async function* () {
-            yield { candidates: [] };
-        })());
+        mockGenAI.mockResolvedValueOnce(
+            (async function* () {
+                yield { candidates: [] };
+            })()
+        );
 
         await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data generated from Gemini TTS');
     });
@@ -158,21 +162,23 @@ describe('Gemini Voice Generation', () => {
 
         // Mock response without audio parts
         const mockGenAI = vi.mocked((provider as any).client.models.generateContentStream);
-        mockGenAI.mockResolvedValueOnce((async function* () {
-            yield {
-                candidates: [
-                    {
-                        content: {
-                            parts: [
-                                {
-                                    text: 'Some text instead of audio',
-                                },
-                            ],
+        mockGenAI.mockResolvedValueOnce(
+            (async function* () {
+                yield {
+                    candidates: [
+                        {
+                            content: {
+                                parts: [
+                                    {
+                                        text: 'Some text instead of audio',
+                                    },
+                                ],
+                            },
                         },
-                    },
-                ],
-            };
-        })());
+                    ],
+                };
+            })()
+        );
 
         await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data generated from Gemini TTS');
     });

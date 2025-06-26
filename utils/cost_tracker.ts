@@ -293,6 +293,63 @@ class CostTracker {
     }
 
     /**
+     * Get the total cost incurred within a specific time window (in seconds from now)
+     * @param seconds The number of seconds to look back from the current time
+     * @returns The total cost within the time window
+     */
+    getCostInTimeWindow(seconds: number): number {
+        const cutoffTime = new Date(Date.now() - seconds * 1000);
+        return this.entries
+            .filter(entry => entry.timestamp && entry.timestamp >= cutoffTime)
+            .reduce((sum, entry) => sum + (entry.cost || 0), 0);
+    }
+
+    /**
+     * Calculate the cost rate (dollars per minute) over a given time window
+     * @param windowSeconds The time window in seconds (default: 60 seconds)
+     * @returns The cost rate in dollars per minute
+     */
+    getCostRate(windowSeconds: number = 60): number {
+        const costInWindow = this.getCostInTimeWindow(windowSeconds);
+        // Convert to rate per minute
+        return (costInWindow / windowSeconds) * 60;
+    }
+
+    /**
+     * Get all usage entries within a specific time window
+     * @param seconds The number of seconds to look back from the current time
+     * @returns Array of ModelUsage entries within the time window
+     */
+    getUsageInTimeWindow(seconds: number): ModelUsage[] {
+        const cutoffTime = new Date(Date.now() - seconds * 1000);
+        return this.entries.filter(entry => entry.timestamp && entry.timestamp >= cutoffTime);
+    }
+
+    /**
+     * Get costs broken down by model within a specific time window
+     * @param seconds The number of seconds to look back from the current time
+     * @returns Record of model names to their cost and call count within the window
+     */
+    getCostsByModelInTimeWindow(seconds: number): Record<string, { cost: number; calls: number }> {
+        const models: Record<string, { cost: number; calls: number }> = {};
+        const entriesInWindow = this.getUsageInTimeWindow(seconds);
+
+        for (const entry of entriesInWindow) {
+            if (!models[entry.model]) {
+                models[entry.model] = {
+                    cost: 0,
+                    calls: 0,
+                };
+            }
+
+            models[entry.model].cost += entry.cost || 0;
+            models[entry.model].calls += 1;
+        }
+
+        return models;
+    }
+
+    /**
      * Reset the cost tracker (mainly for testing)
      */
     reset(): void {
