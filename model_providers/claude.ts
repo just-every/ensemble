@@ -415,8 +415,45 @@ export class ClaudeProvider extends BaseModelProvider {
             /* ---------- End Claude message build ---------- */
         }
 
-        // If thinking is enabled, handle consecutive assistant messages
-        if (thinkingEnabled && result.length > 1) {
+        // If thinking is enabled, ensure proper message formatting
+        if (thinkingEnabled && result.length > 0) {
+            // First, handle the last message if it's an assistant message with tool_use
+            const lastMsg = result[result.length - 1];
+            if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
+                // Check if message contains tool_use blocks
+                const hasToolUse = lastMsg.content.some(block => block.type === 'tool_use');
+
+                if (hasToolUse) {
+                    // Check if message starts with a thinking block
+                    const hasThinkingBlock =
+                        lastMsg.content.length > 0 &&
+                        (lastMsg.content[0].type === 'thinking' || lastMsg.content[0].type === 'redacted_thinking');
+
+                    // If it has tool_use but no thinking block at the start, convert to user message
+                    if (!hasThinkingBlock) {
+                        // Extract tool calls and convert to text description
+                        const toolCalls = lastMsg.content
+                            .filter(block => block.type === 'tool_use')
+                            .map(block => {
+                                const args =
+                                    typeof block.input === 'string' ? block.input : JSON.stringify(block.input);
+                                return `Called tool '${block.name}' with arguments: ${args}`;
+                            })
+                            .join('\n');
+
+                        // Convert the message to a user message with tool call description
+                        lastMsg.role = 'user';
+                        lastMsg.content = [
+                            {
+                                type: 'text',
+                                text: `[Previous assistant action]\n${toolCalls}`,
+                            },
+                        ];
+                    }
+                }
+            }
+
+            // Then handle consecutive assistant messages
             for (let i = 1; i < result.length; i++) {
                 const prevMsg = result[i - 1];
                 const currentMsg = result[i];

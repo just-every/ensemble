@@ -81,7 +81,7 @@ export class AudioStreamPlayer {
             console.error('No format set');
             return;
         }
-        
+
         // Don't accept new chunks if we've already received final chunk (fadeOutAndStop sets this)
         if (this.receivedFinalChunk) {
             return;
@@ -137,7 +137,7 @@ export class AudioStreamPlayer {
             this._resetState();
             return;
         }
-        
+
         // Don't process if we've been stopped (currentFormat is cleared on stop)
         if (!this.currentFormat) {
             return;
@@ -339,10 +339,10 @@ export class AudioStreamPlayer {
     fadeOutAndStop(fadeTimeMs: number = 150): void {
         // Immediately mark as final to prevent new chunks from being processed
         this.receivedFinalChunk = true;
-        
+
         // Clear the queue to prevent further processing
         this.pcmDataQueue = [];
-        
+
         if (!this.audioContext) {
             this.stopStream();
             return;
@@ -395,7 +395,7 @@ export class AudioStreamPlayer {
         // but keep nodes alive for fade out
         const tempSourceNodes = [...this.sourceNodes];
         const tempGainNodes = [...this.gainNodes];
-        
+
         // Reset most state immediately
         this.expectedChunkIndex = 0;
         this.pcmDataQueue = [];
@@ -403,7 +403,7 @@ export class AudioStreamPlayer {
         this.nextStartTime = 0;
         this.isFirstBuffer = true;
         this.currentFormat = null;
-        
+
         // Clear node arrays after fade completes
         setTimeout(() => {
             tempSourceNodes.forEach(node => {
