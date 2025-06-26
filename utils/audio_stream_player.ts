@@ -12,6 +12,7 @@ export interface AudioStreamPlayerOptions {
 export class AudioStreamPlayer {
     private audioContext: AudioContext | null = null;
     private sourceNodes: AudioBufferSourceNode[] = [];
+    private gainNodes: GainNode[] = [];
     private nextStartTime = 0;
     private expectedChunkIndex = 0;
     private receivedFinalChunk = false;
@@ -80,6 +81,11 @@ export class AudioStreamPlayer {
             console.error('No format set');
             return;
         }
+        
+        // Don't accept new chunks if we've already received final chunk (fadeOutAndStop sets this)
+        if (this.receivedFinalChunk) {
+            return;
+        }
 
         if (format === 'wav' || format.includes('pcm')) {
             this._addPcmChunk(base64Chunk, chunkIndex, isFinalChunk);
@@ -125,10 +131,15 @@ export class AudioStreamPlayer {
             return;
         }
 
-        // Check if we're done
+        // Check if we're done or have been stopped
         if (this.receivedFinalChunk && this.pcmDataQueue.length === 0 && this.sourceNodes.length === 0) {
             console.log('PCM stream finished');
             this._resetState();
+            return;
+        }
+        
+        // Don't process if we've been stopped (currentFormat is cleared on stop)
+        if (!this.currentFormat) {
             return;
         }
 
@@ -211,7 +222,14 @@ export class AudioStreamPlayer {
 
         const sourceNode = this.audioContext.createBufferSource();
         sourceNode.buffer = audioBuffer;
-        sourceNode.connect(this.audioContext.destination);
+
+        // Create gain node for volume control
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 1.0;
+
+        // Connect source -> gain -> destination
+        sourceNode.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
 
         const currentTime = this.audioContext.currentTime;
         const startTime = this.nextStartTime <= currentTime ? currentTime : this.nextStartTime;
@@ -219,8 +237,9 @@ export class AudioStreamPlayer {
         sourceNode.start(startTime);
         this.nextStartTime = startTime + audioBuffer.duration;
 
-        // Track this node
+        // Track both nodes
         this.sourceNodes.push(sourceNode);
+        this.gainNodes.push(gainNode);
 
         // Fire event when this is the first audio to actually play
         if (this.isFirstBuffer && this.onFirstAudioPlay) {
@@ -237,6 +256,11 @@ export class AudioStreamPlayer {
             const index = this.sourceNodes.indexOf(sourceNode);
             if (index > -1) {
                 this.sourceNodes.splice(index, 1);
+                // Also remove corresponding gain node
+                const gainNode = this.gainNodes[index];
+                if (gainNode) {
+                    this.gainNodes.splice(index, 1);
+                }
             }
             // Add small delay to allow more data to accumulate
             setTimeout(() => this._processPcmQueue(), 20);
@@ -302,6 +326,7 @@ export class AudioStreamPlayer {
             }
         });
         this.sourceNodes = [];
+        this.gainNodes = [];
 
         if (this.fallbackAudio) {
             this.fallbackAudio.pause();
@@ -309,6 +334,95 @@ export class AudioStreamPlayer {
         }
 
         this._resetState();
+    }
+
+    fadeOutAndStop(fadeTimeMs: number = 150): void {
+        // Immediately mark as final to prevent new chunks from being processed
+        this.receivedFinalChunk = true;
+        
+        // Clear the queue to prevent further processing
+        this.pcmDataQueue = [];
+        
+        if (!this.audioContext) {
+            this.stopStream();
+            return;
+        }
+
+        const currentTime = this.audioContext.currentTime;
+        const fadeTimeSeconds = fadeTimeMs / 1000;
+
+        // Fade out all gain nodes
+        this.gainNodes.forEach((gainNode, index) => {
+            try {
+                // Cancel any scheduled changes
+                gainNode.gain.cancelScheduledValues(currentTime);
+                // Set current value immediately
+                gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+                // Ramp to 0 over the fade time
+                gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeTimeSeconds);
+
+                // Schedule the source node to stop after fade completes
+                const sourceNode = this.sourceNodes[index];
+                if (sourceNode) {
+                    sourceNode.stop(currentTime + fadeTimeSeconds);
+                }
+            } catch {
+                // Ignore errors
+            }
+        });
+
+        // Handle fallback audio fade
+        if (this.fallbackAudio && !this.fallbackAudio.paused) {
+            const audio = this.fallbackAudio;
+            const initialVolume = audio.volume;
+            const fadeSteps = 20;
+            const stepTime = fadeTimeMs / fadeSteps;
+            let step = 0;
+
+            const fadeInterval = setInterval(() => {
+                step++;
+                audio.volume = initialVolume * (1 - step / fadeSteps);
+
+                if (step >= fadeSteps) {
+                    clearInterval(fadeInterval);
+                    audio.pause();
+                    this.fallbackAudio = null;
+                }
+            }, stepTime);
+        }
+
+        // Clear state immediately to prevent any new processing
+        // but keep nodes alive for fade out
+        const tempSourceNodes = [...this.sourceNodes];
+        const tempGainNodes = [...this.gainNodes];
+        
+        // Reset most state immediately
+        this.expectedChunkIndex = 0;
+        this.pcmDataQueue = [];
+        this.fallbackChunks = [];
+        this.nextStartTime = 0;
+        this.isFirstBuffer = true;
+        this.currentFormat = null;
+        
+        // Clear node arrays after fade completes
+        setTimeout(() => {
+            tempSourceNodes.forEach(node => {
+                try {
+                    node.disconnect();
+                } catch {
+                    // Ignore
+                }
+            });
+            tempGainNodes.forEach(node => {
+                try {
+                    node.disconnect();
+                } catch {
+                    // Ignore
+                }
+            });
+            this.sourceNodes = [];
+            this.gainNodes = [];
+        }, fadeTimeMs + 50);
     }
 
     private _resetState(): void {
@@ -319,6 +433,7 @@ export class AudioStreamPlayer {
         this.nextStartTime = 0;
         this.isFirstBuffer = true;
         this.currentFormat = null;
+        this.gainNodes = [];
     }
 
     get isPlaying(): boolean {

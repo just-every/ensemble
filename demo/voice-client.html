@@ -1130,9 +1130,9 @@
 
 
             stopPlayback() {
-                // Stop streaming
+                // Stop streaming with fade out
                 if (this.audioPlayer) {
-                    this.audioPlayer.stopStream();
+                    this.audioPlayer.fadeOutAndStop();
                 }
 
                 // Stop audio player
