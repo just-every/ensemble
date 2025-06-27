@@ -417,38 +417,97 @@ export class ClaudeProvider extends BaseModelProvider {
 
         // If thinking is enabled, ensure proper message formatting
         if (thinkingEnabled && result.length > 0) {
-            // First, handle the last message if it's an assistant message with tool_use
-            const lastMsg = result[result.length - 1];
-            if (lastMsg.role === 'assistant' && Array.isArray(lastMsg.content)) {
-                // Check if message contains tool_use blocks
-                const hasToolUse = lastMsg.content.some(block => block.type === 'tool_use');
+            // Track converted tool IDs to handle orphaned tool_results
+            const convertedToolIds = new Set<string>();
 
-                if (hasToolUse) {
-                    // Check if message starts with a thinking block
-                    const hasThinkingBlock =
-                        lastMsg.content.length > 0 &&
-                        (lastMsg.content[0].type === 'thinking' || lastMsg.content[0].type === 'redacted_thinking');
+            // First pass: Convert all assistant messages with tool_use but no thinking block
+            for (let i = 0; i < result.length; i++) {
+                const msg = result[i];
+                if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+                    // Check if message contains tool_use blocks
+                    const hasToolUse = msg.content.some(block => block.type === 'tool_use');
 
-                    // If it has tool_use but no thinking block at the start, convert to user message
-                    if (!hasThinkingBlock) {
-                        // Extract tool calls and convert to text description
-                        const toolCalls = lastMsg.content
-                            .filter(block => block.type === 'tool_use')
-                            .map(block => {
-                                const args =
-                                    typeof block.input === 'string' ? block.input : JSON.stringify(block.input);
-                                return `Called tool '${block.name}' with arguments: ${args}`;
-                            })
-                            .join('\n');
+                    if (hasToolUse) {
+                        // Check if message starts with a thinking block
+                        const hasThinkingBlock =
+                            msg.content.length > 0 &&
+                            (msg.content[0].type === 'thinking' || msg.content[0].type === 'redacted_thinking');
 
-                        // Convert the message to a user message with tool call description
-                        lastMsg.role = 'user';
-                        lastMsg.content = [
-                            {
+                        // If it has tool_use but no thinking block at the start, convert to user message
+                        if (!hasThinkingBlock) {
+                            // Extract tool calls and collect IDs
+                            const toolUseBlocks = msg.content.filter(block => block.type === 'tool_use');
+
+                            // Collect tool IDs that we're converting
+                            toolUseBlocks.forEach(block => {
+                                if (block.id) {
+                                    convertedToolIds.add(block.id);
+                                }
+                            });
+
+                            // Convert to text description
+                            const toolCalls = toolUseBlocks
+                                .map(block => {
+                                    const args =
+                                        typeof block.input === 'string' ? block.input : JSON.stringify(block.input);
+                                    return `Called tool '${block.name}' with arguments: ${args}`;
+                                })
+                                .join('\n');
+
+                            // Convert the message to a user message with tool call description
+                            msg.role = 'user';
+                            msg.content = [
+                                {
+                                    type: 'text',
+                                    text: `[Previous assistant action]\n${toolCalls}`,
+                                },
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Second pass: Find tool IDs in already-converted text messages
+            for (let i = 0; i < result.length; i++) {
+                const msg = result[i];
+                if (msg.role === 'user' && Array.isArray(msg.content)) {
+                    for (const block of msg.content) {
+                        if (block.type === 'text' && typeof block.text === 'string') {
+                            // Look for tool_use JSON in text that may have been converted already
+                            const toolUseMatches = block.text.matchAll(/"id"\s*:\s*"(call_[^"]+)"/g);
+                            for (const match of toolUseMatches) {
+                                if (match[1]) {
+                                    convertedToolIds.add(match[1]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Third pass: Handle orphaned tool_result messages
+            for (let i = 0; i < result.length; i++) {
+                const msg = result[i];
+                if (msg.role === 'user' && Array.isArray(msg.content)) {
+                    // Check each content block for tool_result
+                    const convertedBlocks = [];
+                    let hasConvertedToolResult = false;
+
+                    for (const block of msg.content) {
+                        if (block.type === 'tool_result' && convertedToolIds.has(block.tool_use_id)) {
+                            // Convert orphaned tool_result to text
+                            hasConvertedToolResult = true;
+                            convertedBlocks.push({
                                 type: 'text',
-                                text: `[Previous assistant action]\n${toolCalls}`,
-                            },
-                        ];
+                                text: `[Tool Result for ${block.tool_use_id}]\n${block.content || '(empty result)'}`,
+                            });
+                        } else {
+                            convertedBlocks.push(block);
+                        }
+                    }
+
+                    if (hasConvertedToolResult) {
+                        msg.content = convertedBlocks;
                     }
                 }
             }
