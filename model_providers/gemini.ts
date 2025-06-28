@@ -494,7 +494,7 @@ export class GeminiProvider extends BaseModelProvider {
                 }
             }
 
-            console.log(`[Gemini] Generating embedding with model ${actualModelId}`);
+            console.log(`[Gemini] Generating embedding with model ${actualModelId}${opts?.dimensions ? ` (dimensions: ${opts.dimensions})` : ''}`);
 
             // Prepare the embedding request payload
             const payload = {
@@ -502,6 +502,8 @@ export class GeminiProvider extends BaseModelProvider {
                 contents: input,
                 config: {
                     taskType: opts?.taskType ?? 'SEMANTIC_SIMILARITY',
+                    // Add outputDimensionality if specified in options
+                    ...(opts?.dimensions && { outputDimensionality: opts.dimensions }),
                 } as any, // Cast to any to allow additional properties
             };
 

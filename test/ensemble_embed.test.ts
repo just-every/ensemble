@@ -51,7 +51,7 @@ describe('ensembleEmbed', () => {
             expect(result).toHaveLength(768);
         });
 
-        it('should select text-embedding-3-small for 1536 dimensions', async () => {
+        it('should select gemini-embedding-exp-03-07 for 1536 dimensions', async () => {
             const mockEmbedding = new Array(1536).fill(0.1);
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
 
@@ -59,13 +59,13 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed('test text', agent, { dimensions: 1536 });
 
             expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'text-embedding-3-small' }),
+                expect.objectContaining({ model: 'gemini-embedding-exp-03-07' }),
                 'embedding'
             );
             expect(result).toHaveLength(1536);
         });
 
-        it('should select text-embedding-3-large for 3072 dimensions', async () => {
+        it('should select gemini-embedding-exp-03-07 for 3072 dimensions', async () => {
             const mockEmbedding = new Array(3072).fill(0.1);
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
 
@@ -73,7 +73,7 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed('test text', agent, { dimensions: 3072 });
 
             expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'text-embedding-3-large' }),
+                expect.objectContaining({ model: 'gemini-embedding-exp-03-07' }),
                 'embedding'
             );
             expect(result).toHaveLength(3072);

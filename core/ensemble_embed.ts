@@ -36,13 +36,17 @@ const embeddingCache = new Map<
  *   modelClass: 'embedding'
  * });
  *
- * // Force specific dimensions (auto-selects appropriate model)
+ * // Force specific dimensions (uses Gemini which supports all dimensions)
  * const embedding768d = await ensembleEmbed('Compact embedding', {}, {
- *   dimensions: 768  // Uses gemini-embedding-exp-03-07
+ *   dimensions: 768  // Uses Gemini (free)
  * });
  *
  * const embedding1536d = await ensembleEmbed('Standard embedding', {}, {
- *   dimensions: 1536  // Uses text-embedding-3-small
+ *   dimensions: 1536  // Uses Gemini (free)
+ * });
+ *
+ * const embedding3072d = await ensembleEmbed('Large embedding', {}, {
+ *   dimensions: 3072  // Uses Gemini (free)
  * });
  * ```
  */
@@ -51,16 +55,22 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
     let effectiveAgent = agent;
     if (options?.dimensions) {
         // Map dimensions to specific models
+        // Gemini supports 768, 1536, and 3072 via outputDimensionality config
+        // For consistency and cost optimization:
+        // - 768: Use Gemini (free)
+        // - 1536: Use Gemini (free) or OpenAI small
+        // - 3072: Use Gemini (free) or OpenAI large
         const dimensionModelMap: Record<number, string> = {
-            768: 'gemini-embedding-exp-03-07',
-            1536: 'text-embedding-3-small',
-            3072: 'text-embedding-3-large',
+            768: 'gemini-embedding-exp-03-07',  // Gemini supports this natively
+            1536: 'gemini-embedding-exp-03-07', // Gemini supports this too (free)
+            3072: 'gemini-embedding-exp-03-07', // Gemini supports this too (free)
         };
 
         const modelForDimension = dimensionModelMap[options.dimensions];
         if (modelForDimension) {
             // Override the agent with the specific model
             effectiveAgent = { ...agent, model: modelForDimension };
+            console.log(`[ensembleEmbed] Dimensions ${options.dimensions} requested, using model: ${modelForDimension}`);
         } else {
             throw new Error(
                 `No embedding model available with ${options.dimensions} dimensions. Available: 768, 1536, 3072`
@@ -82,6 +92,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
 
     // Determine which model to use
     const model = await getModelFromAgent(effectiveAgent, 'embedding');
+    console.log(`[ensembleEmbed] Final model selected: ${model}`);
 
     // Get the provider for this model
     const provider = getModelProvider(model);
@@ -95,6 +106,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
 
     // Handle array result (single text input should return single vector)
     const embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);
+    console.log(`[ensembleEmbed] Received embedding with ${embedding.length} dimensions from model ${model}`);
 
     // Cache the result with simple LRU eviction
     if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
