@@ -37,75 +37,51 @@ describe('ensembleEmbed', () => {
     });
 
     describe('dimensions option', () => {
-        it('should select gemini-embedding-exp-03-07 for 768 dimensions', async () => {
+        it('should pass dimensions to provider for any model', async () => {
             const mockEmbedding = new Array(768).fill(0.1);
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
 
-            const agent: AgentDefinition = { agent_id: 'test' };
+            const agent: AgentDefinition = { agent_id: 'test', model: 'some-embedding-model' };
             const result = await ensembleEmbed('test text', agent, { dimensions: 768 });
 
-            expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'gemini-embedding-exp-03-07' }),
-                'embedding'
-            );
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'some-embedding-model', { dimensions: 768 });
             expect(result).toHaveLength(768);
         });
 
-        it('should select gemini-embedding-exp-03-07 for 1536 dimensions', async () => {
-            const mockEmbedding = new Array(1536).fill(0.1);
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+        it('should pass different dimensions to provider', async () => {
+            const mockEmbedding1536 = new Array(1536).fill(0.1);
+            const mockEmbedding3072 = new Array(3072).fill(0.1);
+            
+            mockProvider.createEmbedding.mockResolvedValueOnce(mockEmbedding1536);
+            mockProvider.createEmbedding.mockResolvedValueOnce(mockEmbedding3072);
 
             const agent: AgentDefinition = { agent_id: 'test' };
-            const result = await ensembleEmbed('test text', agent, { dimensions: 1536 });
+            
+            const result1 = await ensembleEmbed('test text 1', agent, { dimensions: 1536 });
+            const result2 = await ensembleEmbed('test text 2', agent, { dimensions: 3072 });
 
-            expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'gemini-embedding-exp-03-07' }),
-                'embedding'
-            );
-            expect(result).toHaveLength(1536);
+            expect(result1).toHaveLength(1536);
+            expect(result2).toHaveLength(3072);
         });
 
-        it('should select gemini-embedding-exp-03-07 for 3072 dimensions', async () => {
-            const mockEmbedding = new Array(3072).fill(0.1);
-            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
-
-            const agent: AgentDefinition = { agent_id: 'test' };
-            const result = await ensembleEmbed('test text', agent, { dimensions: 3072 });
-
-            expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'gemini-embedding-exp-03-07' }),
-                'embedding'
-            );
-            expect(result).toHaveLength(3072);
-        });
-
-        it('should throw error for unsupported dimensions', async () => {
-            const agent: AgentDefinition = { agent_id: 'test' };
-
-            await expect(ensembleEmbed('test text', agent, { dimensions: 512 })).rejects.toThrow(
-                'No embedding model available with 512 dimensions. Available: 768, 1536, 3072'
-            );
-        });
-
-        it('should override model specified in agent when dimensions are provided', async () => {
+        it('should not override model when dimensions are provided', async () => {
             const mockEmbedding = new Array(768).fill(0.1);
             mockProvider.createEmbedding.mockClear();
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
 
             const agent: AgentDefinition = {
-                agent_id: 'test-override',
-                model: 'text-embedding-3-large', // This should be overridden
+                agent_id: 'test-no-override',
+                model: 'text-embedding-3-large',
             };
 
             // Use unique text to avoid cache
-            const uniqueText = `override test ${Date.now()}`;
+            const uniqueText = `no override test ${Date.now()}`;
             const result = await ensembleEmbed(uniqueText, agent, { dimensions: 768 });
 
-            // The key behavior is that we get the right dimensions back
+            // Verify the original model was used
+            expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(agent, 'embedding');
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', { dimensions: 768 });
             expect(result).toHaveLength(768);
-
-            // And the provider was called
-            expect(mockProvider.createEmbedding).toHaveBeenCalled();
         });
 
         it('should include dimensions in cache key', async () => {

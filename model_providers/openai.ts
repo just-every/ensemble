@@ -385,8 +385,10 @@ export class OpenAIProvider extends BaseModelProvider {
                 encoding_format: 'float',
             };
 
-            // Use 3072 dimensions to match our database schema with halfvec type
-            options.dimensions = opts?.dimensions || 3072;
+            // Add dimensions if specified
+            if (opts?.dimensions) {
+                options.dimensions = opts.dimensions;
+            }
 
             console.log(`[OpenAI] Generating embedding with model ${model}`);
 
