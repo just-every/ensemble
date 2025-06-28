@@ -348,6 +348,8 @@ export async function* ensembleLive(
                     model: agent.model,
                     modelClass: agent.modelClass,
                 },
+                duration_with_tools: duration,
+                request_cost: totalCost > 0 ? totalCost : undefined,
                 timestamp: new Date().toISOString(),
             },
             agent

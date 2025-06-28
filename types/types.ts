@@ -403,8 +403,9 @@ export interface AgentDoneEvent extends StreamEventBase {
     type: 'agent_done';
     agent: AgentExportDefinition;
     request_id?: string; // UUID to tie agent events together
-    duration?: number; // Duration in ms
-    cost?: number; // Calculated cost of LLM request
+    request_cost?: number; // Calculated cost of LLM request
+    request_duration?: number; // Duration in ms of the request only
+    duration_with_tools?: number; // Total duration including tool execution
 }
 
 /**

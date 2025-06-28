@@ -312,8 +312,8 @@ async function* executeRound(
             case 'cost_update': {
                 // Accumulate cost from cost_update events
                 const costEvent = event as any;
-                if (costEvent.usage?.totalCost) {
-                    totalCost += costEvent.usage.totalCost;
+                if (costEvent.usage?.cost) {
+                    totalCost += costEvent.usage.cost;
                 }
                 break;
             }
@@ -413,6 +413,9 @@ async function* executeRound(
         }
     }
 
+    // Calculate request duration
+    const request_duration = Date.now() - startTime;
+
     // Complete then process any tool calls
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
 
@@ -461,16 +464,17 @@ async function* executeRound(
         };
     }
 
-    // Calculate duration
-    const duration = Date.now() - startTime;
+    // Calculate full duration
+    const duration_with_tools = Date.now() - startTime;
 
     // Emit agent_done event through global event controller
     await emitEvent(
         {
             type: 'agent_done',
             request_id: requestId,
-            duration,
-            cost: totalCost > 0 ? totalCost : undefined,
+            request_cost: totalCost > 0 ? totalCost : undefined,
+            request_duration,
+            duration_with_tools,
             timestamp: new Date().toISOString(),
         },
         agent,
