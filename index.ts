@@ -8,6 +8,7 @@ export {
     getModelFromAgent,
     getModelFromClass,
     isProviderKeyValid,
+    canRunAgent,
     ModelProvider, // This is the extended interface from model_provider.ts
 } from './model_providers/model_provider.js';
 

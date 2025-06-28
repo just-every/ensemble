@@ -409,3 +409,101 @@ export function getModelProvider(model?: string): ModelProvider {
     }
     return openRouterProvider;
 }
+
+/**
+ * Check if API keys are available for a given agent specification
+ *
+ * @param agent - Agent definition with model or modelClass
+ * @returns Object with availability status and details
+ *
+ * @example
+ * ```typescript
+ * // Check specific model
+ * const result = await canRunAgent({ model: 'gpt-4' });
+ * if (result.canRun) {
+ *   console.log(`Can run with model: ${result.model}`);
+ * } else {
+ *   console.log(`Missing API key for provider: ${result.missingProvider}`);
+ * }
+ *
+ * // Check model class
+ * const classResult = await canRunAgent({ modelClass: 'standard' });
+ * if (classResult.canRun) {
+ *   console.log(`Available models: ${classResult.availableModels.join(', ')}`);
+ * }
+ * ```
+ */
+export async function canRunAgent(agent: Partial<AgentDefinition>): Promise<{
+    canRun: boolean;
+    model?: string;
+    provider?: ModelProviderID;
+    missingProvider?: ModelProviderID;
+    availableModels?: string[];
+    unavailableModels?: string[];
+    reason?: string;
+}> {
+    // If a specific model is provided
+    if (agent.model) {
+        const provider = getProviderFromModel(agent.model);
+        const hasKey = isProviderKeyValid(provider);
+
+        return {
+            canRun: hasKey,
+            model: agent.model,
+            provider,
+            missingProvider: hasKey ? undefined : provider,
+            reason: hasKey ? undefined : `Missing API key for provider: ${provider}`,
+        };
+    }
+
+    // If a model class is provided
+    if (agent.modelClass) {
+        const modelClassStr = agent.modelClass as string;
+        const modelGroup = modelClassStr && modelClassStr in MODEL_CLASSES ? modelClassStr : 'standard';
+
+        // Get the model class configuration
+        const override = getModelClassOverride(modelGroup);
+        let modelClassConfig = MODEL_CLASSES[modelGroup as keyof typeof MODEL_CLASSES];
+
+        if (override) {
+            modelClassConfig = {
+                ...modelClassConfig,
+                ...override,
+            } as typeof modelClassConfig;
+        }
+
+        const models = [...(override?.models || modelClassConfig.models)];
+
+        // Check each model's availability
+        const availableModels: string[] = [];
+        const unavailableModels: string[] = [];
+        const missingProviders = new Set<ModelProviderID>();
+
+        for (const model of models) {
+            const provider = getProviderFromModel(model);
+            if (isProviderKeyValid(provider)) {
+                availableModels.push(model);
+            } else {
+                unavailableModels.push(model);
+                missingProviders.add(provider);
+            }
+        }
+
+        return {
+            canRun: availableModels.length > 0,
+            availableModels,
+            unavailableModels,
+            missingProvider:
+                availableModels.length === 0 && missingProviders.size === 1
+                    ? Array.from(missingProviders)[0]
+                    : undefined,
+            reason:
+                availableModels.length === 0
+                    ? `No API keys found for any models in class: ${agent.modelClass}. Missing providers: ${Array.from(missingProviders).join(', ')}`
+                    : undefined,
+        };
+    }
+
+    // If neither model nor modelClass is provided, check the default (standard class)
+    return canRunAgent({ modelClass: 'standard' });
+}
