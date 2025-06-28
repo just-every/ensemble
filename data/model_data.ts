@@ -63,7 +63,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-4.1-nano', // OpenAI
             'claude-3-5-haiku-latest', // Anthropic
-            'gemini-2.0-flash-lite', // Google
+            'gemini-2.5-flash-lite-preview-06-17', // Google
             'grok-3-mini', // X.AI
             'meta-llama/llama-4-scout', // Meta/OpenRouter
             'mistral/ministral-8b', // Mistral/OpenRouter
@@ -136,7 +136,7 @@ export const MODEL_CLASSES = {
     // Writing models - optimized for conversation and text generation
     writing: {
         models: [
-            'gemini-2.5-flash-preview-05-20-low', // Google
+            'gemini-2.5-flash-lite-preview-06-17', // Google
             'gpt-4.1-mini', // OpenAI
         ],
         random: true,
@@ -147,7 +147,7 @@ export const MODEL_CLASSES = {
     summary: {
         models: [
             //'meta-llama/llama-4-scout', // Meta/OpenRouter
-            'gemini-2.5-flash-preview-05-20-low', // Google
+            'gemini-2.5-flash-lite-preview-06-17', // Google
             'gpt-4.1-mini', // OpenAI
             //'mistral/ministral-8b', // Mistral/OpenRouter
         ],
@@ -174,7 +174,7 @@ export const MODEL_CLASSES = {
     vision_mini: {
         models: [
             'gpt-4.1-mini', // OpenAI
-            'gemini-2.5-flash-preview-05-20-low', // Google
+            'gemini-2.5-flash-lite-preview-06-17', // Google
             'claude-sonnet-4-20250514-low', // Anthropic
         ],
         random: true,
@@ -185,7 +185,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-4.1', // OpenAI
             'deepseek-reasoner', // DeepSeek
-            'gemini-2.5-flash-preview-05-20', // Google
+            'gemini-2.5-flash-lite-preview-06-17', // Google
             'perplexity/sonar-deep-research', // Perplexity
         ],
         random: true,
@@ -1034,8 +1034,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-flash', 'gemini-2.5-flash-preview-04-17'],
         provider: 'google',
         cost: {
-            input_per_million: 0.15,
-            output_per_million: 3.5, // 0.6 for non thinking - need to add a way to specify this
+            input_per_million: 0.3,
+            output_per_million: 2.5,
         },
         features: {
             context_length: 1048576,
@@ -1047,6 +1047,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             max_output_tokens: 65536,
         },
         class: 'reasoning',
+        score: 75, // Legacy overall score
+        scores: {
+            monologue: 12, // Humanity's Last Exam
+            code: 63, // HumanEval
+            reasoning: 78, // GPQA Diamond
+        },
+        description: 'Balanced multimodal model with large context, built for Agents.',
+    },
+    {
+        id: 'gemini-2.5-flash-lite-preview-06-17',
+        aliases: ['gemini-2.5-flash-lite'],
+        provider: 'google',
+        cost: {
+            input_per_million: 0.1,
+            output_per_million: 0.4,
+        },
+        features: {
+            context_length: 1000000,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 64000,
+        },
+        class: 'reasoning_mini',
         score: 75, // Legacy overall score
         scores: {
             monologue: 12, // Humanity's Last Exam
