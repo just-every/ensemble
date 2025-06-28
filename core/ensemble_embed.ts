@@ -35,11 +35,41 @@ const embeddingCache = new Map<
  * const embedding = await ensembleEmbed('Document text', {
  *   modelClass: 'embedding'
  * });
+ *
+ * // Force specific dimensions (auto-selects appropriate model)
+ * const embedding768d = await ensembleEmbed('Compact embedding', {}, {
+ *   dimensions: 768  // Uses gemini-embedding-exp-03-07
+ * });
+ *
+ * const embedding1536d = await ensembleEmbed('Standard embedding', {}, {
+ *   dimensions: 1536  // Uses text-embedding-3-small
+ * });
  * ```
  */
 export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
+    // If dimensions are specified, override the agent to use a model with matching dimensions
+    let effectiveAgent = agent;
+    if (options?.dimensions) {
+        // Map dimensions to specific models
+        const dimensionModelMap: Record<number, string> = {
+            768: 'gemini-embedding-exp-03-07',
+            1536: 'text-embedding-3-small',
+            3072: 'text-embedding-3-large',
+        };
+
+        const modelForDimension = dimensionModelMap[options.dimensions];
+        if (modelForDimension) {
+            // Override the agent with the specific model
+            effectiveAgent = { ...agent, model: modelForDimension };
+        } else {
+            throw new Error(
+                `No embedding model available with ${options.dimensions} dimensions. Available: 768, 1536, 3072`
+            );
+        }
+    }
+
     // Use a hash of the text and model as the cache key
-    const cacheKey = `${agent.model || agent.modelClass}:${text}`;
+    const cacheKey = `${effectiveAgent.model || effectiveAgent.modelClass}:${text}:${options?.dimensions || ''}`;
 
     // Check if we have a cached embedding
     const cached = embeddingCache.get(cacheKey);
@@ -51,7 +81,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
     }
 
     // Determine which model to use
-    const model = await getModelFromAgent(agent, 'embedding');
+    const model = await getModelFromAgent(effectiveAgent, 'embedding');
 
     // Get the provider for this model
     const provider = getModelProvider(model);
