@@ -405,7 +405,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 input_tokens: inputTokens,
                 output_tokens: 0, // No output tokens for embeddings
                 metadata: {
-                    dimensions: response.data[0]?.embedding.length || opts?.dimensions || 1536,
+                    dimensions: response.data[0]?.embedding.length || options.dimensions,
                 },
             });
 

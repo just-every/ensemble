@@ -590,19 +590,7 @@ export class GeminiProvider extends BaseModelProvider {
                     result = [];
                 }
 
-                // Ensure we truncate or pad to exactly 3072 dimensions for our halfvec database schema
-                let adjustedResult = result;
-                if (result.length !== 3072) {
-                    console.warn(`Gemini embedding returned ${result.length} dimensions, adjusting to 3072...`);
-                    if (result.length > 3072) {
-                        // Truncate if too long
-                        adjustedResult = result.slice(0, 3072);
-                    } else {
-                        // Pad with zeros if too short
-                        adjustedResult = [...result, ...Array(3072 - result.length).fill(0)];
-                    }
-                }
-                return adjustedResult; // This is guaranteed to be number[] with exactly 3072 dimensions
+                return result;
             }
         } catch (error) {
             console.error('[Gemini] Error generating embedding:', error);

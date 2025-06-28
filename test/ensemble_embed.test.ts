@@ -89,13 +89,17 @@ describe('ensembleEmbed', () => {
 
         it('should override model specified in agent when dimensions are provided', async () => {
             const mockEmbedding = new Array(768).fill(0.1);
+            mockProvider.createEmbedding.mockClear();
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
 
             const agent: AgentDefinition = {
-                agent_id: 'test',
+                agent_id: 'test-override',
                 model: 'text-embedding-3-large', // This should be overridden
             };
-            const result = await ensembleEmbed('test text', agent, { dimensions: 768 });
+
+            // Use unique text to avoid cache
+            const uniqueText = `override test ${Date.now()}`;
+            const result = await ensembleEmbed(uniqueText, agent, { dimensions: 768 });
 
             // The key behavior is that we get the right dimensions back
             expect(result).toHaveLength(768);
@@ -156,8 +160,10 @@ describe('ensembleEmbed', () => {
             vi.mocked(getModelProvider).mockReturnValueOnce({} as any); // No createEmbedding method
             vi.mocked(getModelFromAgent).mockResolvedValueOnce('test-model');
 
-            const agent: AgentDefinition = { agent_id: 'test' };
-            await expect(ensembleEmbed('test text', agent)).rejects.toThrow('does not support embeddings');
+            const agent: AgentDefinition = { agent_id: 'test-no-embed' };
+            // Use unique text to avoid cache
+            const uniqueText = `no embed test ${Date.now()}`;
+            await expect(ensembleEmbed(uniqueText, agent)).rejects.toThrow('does not support embeddings');
         });
 
         // Skip cache test since it requires internal cache access
