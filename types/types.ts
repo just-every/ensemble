@@ -258,10 +258,6 @@ export type StreamEventType =
     | 'process_failed'
     | 'process_waiting'
     | 'process_terminated'
-    | 'agent_start'
-    | 'agent_updated'
-    | 'agent_done'
-    | 'agent_status'
     | 'message_start'
     | 'message_delta'
     | 'message_complete'
@@ -385,14 +381,36 @@ export interface ResponseOutputEvent extends StreamEventBase {
 /**
  * Agent lifecycle streaming events
  */
-export interface AgentEvent extends StreamEventBase {
-    type: 'agent_start' | 'agent_status' | 'agent_done';
+export interface AgentStartEvent extends StreamEventBase {
+    type: 'agent_start';
     agent: AgentExportDefinition;
+    request_id?: string; // UUID to tie agent events together
     input?: string;
-    output?: string;
-    status?: string;
-    parent_id?: string;
 }
+/**
+ * Agent lifecycle streaming events
+ */
+export interface AgentStatusEvent extends StreamEventBase {
+    type: 'agent_status';
+    agent: AgentExportDefinition;
+    request_id?: string; // UUID to tie agent events together
+    status?: string;
+}
+/**
+ * Agent lifecycle streaming events
+ */
+export interface AgentDoneEvent extends StreamEventBase {
+    type: 'agent_done';
+    agent: AgentExportDefinition;
+    request_id?: string; // UUID to tie agent events together
+    duration?: number; // Duration in ms
+    cost?: number; // Calculated cost of LLM request
+}
+
+/**
+ * Union type for all agent events
+ */
+export type AgentEvent = AgentStartEvent | AgentStatusEvent | AgentDoneEvent;
 
 /**
  * Union type for all ensemble streaming events

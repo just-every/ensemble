@@ -2,6 +2,7 @@
  * Unified request implementation that combines standard and enhanced features
  */
 
+import { randomUUID } from 'crypto';
 import {
     ProviderStreamEvent,
     ResponseInput,
@@ -192,6 +193,11 @@ async function* executeRound(
     currentToolCalls: number,
     maxToolCalls: number
 ): AsyncGenerator<ProviderStreamEvent> {
+    // Generate request ID and track timing
+    const requestId = randomUUID();
+    const startTime = Date.now();
+    let totalCost = 0;
+
     // Get current messages
     let messages = await history.getMessages(model);
 
@@ -199,6 +205,7 @@ async function* executeRound(
     await emitEvent(
         {
             type: 'agent_start',
+            request_id: requestId,
             input:
                 'content' in messages[0] && typeof messages[0].content === 'string' ? messages[0].content : undefined,
             timestamp: new Date().toISOString(),
@@ -302,6 +309,15 @@ async function* executeRound(
 
         // Handle different event types
         switch (event.type) {
+            case 'cost_update': {
+                // Accumulate cost from cost_update events
+                const costEvent = event as any;
+                if (costEvent.usage?.totalCost) {
+                    totalCost += costEvent.usage.totalCost;
+                }
+                break;
+            }
+
             case 'message_complete': {
                 const messageEvent = event as MessageEventBase;
                 if (
@@ -445,10 +461,16 @@ async function* executeRound(
         };
     }
 
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
     // Emit agent_done event through global event controller
     await emitEvent(
         {
             type: 'agent_done',
+            request_id: requestId,
+            duration,
+            cost: totalCost > 0 ? totalCost : undefined,
             timestamp: new Date().toISOString(),
         },
         agent,

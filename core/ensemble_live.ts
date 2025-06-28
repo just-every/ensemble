@@ -349,7 +349,6 @@ export async function* ensembleLive(
                     modelClass: agent.modelClass,
                 },
                 timestamp: new Date().toISOString(),
-                output: `Session ended after ${duration}ms`,
             },
             agent
         );
