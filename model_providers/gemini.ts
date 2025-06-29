@@ -954,7 +954,7 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             if (usageMetadata) {
-                costTracker.addUsage({
+                const calculatedUsage = costTracker.addUsage({
                     model,
                     input_tokens: usageMetadata.promptTokenCount || 0,
                     output_tokens: usageMetadata.candidatesTokenCount || 0,
@@ -965,18 +965,43 @@ export class GeminiProvider extends BaseModelProvider {
                         tool_tokens: usageMetadata.toolUsePromptTokenCount || 0,
                     },
                 });
-            } else {
-                console.error('[Gemini] No usage metadata found in the response. This may affect token tracking.');
-                costTracker.addUsage({
-                    model,
-                    input_tokens: 0, // Not provided in streaming response
-                    output_tokens: 0, // Not provided in streaming response
-                    cached_tokens: 0,
-                    metadata: {
-                        total_tokens: 0,
-                        source: 'estimated',
+
+                // Yield cost_update event in the stream
+                yield {
+                    type: 'cost_update',
+                    usage: {
+                        ...calculatedUsage,
+                        total_tokens: usageMetadata.totalTokenCount || 0,
                     },
+                };
+            } else {
+                console.warn('[Gemini] No usage metadata found in the response. Using token estimation.');
+
+                // Estimate input tokens from the contents
+                let inputText = '';
+                for (const content of contents) {
+                    if (content.parts) {
+                        for (const part of content.parts) {
+                            if (part.text) {
+                                inputText += part.text + '\n';
+                            }
+                        }
+                    }
+                }
+
+                // Use addEstimatedUsage which returns the calculated usage
+                const calculatedUsage = costTracker.addEstimatedUsage(model, inputText, contentBuffer + thoughtBuffer, {
+                    provider: 'gemini',
                 });
+
+                // Yield cost_update event with estimated usage
+                yield {
+                    type: 'cost_update',
+                    usage: {
+                        ...calculatedUsage,
+                        total_tokens: calculatedUsage.input_tokens + calculatedUsage.output_tokens,
+                    },
+                };
             }
 
             // --- Stream Finished, Emit Final Events ---
@@ -2026,24 +2051,6 @@ class GeminiLiveSession implements LiveSession {
                 metadata: {
                     total_tokens: totalTokens,
                     source: 'gemini-live',
-                },
-            });
-
-            // Cost data is calculated internally by costTracker.addUsage
-            const inputCost = undefined;
-            const outputCost = undefined;
-            const totalCost = undefined;
-
-            this.pushEvent({
-                type: 'cost_update',
-                timestamp: new Date().toISOString(),
-                usage: {
-                    inputTokens,
-                    outputTokens,
-                    totalTokens,
-                    inputCost,
-                    outputCost,
-                    totalCost,
                 },
             });
         }

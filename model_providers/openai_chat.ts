@@ -829,7 +829,7 @@ export class OpenAIChat extends BaseModelProvider {
 
                 // --- Post-Stream Processing ---
                 if (usage) {
-                    costTracker.addUsage({
+                    const calculatedUsage = costTracker.addUsage({
                         model: model,
                         input_tokens: usage.prompt_tokens || 0,
                         output_tokens: usage.completion_tokens || 0,
@@ -839,8 +839,54 @@ export class OpenAIChat extends BaseModelProvider {
                             reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens || 0,
                         },
                     });
+
+                    // Yield cost_update event in the stream
+                    yield {
+                        type: 'cost_update',
+                        usage: {
+                            ...calculatedUsage,
+                            total_tokens:
+                                usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+                        },
+                    };
                 } else {
-                    console.warn(`(${this.provider}) Usage info not found in stream for cost tracking.`);
+                    console.warn(
+                        `(${this.provider}) Usage info not found in stream for cost tracking. Using token estimation.`
+                    );
+
+                    // Estimate tokens from input and output
+                    // Calculate input text from messages
+                    let inputText = '';
+                    for (const msg of chatMessages) {
+                        if (typeof msg.content === 'string') {
+                            inputText += msg.content + '\n';
+                        } else if (Array.isArray(msg.content)) {
+                            for (const part of msg.content) {
+                                if ('text' in part && typeof part.text === 'string') {
+                                    inputText += part.text + '\n';
+                                }
+                            }
+                        }
+                    }
+
+                    // Use the static method from CostTracker
+                    const { CostTracker } = await import('../utils/cost_tracker.js');
+                    const estimatedInputTokens = CostTracker.estimateTokens(inputText);
+                    const estimatedOutputTokens = CostTracker.estimateTokens(aggregatedContent);
+
+                    // Use addEstimatedUsage which returns the calculated usage
+                    const calculatedUsage = costTracker.addEstimatedUsage(model, inputText, aggregatedContent, {
+                        provider: this.provider,
+                    });
+
+                    // Yield cost_update event in the stream
+                    yield {
+                        type: 'cost_update',
+                        usage: {
+                            ...calculatedUsage,
+                            total_tokens: estimatedInputTokens + estimatedOutputTokens,
+                        },
+                    };
                 }
 
                 // Flush any remaining buffered deltas and yield them

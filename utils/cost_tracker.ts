@@ -200,8 +200,9 @@ class CostTracker {
      * Record usage details from a model provider
      *
      * @param usage ModelUsage object containing the cost and usage details
+     * @returns The usage object with calculated cost and timestamp
      */
-    addUsage(usage: ModelUsage): void {
+    addUsage(usage: ModelUsage): ModelUsage {
         try {
             // Calculate cost if not already set
             usage = this.calculateCost({ ...usage });
@@ -235,8 +236,11 @@ class CostTracker {
                     console.error('Error in cost tracker callback:', error);
                 }
             }
+
+            return usage;
         } catch (err) {
             console.error('Error recording usage:', err);
+            return usage;
         }
     }
 
@@ -355,6 +359,45 @@ class CostTracker {
     reset(): void {
         this.entries = [];
         this.started = new Date();
+    }
+
+    /**
+     * Estimate token count from character count
+     * Uses the rough approximation of 1 token ≈ 4 characters
+     * @param text The text to estimate tokens for
+     * @returns Estimated number of tokens
+     */
+    static estimateTokens(text: string): number {
+        if (!text) return 0;
+        // Simple estimation: 1 token ≈ 4 characters
+        return Math.ceil(text.length / 4);
+    }
+
+    /**
+     * Add usage with estimated token counts
+     * Useful when providers don't return token counts in their response
+     * @param model The model used
+     * @param inputText The input text sent to the model
+     * @param outputText The output text received from the model
+     * @param metadata Optional metadata to include
+     * @returns The usage object with calculated cost and timestamp
+     */
+    addEstimatedUsage(
+        model: string,
+        inputText: string,
+        outputText: string,
+        metadata?: Record<string, unknown>
+    ): ModelUsage {
+        const usage: ModelUsage = {
+            model,
+            input_tokens: CostTracker.estimateTokens(inputText),
+            output_tokens: CostTracker.estimateTokens(outputText),
+            metadata: {
+                ...metadata,
+                estimated: true, // Mark that tokens were estimated
+            },
+        };
+        return this.addUsage(usage);
     }
 }
 

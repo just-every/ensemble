@@ -255,14 +255,6 @@ export class TestProvider extends BaseModelProvider {
 
         // Emit usage/cost event
         const outputTokenCount = this.config.tokenUsage?.outputTokens || Math.ceil(response.length / 4);
-        yield {
-            type: 'cost_update',
-            usage: {
-                input_tokens: inputTokenCount,
-                output_tokens: outputTokenCount,
-                total_tokens: inputTokenCount + outputTokenCount,
-            },
-        };
 
         // Track token usage for cost calculation
         costTracker.addUsage({

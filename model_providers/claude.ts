@@ -1140,7 +1140,7 @@ export class ClaudeProvider extends BaseModelProvider {
             // Track cost if we have token usage data
             if (totalInputTokens > 0 || totalOutputTokens > 0) {
                 const cachedTokens = totalCacheCreationInputTokens + totalCacheReadInputTokens;
-                costTracker.addUsage({
+                const calculatedUsage = costTracker.addUsage({
                     model,
                     input_tokens: totalInputTokens,
                     output_tokens: totalOutputTokens,
@@ -1151,6 +1151,15 @@ export class ClaudeProvider extends BaseModelProvider {
                         total_tokens: totalInputTokens + totalOutputTokens,
                     },
                 });
+
+                // Yield cost_update event in the stream
+                yield {
+                    type: 'cost_update',
+                    usage: {
+                        ...calculatedUsage,
+                        total_tokens: totalInputTokens + totalOutputTokens,
+                    },
+                };
             }
         }
     }
