@@ -380,29 +380,23 @@ export class OpenAIChat extends BaseModelProvider {
                 // lastMatch[1] captures the array string "[...]"
                 jsonArrayString = lastMatch[1];
                 matchIndex = lastMatch.index ?? -1; // Store the index where the last match started
-                console.log(`(${this.provider}) Found ${matches.length} TOOL_CALLS patterns. Processing the last one.`);
             }
         } else {
             // Optional: Add your debugging for when no matches are found at all
             if (aggregatedContent.includes('TOOL_CALLS')) {
-                console.log(
+                console.warn(
                     `(${this.provider}) TOOL_CALLS found but regex didn't match globally. Content snippet:`,
                     aggregatedContent.substring(
                         Math.max(0, aggregatedContent.indexOf('TOOL_CALLS') - 20),
                         Math.min(aggregatedContent.length, aggregatedContent.indexOf('TOOL_CALLS') + 300)
                     )
                 ); // Increased snippet length
-            } else {
-                console.log(`(${this.provider}) No TOOL_CALLS found in response.`);
             }
-            console.debug(`(${this.provider}) Full response content:`, aggregatedContent);
         }
 
         // Proceed only if a JSON string was extracted from the last match
         if (jsonArrayString !== null && matchIndex !== -1) {
             try {
-                console.log(`(${this.provider}) Processing last TOOL_CALLS JSON string:`, jsonArrayString);
-
                 // Try to parse the potentially complete JSON string
                 let parsedToolCallArray;
                 try {
@@ -426,7 +420,6 @@ export class OpenAIChat extends BaseModelProvider {
                 // Validate that it's an array
                 if (!Array.isArray(parsedToolCallArray)) {
                     if (typeof parsedToolCallArray === 'object' && parsedToolCallArray !== null) {
-                        console.log(`(${this.provider}) Parsed JSON is not an array but an object, wrapping in array`);
                         parsedToolCallArray = [parsedToolCallArray];
                     } else {
                         throw new Error('Parsed JSON is not an array or object.');
@@ -436,8 +429,6 @@ export class OpenAIChat extends BaseModelProvider {
                 const validSimulatedCalls: ToolCall[] = [];
                 // Iterate through the parsed array - THIS HANDLES MULTIPLE CALLS within the block
                 for (const callData of parsedToolCallArray) {
-                    console.log(`(${this.provider}) Processing tool call object:`, callData);
-
                     // Flexible validation to handle different formats
                     if (callData && typeof callData === 'object') {
                         // Basic check
@@ -508,8 +499,6 @@ export class OpenAIChat extends BaseModelProvider {
                     }
                 }
 
-                console.log(`(${this.provider}) Valid simulated calls extracted:`, validSimulatedCalls);
-
                 // Proceed only if at least one valid call was parsed from the last match
                 if (validSimulatedCalls.length > 0) {
                     // Extract and clean text *before* the *last* marker
@@ -548,7 +537,6 @@ export class OpenAIChat extends BaseModelProvider {
         }
 
         // If no match, or parsing/validation failed for the last match
-        console.log(`(${this.provider}) No valid tool calls processed from TOOL_CALLS markers.`);
         const cleanedContent = aggregatedContent.replaceAll(TOOL_CALL_CLEANUP_REGEX, CLEANUP_PLACEHOLDER);
         return { handled: false, cleanedContent: cleanedContent };
     }
@@ -659,13 +647,8 @@ export class OpenAIChat extends BaseModelProvider {
 
                     // Check if the system was paused during the stream
                     if (isPaused()) {
-                        console.log(`[${this.provider}] System paused during stream for model ${model}. Waiting...`);
-
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
-
-                        // If we're resuming, continue processing
-                        console.log(`[${this.provider}] System resumed, continuing stream for model ${model}`);
                     }
 
                     // ... (stream aggregation logic unchanged) ...
@@ -919,7 +902,6 @@ export class OpenAIChat extends BaseModelProvider {
                                         try {
                                             const parsed = JSON.parse(matches[0]);
                                             completedToolCall.function.arguments = JSON.stringify(parsed);
-                                            console.log(`(${this.provider}) Successfully extracted valid JSON`);
                                         } catch {
                                             // If all else fails, use empty object
                                             completedToolCall.function.arguments = '{}';

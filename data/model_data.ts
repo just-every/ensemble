@@ -1630,6 +1630,98 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'transcription',
         description: 'OpenAI Whisper transcription with full-turn output',
     },
+
+    //
+    // DeepSeek models
+    //
+
+    {
+        id: 'deepseek-chat',
+        aliases: ['deepseek-v3-0324'],
+        provider: 'deepseek',
+        cost: {
+            input_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 0.27, // Cache miss during peak hours
+                off_peak_price_per_million: 0.135, // 50% off during off-peak
+            },
+            cached_input_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 0.07, // Cache hit during peak hours
+                off_peak_price_per_million: 0.035, // 50% off during off-peak
+            },
+            output_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 1.1,
+                off_peak_price_per_million: 0.55, // 50% off during off-peak
+            },
+        },
+        features: {
+            context_length: 64000,
+            max_output_tokens: 8192, // Default 4K, max 8K
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true, // Supports function calling
+            streaming: true,
+            json_output: true, // Supports JSON output
+        },
+        class: 'standard',
+        score: 75, // Estimated score for a capable chat model
+        description: 'DeepSeek-V3 chat model with FIM completion support and time-based pricing',
+    },
+    {
+        id: 'deepseek-reasoner',
+        aliases: ['deepseek-r1-0528'],
+        provider: 'deepseek',
+        cost: {
+            input_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 0.55, // Cache miss during peak hours
+                off_peak_price_per_million: 0.1375, // 75% off during off-peak
+            },
+            cached_input_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 0.14, // Cache hit during peak hours
+                off_peak_price_per_million: 0.035, // 75% off during off-peak
+            },
+            output_per_million: {
+                peak_utc_start_hour: 0,
+                peak_utc_start_minute: 30,
+                peak_utc_end_hour: 16,
+                peak_utc_end_minute: 30,
+                peak_price_per_million: 2.19,
+                off_peak_price_per_million: 0.5475, // 75% off during off-peak
+            },
+        },
+        features: {
+            context_length: 64000,
+            max_output_tokens: 64000, // Default 32K, max 64K
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true, // Supports function calling
+            streaming: true,
+            json_output: true, // Supports JSON output
+            reasoning_output: true, // Advanced reasoning capabilities
+        },
+        class: 'reasoning',
+        score: 85, // Higher score for reasoning model
+        description: 'DeepSeek-R1 advanced reasoning model with extended output and time-based pricing',
+    },
 ];
 
 /**
