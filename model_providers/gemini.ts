@@ -494,7 +494,9 @@ export class GeminiProvider extends BaseModelProvider {
                 }
             }
 
-            console.log(`[Gemini] Generating embedding with model ${actualModelId}${opts?.dimensions ? ` (dimensions: ${opts.dimensions})` : ''}`);
+            console.log(
+                `[Gemini] Generating embedding with model ${actualModelId}${opts?.dimensions ? ` (dimensions: ${opts.dimensions})` : ''}`
+            );
 
             // Prepare the embedding request payload
             const payload = {

@@ -542,6 +542,30 @@ export class ClaudeProvider extends BaseModelProvider {
                     }
                 }
             }
+
+            // Final pass: Handle ANY remaining assistant messages without thinking blocks
+            // This catches assistant messages that aren't consecutive and don't have tool_use
+            for (let i = 0; i < result.length; i++) {
+                const msg = result[i];
+                if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+                    // Check if message starts with a thinking block
+                    const hasThinkingBlock =
+                        msg.content.length > 0 &&
+                        (msg.content[0].type === 'thinking' || msg.content[0].type === 'redacted_thinking');
+
+                    // If no thinking block and only contains text content, convert to user message
+                    if (!hasThinkingBlock && msg.content.every(block => block.type === 'text')) {
+                        const contentStr = contentToString(msg.content);
+                        msg.role = 'user';
+                        msg.content = [
+                            {
+                                type: 'text',
+                                text: `[Previous assistant response]\n${contentStr}`,
+                            },
+                        ];
+                    }
+                }
+            }
         }
 
         return result;

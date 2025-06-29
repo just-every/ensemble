@@ -44,19 +44,21 @@ describe('ensembleEmbed', () => {
             const agent: AgentDefinition = { agent_id: 'test', model: 'some-embedding-model' };
             const result = await ensembleEmbed('test text', agent, { dimensions: 768 });
 
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'some-embedding-model', { dimensions: 768 });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'some-embedding-model', {
+                dimensions: 768,
+            });
             expect(result).toHaveLength(768);
         });
 
         it('should pass different dimensions to provider', async () => {
             const mockEmbedding1536 = new Array(1536).fill(0.1);
             const mockEmbedding3072 = new Array(3072).fill(0.1);
-            
+
             mockProvider.createEmbedding.mockResolvedValueOnce(mockEmbedding1536);
             mockProvider.createEmbedding.mockResolvedValueOnce(mockEmbedding3072);
 
             const agent: AgentDefinition = { agent_id: 'test' };
-            
+
             const result1 = await ensembleEmbed('test text 1', agent, { dimensions: 1536 });
             const result2 = await ensembleEmbed('test text 2', agent, { dimensions: 3072 });
 
@@ -80,7 +82,9 @@ describe('ensembleEmbed', () => {
 
             // Verify the original model was used
             expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(agent, 'embedding');
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', { dimensions: 768 });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', {
+                dimensions: 768,
+            });
             expect(result).toHaveLength(768);
         });
 
