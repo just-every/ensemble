@@ -54,6 +54,7 @@ import { costTracker } from '../index.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, resizeAndTruncateForGemini } from '../utils/image_utils.js';
+import { hasEventHandler } from '../utils/event_controller.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -966,14 +967,17 @@ export class GeminiProvider extends BaseModelProvider {
                     },
                 });
 
-                // Yield cost_update event in the stream
-                yield {
-                    type: 'cost_update',
-                    usage: {
-                        ...calculatedUsage,
-                        total_tokens: usageMetadata.totalTokenCount || 0,
-                    },
-                };
+                // Only yield cost_update event if no global event handler is set
+                // This prevents duplicate events when using the global EventController
+                if (!hasEventHandler()) {
+                    yield {
+                        type: 'cost_update',
+                        usage: {
+                            ...calculatedUsage,
+                            total_tokens: usageMetadata.totalTokenCount || 0,
+                        },
+                    };
+                }
             } else {
                 console.warn('[Gemini] No usage metadata found in the response. Using token estimation.');
 
@@ -994,14 +998,17 @@ export class GeminiProvider extends BaseModelProvider {
                     provider: 'gemini',
                 });
 
-                // Yield cost_update event with estimated usage
-                yield {
-                    type: 'cost_update',
-                    usage: {
-                        ...calculatedUsage,
-                        total_tokens: calculatedUsage.input_tokens + calculatedUsage.output_tokens,
-                    },
-                };
+                // Only yield cost_update event if no global event handler is set
+                // This prevents duplicate events when using the global EventController
+                if (!hasEventHandler()) {
+                    yield {
+                        type: 'cost_update',
+                        usage: {
+                            ...calculatedUsage,
+                            total_tokens: calculatedUsage.input_tokens + calculatedUsage.output_tokens,
+                        },
+                    };
+                }
             }
 
             // --- Stream Finished, Emit Final Events ---

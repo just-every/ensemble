@@ -11,6 +11,7 @@ import { BaseModelProvider } from './base_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
 import { costTracker } from '../index.js';
+import { hasEventHandler } from '../utils/event_controller.js';
 
 /**
  * Configuration for the test provider behavior
@@ -257,11 +258,23 @@ export class TestProvider extends BaseModelProvider {
         const outputTokenCount = this.config.tokenUsage?.outputTokens || Math.ceil(response.length / 4);
 
         // Track token usage for cost calculation
-        costTracker.addUsage({
+        const calculatedUsage = costTracker.addUsage({
             model,
             input_tokens: inputTokenCount,
             output_tokens: outputTokenCount,
         });
+
+        // Only yield cost_update event if no global event handler is set
+        // This prevents duplicate events when using the global EventController
+        if (!hasEventHandler()) {
+            yield {
+                type: 'cost_update',
+                usage: {
+                    ...calculatedUsage,
+                    total_tokens: inputTokenCount + outputTokenCount,
+                },
+            };
+        }
     }
 
     /**
