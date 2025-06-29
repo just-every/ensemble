@@ -358,7 +358,14 @@ export interface ErrorEvent extends StreamEventBase {
  */
 export interface TaskEvent extends StreamEventBase {
     type: 'task_complete' | 'task_fatal_error';
-    result?: string;
+    result: string;
+    finalState?: {
+        metaFrequency?: string;
+        thoughtDelay?: string;
+        disabledModels?: string[];
+        modelScores?: Record<string, number>;
+        messages?: ResponseInput;
+    };
 }
 
 /**
