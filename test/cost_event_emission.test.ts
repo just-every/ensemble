@@ -1,127 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { costTracker } from '../utils/cost_tracker.js';
-import { setEventHandler } from '../utils/event_controller.js';
-import { CostUpdateEvent, ProviderStreamEvent } from '../types/types.js';
 
-describe('Automatic Cost Event Emission', () => {
-    let capturedEvents: ProviderStreamEvent[] = [];
-
+describe('Cost Tracker Usage Callbacks', () => {
     beforeEach(() => {
         // Reset cost tracker
         costTracker.reset();
-
-        // Clear captured events
-        capturedEvents = [];
-
-        // Set up event handler to capture events
-        setEventHandler(event => {
-            capturedEvents.push(event);
-        });
     });
 
-    afterEach(() => {
-        // Clear event handler
-        setEventHandler(null);
-    });
-
-    it('should automatically emit cost_update event when usage is added', async () => {
-        // Add usage
-        costTracker.addUsage({
-            model: 'test-model',
-            input_tokens: 100,
-            output_tokens: 50,
-            cached_tokens: 10,
-        });
-
-        // Wait a bit for async event emission
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // Check that a cost_update event was emitted
-        expect(capturedEvents).toHaveLength(1);
-
-        const event = capturedEvents[0] as CostUpdateEvent;
-        expect(event.type).toBe('cost_update');
-        expect(event.usage.input_tokens).toBe(100);
-        expect(event.usage.output_tokens).toBe(50);
-        expect(event.usage.total_tokens).toBe(150);
-        expect(event.usage.cached_tokens).toBe(10);
-        expect(event.usage.model).toBe('test-model');
-        expect(event.timestamp).toBeDefined();
-    });
-
-    it('should not emit cost_update event when no event handler is set', async () => {
-        // Clear event handler
-        setEventHandler(null);
-
-        // Add usage
-        costTracker.addUsage({
-            model: 'test-model',
-            input_tokens: 100,
-            output_tokens: 50,
-        });
-
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // No events should be captured
-        expect(capturedEvents).toHaveLength(0);
-    });
-
-    it('should handle missing token values gracefully', async () => {
-        // Add usage with missing values
-        costTracker.addUsage({
-            model: 'test-model',
-            // No token values provided
-        });
-
-        // Wait a bit for async event emission
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // Check event was emitted with defaults
-        expect(capturedEvents).toHaveLength(1);
-
-        const event = capturedEvents[0] as CostUpdateEvent;
-        expect(event.usage.input_tokens).toBeUndefined();
-        expect(event.usage.output_tokens).toBeUndefined();
-        expect(event.usage.total_tokens).toBe(0);
-        expect(event.usage.cached_tokens).toBeUndefined();
-        expect(event.usage.model).toBe('test-model');
-    });
-
-    it('should emit multiple events for multiple usage additions', async () => {
-        // Add multiple usages
-        costTracker.addUsage({
-            model: 'test-model',
-            input_tokens: 100,
-            output_tokens: 50,
-        });
-
-        costTracker.addUsage({
-            model: 'gpt-4o',
-            input_tokens: 200,
-            output_tokens: 100,
-            cached_tokens: 25,
-        });
-
-        // Wait a bit for async event emission
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // Check that two events were emitted
-        expect(capturedEvents).toHaveLength(2);
-
-        const event1 = capturedEvents[0] as CostUpdateEvent;
-        expect(event1.usage.input_tokens).toBe(100);
-        expect(event1.usage.output_tokens).toBe(50);
-        expect(event1.usage.total_tokens).toBe(150);
-
-        const event2 = capturedEvents[1] as CostUpdateEvent;
-        expect(event2.usage.input_tokens).toBe(200);
-        expect(event2.usage.output_tokens).toBe(100);
-        expect(event2.usage.total_tokens).toBe(300);
-        expect(event2.usage.cached_tokens).toBe(25);
-    });
-
-    it('should continue to work with legacy onAddUsage callbacks', async () => {
+    it('should continue to work with legacy onAddUsage callbacks', () => {
         let callbackCalled = false;
         let callbackUsage: any = null;
 
@@ -132,27 +18,97 @@ describe('Automatic Cost Event Emission', () => {
         });
 
         // Add usage
+        const returnedUsage = costTracker.addUsage({
+            model: 'test-model',
+            input_tokens: 100,
+            output_tokens: 50,
+        });
+
+        // Callback should be called synchronously
+        expect(callbackCalled).toBe(true);
+        expect(callbackUsage).toBeDefined();
+        expect(callbackUsage.model).toBe('test-model');
+        expect(callbackUsage.input_tokens).toBe(100);
+        expect(callbackUsage.output_tokens).toBe(50);
+
+        // Returned usage should have calculated cost
+        expect(returnedUsage).toBeDefined();
+        expect(returnedUsage.cost).toBeDefined();
+        expect(returnedUsage.timestamp).toBeDefined();
+    });
+
+    it('should return usage object with calculated cost', () => {
+        // Add usage
+        const returnedUsage = costTracker.addUsage({
+            model: 'gpt-4o',
+            input_tokens: 200,
+            output_tokens: 100,
+            cached_tokens: 25,
+        });
+
+        // Check returned usage
+        expect(returnedUsage).toBeDefined();
+        expect(returnedUsage.model).toBe('gpt-4o');
+        expect(returnedUsage.input_tokens).toBe(200);
+        expect(returnedUsage.output_tokens).toBe(100);
+        expect(returnedUsage.cached_tokens).toBe(25);
+        expect(returnedUsage.cost).toBeGreaterThan(0);
+        expect(returnedUsage.timestamp).toBeDefined();
+    });
+
+    it('should handle missing token values gracefully', () => {
+        // Add usage with missing values
+        const returnedUsage = costTracker.addUsage({
+            model: 'gpt-4o',
+            // No token values provided
+        });
+
+        // Should still return valid usage object
+        expect(returnedUsage).toBeDefined();
+        expect(returnedUsage.model).toBe('gpt-4o');
+        expect(returnedUsage.cost).toBe(0);
+        expect(returnedUsage.timestamp).toBeDefined();
+    });
+
+    it('should handle multiple callbacks', () => {
+        const callbackResults: any[] = [];
+
+        // Add multiple callbacks
+        costTracker.onAddUsage(usage => {
+            callbackResults.push({ callback: 1, usage });
+        });
+
+        costTracker.onAddUsage(usage => {
+            callbackResults.push({ callback: 2, usage });
+        });
+
+        // Add usage
         costTracker.addUsage({
             model: 'test-model',
             input_tokens: 100,
             output_tokens: 50,
         });
 
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // Both event and callback should work
-        expect(capturedEvents).toHaveLength(1);
-        expect(callbackCalled).toBe(true);
-        expect(callbackUsage).toBeDefined();
-        expect(callbackUsage.model).toBe('test-model');
+        // Both callbacks should be called
+        expect(callbackResults).toHaveLength(2);
+        expect(callbackResults[0].callback).toBe(1);
+        expect(callbackResults[1].callback).toBe(2);
+        expect(callbackResults[0].usage.model).toBe('test-model');
+        expect(callbackResults[1].usage.model).toBe('test-model');
     });
 
-    it('should handle errors in event emission gracefully', async () => {
-        // Set up a failing event handler
+    it('should handle errors in callbacks gracefully', () => {
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        setEventHandler(() => {
-            throw new Error('Event handler error');
+        let goodCallbackCalled = false;
+
+        // Add failing callback
+        costTracker.onAddUsage(() => {
+            throw new Error('Callback error');
+        });
+
+        // Add good callback
+        costTracker.onAddUsage(() => {
+            goodCallbackCalled = true;
         });
 
         // Add usage - should not throw
@@ -164,15 +120,37 @@ describe('Automatic Cost Event Emission', () => {
             });
         }).not.toThrow();
 
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 10));
-
-        // Error should be logged
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[EventController] Error in event handler:'),
-            expect.any(Error)
-        );
+        // Error should be logged but good callback should still run
+        expect(consoleSpy).toHaveBeenCalledWith('Error in cost tracker callback:', expect.any(Error));
+        expect(goodCallbackCalled).toBe(true);
 
         consoleSpy.mockRestore();
+    });
+
+    it('should work with addEstimatedUsage', () => {
+        let callbackCalled = false;
+        let callbackUsage: any = null;
+
+        // Add callback
+        costTracker.onAddUsage(usage => {
+            callbackCalled = true;
+            callbackUsage = usage;
+        });
+
+        // Add estimated usage
+        const returnedUsage = costTracker.addEstimatedUsage('test-model', 'This is input text', 'This is output text', {
+            source: 'test',
+        });
+
+        // Check callback was called
+        expect(callbackCalled).toBe(true);
+        expect(callbackUsage.metadata.estimated).toBe(true);
+        expect(callbackUsage.metadata.source).toBe('test');
+
+        // Check returned usage
+        expect(returnedUsage).toBeDefined();
+        expect(returnedUsage.input_tokens).toBe(5); // "This is input text" = 18 chars / 4 = 5 tokens
+        expect(returnedUsage.output_tokens).toBe(5); // "This is output text" = 19 chars / 4 = 5 tokens
+        expect(returnedUsage.metadata.estimated).toBe(true);
     });
 });

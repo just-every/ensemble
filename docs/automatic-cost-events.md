@@ -1,10 +1,10 @@
-# Automatic Cost Event Emission
+# Cost Event Emission in Streams
 
-As of version 0.3.0, the ensemble library automatically emits `cost_update` events whenever token usage is recorded by any model provider. This provides a unified way to track costs across all requests without needing to manually set up callbacks.
+As of version 0.3.0+, the ensemble library emits `cost_update` events directly in provider response streams. This provides a unified way to track costs in real-time as responses are generated.
 
 ## How It Works
 
-When any model provider records token usage via `costTracker.addUsage()`, a `cost_update` event is automatically emitted through the global event controller if an event handler is set.
+Model providers now emit `cost_update` events as part of their response streams. When token usage data is available (either from the API or through estimation), providers yield a `cost_update` event that can be consumed alongside other stream events.
 
 ## Event Structure
 
@@ -12,35 +12,50 @@ When any model provider records token usage via `costTracker.addUsage()`, a `cos
 interface CostUpdateEvent {
     type: 'cost_update';
     usage: {
+        model: string;
         input_tokens: number;
         output_tokens: number;
-        total_tokens?: number;
+        total_tokens: number;
         cached_tokens?: number;
+        cost?: number;
+        metadata?: {
+            estimated?: boolean;
+            [key: string]: any;
+        };
     };
-    timestamp: string;
 }
 ```
 
 ## Basic Usage
 
 ```typescript
-import { setEventHandler, ensembleRequest, CostUpdateEvent } from '@just-every/ensemble';
+import { ensembleRequest } from '@just-every/ensemble';
 
-// Set up a global event handler
-setEventHandler((event) => {
-    if (event.type === 'cost_update') {
-        const costEvent = event as CostUpdateEvent;
-        console.log(`Tokens used - Input: ${costEvent.usage.input_tokens}, Output: ${costEvent.usage.output_tokens}`);
-    }
-});
-
-// Make requests - cost events will be emitted automatically
+// Make requests - cost events are included in the stream
 const stream = ensembleRequest([
     { role: 'user', content: 'Hello!' }
 ], { model: 'gpt-3.5-turbo' });
 
 for await (const event of stream) {
-    // Process stream events
+    if (event.type === 'cost_update') {
+        console.log(`Tokens used - Input: ${event.usage.input_tokens}, Output: ${event.usage.output_tokens}`);
+        console.log(`Cost: $${event.usage.cost?.toFixed(6)}`);
+    }
+}
+```
+
+## Token Estimation
+
+For providers that don't return token usage data (e.g., XAI, DeepSeek, OpenRouter), the library automatically estimates tokens using a character-based approximation (1 token ≈ 4 characters). These estimates are marked with `metadata.estimated = true`.
+
+```typescript
+for await (const event of stream) {
+    if (event.type === 'cost_update') {
+        if (event.usage.metadata?.estimated) {
+            console.log('Note: Token counts are estimated');
+        }
+        console.log(`Tokens: ${event.usage.total_tokens}`);
+    }
 }
 ```
 
@@ -49,35 +64,24 @@ for await (const event of stream) {
 You can build sophisticated cost monitoring systems using these events:
 
 ```typescript
-class CostTracker {
+class StreamCostTracker {
     private modelCosts = new Map<string, number>();
     
-    constructor() {
-        setEventHandler(this.handleEvent.bind(this));
-    }
-    
-    private handleEvent(event: ProviderStreamEvent) {
-        if (event.type === 'cost_update') {
-            // Track costs by model, time period, etc.
-            this.recordCost(event as CostUpdateEvent);
+    async processStream(stream: AsyncGenerator<ProviderStreamEvent>) {
+        for await (const event of stream) {
+            if (event.type === 'cost_update') {
+                this.recordCost(event.usage);
+            }
+            // Handle other events...
         }
     }
     
-    private recordCost(event: CostUpdateEvent) {
-        // Implementation details...
+    private recordCost(usage: ModelUsage) {
+        const current = this.modelCosts.get(usage.model) || 0;
+        this.modelCosts.set(usage.model, current + (usage.cost || 0));
     }
 }
 ```
-
-## Performance Considerations
-
-- Events are emitted asynchronously to avoid blocking the main execution flow
-- Events are only emitted if an event handler is set (checked via `hasEventHandler()`)
-- Errors in event handlers are caught and logged, preventing them from affecting the main flow
-
-## Backwards Compatibility
-
-The existing `costTracker.onAddUsage()` callback mechanism continues to work alongside the automatic event emission. Both will be triggered when usage is recorded.
 
 ## When Events Are Emitted
 
@@ -87,12 +91,37 @@ Cost events are emitted in the following scenarios:
 2. **For embeddings** - When embedding requests complete
 3. **For image generation** - When images are generated
 4. **For cached tokens** - When providers report cache usage (e.g., Claude, GPT-4)
+5. **With token estimation** - When providers don't return usage data
 
-## Limitations
+## Provider Support
 
-- The `cost_update` event doesn't include the model name (this would require changes to the ModelUsage interface)
-- Events are emitted at the provider level, not per-message
-- Some providers may not report token usage for certain operations
+| Provider | Real Usage Data | Token Estimation |
+|----------|----------------|------------------|
+| OpenAI | ✅ | - |
+| Anthropic (Claude) | ✅ | - |
+| Google (Gemini) | ✅ | ✅ (fallback) |
+| XAI (Grok) | ❌ | ✅ |
+| DeepSeek | ❌ | ✅ |
+| OpenRouter | ❌ | ✅ |
+
+## Backwards Compatibility
+
+The `costTracker.onAddUsage()` callback mechanism continues to work for custom integrations. Callbacks are triggered synchronously when usage is recorded.
+
+```typescript
+import { costTracker } from '@just-every/ensemble';
+
+// Legacy callback approach still works
+costTracker.onAddUsage((usage) => {
+    console.log(`Usage recorded for ${usage.model}`);
+});
+```
+
+## Performance Considerations
+
+- Cost events are yielded synchronously as part of the stream
+- Token estimation is lightweight (simple character counting)
+- No duplicate events - each provider emits exactly one cost_update per request
 
 ## See Also
 
