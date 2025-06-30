@@ -390,7 +390,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 options.dimensions = opts.dimensions;
             }
 
-            console.log(`[OpenAI] Generating embedding with model ${model}`);
+            //console.log(`[OpenAI] Generating embedding with model ${model}`);
 
             // Call the OpenAI API
             const response = await this.client.embeddings.create(options);
@@ -632,7 +632,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 response_format = 'mp3';
             }
 
-            console.log(`[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`);
+            //console.log(`[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`);
 
             // Add in affect
             let instructions = opts?.instructions || undefined;
@@ -728,7 +728,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
                     // Only convert to reasoning if both current model and source model are o-class
                     if (model.startsWith('o') && message.thinking_id && model === originalModel) {
-                        console.log(`[OpenAI] Processing thinking message with ID: ${message.thinking_id}`, message);
+                        //console.log(`[OpenAI] Processing thinking message with ID: ${message.thinking_id}`, message);
                         const match = message.thinking_id.match(/^(rs_[A-Za-z0-9]+)-(\d)$/);
                         if (match) {
                             const reasoningId = match[1];
@@ -971,13 +971,13 @@ export class OpenAIProvider extends BaseModelProvider {
 
                     // Check if the system was paused during the stream
                     if (isPaused()) {
-                        console.log(`[OpenAI] System paused during stream for model ${model}. Waiting...`);
+                        //console.log(`[OpenAI] System paused during stream for model ${model}. Waiting...`);
 
                         // Wait while paused instead of aborting
                         await waitWhilePaused(100, agent.abortSignal);
 
                         // If we're resuming, continue processing
-                        console.log(`[OpenAI] System resumed, continuing stream for model ${model}`);
+                        //console.log(`[OpenAI] System resumed, continuing stream for model ${model}`);
                     }
 
                     // --- Response Lifecycle Events ---
@@ -1110,7 +1110,7 @@ export class OpenAIProvider extends BaseModelProvider {
                             messagePositions.set(eventData.item_id, position);
                         } else {
                             // Log other types of annotations
-                            console.log('Annotation added:', eventData.annotation);
+                            //console.log('Annotation added:', eventData.annotation);
                         }
                     } else if (event.type === 'response.output_text.done' && event.text !== undefined) {
                         // Check text exists
@@ -1138,13 +1138,13 @@ export class OpenAIProvider extends BaseModelProvider {
                     // --- Refusal Events ---
                     else if (event.type === 'response.refusal.delta' && event.delta) {
                         // Streamed refusal text chunk
-                        console.log(`Refusal delta for item ${event.item_id}: ${event.delta}`);
+                        //console.log(`Refusal delta for item ${event.item_id}: ${event.delta}`);
                         // Decide how to handle/yield refusal text (e.g., separate event type)
                         //yield { type: 'refusal_delta', message_id: event.item_id, content: event.delta };
                     } else if (event.type === 'response.refusal.done' && event.refusal) {
                         // Refusal text finalized
                         log_llm_error(requestId, 'OpenAI refusal error: ' + event.refusal);
-                        console.log(`Refusal done for item ${event.item_id}: ${event.refusal}`);
+                        console.error(`Refusal for item ${event.item_id}: ${event.refusal}`);
                         yield {
                             type: 'error',
                             error: 'OpenAI refusal error: ' + event.refusal,
@@ -1188,42 +1188,34 @@ export class OpenAIProvider extends BaseModelProvider {
 
                     // --- File Search Events ---
                     else if (event.type === 'response.file_search_call.in_progress') {
-                        console.log(`File search in progress for item ${event.item_id}...`);
+                        //console.log(`File search in progress for item ${event.item_id}...`);
                         //yield { type: 'file_search_started', item_id: event.item_id };
                     } else if (event.type === 'response.file_search_call.searching') {
-                        console.log(`File search searching for item ${event.item_id}...`);
+                        //console.log(`File search searching for item ${event.item_id}...`);
                         //yield { type: 'file_search_pending', item_id: event.item_id };
                     } else if (event.type === 'response.file_search_call.completed') {
-                        console.log(`File search completed for item ${event.item_id}.`);
+                        //console.log(`File search completed for item ${event.item_id}.`);
                         //yield { type: 'file_search_completed', item_id: event.item_id };
                         // Note: Results are typically delivered via annotations in the text output.
                     }
 
                     // --- Web Search Events ---
                     else if (event.type === 'response.web_search_call.in_progress') {
-                        console.log(`Web search in progress for item ${event.item_id}...`);
+                        //console.log(`Web search in progress for item ${event.item_id}...`);
                         //yield { type: 'web_search_started', item_id: event.item_id };
                     } else if (event.type === 'response.web_search_call.searching') {
-                        console.log(`Web search searching for item ${event.item_id}...`);
+                        //console.log(`Web search searching for item ${event.item_id}...`);
                         //yield { type: 'web_search_pending', item_id: event.item_id };
                     } else if (event.type === 'response.web_search_call.completed') {
-                        console.log(`Web search completed for item ${event.item_id}.`);
+                        //console.log(`Web search completed for item ${event.item_id}.`);
                         //yield { type: 'web_search_completed', item_id: event.item_id };
                         // Note: Results might be used internally by the model or delivered via annotations/text.
                     }
 
                     // --- Reasoning Summary Events ---
                     else if (event.type === 'response.reasoning_summary_part.added') {
-                        // A new reasoning summary part was added - we just log this
-                        console.log(
-                            `Reasoning summary part added for item ${event.item_id}, index ${event.summary_index}`
-                        );
                         // We don't yield anything here, we wait for the text deltas
                     } else if (event.type === 'response.reasoning_summary_part.done') {
-                        // A reasoning summary part was completed - we just log this
-                        console.log(
-                            `Reasoning summary part done for item ${event.item_id}, index ${event.summary_index}`
-                        );
                         // We don't yield anything here, we rely on the text.done event
                     } else if (event.type === 'response.reasoning_summary_text.delta' && event.delta) {
                         // A delta was added to a reasoning summary text
@@ -1379,7 +1371,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
                 ws!.on('open', () => {
                     clearTimeout(timeout);
-                    console.log('[OpenAI] WebSocket connected for transcription');
+                    //console.log('[OpenAI] WebSocket connected for transcription');
                     isConnected = true;
                     resolve();
                 });
@@ -1487,7 +1479,7 @@ export class OpenAIProvider extends BaseModelProvider {
             });
 
             ws.on('close', () => {
-                console.log('[OpenAI] WebSocket closed');
+                //console.log('[OpenAI] WebSocket closed');
                 isConnected = false;
             });
 
