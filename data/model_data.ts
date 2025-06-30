@@ -240,6 +240,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         features: {
             input_modality: ['text'],
             output_modality: ['embedding'],
+            input_token_limit: 8191,
         },
         embedding: true,
         dim: 1536,
@@ -256,6 +257,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         features: {
             input_modality: ['text'],
             output_modality: ['embedding'],
+            input_token_limit: 8191,
         },
         embedding: true,
         dim: 3072,
@@ -272,6 +274,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         features: {
             input_modality: ['text'],
             output_modality: ['embedding'],
+            input_token_limit: 8191,
         },
         embedding: true,
         dim: 768,

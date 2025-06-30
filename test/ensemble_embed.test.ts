@@ -8,7 +8,13 @@ vi.mock('../model_providers/model_provider.js', () => ({
     getModelProvider: vi.fn(),
 }));
 
+// Mock the model data module
+vi.mock('../data/model_data.js', () => ({
+    findModel: vi.fn(),
+}));
+
 import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
+import { findModel } from '../data/model_data.js';
 
 describe('ensembleEmbed', () => {
     let mockProvider: any;
@@ -26,6 +32,28 @@ describe('ensembleEmbed', () => {
         vi.mocked(getModelFromAgent).mockImplementation(async agent => {
             if (agent.model) return agent.model;
             return 'text-embedding-3-small'; // Default model
+        });
+
+        // Setup findModel mock to return appropriate model info
+        vi.mocked(findModel).mockImplementation((modelId: string) => {
+            if (modelId === 'text-embedding-3-small' || modelId === 'text-embedding-3-large') {
+                return {
+                    id: modelId,
+                    provider: 'openai',
+                    features: { input_token_limit: 8191 },
+                    cost: {},
+                } as any;
+            }
+            if (modelId === 'gemini-embedding-exp-03-07') {
+                return {
+                    id: modelId,
+                    provider: 'google',
+                    features: { input_token_limit: 8191 },
+                    cost: {},
+                } as any;
+            }
+            // Return null for unknown models (no token limit)
+            return null;
         });
 
         // Default mock embedding response
@@ -178,7 +206,7 @@ describe('ensembleEmbed', () => {
             expect(result).toHaveLength(1536);
         });
 
-        it('should not chunk for non-OpenAI models', async () => {
+        it('should not chunk for models without input token limits', async () => {
             const longText = 'a'.repeat(30000);
             const mockEmbedding = new Array(768).fill(0.1);
             mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
