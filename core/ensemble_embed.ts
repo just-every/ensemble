@@ -19,8 +19,8 @@ const embeddingCache = new Map<
  * Defaults to OpenAI's text-embedding-3-small model with 1536 dimensions
  * for consistent embeddings across applications.
  *
- * For long texts that exceed model token limits, automatically splits into chunks
- * and averages the embeddings.
+ * For long texts that exceed model token limits (8191 tokens for OpenAI and Gemini),
+ * automatically splits into chunks and averages the embeddings.
  *
  * @param text - Text to embed
  * @param agent - Agent configuration (optional - defaults to text-embedding-3-small)
@@ -86,11 +86,12 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         throw new Error(`Provider for model ${model} does not support embeddings`);
     }
 
-    // Check if we need to chunk the text for OpenAI embeddings
-    // OpenAI models have a max token limit of 8191
+    // Check if we need to chunk the text for models with token limits
+    // OpenAI and Gemini embedding models have a max token limit of 8191
     // Using chars/4 as a rough estimation
     const MAX_CHARS_PER_CHUNK = 8191 * 4 * 0.9; // 90% of max to be safe
-    const needsChunking = model.includes('text-embedding-3') && text.length > MAX_CHARS_PER_CHUNK;
+    const needsChunking =
+        (model.includes('text-embedding-3') || model.includes('gemini-embedding')) && text.length > MAX_CHARS_PER_CHUNK;
 
     let embedding: number[];
 

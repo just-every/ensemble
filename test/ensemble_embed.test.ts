@@ -138,6 +138,30 @@ describe('ensembleEmbed', () => {
             expect(result[0]).toBeCloseTo(0.15); // (0.1 + 0.2) / 2
         });
 
+        it('should chunk long texts for Gemini embeddings', async () => {
+            // Create a long text that exceeds the token limit
+            const longText = 'a'.repeat(30000); // ~7500 tokens
+            const mockEmbedding1 = new Array(768).fill(0.3);
+            const mockEmbedding2 = new Array(768).fill(0.7);
+            mockProvider.createEmbedding.mockResolvedValue([mockEmbedding1, mockEmbedding2]);
+
+            const agent: AgentDefinition = { agent_id: 'test', model: 'gemini-embedding-exp-03-07' };
+            const result = await ensembleEmbed(longText, agent, { dimensions: 768 });
+
+            // Should have called createEmbedding with an array of chunks
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(expect.any(Array), 'gemini-embedding-exp-03-07', {
+                dimensions: 768,
+            });
+
+            // Check that it created 2 chunks
+            const callArgs = mockProvider.createEmbedding.mock.calls[0];
+            expect(callArgs[0]).toHaveLength(2);
+
+            // Result should be averaged
+            expect(result).toHaveLength(768);
+            expect(result[0]).toBeCloseTo(0.5); // (0.3 + 0.7) / 2
+        });
+
         it('should not chunk short texts', async () => {
             const shortText = 'This is a short text';
             const mockEmbedding = new Array(1536).fill(0.1);
