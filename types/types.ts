@@ -180,6 +180,7 @@ export type ResponseInputItem =
 
 export interface ResponseBaseMessage {
     type: string;
+    id?: string; // Optional unique identifier for the message
     model?: string;
     timestamp?: number; // Timestamp for the event, shared by all event types
 }

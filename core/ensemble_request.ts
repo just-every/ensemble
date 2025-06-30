@@ -12,9 +12,6 @@ import {
     ResponseOutputMessage,
     ResponseInputMessage,
     MessageEventBase,
-    type ResponseThinkingMessage,
-    type ResponseInputFunctionCall,
-    type ResponseInputFunctionCallOutput,
     type ToolEvent,
 } from '../types/types.js';
 import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
@@ -24,6 +21,12 @@ import { processToolResult } from '../utils/tool_result_processor.js';
 import { verifyOutput } from '../utils/verification.js';
 import { waitWhilePaused } from '../utils/pause_controller.js';
 import { emitEvent } from '../utils/event_controller.js';
+import {
+    convertToThinkingMessage,
+    convertToOutputMessage,
+    convertToFunctionCall,
+    convertToFunctionCallOutput,
+} from '../utils/message_converter.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 
@@ -324,15 +327,7 @@ async function* executeRound(
                     messageEvent.thinking_content ||
                     (!messageEvent.content && messageEvent.message_id) // Note that some providers require empty thinking nodes to be included in the conversation history
                 ) {
-                    const thinkingMessage: ResponseThinkingMessage = {
-                        type: 'thinking',
-                        role: 'assistant',
-                        content: messageEvent.thinking_content || '',
-                        signature: messageEvent.thinking_signature || '',
-                        thinking_id: messageEvent.message_id || '',
-                        status: 'completed',
-                        model,
-                    };
+                    const thinkingMessage = convertToThinkingMessage(messageEvent, model);
 
                     if (agent.onThinking) {
                         await agent.onThinking(thinkingMessage);
@@ -345,14 +340,7 @@ async function* executeRound(
                     };
                 }
                 if (messageEvent.content) {
-                    const contentMessage: ResponseOutputMessage = {
-                        id: messageEvent.message_id,
-                        type: 'message',
-                        role: 'assistant',
-                        content: messageEvent.content,
-                        status: 'completed',
-                        model,
-                    };
+                    const contentMessage = convertToOutputMessage(messageEvent, model, 'completed');
 
                     if (agent.onResponse) {
                         await agent.onResponse(contentMessage);
@@ -384,15 +372,7 @@ async function* executeRound(
                 const toolCall = toolEvent.tool_call;
 
                 // Add function call
-                const functionCall: ResponseInputFunctionCall = {
-                    type: 'function_call',
-                    id: toolCall.id,
-                    call_id: toolCall.call_id || toolCall.id,
-                    name: toolCall.function.name,
-                    arguments: toolCall.function.arguments,
-                    model,
-                    status: 'completed',
-                };
+                const functionCall = convertToFunctionCall(toolCall, model, 'completed');
 
                 // Run tools in parallel
                 toolPromises.push(processToolCall(toolCall, agent));
@@ -447,15 +427,7 @@ async function* executeRound(
         // Emit tool done event through global event controller
         await emitEvent(toolDoneEvent, agent, model);
 
-        const functionOutput: ResponseInputFunctionCallOutput = {
-            type: 'function_call_output',
-            id: toolResult.id,
-            call_id: toolResult.call_id || toolResult.id,
-            name: toolResult.toolCall.function.name,
-            output: toolResult.output + (toolResult.error || ''),
-            model,
-            status: 'completed',
-        };
+        const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
 
         history.add(functionOutput);
         yield {
