@@ -113,6 +113,64 @@ describe('ensembleEmbed', () => {
         });
     });
 
+    describe('chunking for long texts', () => {
+        it('should chunk long texts for OpenAI embeddings', async () => {
+            // Create a long text that exceeds the token limit
+            const longText = 'a'.repeat(30000); // ~7500 tokens
+            const mockEmbedding1 = new Array(1536).fill(0.1);
+            const mockEmbedding2 = new Array(1536).fill(0.2);
+            mockProvider.createEmbedding.mockResolvedValue([mockEmbedding1, mockEmbedding2]);
+
+            const agent: AgentDefinition = { agent_id: 'test', model: 'text-embedding-3-small' };
+            const result = await ensembleEmbed(longText, agent);
+
+            // Should have called createEmbedding with an array of chunks
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(expect.any(Array), 'text-embedding-3-small', {
+                dimensions: 1536,
+            });
+
+            // Check that it created 2 chunks
+            const callArgs = mockProvider.createEmbedding.mock.calls[0];
+            expect(callArgs[0]).toHaveLength(2);
+
+            // Result should be averaged
+            expect(result).toHaveLength(1536);
+            expect(result[0]).toBeCloseTo(0.15); // (0.1 + 0.2) / 2
+        });
+
+        it('should not chunk short texts', async () => {
+            const shortText = 'This is a short text';
+            const mockEmbedding = new Array(1536).fill(0.1);
+            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+
+            const agent: AgentDefinition = { agent_id: 'test', model: 'text-embedding-3-small' };
+            const result = await ensembleEmbed(shortText, agent);
+
+            // Should have called createEmbedding with the text directly
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(shortText, 'text-embedding-3-small', {
+                dimensions: 1536,
+            });
+
+            expect(result).toHaveLength(1536);
+        });
+
+        it('should not chunk for non-OpenAI models', async () => {
+            const longText = 'a'.repeat(30000);
+            const mockEmbedding = new Array(768).fill(0.1);
+            mockProvider.createEmbedding.mockResolvedValue(mockEmbedding);
+
+            const agent: AgentDefinition = { agent_id: 'test', model: 'some-other-embedding' };
+            const result = await ensembleEmbed(longText, agent, { dimensions: 768 });
+
+            // Should have called createEmbedding with the full text
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(longText, 'some-other-embedding', {
+                dimensions: 768,
+            });
+
+            expect(result).toHaveLength(768);
+        });
+    });
+
     describe('basic functionality', () => {
         it('should call provider.createEmbedding with correct parameters', async () => {
             const mockEmbedding = [0.1, 0.2, 0.3];

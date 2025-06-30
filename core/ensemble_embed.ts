@@ -19,6 +19,9 @@ const embeddingCache = new Map<
  * Defaults to OpenAI's text-embedding-3-small model with 1536 dimensions
  * for consistent embeddings across applications.
  *
+ * For long texts that exceed model token limits, automatically splits into chunks
+ * and averages the embeddings.
+ *
  * @param text - Text to embed
  * @param agent - Agent configuration (optional - defaults to text-embedding-3-small)
  * @param options - Optional configuration
@@ -51,6 +54,10 @@ const embeddingCache = new Map<
  * const embedding3072d = await ensembleEmbed('Large embedding', agent, {
  *   dimensions: 3072
  * });
+ *
+ * // Long text is automatically chunked
+ * const longText = "...".repeat(10000); // Very long text
+ * const embedding = await ensembleEmbed(longText, agent);
  * ```
  */
 export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
@@ -79,11 +86,41 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         throw new Error(`Provider for model ${model} does not support embeddings`);
     }
 
-    // Generate the embedding using the provider with dimensions
-    const result = await provider.createEmbedding(text, model, { ...options, dimensions });
+    // Check if we need to chunk the text for OpenAI embeddings
+    // OpenAI models have a max token limit of 8191
+    // Using chars/4 as a rough estimation
+    const MAX_CHARS_PER_CHUNK = 8191 * 4 * 0.9; // 90% of max to be safe
+    const needsChunking = model.includes('text-embedding-3') && text.length > MAX_CHARS_PER_CHUNK;
 
-    // Handle array result (single text input should return single vector)
-    const embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);
+    let embedding: number[];
+
+    if (needsChunking) {
+        // Split text into chunks
+        const chunks: string[] = [];
+        for (let i = 0; i < text.length; i += MAX_CHARS_PER_CHUNK) {
+            chunks.push(text.slice(i, i + MAX_CHARS_PER_CHUNK));
+        }
+
+        // Get embeddings for all chunks in a single batch request
+        const result = await provider.createEmbedding(chunks, model, { ...options, dimensions });
+
+        // Result should be an array of embeddings
+        const embeddings = result as number[][];
+
+        // Average the embeddings
+        embedding = new Array(dimensions).fill(0);
+        for (const vec of embeddings) {
+            for (let i = 0; i < dimensions; i++) {
+                embedding[i] += vec[i] / embeddings.length;
+            }
+        }
+    } else {
+        // Generate single embedding
+        const result = await provider.createEmbedding(text, model, { ...options, dimensions });
+
+        // Handle array result (single text input should return single vector)
+        embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);
+    }
 
     // Cache the result with simple LRU eviction
     if (embeddingCache.size >= EMBEDDING_CACHE_MAX) {
