@@ -1,5 +1,5 @@
 import type { AgentDefinition, EmbedOpts } from '../types/types.js';
-import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
+import { getModelProvider } from '../model_providers/model_provider.js';
 
 const EMBEDDING_TTL_MS = 1000 * 60 * 60; // 1 hour
 const EMBEDDING_CACHE_MAX = 1000;

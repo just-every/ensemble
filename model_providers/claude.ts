@@ -35,7 +35,6 @@ import { isPaused } from '../utils/pause_controller.js';
 import { findModel } from '../data/model_data.js';
 import { appendMessageWithImage, resizeAndTruncateForClaude } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
-import { hasEventHandler } from '../utils/event_controller.js';
 
 // Define mappings for thinking budget configurations
 const THINKING_BUDGET_CONFIGS: Record<string, number> = {
@@ -1153,17 +1152,14 @@ export class ClaudeProvider extends BaseModelProvider {
                     },
                 });
 
-                // Only yield cost_update event if no global event handler is set
-                // This prevents duplicate events when using the global EventController
-                if (!hasEventHandler()) {
-                    yield {
-                        type: 'cost_update',
-                        usage: {
-                            ...calculatedUsage,
-                            total_tokens: totalInputTokens + totalOutputTokens,
-                        },
-                    };
-                }
+                // Always yield cost_update event to ensure stream consumers receive cost data
+                yield {
+                    type: 'cost_update',
+                    usage: {
+                        ...calculatedUsage,
+                        total_tokens: totalInputTokens + totalOutputTokens,
+                    },
+                };
             }
         }
     }
