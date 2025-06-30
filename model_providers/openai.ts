@@ -27,6 +27,7 @@ import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
+import { hasEventHandler } from '../utils/event_controller.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { ReasoningEffort } from 'openai/resources/shared.js';
 import type { WebSocket } from 'ws';
@@ -831,6 +832,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 if ((message.type ?? 'message') === 'message' && 'content' in message) {
                     if ('id' in message && message.id && (!message.id.startsWith('msg_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'msg_', remove it
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { id, ...rest } = message;
                         message = rest;
                     }
@@ -982,7 +984,7 @@ export class OpenAIProvider extends BaseModelProvider {
                         // console.log(`Response ${event.response.id} is in progress...`);
                     } else if (event.type === 'response.completed' && event.response?.usage) {
                         // Final usage information
-                        costTracker.addUsage({
+                        const calculatedUsage = costTracker.addUsage({
                             model, // Ensure 'model' variable is accessible here
                             input_tokens: event.response.usage.input_tokens || 0,
                             output_tokens: event.response.usage.output_tokens || 0,
@@ -991,6 +993,19 @@ export class OpenAIProvider extends BaseModelProvider {
                                 reasoning_tokens: event.response.usage.output_tokens_details?.reasoning_tokens || 0,
                             },
                         });
+
+                        // Only yield cost_update event if no global event handler is set
+                        // This prevents duplicate events when using the global EventController
+                        if (!hasEventHandler()) {
+                            yield {
+                                type: 'cost_update',
+                                usage: {
+                                    ...calculatedUsage,
+                                    total_tokens:
+                                        event.response.usage.input_tokens + event.response.usage.output_tokens,
+                                },
+                            };
+                        }
                         // console.log(`Response ${event.response.id} completed.`);
                     } else if (event.type === 'response.failed' && event.response?.error) {
                         // Response failed entirely
