@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
     MessageEventBase,
     ResponseBaseMessage,
@@ -14,7 +15,7 @@ import {
  */
 export function convertToThinkingMessage(event: MessageEventBase, model?: string): ResponseThinkingMessage {
     return {
-        id: event.message_id,
+        id: event.message_id || randomUUID(),
         type: 'thinking',
         role: 'assistant',
         content: event.thinking_content || '',
@@ -35,7 +36,7 @@ export function convertToOutputMessage(
     status: 'in_progress' | 'completed' | 'incomplete' = 'completed'
 ): ResponseOutputMessage {
     return {
-        id: event.message_id,
+        id: event.message_id || randomUUID(),
         type: 'message',
         role: 'assistant',
         content: event.content,
@@ -54,7 +55,7 @@ export function convertToFunctionCall(
     status: 'in_progress' | 'completed' | 'incomplete' = 'completed'
 ): ResponseInputFunctionCall {
     return {
-        id: toolCall.id,
+        id: toolCall.id || randomUUID(),
         type: 'function_call',
         call_id: toolCall.call_id || toolCall.id,
         name: toolCall.function.name,
@@ -73,8 +74,11 @@ export function convertToFunctionCallOutput(
     model?: string,
     status: 'in_progress' | 'completed' | 'incomplete' = 'completed'
 ): ResponseInputFunctionCallOutput {
+    // Append '_output' to avoid ID collision with the function call
+    const id = toolResult.id ? `${toolResult.id}_output` : randomUUID();
+
     return {
-        id: toolResult.id,
+        id,
         type: 'function_call_output',
         call_id: toolResult.call_id || toolResult.id,
         name: toolResult.toolCall.function.name,
@@ -91,7 +95,7 @@ export function convertToFunctionCallOutput(
 export function ensureMessageId<T extends ResponseBaseMessage>(message: T): T {
     if (!message.id) {
         // Generate a unique ID if not present
-        message.id = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        message.id = randomUUID();
     }
     return message;
 }
