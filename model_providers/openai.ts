@@ -831,12 +831,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 if ((message.type ?? 'message') === 'message' && 'content' in message) {
                     if ('id' in message && message.id && (!message.id.startsWith('msg_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'msg_', remove it
-
                         const { id, ...rest } = message;
                         message = rest;
-                        console.log(
-                            `[OpenAI] Removed message ID: ${id} model: ${model} originalModel: ${originalModel}`
-                        );
                     }
 
                     input = await appendMessageWithImage(

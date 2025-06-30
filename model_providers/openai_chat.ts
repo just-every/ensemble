@@ -854,10 +854,6 @@ export class OpenAIChat extends BaseModelProvider {
                         };
                     }
                 } else {
-                    console.warn(
-                        `(${this.provider}) Usage info not found in stream for cost tracking. Using token estimation.`
-                    );
-
                     // Estimate tokens from input and output
                     // Calculate input text from messages
                     let inputText = '';
