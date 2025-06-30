@@ -200,8 +200,8 @@ export const MODEL_CLASSES = {
 
     embedding: {
         models: [
-            'gemini-embedding-exp-03-07', // Google's Gemini embedding model (768d) - FREE
             'text-embedding-3-small', // OpenAI's standard embedding model (1536d)
+            'gemini-embedding-exp-03-07', // Google's Gemini embedding model (768d) - FREE
         ],
         description: 'Vector embedding models for semantic search and RAG',
     },

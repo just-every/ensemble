@@ -16,7 +16,11 @@ const embeddingCache = new Map<
 /**
  * Generate an embedding vector for the given text
  *
+ * Defaults to OpenAI's text-embedding-3-small model with 1536 dimensions
+ * for consistent embeddings across applications.
+ *
  * @param text - Text to embed
+ * @param agent - Agent configuration (optional - defaults to text-embedding-3-small)
  * @param options - Optional configuration
  * @returns Promise that resolves to a normalized embedding vector
  *
@@ -36,12 +40,12 @@ const embeddingCache = new Map<
  *   modelClass: 'embedding'
  * });
  *
- * // Default is 768 dimensions
- * const embedding = await ensembleEmbed('Default dimensions', agent);
+ * // Default is text-embedding-3-small with 1536 dimensions
+ * const embedding = await ensembleEmbed('Default embedding', {});
  *
  * // Force specific dimensions (provider must support the requested dimensions)
- * const embedding1536d = await ensembleEmbed('Standard embedding', agent, {
- *   dimensions: 1536
+ * const embedding768d = await ensembleEmbed('Compact embedding', agent, {
+ *   dimensions: 768
  * });
  *
  * const embedding3072d = await ensembleEmbed('Large embedding', agent, {
@@ -50,8 +54,8 @@ const embeddingCache = new Map<
  * ```
  */
 export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
-    // Default to 768 dimensions if not specified
-    const dimensions = options?.dimensions || 768;
+    // Default to 1536 dimensions for text-embedding-3-small
+    const dimensions = options?.dimensions || 1536;
 
     // Use a hash of the text and model as the cache key
     const cacheKey = `${agent.model || agent.modelClass}:${text}:${dimensions}`;
@@ -65,8 +69,8 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         embeddingCache.delete(cacheKey);
     }
 
-    // Determine which model to use
-    const model = await getModelFromAgent(agent, 'embedding');
+    // Determine which model to use - default to text-embedding-3-small if not specified
+    const model = agent.model || (await getModelFromAgent(agent, 'embedding')) || 'text-embedding-3-small';
 
     // Get the provider for this model
     const provider = getModelProvider(model);

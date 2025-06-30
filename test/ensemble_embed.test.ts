@@ -80,8 +80,8 @@ describe('ensembleEmbed', () => {
             const uniqueText = `no override test ${Date.now()}`;
             const result = await ensembleEmbed(uniqueText, agent, { dimensions: 768 });
 
-            // Verify the original model was used
-            expect(vi.mocked(getModelFromAgent)).toHaveBeenCalledWith(agent, 'embedding');
+            // Verify the original model was used (getModelFromAgent should not be called since model is specified)
+            expect(vi.mocked(getModelFromAgent)).not.toHaveBeenCalled();
             expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', {
                 dimensions: 768,
             });
@@ -121,7 +121,7 @@ describe('ensembleEmbed', () => {
             const agent: AgentDefinition = { agent_id: 'test', model: 'test-model' };
             const result = await ensembleEmbed('test text', agent);
 
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', { dimensions: 768 });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', { dimensions: 1536 });
             expect(result).toEqual(mockEmbedding);
         });
 
