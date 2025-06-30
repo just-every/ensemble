@@ -70,7 +70,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
     }
 
     // Determine which model to use - default to text-embedding-3-small if not specified
-    const model = agent.model || (await getModelFromAgent(agent, 'embedding')) || 'text-embedding-3-small';
+    const model = agent.model || 'text-embedding-3-small';
 
     // Get the provider for this model
     const provider = getModelProvider(model);
