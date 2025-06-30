@@ -831,7 +831,6 @@ export class OpenAIProvider extends BaseModelProvider {
                 if ((message.type ?? 'message') === 'message' && 'content' in message) {
                     if ('id' in message && message.id && (!message.id.startsWith('msg_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'msg_', remove it
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { id, ...rest } = message;
                         message = rest;
                     }

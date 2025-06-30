@@ -25,6 +25,7 @@ import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_
 // import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
+import { hasEventHandler } from '../utils/event_controller.js';
 
 // Extended types for Perplexity/OpenRouter response formats
 interface ExtendedDelta extends OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta {
@@ -840,15 +841,18 @@ export class OpenAIChat extends BaseModelProvider {
                         },
                     });
 
-                    // Always yield cost_update event to ensure stream consumers receive cost data
-                    yield {
-                        type: 'cost_update',
-                        usage: {
-                            ...calculatedUsage,
-                            total_tokens:
-                                usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
-                        },
-                    };
+                    // Only yield cost_update event if no global event handler is set
+                    // This prevents duplicate events when using the global EventController
+                    if (!hasEventHandler()) {
+                        yield {
+                            type: 'cost_update',
+                            usage: {
+                                ...calculatedUsage,
+                                total_tokens:
+                                    usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+                            },
+                        };
+                    }
                 } else {
                     // Estimate tokens from input and output
                     // Calculate input text from messages
@@ -875,14 +879,17 @@ export class OpenAIChat extends BaseModelProvider {
                         provider: this.provider,
                     });
 
-                    // Always yield cost_update event to ensure stream consumers receive cost data
-                    yield {
-                        type: 'cost_update',
-                        usage: {
-                            ...calculatedUsage,
-                            total_tokens: estimatedInputTokens + estimatedOutputTokens,
-                        },
-                    };
+                    // Only yield cost_update event if no global event handler is set
+                    // This prevents duplicate events when using the global EventController
+                    if (!hasEventHandler()) {
+                        yield {
+                            type: 'cost_update',
+                            usage: {
+                                ...calculatedUsage,
+                                total_tokens: estimatedInputTokens + estimatedOutputTokens,
+                            },
+                        };
+                    }
                 }
 
                 // Flush any remaining buffered deltas and yield them
