@@ -121,7 +121,7 @@ describe('ensembleEmbed', () => {
             const agent: AgentDefinition = { agent_id: 'test', model: 'test-model' };
             const result = await ensembleEmbed('test text', agent);
 
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', undefined);
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', { dimensions: 768 });
             expect(result).toEqual(mockEmbedding);
         });
 

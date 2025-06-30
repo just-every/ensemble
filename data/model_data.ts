@@ -227,13 +227,6 @@ export const MODEL_CLASSES = {
     },
 };
 
-// Add supported embedding dimensions for various models
-export const EMBEDDING_DIMENSIONS: Record<string, number> = {
-    'text-embedding-3-small': 1536,
-    'text-embedding-3-large': 3072,
-    'gemini-embedding-exp-03-07': 768,
-};
-
 // Main model registry with all supported models
 export const MODEL_REGISTRY: ModelEntry[] = [
     // Embedding models

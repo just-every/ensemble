@@ -36,11 +36,10 @@ const embeddingCache = new Map<
  *   modelClass: 'embedding'
  * });
  *
- * // Force specific dimensions (provider must support the requested dimensions)
- * const embedding768d = await ensembleEmbed('Compact embedding', agent, {
- *   dimensions: 768
- * });
+ * // Default is 768 dimensions
+ * const embedding = await ensembleEmbed('Default dimensions', agent);
  *
+ * // Force specific dimensions (provider must support the requested dimensions)
  * const embedding1536d = await ensembleEmbed('Standard embedding', agent, {
  *   dimensions: 1536
  * });
@@ -51,8 +50,11 @@ const embeddingCache = new Map<
  * ```
  */
 export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
+    // Default to 768 dimensions if not specified
+    const dimensions = options?.dimensions || 768;
+
     // Use a hash of the text and model as the cache key
-    const cacheKey = `${agent.model || agent.modelClass}:${text}:${options?.dimensions || ''}`;
+    const cacheKey = `${agent.model || agent.modelClass}:${text}:${dimensions}`;
 
     // Check if we have a cached embedding
     const cached = embeddingCache.get(cacheKey);
@@ -73,8 +75,8 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         throw new Error(`Provider for model ${model} does not support embeddings`);
     }
 
-    // Generate the embedding using the provider
-    const result = await provider.createEmbedding(text, model, options);
+    // Generate the embedding using the provider with dimensions
+    const result = await provider.createEmbedding(text, model, { ...options, dimensions });
 
     // Handle array result (single text input should return single vector)
     const embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);
