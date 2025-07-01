@@ -547,6 +547,7 @@ export type ModelClassID =
     | 'vision'
     | 'vision_mini'
     | 'search'
+    | 'long'
     | 'image_generation'
     | 'embedding'
     | 'voice'
