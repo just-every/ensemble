@@ -198,8 +198,7 @@ export const MODEL_CLASSES = {
             'gpt-4.1-nano', // OpenAI - 1M context
             'gpt-4.1-mini', // OpenAI - 1M context
             'gemini-2.5-pro-preview-06-05', // Google - 1M context
-            'gemini-2.5-flash-preview-05-20-medium', // Google - 1M context
-            'gemini-2.5-flash-preview-05-20-low', // Google - 1M context
+            'gemini-2.5-flash-preview-05-20', // Google - 1M context
             'gemini-2.5-flash-lite-preview-06-17', // Google - 1M context
         ],
         random: true,
