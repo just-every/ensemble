@@ -1,6 +1,6 @@
 {
     "name": "@just-every/ensemble",
-    "version": "0.2.116",
+    "version": "0.2.117",
     "description": "LLM provider abstraction layer with unified streaming interface",
     "type": "module",
     "main": "./dist/cjs/index.cjs",
@@ -38,7 +38,7 @@
         "build:cjs": "tsc -p tsconfig.cjs.json",
         "build:fixup": "node scripts/fixup-cjs.js",
         "demo": "npx tsx demo/start-all-demos.ts",
-        "demo:voice": "npx tsx demo/voice-server.ts",
+        "demo:voice": "npm run build && npx tsx demo/voice-server.ts",
         "demo:transcription": "npx tsx demo/transcription-server.ts",
         "demo:request": "npx tsx demo/request-server.ts",
         "demo:embed": "npx tsx demo/embed-server.ts",
@@ -51,8 +51,7 @@
         "lint:fix": "eslint '**/*.{ts,tsx}' --fix",
         "docs": "typedoc",
         "demo:live": "npm run build && npx tsx demo/live-server.ts",
-        "demo:listen": "npm run build && npx tsx demo/transcription-server.ts",
-        "demo:voice": "npm run build && npx tsx demo/voice-server.ts"
+        "demo:listen": "npm run build && npx tsx demo/transcription-server.ts"
     },
     "exports": {
         ".": {
