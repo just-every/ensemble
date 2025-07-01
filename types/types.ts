@@ -107,7 +107,6 @@ export interface ModelSettings {
     tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
-    force_json?: boolean; // Force JSON output even if model doesn't natively support it
 }
 
 /**

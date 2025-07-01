@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ensemble Demos</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-dark: #1557b0;
+            --success: #34a853;
+            --warning: #fbbc04;
+            --error: #ea4335;
+            --background: #f5f5f5;
+            --surface: #ffffff;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --border: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--surface);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-shrink: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-tab:hover {
+            background: #f8f9fa;
+            color: var(--text);
+        }
+
+        .nav-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .demo-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .demo-frame {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none;
+        }
+
+        .demo-frame.active {
+            display: block;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 100;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .demo-info {
+            max-width: 600px;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .demo-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .demo-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .demo-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .demo-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--surface);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-wrap: wrap;
+            }
+
+            .nav-tabs {
+                width: 100%;
+                overflow-x: auto;
+                margin-left: 0;
+                margin-top: 12px;
+            }
+
+            .nav-tab {
+                font-size: 14px;
+                padding: 10px 16px;
+            }
+
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
+            </svg>
+            Ensemble Demos
+        </div>
+        <nav class="nav-tabs" id="navTabs">
+            <button class="nav-tab active" onclick="switchDemo('home')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                Home
+            </button>
+            <button class="nav-tab" onclick="switchDemo('voice')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 13c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z"/>
+                    <path d="M9 9V7c0-1.66-1.34-3-3-3S3 5.34 3 7v2"/>
+                    <path d="M21 13c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z"/>
+                    <path d="M21 9V7c0-1.66-1.34-3-3-3s-3 1.34-3 3v2"/>
+                </svg>
+                Voice
+            </button>
+            <button class="nav-tab" onclick="switchDemo('transcription')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 15c1.66 0 2.99-1.34 2.99-3L15 6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.42 2.72 6.23 6 6.72V22h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                </svg>
+                Transcription
+            </button>
+            <button class="nav-tab" onclick="switchDemo('request')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    <circle cx="8" cy="9" r="1"/>
+                    <circle cx="12" cy="9" r="1"/>
+                    <circle cx="16" cy="9" r="1"/>
+                </svg>
+                Chat
+            </button>
+            <button class="nav-tab" onclick="switchDemo('embed')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14.5 2.5L3 14l1.5 1.5L16 4zm5 0L8 14l1.5 1.5L21 4zM19.5 7.5L8 19l1.5 1.5L21 8z"/>
+                </svg>
+                Embeddings
+            </button>
+        </nav>
+    </div>
+
+    <div class="demo-container">
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p>Loading demo...</p>
+        </div>
+
+        <!-- Home screen -->
+        <div id="homeScreen" class="demo-frame active" style="position: static; display: flex; align-items: center; justify-content: center;">
+            <div class="demo-info">
+                <h1 style="font-size: 36px; margin-bottom: 16px; color: var(--primary);">Welcome to Ensemble Demos</h1>
+                <p style="font-size: 18px; color: var(--text-secondary); margin-bottom: 40px;">
+                    Explore the capabilities of the Ensemble AI library through interactive demonstrations.
+                </p>
+
+                <div class="demo-grid">
+                    <div class="demo-card" onclick="switchDemo('voice')">
+                        <div class="demo-icon">🎤</div>
+                        <div class="demo-title">Voice Generation</div>
+                        <div class="demo-description">
+                            Convert text to natural-sounding speech with multiple voices and providers
+                        </div>
+                    </div>
+
+                    <div class="demo-card" onclick="switchDemo('transcription')">
+                        <div class="demo-icon">🎧</div>
+                        <div class="demo-title">Live Transcription</div>
+                        <div class="demo-description">
+                            Real-time speech-to-text with streaming audio processing
+                        </div>
+                    </div>
+
+                    <div class="demo-card" onclick="switchDemo('request')">
+                        <div class="demo-icon">💬</div>
+                        <div class="demo-title">Chat Request</div>
+                        <div class="demo-description">
+                            Streaming AI responses with tool calling and multi-model support
+                        </div>
+                    </div>
+
+                    <div class="demo-card" onclick="switchDemo('embed')">
+                        <div class="demo-icon">📊</div>
+                        <div class="demo-title">Text Embeddings</div>
+                        <div class="demo-description">
+                            Generate vector embeddings and perform similarity search
+                        </div>
+                    </div>
+                </div>
+
+                <p style="margin-top: 40px; color: var(--text-secondary);">
+                    Click on any demo above or use the navigation tabs to get started.
+                </p>
+            </div>
+        </div>
+
+        <!-- Demo iframes -->
+        <iframe id="voiceFrame" class="demo-frame" data-src="voice-client.html"></iframe>
+        <iframe id="transcriptionFrame" class="demo-frame" data-src="transcription-client.html"></iframe>
+        <iframe id="requestFrame" class="demo-frame" data-src="request-client.html"></iframe>
+        <iframe id="embedFrame" class="demo-frame" data-src="embed-client.html"></iframe>
+    </div>
+
+    <div class="connection-status">
+        <span class="status-indicator"></span>
+        <span>Server Connected</span>
+    </div>
+
+    <script>
+        // Current active demo
+        let currentDemo = 'home';
+        let loadedDemos = new Set();
+
+        // WebSocket URLs for each demo (updated to use path-based routing)
+        const wsUrls = {
+            voice: `ws://${window.location.host}/voice`,
+            transcription: `ws://${window.location.host}/transcription`,
+            request: `ws://${window.location.host}/request`,
+            embed: `ws://${window.location.host}/embed`
+        };
+
+        // Switch between demos
+        function switchDemo(demoName) {
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.closest('.nav-tab').classList.add('active');
+
+            // Hide all frames
+            document.querySelectorAll('.demo-frame').forEach(frame => {
+                frame.classList.remove('active');
+            });
+
+            // Show home screen or load demo
+            if (demoName === 'home') {
+                document.getElementById('homeScreen').classList.add('active');
+                document.getElementById('loadingOverlay').classList.add('hidden');
+            } else {
+                const frame = document.getElementById(`${demoName}Frame`);
+                
+                // Load iframe if not already loaded
+                if (!loadedDemos.has(demoName)) {
+                    document.getElementById('loadingOverlay').classList.remove('hidden');
+                    
+                    const src = frame.getAttribute('data-src');
+                    frame.src = src;
+                    
+                    frame.onload = () => {
+                        // Update WebSocket URL in the iframe
+                        try {
+                            frame.contentWindow.postMessage({
+                                type: 'updateWsUrl',
+                                url: wsUrls[demoName]
+                            }, '*');
+                        } catch (e) {
+                            console.log('Could not post message to iframe');
+                        }
+                        
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        loadedDemos.add(demoName);
+                    };
+                }
+                
+                frame.classList.add('active');
+            }
+
+            currentDemo = demoName;
+        }
+
+        // Listen for messages from iframes to update connection status
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'connectionStatus') {
+                // Update connection indicator based on iframe status
+                const indicator = document.querySelector('.status-indicator');
+                const text = document.querySelector('.connection-status span:last-child');
+                
+                if (event.data.connected) {
+                    indicator.style.background = 'var(--success)';
+                    text.textContent = 'Server Connected';
+                } else {
+                    indicator.style.background = 'var(--error)';
+                    text.textContent = 'Server Disconnected';
+                }
+            }
+        });
+
+        // Update iframe WebSocket URLs when they load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Each demo client needs to be updated to:
+            // 1. Listen for postMessage with new WS URL
+            // 2. Use relative WS paths instead of hardcoded ports
+            
+            // For now, we'll update the server URLs in each client manually
+            const frames = ['voice', 'transcription', 'request', 'embed'];
+            frames.forEach(name => {
+                const frame = document.getElementById(`${name}Frame`);
+                if (frame) {
+                    frame.setAttribute('data-ws-url', wsUrls[name]);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
