@@ -67,11 +67,7 @@ If you get a 401 error, check:
 
 ### Test Environment
 
-Note: In the test environment (vitest), API keys are mocked. To test with real API keys, run the example scripts directly:
-
-```bash
-npx tsx examples/perplexity-example.ts
-```
+Note: In the test environment (vitest), API keys are mocked. To test with real API keys, use the interactive demos in the `demo/` directory.
 
 ## Pricing
 

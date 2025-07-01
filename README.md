@@ -83,7 +83,7 @@ console.log('Validation Result:', {
 ## Documentation
 
 - [Tool Execution Guide](docs/tool-execution.md) - Advanced tool calling features
-- [Examples](examples/) - Complete working examples
+- [Interactive Demos](demo/) - Web-based demos for core features
 - Generated [API Reference](docs/api) with `npm run docs`
   Run `npm run docs` to regenerate the HTML documentation.
 

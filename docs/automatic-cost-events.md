@@ -97,5 +97,5 @@ Cost events are emitted in the following scenarios:
 ## See Also
 
 - [Event Controller Documentation](./event-controller.md)
-- [Cost Tracking Example](../examples/cost-event-tracking.ts)
+- [Interactive Demos](../demo/) - See cost tracking in action
 - [Tool Execution Events](./tool-execution.md)
