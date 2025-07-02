@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Unified demo server for all Ensemble demos
- * 
+ *
  * This server runs all demo endpoints on a single port with a unified interface
  */
 
@@ -59,19 +59,19 @@ async function setupHandlers() {
         const pathname = new URL(request.url!, `http://${request.headers.host}`).pathname;
 
         if (pathname === '/voice') {
-            wssVoice.handleUpgrade(request, socket, head, (ws) => {
+            wssVoice.handleUpgrade(request, socket, head, ws => {
                 wssVoice.emit('connection', ws, request);
             });
         } else if (pathname === '/transcription') {
-            wssTranscription.handleUpgrade(request, socket, head, (ws) => {
+            wssTranscription.handleUpgrade(request, socket, head, ws => {
                 wssTranscription.emit('connection', ws, request);
             });
         } else if (pathname === '/request') {
-            wssRequest.handleUpgrade(request, socket, head, (ws) => {
+            wssRequest.handleUpgrade(request, socket, head, ws => {
                 wssRequest.emit('connection', ws, request);
             });
         } else if (pathname === '/embed') {
-            wssEmbed.handleUpgrade(request, socket, head, (ws) => {
+            wssEmbed.handleUpgrade(request, socket, head, ws => {
                 wssEmbed.emit('connection', ws, request);
             });
         } else {
@@ -103,7 +103,7 @@ server.listen(PORT, async () => {
     console.log('   • Live Transcription - Real-time speech-to-text');
     console.log('   • Chat Request - Streaming AI responses with tools');
     console.log('   • Text Embeddings - Vector embeddings and similarity search\n');
-    
+
     // Set up handlers after server starts
     await setupHandlers();
 });

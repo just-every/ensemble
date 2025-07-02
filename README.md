@@ -5,6 +5,37 @@
 
 A simple interface for interacting with multiple LLM providers during a single conversation.
 
+## 🚀 Quick Demo
+
+Try the interactive demos to see Ensemble in action:
+
+```bash
+npm run demo
+```
+
+This opens a unified demo interface at http://localhost:3000 with all demos:
+
+### Demo Interface
+![Ensemble Demos Interface](demo/screenshots/demo-interface.png)
+
+### Available Demos
+
+#### 💬 Chat Request Demo
+Streaming AI responses with tool calling and multi-model support
+![Chat Request Demo](demo/screenshots/chat-demo.png)
+
+#### 📊 Text Embeddings Demo  
+Generate vector embeddings and perform similarity search
+![Text Embeddings Demo](demo/screenshots/embed-demo.png)
+
+#### 🎤 Voice Generation Demo
+Convert text to natural-sounding speech with multiple providers
+![Voice Generation Demo](demo/screenshots/voice-demo.png)
+
+#### 🎧 Live Transcription Demo
+Real-time speech-to-text with streaming audio processing
+![Transcription Demo](demo/screenshots/transcription-demo.png)
+
 ## Features
 
 - 🤝 **Unified Streaming Interface** - Consistent event-based streaming across all providers
@@ -25,19 +56,31 @@ npm install @just-every/ensemble
 
 ## Environment Setup
 
-Set your provider API keys as environment variables before running examples or using the library:
+Copy `.env.example` to `.env` and add your API keys:
 
 ```bash
-export OPENAI_API_KEY=your-openai-key
-export ANTHROPIC_API_KEY=your-anthropic-key
-export GOOGLE_API_KEY=your-google-key
-export XAI_API_KEY=your-xai-key
-export DEEPSEEK_API_KEY=your-deepseek-key
-export OPENROUTER_API_KEY=your-openrouter-key
-export ELEVENLABS_API_KEY=your-elevenlabs-key
+cp .env.example .env
 ```
 
-These variables enable access to the respective providers. Only the keys you need are required.
+Available API keys (add only the ones you need):
+
+```bash
+# LLM Providers
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key  
+GOOGLE_API_KEY=your-google-key
+XAI_API_KEY=your-xai-key
+DEEPSEEK_API_KEY=your-deepseek-key
+OPENROUTER_API_KEY=your-openrouter-key
+
+# Voice & Audio Providers  
+ELEVENLABS_API_KEY=your-elevenlabs-key
+
+# Search Providers
+BRAVE_API_KEY=your-brave-key
+```
+
+**Note**: You only need to configure API keys for the providers you plan to use. The system will automatically select available providers based on configured keys.
 
 ## Quick Start
 
@@ -85,7 +128,8 @@ console.log('Validation Result:', {
 - [Tool Execution Guide](docs/tool-execution.md) - Advanced tool calling features
 - [Interactive Demos](demo/) - Web-based demos for core features
 - Generated [API Reference](docs/api) with `npm run docs`
-  Run `npm run docs` to regenerate the HTML documentation.
+  
+Run `npm run docs` to regenerate the HTML documentation.
 
 ## Core Concepts
 

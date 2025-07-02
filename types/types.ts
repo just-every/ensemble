@@ -545,7 +545,6 @@ export type ModelClassID =
     | 'summary'
     | 'vision'
     | 'vision_mini'
-    | 'search'
     | 'long'
     | 'image_generation'
     | 'embedding'
@@ -610,6 +609,7 @@ export interface ModelFeatures {
     input_modality?: ('text' | 'image' | 'audio' | 'video')[]; // Supported input types
     output_modality?: ('text' | 'image' | 'audio' | 'embedding')[]; // Supported output types
     tool_use?: boolean; // Whether the model supports tool/function calling
+    simulate_tools?: boolean; // Whether to use simulated tool calls instead of native ones
     streaming?: boolean; // Whether the model supports streaming responses
     json_output?: boolean; // Whether the model reliably outputs JSON
     max_output_tokens?: number; // Maximum output tokens for the model

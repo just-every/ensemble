@@ -210,7 +210,7 @@ app.get('/', (req, res) => {
         <h1>Ensemble Transcription Server</h1>
         <p>Server is running on port ${PORT}</p>
         <p>Active connections: ${activeConnections.size}</p>
-        <p>Open <a href="/transcription-client.html">transcription-client.html</a> to start</p>
+        <p>Open <a href="/listen-client.html">listen-client.html</a> to start</p>
         <hr>
         <p>API Key Status: ${process.env.GOOGLE_API_KEY ? '✅ Configured' : '❌ Missing'}</p>
         <p>WebSocket endpoint: ws://localhost:${PORT}</p>
@@ -224,7 +224,7 @@ server.listen(PORT, () => {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📡 Server running at: http://localhost:${PORT}
-🌐 Client URL: http://localhost:${PORT}/transcription-client.html
+🌐 Client URL: http://localhost:${PORT}/listen-client.html
 🔑 API Keys:
    Gemini: ${process.env.GOOGLE_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
    OpenAI: ${process.env.OPENAI_API_KEY ? '✅ Found' : '❌ Missing (set OPENAI_API_KEY)'}

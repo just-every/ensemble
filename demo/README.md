@@ -2,9 +2,9 @@
 
 This directory contains interactive web-based demonstrations of the core Ensemble library features.
 
-## Quick Start
+## 🚀 Quick Start
 
-To run all demos at once with a unified menu:
+**Run all demos with one command:**
 
 ```bash
 npm run demo
@@ -69,14 +69,29 @@ npm run demo:embed
 
 ## Requirements
 
-1. **API Keys**: Make sure you have the necessary API keys in your `.env` file:
+1. **API Keys**: Copy `.env.example` to `.env` and add your API keys:
+   ```bash
+   cp ../.env.example ../.env
+   ```
+   
+   Available providers:
    ```env
+   # LLM Providers
    OPENAI_API_KEY=your-key-here
    ANTHROPIC_API_KEY=your-key-here
    GOOGLE_API_KEY=your-key-here
+   XAI_API_KEY=your-key-here
+   DEEPSEEK_API_KEY=your-key-here
+   OPENROUTER_API_KEY=your-key-here
+   
+   # Voice & Audio
    ELEVENLABS_API_KEY=your-key-here
-   # ... other providers
+   
+   # Search
+   BRAVE_API_KEY=your-key-here
    ```
+   
+   **Note**: Only add keys for providers you want to use. The demos will show which providers are available based on your configuration.
 
 2. **Build**: The demos use the built distribution files, so make sure to build first:
    ```bash

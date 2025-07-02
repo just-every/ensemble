@@ -14,7 +14,8 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ensembleRequest } from '../dist/index.js';
-import type { ToolFunction, AgentDefinition, StreamEvent } from '../dist/types.js';
+import type { ToolFunction, AgentDefinition } from '../dist/types.js';
+import { MODEL_REGISTRY, MODEL_CLASSES } from '../dist/data/model_data.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -42,15 +43,63 @@ app.use('/dist', express.static(join(__dirname, '..', 'dist')));
 // WebSocket server for streaming
 const wss = new WebSocketServer({ server });
 
+// Helper function to generate mock responses using a mini model
+async function generateMockResponse(toolName: string, args: any): Promise<string> {
+    try {
+        // Use a mini model to generate more realistic mock responses
+        const prompt = `Generate a realistic mock response for a tool called "${toolName}" with arguments: ${JSON.stringify(args)}. 
+Keep it brief but realistic. Add "(Mock Response)" at the end.`;
+
+        const mockAgent: AgentDefinition = {
+            agent_id: 'mock-tool-response',
+            modelClass: 'mini',
+            maxTokens: 200,
+            temperature: 0.7,
+        };
+
+        let response = '';
+        for await (const event of ensembleRequest([{ role: 'user', content: prompt }], mockAgent)) {
+            if (event.type === 'message_complete' && event.content) {
+                response = event.content;
+            }
+        }
+
+        return response || `Mock response for ${toolName} (Mock Response)`;
+    } catch (error) {
+        // Fallback to simple mock responses if mini model fails
+        console.log(`Failed to generate mock response with mini model: ${error}`);
+
+        // Return more realistic fallback responses based on tool name
+        switch (toolName) {
+            case 'get_weather': {
+                const location = args.location || 'Unknown';
+                const temp = Math.floor(Math.random() * 20) + 15;
+                const conditions = ['sunny', 'partly cloudy', 'cloudy', 'rainy'];
+                const condition = conditions[Math.floor(Math.random() * conditions.length)];
+                return `Weather in ${location}: ${temp}°C, ${condition}. Humidity: ${60 + Math.floor(Math.random() * 30)}%. Wind: ${5 + Math.floor(Math.random() * 15)} km/h. (Mock Response)`;
+            }
+
+            case 'web_search': {
+                const query = args.query || 'search term';
+                return `Search results for "${query}":
+1. ${query} - Wikipedia: Comprehensive overview and history
+2. Latest ${query} news and updates - TechCrunch
+3. Understanding ${query}: A beginner's guide - Medium
+4. ${query} best practices and tips - Stack Overflow
+(Mock Response)`;
+            }
+
+            default:
+                return `Mock response for ${toolName} with args: ${JSON.stringify(args)} (Mock Response)`;
+        }
+    }
+}
+
 // Example tools for demonstration
 const exampleTools: ToolFunction[] = [
     {
         function: async ({ location }: { location: string }) => {
-            // Simulate weather API call
-            const conditions = ['sunny', 'cloudy', 'rainy', 'snowy'];
-            const temp = Math.floor(Math.random() * 30) + 10;
-            const condition = conditions[Math.floor(Math.random() * conditions.length)];
-            return `The weather in ${location} is ${condition} with a temperature of ${temp}°C.`;
+            return await generateMockResponse('get_weather', { location });
         },
         definition: {
             type: 'function',
@@ -73,7 +122,7 @@ const exampleTools: ToolFunction[] = [
     {
         function: async ({ expression }: { expression: string }) => {
             try {
-                // Simple safe math evaluation
+                // Still do actual math calculation for this one
                 const result = Function('"use strict"; return (' + expression + ')')();
                 return `Result: ${result}`;
             } catch (error) {
@@ -100,13 +149,7 @@ const exampleTools: ToolFunction[] = [
     },
     {
         function: async ({ query }: { query: string }) => {
-            // Simulate web search
-            const results = [
-                `Result 1: Information about "${query}" from Wikipedia...`,
-                `Result 2: Recent news about "${query}" from tech blogs...`,
-                `Result 3: Academic paper discussing "${query}" in detail...`,
-            ];
-            return results.join('\n\n');
+            return await generateMockResponse('web_search', { query });
         },
         definition: {
             type: 'function',
@@ -129,13 +172,16 @@ const exampleTools: ToolFunction[] = [
 ];
 
 // Track active connections
-const activeConnections = new Map<string, {
-    startTime: number;
-    messageCount: number;
-    ws: any;
-    isStreaming: boolean;
-    abortController?: AbortController;
-}>();
+const activeConnections = new Map<
+    string,
+    {
+        startTime: number;
+        messageCount: number;
+        ws: any;
+        isStreaming: boolean;
+        abortController?: AbortController;
+    }
+>();
 
 // Handle WebSocket connections
 wss.on('connection', ws => {
@@ -150,15 +196,30 @@ wss.on('connection', ws => {
         isStreaming: false,
     });
 
-    // Send connection acknowledgment
-    ws.send(JSON.stringify({
-        type: 'connected',
-        connectionId,
-        availableTools: exampleTools.map(t => ({
-            name: t.definition.function.name,
-            description: t.definition.function.description,
-        })),
-    }));
+    // Send connection acknowledgment with live model data
+    ws.send(
+        JSON.stringify({
+            type: 'connected',
+            connectionId,
+            availableTools: exampleTools.map(t => ({
+                name: t.definition.function.name,
+                description: t.definition.function.description,
+            })),
+            models: Object.values(MODEL_REGISTRY).map(model => ({
+                id: model.id,
+                provider: model.provider,
+                description: model.description || '',
+                aliases: model.aliases || [],
+                features: model.features,
+            })),
+            modelClasses: Object.entries(MODEL_CLASSES).map(([id, classData]) => ({
+                id,
+                models: classData.models,
+                description: classData.description,
+                random: classData.random,
+            })),
+        })
+    );
 
     // Handle incoming messages
     ws.on('message', async data => {
@@ -171,10 +232,12 @@ wss.on('connection', ws => {
             switch (message.type) {
                 case 'chat':
                     if (connInfo.isStreaming) {
-                        ws.send(JSON.stringify({
-                            type: 'error',
-                            error: 'Request already in progress',
-                        }));
+                        ws.send(
+                            JSON.stringify({
+                                type: 'error',
+                                error: 'Request already in progress',
+                            })
+                        );
                         return;
                     }
 
@@ -200,10 +263,12 @@ wss.on('connection', ws => {
             }
         } catch (err) {
             console.error('Error handling message:', err);
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'error',
+                    error: err instanceof Error ? err.message : 'Unknown error',
+                })
+            );
         }
     });
 
@@ -236,13 +301,26 @@ async function handleChat(connectionId: string, message: any) {
     if (!connInfo) return;
 
     const { ws } = connInfo;
-    const { messages, model, modelClass, toolsEnabled, maxTokens, temperature } = message;
+    const {
+        messages,
+        model,
+        modelClass,
+        toolsEnabled,
+        maxTokens,
+        temperature,
+        topP,
+        frequencyPenalty,
+        presencePenalty,
+        seed,
+    } = message;
 
     if (!messages || messages.length === 0) {
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: 'No messages provided',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: 'No messages provided',
+            })
+        );
         return;
     }
 
@@ -256,48 +334,52 @@ async function handleChat(connectionId: string, message: any) {
         connInfo.abortController = new AbortController();
 
         // Send stream start event
-        ws.send(JSON.stringify({
-            type: 'stream_start',
-            model: model || modelClass,
-            messageCount: messages.length,
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'stream_start',
+                model: model || modelClass,
+                messageCount: messages.length,
+            })
+        );
 
         // Create agent definition
         const agent: AgentDefinition = {
             agent_id: connectionId,
             ...(model ? { model } : { modelClass }),
             maxTokens,
-            temperature,
+            ...(temperature !== undefined && { temperature }),
+            ...(topP !== undefined && { topP }),
+            ...(frequencyPenalty !== undefined && { frequencyPenalty }),
+            ...(presencePenalty !== undefined && { presencePenalty }),
+            ...(seed !== undefined && { seed }),
+            tools: toolsEnabled ? exampleTools : undefined,
+            abortSignal: connInfo.abortController.signal,
         };
 
         // Stream the response
-        for await (const event of ensembleRequest(
-            messages,
-            agent,
-            {
-                tools: toolsEnabled ? exampleTools : undefined,
-                signal: connInfo.abortController.signal,
-            }
-        )) {
+        for await (const event of ensembleRequest(messages, agent)) {
             // Forward all events to the client
             ws.send(JSON.stringify(event));
         }
 
         // Send completion event
         ws.send(JSON.stringify({ type: 'stream_complete' }));
-
     } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
-            ws.send(JSON.stringify({
-                type: 'stream_aborted',
-                message: 'Request was aborted',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'stream_aborted',
+                    message: 'Request was aborted',
+                })
+            );
         } else {
             console.error('Error in chat:', err);
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'error',
+                    error: err instanceof Error ? err.message : 'Unknown error',
+                })
+            );
         }
     } finally {
         connInfo.abortController = undefined;

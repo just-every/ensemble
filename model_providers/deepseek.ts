@@ -16,41 +16,6 @@ import OpenAI from 'openai';
 
 // Define a type alias for message parameters for clarity
 type MessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
-// Define type for standard OpenAI tool format
-type OpenAITool = OpenAI.Chat.Completions.ChatCompletionTool;
-
-/**
- * Helper function to generate a textual description of tools for the system prompt.
- * @param tools Array of ToolFunction objects.
- * @returns A string describing the available tools and instructions for simulated calls.
- */
-function formatToolsForPrompt(tools: OpenAITool[]): string {
-    if (!tools || tools.length === 0) {
-        return 'No tools are available for use.';
-    }
-
-    const toolDescriptions = tools
-        .map(tool => {
-            if (tool.type !== 'function' || !tool.function) {
-                return `  - Unknown tool type: ${tool.type}`;
-            }
-            const func = tool.function;
-            // Safely access parameters and properties
-            const parameters = func.parameters && typeof func.parameters === 'object' ? func.parameters : {};
-            const properties = 'properties' in parameters ? parameters.properties : {};
-            const requiredParams =
-                'required' in parameters && Array.isArray(parameters.required) ? parameters.required : [];
-
-            const paramsJson = JSON.stringify(properties, null, 2);
-
-            return `  - Name: ${func.name}\n    Description: ${func.description || 'No description'}\n    Parameters (JSON Schema): ${paramsJson}\n    Required Parameters: ${requiredParams.join(', ') || 'None'}`;
-        })
-        .join('\n\n');
-
-    // Instructions updated for MULTIPLE tool calls using TOOL_CALLS and a JSON array
-    // Added a note about fixed/consistent tool call IDs
-    return `You have the following tools available:\n${toolDescriptions}\n\nTo use one or more tools, output the following JSON structure containing an ARRAY of tool calls on a new line *at the very end* of your response, and *only* if you intend to call tool(s). Ensure the arguments value in each call is a JSON *string*: \n\`\`\`json\nTOOL_CALLS: [ {"id": "call_001", "type": "function", "function": {"name": "function_name_1", "arguments": "{\\"arg1\\": \\"value1\\"}"}}, {"id": "call_002", "type": "function", "function": {"name": "function_name_2", "arguments": "{\\"argA\\": true, \\"argB\\": 123}"}} ]\n\`\`\`\nReplace \`function_name\` and arguments accordingly for each tool call you want to make. Put all desired calls in the array. IMPORTANT: Always include an 'id' field with a unique string for each call. Do not add any text after the TOOL_CALLS line. If you are not calling any tools, respond normally without the TOOL_CALLS structure.`;
-}
 
 /**
  * DeepSeek model provider implementation
@@ -72,11 +37,8 @@ export class DeepSeekProvider extends OpenAIChat {
     ): OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming {
         // Check if the specific 'deepseek-reasoner' model is being used
         if (requestParams.model === 'deepseek-reasoner') {
-            const originalTools: OpenAITool[] = requestParams.tools ?? [];
-
             // --- Parameter Adjustments ---
             requestParams.max_tokens = 8000; // Set a reasonable default if needed
-            delete requestParams.tools;
             delete requestParams.response_format;
             delete requestParams.logprobs;
             delete requestParams.top_logprobs;
@@ -85,12 +47,6 @@ export class DeepSeekProvider extends OpenAIChat {
             }
 
             let messages: MessageParam[] = [...requestParams.messages];
-
-            // Add in tool descriptions and instructions
-            const toolInfoForPrompt = formatToolsForPrompt(originalTools);
-            if (toolInfoForPrompt) {
-                messages.push({ role: 'system', content: toolInfoForPrompt });
-            }
 
             // Ensure the content of messages are strings
             messages = messages.map(originalMessage => {

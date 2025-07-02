@@ -43,6 +43,7 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'dall-e': openaiProvider, // Image generation models
     'gpt-image': openaiProvider, // GPT-Image-1 model
     'tts-': openaiProvider, // TTS models
+    'codex-': openaiProvider, // Coding models
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
@@ -301,7 +302,7 @@ export async function getModelFromClass(
                 shouldRandomize && !modelScores
                     ? modelsWithKeyAndQuota[Math.floor(Math.random() * modelsWithKeyAndQuota.length)]
                     : selectWeightedModel(modelsWithKeyAndQuota, modelScores);
-            console.log(`Using model ${selectedModel} from class ${modelGroup} (has API key and quota)`);
+            console.log(`Using '${selectedModel}' model for '${modelGroup}' class.`);
             return selectedModel;
         }
 
@@ -317,7 +318,7 @@ export async function getModelFromClass(
                 shouldRandomize && !modelScores
                     ? modelsWithKey[Math.floor(Math.random() * modelsWithKey.length)]
                     : selectWeightedModel(modelsWithKey, modelScores);
-            console.log(`Using model ${selectedModel} from class ${modelGroup} (has API key but may exceed quota)`);
+            console.log(`Using '${selectedModel}' model for '${modelGroup}' class (may exceed quota).`);
             return selectedModel;
         }
     }
@@ -339,7 +340,7 @@ export async function getModelFromClass(
         if (standardModelsWithKeyAndQuota.length > 0) {
             // Use weighted selection for fallback too
             const selectedModel = selectWeightedModel(standardModelsWithKeyAndQuota, modelScores);
-            console.log(`Falling back to standard class model ${selectedModel} (has API key and quota)`);
+            console.warn(`Falling back to 'standard' class with model '${selectedModel}'.`);
             return selectedModel;
         }
 
@@ -351,7 +352,7 @@ export async function getModelFromClass(
 
         if (standardModelsWithKey.length > 0) {
             const selectedModel = selectWeightedModel(standardModelsWithKey, modelScores);
-            console.log(`Falling back to standard class model ${selectedModel} (has API key but may exceed quota)`);
+            console.log(`Falling back to 'standard' class with model '${selectedModel}' (may exceed quota).`);
             return selectedModel;
         }
     }

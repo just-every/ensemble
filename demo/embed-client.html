@@ -65,11 +65,172 @@
 
         h1 {
             color: var(--primary);
-            margin-bottom: 24px;
+            margin-bottom: 0;
             display: flex;
             align-items: center;
             gap: 12px;
             font-size: 28px;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .generate-code-btn {
+            background: var(--surface);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .generate-code-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-tabs-section {
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 20px;
+            color: var(--text);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 0 24px;
+        }
+
+        .code-tab {
+            background: none;
+            border: none;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .code-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .code-container {
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .code-container pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-button:hover {
+            background: var(--primary-dark);
+        }
+
+        .copy-button.copied {
+            background: var(--success);
         }
 
         h2 {
@@ -485,12 +646,20 @@
 <body>
     <div class="container">
         <div class="header-card">
-            <h1>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14.5 2.5L3 14l1.5 1.5L16 4zm5 0L8 14l1.5 1.5L21 4zM19.5 7.5L8 19l1.5 1.5L21 8z"/>
-                </svg>
-                Ensemble Embed Demo
-            </h1>
+            <div class="header-row">
+                <h1>
+                    <svg width="32" height="32" viewBox="0 0 448 512" fill="currentColor">
+                        <path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z"/>
+                    </svg>
+                    Ensemble Embed Demo
+                </h1>
+                <button class="generate-code-btn" onclick="showCodeModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+                    </svg>
+                    Generate Code
+                </button>
+            </div>
 
             <div class="status-section">
                 <div id="status" class="status">
@@ -670,6 +839,36 @@
         </div>
     </div>
 
+    <!-- Code Generation Modal -->
+    <div id="codeModal" class="modal-overlay" onclick="if(event.target === this) hideCodeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Generated Code</h2>
+                <button class="modal-close" onclick="hideCodeModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-tabs-section">
+                <div class="code-tabs">
+                    <button class="code-tab active" onclick="switchCodeTab('server')">Server Code</button>
+                    <button class="code-tab" onclick="switchCodeTab('client')">Client Code</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="serverCode" class="code-container">
+                    <button class="copy-button" onclick="copyCode('server')">Copy</button>
+                    <pre id="serverCodeContent"></pre>
+                </div>
+                <div id="clientCode" class="code-container" style="display: none;">
+                    <button class="copy-button" onclick="copyCode('client')">Copy</button>
+                    <pre id="clientCodeContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State management
         let ws = null;
@@ -717,7 +916,26 @@
 
         // Auto-connect on load
         window.addEventListener('load', () => {
+            // Always connect immediately
             setTimeout(connect, 500);
+        });
+
+        // Listen for messages from parent frame (kept for potential future use)
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'updateWsUrl' && event.data.url) {
+                console.log('Updating WebSocket URL from parent:', event.data.url);
+                
+                // Update the server URL input
+                document.getElementById('serverUrl').value = event.data.url;
+                
+                // If connected, disconnect and reconnect with new URL
+                if (isConnected) {
+                    disconnect();
+                    setTimeout(() => {
+                        connect();
+                    }, 100);
+                }
+            }
         });
 
         // Connect to WebSocket server
@@ -974,11 +1192,21 @@
 
         // Render analysis
         function renderAnalysis(data) {
-            document.getElementById('analysisCard').style.display = 'block';
-            document.getElementById('analysisContent').textContent = data.analysis;
+            console.log('Rendering analysis:', data);
+            const analysisCard = document.getElementById('analysisCard');
+            const analysisContent = document.getElementById('analysisContent');
+            
+            if (!data.analysis) {
+                console.warn('No analysis text in data:', data);
+                analysisContent.textContent = 'No analysis available.';
+            } else {
+                analysisContent.textContent = data.analysis;
+            }
+            
+            analysisCard.style.display = 'block';
             
             // Scroll to analysis
-            document.getElementById('analysisCard').scrollIntoView({ behavior: 'smooth' });
+            analysisCard.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Toggle selection
@@ -1102,6 +1330,182 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Code generation functions
+        function showCodeModal() {
+            const model = document.getElementById('modelSelect').value;
+            const dimensions = document.getElementById('dimensionsSelect').value;
+
+            // Generate server code
+            const serverCode = generateServerCode(model, dimensions);
+            document.getElementById('serverCodeContent').textContent = serverCode;
+
+            // Generate client code
+            const clientCode = generateClientCode(model, dimensions);
+            document.getElementById('clientCodeContent').textContent = clientCode;
+
+            // Show modal
+            document.getElementById('codeModal').classList.add('active');
+        }
+
+        function hideCodeModal() {
+            document.getElementById('codeModal').classList.remove('active');
+        }
+
+        function switchCodeTab(tab) {
+            const tabs = document.querySelectorAll('.code-tab');
+            const containers = document.querySelectorAll('.code-container');
+
+            tabs.forEach(t => t.classList.remove('active'));
+            containers.forEach(c => c.style.display = 'none');
+
+            if (tab === 'server') {
+                tabs[0].classList.add('active');
+                document.getElementById('serverCode').style.display = 'block';
+            } else {
+                tabs[1].classList.add('active');
+                document.getElementById('clientCode').style.display = 'block';
+            }
+        }
+
+        function copyCode(type) {
+            const content = type === 'server'
+                ? document.getElementById('serverCodeContent').textContent
+                : document.getElementById('clientCodeContent').textContent;
+
+            navigator.clipboard.writeText(content).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function generateServerCode(model, dimensions) {
+            const dimensionsLine = dimensions ? `dimensions: ${dimensions},` : '';
+            
+            return `import { ensembleEmbed } from '@just-every/ensemble';
+
+const texts = [
+    'The quick brown fox jumps over the lazy dog',
+    'Machine learning is transforming technology',
+    'Embeddings capture semantic meaning in text'
+];
+
+const options = {
+    model: '${model}',${dimensionsLine ? '\n    ' + dimensionsLine : ''}
+};
+
+// Generate embeddings
+try {
+    const embeddings = await ensembleEmbed(texts, options);
+    
+    console.log('Generated embeddings:');
+    embeddings.forEach((embedding, index) => {
+        console.log(\`Text \${index + 1}: \${texts[index]}\`);
+        console.log(\`Embedding: [\${embedding.slice(0, 5).join(', ')}...] (\${embedding.length}d)\`);
+        console.log('---');
+    });
+    
+    // Calculate similarity between first two embeddings
+    const similarity = cosineSimilarity(embeddings[0], embeddings[1]);
+    console.log(\`Similarity between first two texts: \${similarity.toFixed(4)}\`);
+    
+} catch (error) {
+    console.error('Error generating embeddings:', error);
+}
+
+// Helper function to calculate cosine similarity
+function cosineSimilarity(a, b) {
+    const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+    const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+    const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+    return dotProduct / (magnitudeA * magnitudeB);
+}`;
+        }
+
+        function generateClientCode(model, dimensions) {
+            const dimensionsLine = dimensions ? `dimensions: ${dimensions},` : '';
+            
+            return `// Embedding similarity search example
+import { ensembleEmbed } from '@just-every/ensemble';
+
+class EmbeddingSearchEngine {
+    constructor() {
+        this.embeddings = [];
+        this.texts = [];
+    }
+
+    async addDocument(text) {
+        const embedding = await ensembleEmbed([text], {
+            model: '${model}',${dimensionsLine ? '\n            ' + dimensionsLine : ''}
+        });
+        
+        this.texts.push(text);
+        this.embeddings.push(embedding[0]);
+        
+        console.log(\`Added document: "\${text.substring(0, 50)}..."\`);
+    }
+
+    async search(query, topK = 5) {
+        if (this.embeddings.length === 0) {
+            throw new Error('No documents indexed');
+        }
+
+        // Generate embedding for the query
+        const queryEmbedding = await ensembleEmbed([query], {
+            model: '${model}',${dimensionsLine ? '\n            ' + dimensionsLine : ''}
+        });
+
+        // Calculate similarities
+        const similarities = this.embeddings.map((embedding, index) => ({
+            text: this.texts[index],
+            similarity: this.cosineSimilarity(queryEmbedding[0], embedding),
+            index
+        }));
+
+        // Sort by similarity and return top results
+        return similarities
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, topK);
+    }
+
+    cosineSimilarity(a, b) {
+        const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+        const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+        const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+        return dotProduct / (magnitudeA * magnitudeB);
+    }
+}
+
+// Usage example
+async function demo() {
+    const searchEngine = new EmbeddingSearchEngine();
+    
+    // Add some documents
+    await searchEngine.addDocument('Machine learning algorithms for data analysis');
+    await searchEngine.addDocument('Cooking recipes for Italian cuisine');
+    await searchEngine.addDocument('Deep learning neural network architectures');
+    await searchEngine.addDocument('Travel guide for European destinations');
+    
+    // Search for similar documents
+    const results = await searchEngine.search('AI and machine learning');
+    
+    console.log('Search results:');
+    results.forEach((result, index) => {
+        console.log(\`\${index + 1}. Similarity: \${result.similarity.toFixed(4)}\`);
+        console.log(\`   Text: \${result.text}\`);
+    });
+}
+
+// Run the demo
+demo().catch(console.error);`;
         }
     </script>
 </body>

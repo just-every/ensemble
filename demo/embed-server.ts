@@ -53,29 +53,32 @@ interface StoredEmbedding {
 const embeddingStore: StoredEmbedding[] = [];
 
 // Track active connections
-const activeConnections = new Map<string, {
-    startTime: number;
-    embedCount: number;
-    ws: any;
-    isProcessing: boolean;
-}>();
+const activeConnections = new Map<
+    string,
+    {
+        startTime: number;
+        embedCount: number;
+        ws: any;
+        isProcessing: boolean;
+    }
+>();
 
 // Calculate cosine similarity between two vectors
 function cosineSimilarity(a: number[], b: number[]): number {
     if (a.length !== b.length) {
         throw new Error('Vectors must have the same length');
     }
-    
+
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
-    
+
     for (let i = 0; i < a.length; i++) {
         dotProduct += a[i] * b[i];
         normA += a[i] * a[i];
         normB += b[i] * b[i];
     }
-    
+
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
@@ -93,17 +96,19 @@ wss.on('connection', ws => {
     });
 
     // Send connection acknowledgment with current store
-    ws.send(JSON.stringify({
-        type: 'connected',
-        connectionId,
-        storeCount: embeddingStore.length,
-        availableModels: [
-            { id: 'text-embedding-3-small', name: 'OpenAI Small (1536d)', provider: 'openai' },
-            { id: 'text-embedding-3-large', name: 'OpenAI Large (3072d)', provider: 'openai' },
-            { id: 'text-embedding-ada-002', name: 'OpenAI Ada v2 (1536d)', provider: 'openai' },
-            { id: 'gemini-embedding-exp-03-07', name: 'Gemini Experimental (768d)', provider: 'google' },
-        ]
-    }));
+    ws.send(
+        JSON.stringify({
+            type: 'connected',
+            connectionId,
+            storeCount: embeddingStore.length,
+            availableModels: [
+                { id: 'text-embedding-3-small', name: 'OpenAI Small (1536d)', provider: 'openai' },
+                { id: 'text-embedding-3-large', name: 'OpenAI Large (3072d)', provider: 'openai' },
+                { id: 'text-embedding-ada-002', name: 'OpenAI Ada v2 (1536d)', provider: 'openai' },
+                { id: 'gemini-embedding-exp-03-07', name: 'Gemini Experimental (768d)', provider: 'google' },
+            ],
+        })
+    );
 
     // Handle incoming messages
     ws.on('message', async data => {
@@ -116,10 +121,12 @@ wss.on('connection', ws => {
             switch (message.type) {
                 case 'embed':
                     if (connInfo.isProcessing) {
-                        ws.send(JSON.stringify({
-                            type: 'error',
-                            error: 'Already processing an embedding request',
-                        }));
+                        ws.send(
+                            JSON.stringify({
+                                type: 'error',
+                                error: 'Already processing an embedding request',
+                            })
+                        );
                         return;
                     }
 
@@ -138,35 +145,42 @@ wss.on('connection', ws => {
 
                 case 'clear':
                     embeddingStore.length = 0;
-                    ws.send(JSON.stringify({
-                        type: 'store_cleared',
-                        message: 'All embeddings cleared',
-                    }));
+                    ws.send(
+                        JSON.stringify({
+                            type: 'store_cleared',
+                            message: 'All embeddings cleared',
+                        })
+                    );
                     break;
 
-                case 'delete':
+                case 'delete': {
                     const index = embeddingStore.findIndex(e => e.id === message.id);
                     if (index !== -1) {
                         embeddingStore.splice(index, 1);
-                        ws.send(JSON.stringify({
-                            type: 'embedding_deleted',
-                            id: message.id,
-                        }));
+                        ws.send(
+                            JSON.stringify({
+                                type: 'embedding_deleted',
+                                id: message.id,
+                            })
+                        );
                     }
                     break;
+                }
 
                 case 'get_store':
-                    ws.send(JSON.stringify({
-                        type: 'store_data',
-                        embeddings: embeddingStore.map(e => ({
-                            id: e.id,
-                            text: e.text,
-                            model: e.model,
-                            dimensions: e.dimensions,
-                            timestamp: e.timestamp,
-                            metadata: e.metadata,
-                        })),
-                    }));
+                    ws.send(
+                        JSON.stringify({
+                            type: 'store_data',
+                            embeddings: embeddingStore.map(e => ({
+                                id: e.id,
+                                text: e.text,
+                                model: e.model,
+                                dimensions: e.dimensions,
+                                timestamp: e.timestamp,
+                                metadata: e.metadata,
+                            })),
+                        })
+                    );
                     break;
 
                 case 'ping':
@@ -178,10 +192,12 @@ wss.on('connection', ws => {
             }
         } catch (err) {
             console.error('Error handling message:', err);
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: err instanceof Error ? err.message : 'Unknown error',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'error',
+                    error: err instanceof Error ? err.message : 'Unknown error',
+                })
+            );
         }
     });
 
@@ -214,10 +230,12 @@ async function handleEmbed(connectionId: string, message: any) {
     const { texts, model, dimensions } = message;
 
     if (!texts || texts.length === 0) {
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: 'No texts provided',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: 'No texts provided',
+            })
+        );
         return;
     }
 
@@ -228,12 +246,14 @@ async function handleEmbed(connectionId: string, message: any) {
 
     try {
         // Send start event
-        ws.send(JSON.stringify({
-            type: 'embed_start',
-            model,
-            dimensions,
-            textCount: texts.length,
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'embed_start',
+                model,
+                dimensions,
+                textCount: texts.length,
+            })
+        );
 
         const startTime = Date.now();
         const embeddings: StoredEmbedding[] = [];
@@ -241,7 +261,7 @@ async function handleEmbed(connectionId: string, message: any) {
         // Generate embeddings for each text
         for (let i = 0; i < texts.length; i++) {
             const text = texts[i];
-            
+
             // Create agent definition
             const agent: AgentDefinition = {
                 agent_id: connectionId,
@@ -249,11 +269,7 @@ async function handleEmbed(connectionId: string, message: any) {
             };
 
             // Generate embedding
-            const embedding = await ensembleEmbed(
-                text,
-                agent,
-                dimensions ? { dimensions } : undefined
-            );
+            const embedding = await ensembleEmbed(text, agent, dimensions ? { dimensions } : undefined);
 
             // Store the embedding
             const stored: StoredEmbedding = {
@@ -270,36 +286,41 @@ async function handleEmbed(connectionId: string, message: any) {
             connInfo.embedCount++;
 
             // Send progress
-            ws.send(JSON.stringify({
-                type: 'embed_progress',
-                current: i + 1,
-                total: texts.length,
-                id: stored.id,
-                dimensions: stored.dimensions,
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'embed_progress',
+                    current: i + 1,
+                    total: texts.length,
+                    id: stored.id,
+                    dimensions: stored.dimensions,
+                })
+            );
         }
 
         const duration = (Date.now() - startTime) / 1000;
 
         // Send completion
-        ws.send(JSON.stringify({
-            type: 'embed_complete',
-            embeddings: embeddings.map(e => ({
-                id: e.id,
-                text: e.text,
-                dimensions: e.dimensions,
-                preview: e.embedding.slice(0, 5).map(n => n.toFixed(4)),
-            })),
-            duration,
-            averageTime: duration / texts.length,
-        }));
-
+        ws.send(
+            JSON.stringify({
+                type: 'embed_complete',
+                embeddings: embeddings.map(e => ({
+                    id: e.id,
+                    text: e.text,
+                    dimensions: e.dimensions,
+                    preview: e.embedding.slice(0, 5).map(n => n.toFixed(4)),
+                })),
+                duration,
+                averageTime: duration / texts.length,
+            })
+        );
     } catch (err) {
         console.error('Error in embed:', err);
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: err instanceof Error ? err.message : 'Unknown error',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: err instanceof Error ? err.message : 'Unknown error',
+            })
+        );
     }
 }
 
@@ -312,10 +333,12 @@ async function handleSearch(connectionId: string, message: any) {
     const { query, model, dimensions, topK = 5 } = message;
 
     if (!query) {
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: 'No query provided',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: 'No query provided',
+            })
+        );
         return;
     }
 
@@ -323,11 +346,13 @@ async function handleSearch(connectionId: string, message: any) {
 
     try {
         // Send start event
-        ws.send(JSON.stringify({
-            type: 'search_start',
-            query,
-            model,
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'search_start',
+                query,
+                model,
+            })
+        );
 
         // Generate embedding for query
         const agent: AgentDefinition = {
@@ -335,21 +360,19 @@ async function handleSearch(connectionId: string, message: any) {
             model,
         };
 
-        const queryEmbedding = await ensembleEmbed(
-            query,
-            agent,
-            dimensions ? { dimensions } : undefined
-        );
+        const queryEmbedding = await ensembleEmbed(query, agent, dimensions ? { dimensions } : undefined);
 
         // Find similar embeddings (filter by dimensions)
         const candidates = embeddingStore.filter(e => e.dimensions === queryEmbedding.length);
-        
+
         if (candidates.length === 0) {
-            ws.send(JSON.stringify({
-                type: 'search_complete',
-                results: [],
-                message: `No embeddings found with ${queryEmbedding.length} dimensions`,
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'search_complete',
+                    results: [],
+                    message: `No embeddings found with ${queryEmbedding.length} dimensions`,
+                })
+            );
             return;
         }
 
@@ -364,25 +387,28 @@ async function handleSearch(connectionId: string, message: any) {
         const topResults = similarities.slice(0, topK);
 
         // Send results
-        ws.send(JSON.stringify({
-            type: 'search_complete',
-            results: topResults.map(r => ({
-                id: r.id,
-                text: r.text,
-                similarity: r.similarity,
-                model: r.model,
-                timestamp: r.timestamp,
-            })),
-            queryDimensions: queryEmbedding.length,
-            totalCandidates: candidates.length,
-        }));
-
+        ws.send(
+            JSON.stringify({
+                type: 'search_complete',
+                results: topResults.map(r => ({
+                    id: r.id,
+                    text: r.text,
+                    similarity: r.similarity,
+                    model: r.model,
+                    timestamp: r.timestamp,
+                })),
+                queryDimensions: queryEmbedding.length,
+                totalCandidates: candidates.length,
+            })
+        );
     } catch (err) {
         console.error('Error in search:', err);
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: err instanceof Error ? err.message : 'Unknown error',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: err instanceof Error ? err.message : 'Unknown error',
+            })
+        );
     }
 }
 
@@ -395,10 +421,12 @@ async function handleAnalyze(connectionId: string, message: any) {
     const { ids } = message;
 
     if (!ids || ids.length < 2) {
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: 'Need at least 2 embeddings to analyze',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: 'Need at least 2 embeddings to analyze',
+            })
+        );
         return;
     }
 
@@ -411,20 +439,24 @@ async function handleAnalyze(connectionId: string, message: any) {
             .filter(Boolean) as StoredEmbedding[];
 
         if (embeddings.length < 2) {
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: 'Could not find all requested embeddings',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'error',
+                    error: 'Could not find all requested embeddings',
+                })
+            );
             return;
         }
 
         // Check dimensions match
         const dims = embeddings[0].dimensions;
         if (!embeddings.every(e => e.dimensions === dims)) {
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: 'All embeddings must have the same dimensions',
-            }));
+            ws.send(
+                JSON.stringify({
+                    type: 'error',
+                    error: 'All embeddings must have the same dimensions',
+                })
+            );
             return;
         }
 
@@ -448,9 +480,9 @@ async function handleAnalyze(connectionId: string, message: any) {
 ${embeddings.map((e, i) => `Text ${i + 1}: "${e.text}"`).join('\n')}
 
 Similarity matrix (values from -1 to 1, where 1 = identical):
-${similarities.map((row, i) => 
-    `Text ${i + 1}: [${row.map((s, j) => `${j + 1}:${s.toFixed(3)}`).join(', ')}]`
-).join('\n')}
+${similarities
+    .map((row, i) => `Text ${i + 1}: [${row.map((s, j) => `${j + 1}:${s.toFixed(3)}`).join(', ')}]`)
+    .join('\n')}
 
 Provide a brief analysis of:
 1. Which texts are most similar and why
@@ -458,42 +490,50 @@ Provide a brief analysis of:
 3. Any interesting patterns or clusters
 4. What these similarities reveal about the semantic relationships`;
 
-        const analysis = await ensembleRequest(
-            [{ role: 'user', content: analysisPrompt }],
-            agent
-        );
+        const analysis = await ensembleRequest([{ role: 'user', content: analysisPrompt }], agent);
 
         let aiAnalysis = '';
         for await (const event of analysis) {
-            if (event.type === 'message_delta' && event.delta) {
-                aiAnalysis += event.delta;
+            if (event.type === 'message_delta' && event.content) {
+                aiAnalysis = event.content;
+            } else if (event.type === 'message_complete' && event.content) {
+                aiAnalysis = event.content;
             }
         }
 
-        // Send analysis results
-        ws.send(JSON.stringify({
-            type: 'analyze_complete',
-            embeddings: embeddings.map(e => ({
-                id: e.id,
-                text: e.text,
-                model: e.model,
-            })),
-            similarities: similarities.map((row, i) => ({
-                from: embeddings[i].id,
-                to: row.map((sim, j) => ({
-                    id: embeddings[j].id,
-                    similarity: sim,
-                })),
-            })),
-            analysis: aiAnalysis,
-        }));
+        console.log(`📊 Analysis result for ${connectionId}: ${aiAnalysis.length} characters`);
+        if (!aiAnalysis) {
+            console.warn('⚠️ Analysis was empty! Sending default message.');
+            aiAnalysis = 'Analysis generation failed. Please try again.';
+        }
 
+        // Send analysis results
+        ws.send(
+            JSON.stringify({
+                type: 'analyze_complete',
+                embeddings: embeddings.map(e => ({
+                    id: e.id,
+                    text: e.text,
+                    model: e.model,
+                })),
+                similarities: similarities.map((row, i) => ({
+                    from: embeddings[i].id,
+                    to: row.map((sim, j) => ({
+                        id: embeddings[j].id,
+                        similarity: sim,
+                    })),
+                })),
+                analysis: aiAnalysis,
+            })
+        );
     } catch (err) {
         console.error('Error in analyze:', err);
-        ws.send(JSON.stringify({
-            type: 'error',
-            error: err instanceof Error ? err.message : 'Unknown error',
-        }));
+        ws.send(
+            JSON.stringify({
+                type: 'error',
+                error: err instanceof Error ? err.message : 'Unknown error',
+            })
+        );
     }
 }
 

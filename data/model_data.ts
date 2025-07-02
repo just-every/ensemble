@@ -198,7 +198,8 @@ export const MODEL_CLASSES = {
             'gpt-4.1-nano', // OpenAI - 1M context
             'gpt-4.1-mini', // OpenAI - 1M context
             'gemini-2.5-pro-preview-06-05', // Google - 1M context
-            'gemini-2.5-flash-preview-05-20', // Google - 1M context
+            'gemini-2.5-flash-preview-05-20-medium', // Google - 1M context
+            'gemini-2.5-flash-preview-05-20-low', // Google - 1M context
             'gemini-2.5-flash-lite-preview-06-17', // Google - 1M context
         ],
         random: true,
@@ -664,46 +665,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 60, // GPQA Diamond
         },
         description: 'Smaller, faster version of GPT-4o',
-    },
-    {
-        id: 'gpt-4o-search-preview',
-        aliases: ['gpt-4o-search-preview-2025-03-11'],
-        provider: 'openai',
-        cost: {
-            input_per_million: 2.5, // Base model cost
-            output_per_million: 10.0, // Base model cost
-            // Note: Web search adds per-1k-call costs ($30-$50)
-        },
-        features: {
-            context_length: 128000, // Assumed based on gpt-4o
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true, // Includes built-in search tool
-            streaming: true,
-            json_output: true,
-        },
-        class: 'search',
-        description: 'GPT-4o with built-in search capabilities',
-    },
-    {
-        id: 'gpt-4o-mini-search-preview',
-        aliases: ['gpt-4o-mini-search-preview-2025-03-11'],
-        provider: 'openai',
-        cost: {
-            input_per_million: 0.15, // Base model cost
-            output_per_million: 0.6, // Base model cost
-            // Note: Web search adds per-1k-call costs ($25-$30)
-        },
-        features: {
-            context_length: 128000, // Assumed based on gpt-4o-mini
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true, // Includes built-in search tool
-            streaming: true,
-            json_output: true,
-        },
-        class: 'search',
-        description: 'Smaller GPT-4o with built-in search capabilities',
     },
 
     // O series models
@@ -1332,7 +1293,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
         },
-        class: 'search',
+        class: 'standard',
         description: 'Lightweight, cost-effective search model designed for quick, grounded answers.',
     },
     {
@@ -1350,7 +1311,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
         },
-        class: 'search',
+        class: 'standard',
         description: 'Advanced search model optimized for complex queries and deeper content understanding.',
     },
     {
@@ -1404,7 +1365,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
         },
-        class: 'search',
+        class: 'standard',
         description: 'Best suited for exhaustive research, generating detailed reports and in-depth insights.',
     },
     // Mistral models (via OpenRouter)
@@ -1723,7 +1684,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             max_output_tokens: 64000, // Default 32K, max 64K
             input_modality: ['text'],
             output_modality: ['text'],
-            tool_use: true, // Supports function calling
+            tool_use: true, // Supports function calling via simulation
+            simulate_tools: true, // Uses simulated tool calls instead of native ones
             streaming: true,
             json_output: true, // Supports JSON output
             reasoning_output: true, // Advanced reasoning capabilities

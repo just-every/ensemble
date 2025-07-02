@@ -204,18 +204,28 @@ async function* executeRound(
     // Get current messages
     let messages = await history.getMessages(model);
 
-    // Emit agent_start event through global event controller
-    await emitEvent(
-        {
-            type: 'agent_start',
-            request_id: requestId,
-            input:
-                'content' in messages[0] && typeof messages[0].content === 'string' ? messages[0].content : undefined,
-            timestamp: new Date().toISOString(),
+    // Create and yield agent_start event
+    const agentStartEvent = {
+        type: 'agent_start' as const,
+        request_id: requestId,
+        input: 'content' in messages[0] && typeof messages[0].content === 'string' ? messages[0].content : undefined,
+        timestamp: new Date().toISOString(),
+        agent: {
+            agent_id: agent.agent_id,
+            name: agent.name,
+            parent_id: agent.parent_id,
+            model: agent.model || model,
+            modelClass: agent.modelClass,
+            cwd: agent.cwd,
+            modelScores: agent.modelScores,
+            disabledModels: agent.disabledModels,
         },
-        agent,
-        model
-    );
+    };
+
+    yield agentStartEvent;
+
+    // Also emit through global event controller
+    await emitEvent(agentStartEvent, agent, model);
 
     // Allow agent onRequest hook
     if (agent.onRequest) {

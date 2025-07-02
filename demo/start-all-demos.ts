@@ -1,19 +1,69 @@
 #!/usr/bin/env node
 /**
  * Start all demo servers concurrently
- * 
+ *
  * This script launches all demo servers on their respective ports
  * and provides a unified menu interface
  */
 
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import express from 'express';
 import open from 'open';
+import { promisify } from 'util';
+import net from 'net';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const execAsync = promisify(exec);
+
+// Utility function to check if a port is in use
+async function isPortInUse(port: number): Promise<boolean> {
+    return new Promise(resolve => {
+        const server = net.createServer();
+        server.listen(port, () => {
+            server.once('close', () => resolve(false));
+            server.close();
+        });
+        server.on('error', () => resolve(true));
+    });
+}
+
+// Kill any existing processes on our demo ports
+async function killExistingProcesses(ports: number[]): Promise<void> {
+    console.log('🔍 Checking for existing processes on demo ports...');
+
+    for (const port of ports) {
+        try {
+            // Find processes using the port
+            const { stdout } = await execAsync(`lsof -ti:${port}`);
+            const pids = stdout
+                .trim()
+                .split('\n')
+                .filter(pid => pid);
+
+            if (pids.length > 0) {
+                console.log(`   Found ${pids.length} process(es) on port ${port}, killing...`);
+                for (const pid of pids) {
+                    try {
+                        await execAsync(`kill -9 ${pid}`);
+                        console.log(`   ✅ Killed process ${pid} on port ${port}`);
+                    } catch (error) {
+                        console.log(
+                            `   ⚠️  Could not kill process ${pid}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                        );
+                    }
+                }
+            }
+        } catch {
+            // No processes found on this port, which is good
+        }
+    }
+
+    // Wait a moment for processes to fully terminate
+    await new Promise(resolve => setTimeout(resolve, 1000));
+}
 
 // Demo server configurations
 const demos = [
@@ -21,71 +71,91 @@ const demos = [
         name: 'Voice Generation',
         script: 'voice-server.ts',
         port: 3004,
-        path: '/voice-client.html'
+        path: '/voice-client.html',
     },
     {
         name: 'Live Transcription',
-        script: 'transcription-server.ts',
+        script: 'listen-server.ts',
         port: 3003,
-        path: '/transcription-client.html'
+        path: '/listen-client.html',
     },
     {
         name: 'Chat Request',
         script: 'request-server.ts',
         port: 3005,
-        path: '/request-client.html'
+        path: '/request-client.html',
     },
     {
         name: 'Text Embeddings',
         script: 'embed-server.ts',
         port: 3006,
-        path: '/embed-client.html'
-    }
+        path: '/embed-client.html',
+    },
 ];
 
 // Start individual demo servers
-console.log('🚀 Starting Ensemble demo servers...\n');
+async function startDemoServers() {
+    console.log('🚀 Starting Ensemble demo servers...\n');
 
-const processes: any[] = [];
+    // Get all ports that will be used
+    const allPorts = [...demos.map(d => d.port), 3000]; // Include menu port
 
-demos.forEach(demo => {
-    console.log(`Starting ${demo.name} server on port ${demo.port}...`);
-    
-    const proc = spawn('npx', ['tsx', join(__dirname, demo.script)], {
-        stdio: 'pipe',
-        shell: true
+    // Kill any existing processes on these ports
+    await killExistingProcesses(allPorts);
+
+    // Verify ports are available
+    for (const port of allPorts) {
+        const inUse = await isPortInUse(port);
+        if (inUse) {
+            console.error(
+                `❌ Port ${port} is still in use after cleanup. Please manually stop any processes using this port.`
+            );
+            process.exit(1);
+        }
+    }
+
+    console.log('✅ All ports are available\n');
+
+    const processes: any[] = [];
+
+    demos.forEach(demo => {
+        console.log(`Starting ${demo.name} server on port ${demo.port}...`);
+
+        const proc = spawn('npx', ['tsx', join(__dirname, demo.script)], {
+            stdio: 'pipe',
+            shell: true,
+        });
+
+        proc.stdout.on('data', data => {
+            console.log(`[${demo.name}] ${data.toString().trim()}`);
+        });
+
+        proc.stderr.on('data', data => {
+            console.error(`[${demo.name}] ${data.toString().trim()}`);
+        });
+
+        proc.on('error', error => {
+            console.error(`Failed to start ${demo.name}: ${error.message}`);
+        });
+
+        processes.push(proc);
     });
-    
-    proc.stdout.on('data', (data) => {
-        console.log(`[${demo.name}] ${data.toString().trim()}`);
-    });
-    
-    proc.stderr.on('data', (data) => {
-        console.error(`[${demo.name}] ${data.toString().trim()}`);
-    });
-    
-    proc.on('error', (error) => {
-        console.error(`Failed to start ${demo.name}: ${error.message}`);
-    });
-    
-    processes.push(proc);
-});
 
-// Create menu server
-const app = express();
-const MENU_PORT = 3000;
+    // Create menu server
+    const app = express();
+    const MENU_PORT = 3000;
 
-app.use(express.static(__dirname));
+    app.use(express.static(__dirname));
 
-// Create a simple menu page
-app.get('/', (req, res) => {
-    res.send(`
+    // Create a simple menu page
+    app.get('/', (req, res) => {
+        res.send(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ensemble Demos</title>
+    <title>Ensemble Demo</title>
     <style>
         :root {
             --primary: #1a73e8;
@@ -239,7 +309,7 @@ app.get('/', (req, res) => {
             <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
             </svg>
-            Ensemble Demos
+            Ensemble Demo
         </h1>
         <p class="subtitle">Interactive demonstrations of the Ensemble AI library</p>
 
@@ -249,25 +319,36 @@ app.get('/', (req, res) => {
         </div>
 
         <div class="demo-grid">
-            ${demos.map(demo => `
+            ${demos
+                .map(
+                    demo => `
                 <a href="http://localhost:${demo.port}${demo.path}" class="demo-card" target="_blank">
                     <div class="demo-header">
                         <div class="demo-icon">${
-                            demo.name.includes('Voice') ? '🎤' :
-                            demo.name.includes('Transcription') ? '🎧' :
-                            demo.name.includes('Chat') ? '💬' : '📊'
+                            demo.name.includes('Voice')
+                                ? '🎤'
+                                : demo.name.includes('Transcription')
+                                  ? '🎧'
+                                  : demo.name.includes('Chat')
+                                    ? '💬'
+                                    : '📊'
                         }</div>
                         <div class="demo-title">${demo.name}</div>
                     </div>
                     <div class="demo-description">${
-                        demo.name.includes('Voice') ? 'Convert text to natural-sounding speech with multiple voices and providers' :
-                        demo.name.includes('Transcription') ? 'Real-time speech-to-text with streaming audio processing' :
-                        demo.name.includes('Chat') ? 'Streaming AI responses with tool calling and multi-model support' :
-                        'Generate vector embeddings and perform similarity search'
+                        demo.name.includes('Voice')
+                            ? 'Convert text to natural-sounding speech with multiple voices and providers'
+                            : demo.name.includes('Transcription')
+                              ? 'Real-time speech-to-text with streaming audio processing'
+                              : demo.name.includes('Chat')
+                                ? 'Streaming AI responses with tool calling and multi-model support'
+                                : 'Generate vector embeddings and perform similarity search'
                     }</div>
                     <div class="demo-port">Port ${demo.port} →</div>
                 </a>
-            `).join('')}
+            `
+                )
+                .join('')}
         </div>
 
         <div class="instructions">
@@ -282,36 +363,43 @@ app.get('/', (req, res) => {
     </div>
 </body>
 </html>
-    `);
-});
-
-// Start menu server
-app.listen(MENU_PORT, () => {
-    console.log(`\n✅ All demo servers started!`);
-    console.log(`\n📋 Demo Menu: http://localhost:${MENU_PORT}`);
-    console.log('\nIndividual demos:');
-    demos.forEach(demo => {
-        console.log(`   • ${demo.name}: http://localhost:${demo.port}${demo.path}`);
+        `);
     });
-    console.log('\nPress Ctrl+C to stop all servers\n');
 
-    // Open the menu in the default browser
-    setTimeout(() => {
-        open(`http://localhost:${MENU_PORT}`);
-    }, 2000);
-});
+    // Start menu server
+    app.listen(MENU_PORT, () => {
+        console.log(`\n✅ All demo servers started!`);
+        console.log(`\n📋 Demo Menu: http://localhost:${MENU_PORT}`);
+        console.log('\nIndividual demos:');
+        demos.forEach(demo => {
+            console.log(`   • ${demo.name}: http://localhost:${demo.port}${demo.path}`);
+        });
+        console.log('\nPress Ctrl+C to stop all servers\n');
 
-// Handle cleanup
-process.on('SIGINT', () => {
-    console.log('\n\nShutting down all demo servers...');
-    processes.forEach(proc => {
-        proc.kill();
+        // Open the menu in the default browser
+        setTimeout(() => {
+            open(`http://localhost:${MENU_PORT}`);
+        }, 2000);
     });
-    process.exit(0);
-});
 
-process.on('exit', () => {
-    processes.forEach(proc => {
-        proc.kill();
+    // Handle cleanup
+    process.on('SIGINT', () => {
+        console.log('\n\nShutting down all demo servers...');
+        processes.forEach(proc => {
+            proc.kill();
+        });
+        process.exit(0);
     });
+
+    process.on('exit', () => {
+        processes.forEach(proc => {
+            proc.kill();
+        });
+    });
+}
+
+// Start the demo servers
+startDemoServers().catch(err => {
+    console.error('Failed to start demo servers:', err);
+    process.exit(1);
 });

@@ -26,6 +26,7 @@ import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import { hasEventHandler } from '../utils/event_controller.js';
+import { findModel } from '../data/model_data.js';
 
 // Extended types for Perplexity/OpenRouter response formats
 interface ExtendedDelta extends OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta {
@@ -48,6 +49,39 @@ interface ExtendedChunk extends OpenAI.Chat.Completions.ChatCompletionChunk {
 // Also detects when pattern is inside code blocks with backticks
 const SIMULATED_TOOL_CALL_REGEX = /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*(\[.*\])(?:\s*```)?/gs; // Use greedy .*
 const TOOL_CALL_CLEANUP_REGEX = /\n?\s*(?:```(?:json)?\s*)?\s*TOOL_CALLS:\s*\[.*\](?:\s*```)?/gms; // Use greedy .* here too for consistency
+
+/**
+ * Helper function to generate a textual description of tools for the system prompt.
+ * Used for models that don't support native tool calling but can simulate it via text.
+ * @param tools Array of OpenAI tool objects.
+ * @returns A string describing the available tools and instructions for simulated calls.
+ */
+function formatToolsForPrompt(tools: OpenAI.Chat.Completions.ChatCompletionTool[]): string {
+    if (!tools || tools.length === 0) {
+        return 'No tools are available for use.';
+    }
+
+    const toolDescriptions = tools
+        .map(tool => {
+            if (tool.type !== 'function' || !tool.function) {
+                return `  - Unknown tool type: ${tool.type}`;
+            }
+            const func = tool.function;
+            // Safely access parameters and properties
+            const parameters = func.parameters && typeof func.parameters === 'object' ? func.parameters : {};
+            const properties = 'properties' in parameters ? parameters.properties : {};
+            const requiredParams =
+                'required' in parameters && Array.isArray(parameters.required) ? parameters.required : [];
+
+            const paramsJson = JSON.stringify(properties, null, 2);
+
+            return `  - Name: ${func.name}\n    Description: ${func.description || 'No description'}\n    Parameters (JSON Schema): ${paramsJson}\n    Required Parameters: ${requiredParams.join(', ') || 'None'}`;
+        })
+        .join('\n\n');
+
+    // Instructions for MULTIPLE tool calls using TOOL_CALLS and a JSON array
+    return `You have the following tools available:\n${toolDescriptions}\n\nTo use one or more tools, output the following JSON structure containing an ARRAY of tool calls on a new line *at the very end* of your response, and *only* if you intend to call tool(s). Ensure the arguments value in each call is a JSON *string*: \n\`\`\`json\nTOOL_CALLS: [ {"id": "call_001", "type": "function", "function": {"name": "function_name_1", "arguments": "{\\"arg1\\": \\"value1\\"}"}}, {"id": "call_002", "type": "function", "function": {"name": "function_name_2", "arguments": "{\\"argA\\": true, \\"argB\\": 123}"}} ]\n\`\`\`\nReplace \`function_name\` and arguments accordingly for each tool call you want to make. Put all desired calls in the array. IMPORTANT: Always include an 'id' field with a unique string for each call. Do not add any text after the TOOL_CALLS line. If you are not calling any tools, respond normally without the TOOL_CALLS structure.`;
+}
 const CLEANUP_PLACEHOLDER = '[Simulated Tool Calls Removed]';
 
 // --- Helper Functions ---
@@ -585,15 +619,33 @@ export class OpenAIChat extends BaseModelProvider {
                     json_schema: settings.json_schema,
                 };
             }
-            // Check if this is a Mistral model that doesn't support tools
-            const isMistralModel = model.includes('mistral') || model.includes('magistral');
+            // Check model features to determine tool support
+            const modelEntry = findModel(model);
+            const shouldSimulateTools = modelEntry?.features?.simulate_tools === true;
+            const supportsNativeTools = modelEntry?.features?.tool_use === true && !shouldSimulateTools;
 
-            if (tools && tools.length > 0 && !isMistralModel) {
-                requestParams.tools = await convertToOpenAITools(tools);
-            } else if (tools && tools.length > 0 && isMistralModel) {
-                console.warn(
-                    `(${this.provider}) Mistral models don't support native tool calling. Tools will be ignored.`
-                );
+            if (tools && tools.length > 0) {
+                if (supportsNativeTools) {
+                    // Use native tool calling
+                    requestParams.tools = await convertToOpenAITools(tools);
+                } else if (shouldSimulateTools) {
+                    // Use simulated tool calling - add tool descriptions to system message
+                    const openAITools = await convertToOpenAITools(tools);
+                    const toolInfoForPrompt = formatToolsForPrompt(openAITools);
+
+                    // Add tool instructions to messages
+                    const messages = [...requestParams.messages];
+                    messages.push({ role: 'system', content: toolInfoForPrompt });
+                    requestParams.messages = messages;
+
+                    // Don't set tools in request params for simulation
+                    requestParams.tools = undefined;
+                } else {
+                    console.warn(
+                        `(${this.provider}) Model '${model}' doesn't support tool calling. Tools will be ignored.`
+                    );
+                    requestParams.tools = undefined;
+                }
             }
 
             const overrideParams = { ...this.commonParams };

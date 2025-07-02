@@ -73,9 +73,8 @@ class CostTracker {
                 'peak_price_per_million' in model.cost.cached_input_per_million);
 
         if (!usage.timestamp && usesTimeBasedPricing) {
-            console.warn(
-                `Timestamp missing for time-based pricing model '${usage.model}'. Defaulting to current time for calculation.`
-            );
+            // Silently default to current time for calculation
+            // Note: Timestamp missing for time-based pricing - using current time
         }
 
         // Helper function to get price per million based on token count and cost structure

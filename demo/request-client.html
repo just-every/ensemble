@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ensemble Request Demo</title>
+    <!-- Markdown renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@14.1.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
     <style>
         :root {
             --primary: #1a73e8;
@@ -14,7 +17,7 @@
             --background: #f5f5f5;
             --surface: #ffffff;
             --text: #202124;
-            --text-secondary: #5f6368;
+            --text-secondary: #959595;
             --code-bg: #f8f9fa;
             --border: #e0e0e0;
         }
@@ -69,6 +72,167 @@
             align-items: center;
             gap: 12px;
             font-size: 28px;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .generate-code-btn {
+            background: var(--surface);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .generate-code-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface);
+            border-radius: 12px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-tabs-section {
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-title {
+            margin: 0;
+            font-size: 20px;
+            color: var(--text);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f0f0f0;
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 0 24px;
+        }
+
+        .code-tab {
+            background: none;
+            border: none;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .code-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .code-container {
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .code-container pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-button:hover {
+            background: var(--primary-dark);
+        }
+
+        .copy-button.copied {
+            background: var(--success);
         }
 
         h2 {
@@ -142,8 +306,15 @@
 
         .message {
             display: flex;
-            gap: 12px;
+            flex-direction: column;
+            gap: 4px;
             animation: fadeIn 0.3s ease;
+        }
+
+        .message-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
         }
 
         @keyframes fadeIn {
@@ -161,6 +332,7 @@
             font-weight: bold;
             color: white;
             flex-shrink: 0;
+            margin-top: 2px; /* Slightly offset to align with first line of text */
         }
 
         .message.user .message-avatar {
@@ -177,10 +349,22 @@
 
         .message-content {
             flex: 1;
+            word-wrap: break-word;
+            position: relative;
+        }
+
+        .message-metadata {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 400;
+            padding: 0;
+            margin: 0 0 0 48px; /* Offset by avatar width + gap */
+        }
+
+        .message-body {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 12px 16px;
-            word-wrap: break-word;
         }
 
         .message-content pre {
@@ -198,6 +382,92 @@
             border-radius: 4px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
+        }
+
+        /* Markdown content styling */
+        .message-content .content h1,
+        .message-content .content h2,
+        .message-content .content h3,
+        .message-content .content h4,
+        .message-content .content h5,
+        .message-content .content h6 {
+            margin: 16px 0 8px 0;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .message-content .content h1 { font-size: 1.5em; }
+        .message-content .content h2 { font-size: 1.3em; }
+        .message-content .content h3 { font-size: 1.1em; }
+
+        .message-content .content p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .message-content .content ul,
+        .message-content .content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .message-content .content li {
+            margin: 4px 0;
+        }
+
+        .message-content .content blockquote {
+            border-left: 4px solid var(--primary);
+            padding-left: 16px;
+            margin: 16px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .message-content .content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }
+
+        .message-content .content th,
+        .message-content .content td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .message-content .content th {
+            background: #f0f0f0;
+            font-weight: 600;
+        }
+
+        .typing-indicator-modern {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dots span {
+            width: 4px;
+            height: 4px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
         }
 
         .tool-call {
@@ -254,7 +524,7 @@
         .input-wrapper {
             display: flex;
             gap: 12px;
-            align-items: flex-end;
+            align-items: flex-start;
         }
 
         textarea {
@@ -495,6 +765,66 @@
             margin-top: 8px;
         }
 
+        .advanced-section {
+            margin: 10px 0;
+            padding: 16px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .advanced-toggle {
+            width: 100%;
+            background: none;
+            border: none;
+            padding: 8px 0;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-align: left;
+            transition: color 0.2s;
+        }
+
+        .advanced-toggle:hover {
+            color: var(--text);
+        }
+
+        .advanced-toggle .chevron {
+            transition: transform 0.2s;
+        }
+
+        .advanced-toggle.expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .advanced-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #f9f9f9;
+        }
+
+        .advanced-content.expanded {
+            max-height: 600px;
+            padding: 10px;
+        }
+
+        .advanced-content .checkbox-group {
+            margin-bottom: 20px;
+            padding-bottom: 4px;
+        }
+
+        .advanced-content .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .advanced-content .setting-group:last-child {
+            margin-bottom: 0;
+        }
+
         .error-message {
             background: #fce8e6;
             color: var(--error);
@@ -533,59 +863,72 @@
                         <label class="setting-label">Model</label>
                         <select id="modelSelect">
                             <option value="">Use Model Class</option>
-                            <optgroup label="OpenAI">
-                                <option value="gpt-4o">GPT-4o</option>
-                                <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                            </optgroup>
-                            <optgroup label="Anthropic">
-                                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                            </optgroup>
-                            <optgroup label="Google">
-                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                            </optgroup>
-                            <optgroup label="X.AI">
-                                <option value="grok-beta">Grok Beta</option>
-                            </optgroup>
-                            <optgroup label="DeepSeek">
-                                <option value="deepseek-chat">DeepSeek Chat</option>
-                                <option value="deepseek-coder">DeepSeek Coder</option>
-                            </optgroup>
+                            <!-- Models will be populated dynamically -->
                         </select>
                     </div>
 
                     <div class="setting-group">
                         <label class="setting-label">Model Class</label>
                         <select id="modelClassSelect">
-                            <option value="standard" selected>Standard</option>
-                            <option value="mini">Mini</option>
-                            <option value="reasoning">Reasoning</option>
-                            <option value="code">Code</option>
-                            <option value="vision">Vision</option>
-                            <option value="long">Long Context</option>
+                            <!-- Model classes will be populated dynamically -->
                         </select>
                     </div>
 
-                    <div class="setting-group">
-                        <label class="setting-label">Max Tokens</label>
-                        <input type="number" id="maxTokens" value="1000" min="1" max="4096">
-                    </div>
+                    <div class="advanced-section">
+                        <button type="button" class="advanced-toggle" onclick="toggleAdvanced()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="chevron">
+                                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                            </svg>
+                            Advanced Settings
+                        </button>
+                        <div class="advanced-content" id="advancedContent">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="enableTools" checked>
+                                <label for="enableTools" class="setting-label">Enable Tool Calling</label>
+                            </div>
 
-                    <div class="setting-group">
-                        <label class="setting-label">Temperature</label>
-                        <div class="slider-container">
-                            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
-                            <span class="slider-value" id="temperatureValue">0.7</span>
+                            <div class="setting-group">
+                                <label class="setting-label">Max Tokens</label>
+                                <input type="number" id="maxTokens" value="1000" min="1" max="8192">
+                            </div>
+
+                            <div class="setting-group">
+                                <label class="setting-label">Temperature</label>
+                                <div class="slider-container">
+                                    <input type="range" id="temperature" min="0" max="2" step="0.1" value="1.0">
+                                    <span class="slider-value" id="temperatureValue">1.0</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-group">
+                                <label class="setting-label">Top P</label>
+                                <div class="slider-container">
+                                    <input type="range" id="topP" min="0" max="1" step="0.01" value="1.0">
+                                    <span class="slider-value" id="topPValue">1.0</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-group">
+                                <label class="setting-label">Frequency Penalty</label>
+                                <div class="slider-container">
+                                    <input type="range" id="frequencyPenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="frequencyPenaltyValue">0</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-group">
+                                <label class="setting-label">Presence Penalty</label>
+                                <div class="slider-container">
+                                    <input type="range" id="presencePenalty" min="-2" max="2" step="0.1" value="0">
+                                    <span class="slider-value" id="presencePenaltyValue">0</span>
+                                </div>
+                            </div>
+
+                            <div class="setting-group">
+                                <label class="setting-label">Seed (for reproducible outputs)</label>
+                                <input type="number" id="seed" placeholder="Leave empty for random">
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableTools" checked>
-                        <label for="enableTools">Enable Tool Calling</label>
                     </div>
                 </div>
 
@@ -646,15 +989,20 @@
 
         <div class="main-content">
             <div class="card chat-container">
-                <h1>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                        <circle cx="8" cy="9" r="1"/>
-                        <circle cx="12" cy="9" r="1"/>
-                        <circle cx="16" cy="9" r="1"/>
-                    </svg>
-                    Ensemble Request Demo
-                </h1>
+                <div class="header-row">
+                    <h1>
+                        <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
+                            <path d="M64 0C28.7 0 0 28.7 0 64L0 256c0 35.3 28.7 64 64 64l32 0 0 48c0 6.1 3.4 11.6 8.8 14.3s11.9 2.1 16.8-1.5L202.7 320 352 320c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64L64 0zM352 352l-96 0 0 32c0 35.3 28.7 64 64 64l117.3 0 81.1 60.8c4.8 3.6 11.3 4.2 16.8 1.5s8.8-8.2 8.8-14.3l0-48 32 0c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64l-128 0 0 128c0 53-43 96-96 96z"/>
+                        </svg>
+                        Ensemble Request Demo
+                    </h1>
+                    <button class="generate-code-btn" onclick="showCodeModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+                        </svg>
+                        Generate Code
+                    </button>
+                </div>
 
                 <div class="status-section">
                     <div id="status" class="status">
@@ -696,6 +1044,36 @@
         </div>
     </div>
 
+    <!-- Code Generation Modal -->
+    <div id="codeModal" class="modal-overlay" onclick="if(event.target === this) hideCodeModal()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Generated Code</h2>
+                <button class="modal-close" onclick="hideCodeModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-tabs-section">
+                <div class="code-tabs">
+                    <button class="code-tab active" onclick="switchCodeTab('server')">Server Code</button>
+                    <button class="code-tab" onclick="switchCodeTab('client')">Client Code</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="serverCode" class="code-container">
+                    <button class="copy-button" onclick="copyCode('server')">Copy</button>
+                    <pre id="serverCodeContent"></pre>
+                </div>
+                <div id="clientCode" class="code-container" style="display: none;">
+                    <button class="copy-button" onclick="copyCode('client')">Copy</button>
+                    <pre id="clientCodeContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // State management
         let ws = null;
@@ -703,9 +1081,13 @@
         let isStreaming = false;
         let messages = [];
         let currentMessageElement = null;
+        let currentMessageModel = null;
+        let currentMessageClass = null;
         let totalTokens = 0;
         let totalCost = 0;
         let availableTools = [];
+        let availableModels = [];
+        let availableModelClasses = [];
 
         // Example prompts
         const examples = {
@@ -741,9 +1123,40 @@
             document.getElementById('temperatureValue').textContent = e.target.value;
         });
 
+        document.getElementById('topP').addEventListener('input', (e) => {
+            document.getElementById('topPValue').textContent = e.target.value;
+        });
+
+        document.getElementById('frequencyPenalty').addEventListener('input', (e) => {
+            document.getElementById('frequencyPenaltyValue').textContent = e.target.value;
+        });
+
+        document.getElementById('presencePenalty').addEventListener('input', (e) => {
+            document.getElementById('presencePenaltyValue').textContent = e.target.value;
+        });
+
         // Auto-connect on load
         window.addEventListener('load', () => {
+            // Always connect immediately
             setTimeout(connect, 500);
+        });
+
+        // Listen for messages from parent frame (kept for potential future use)
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'updateWsUrl' && event.data.url) {
+                console.log('Updating WebSocket URL from parent:', event.data.url);
+
+                // Update the server URL input
+                document.getElementById('serverUrl').value = event.data.url;
+
+                // If connected, disconnect and reconnect with new URL
+                if (isConnected) {
+                    disconnect();
+                    setTimeout(() => {
+                        connect();
+                    }, 100);
+                }
+            }
         });
 
         // Connect to WebSocket server
@@ -804,48 +1217,156 @@
                         availableTools = data.availableTools;
                         updateToolsList();
                     }
+                    if (data.models) {
+                        availableModels = data.models;
+                        populateModelSelect();
+                    }
+                    if (data.modelClasses) {
+                        availableModelClasses = data.modelClasses;
+                        populateModelClassSelect();
+                    }
+                    break;
+
+                case 'agent_start':
+                    // Capture the actual resolved model from the agent
+                    if (data.agent) {
+                        currentMessageModel = data.agent.model;
+                        currentMessageClass = data.agent.modelClass;
+
+                        // Update the metadata of the current streaming message
+                        if (currentMessageElement) {
+                            // currentMessageElement is messageBody
+                            // Navigate: messageBody -> message-content -> message-row -> message
+                            const messageContent = currentMessageElement.parentElement; // message-content
+                            const messageRow = messageContent?.parentElement; // message-row
+                            const message = messageRow?.parentElement; // message
+                            const metadata = message?.querySelector('.message-metadata');
+                            if (metadata) {
+                                let metadataText = '';
+                                if (currentMessageClass && currentMessageModel) {
+                                    metadataText = `Class: ${currentMessageClass} • Model: ${currentMessageModel}`;
+                                } else if (currentMessageClass) {
+                                    metadataText = `Class: ${currentMessageClass}`;
+                                } else if (currentMessageModel) {
+                                    metadataText = `Model: ${currentMessageModel}`;
+                                }
+                                metadata.textContent = metadataText;
+                            }
+                        }
+                    }
                     break;
 
                 case 'stream_start':
                     isStreaming = true;
+                    // Update model if server provides it, otherwise keep the one we sent
+                    if (data.model) {
+                        currentMessageModel = data.model;
+                    }
                     document.getElementById('stopBtn').style.display = 'flex';
                     document.getElementById('sendBtn').style.display = 'none';
                     addMessage('assistant', '', true);
                     break;
 
                 case 'message_start':
-                    // Message metadata
-                    if (currentMessageElement && data.model) {
-                        const modelBadge = document.createElement('div');
-                        modelBadge.style.fontSize = '12px';
-                        modelBadge.style.color = 'var(--text-secondary)';
-                        modelBadge.style.marginBottom = '8px';
-                        modelBadge.textContent = `Model: ${data.model}`;
-                        currentMessageElement.prepend(modelBadge);
+                    // Update current model if provided
+                    if (data.model) {
+                        currentMessageModel = data.model;
                     }
                     break;
 
                 case 'message_delta':
-                    if (currentMessageElement) {
-                        const contentDiv = currentMessageElement.querySelector('.content') || currentMessageElement;
-                        contentDiv.textContent += data.delta || '';
+                    if (currentMessageElement && data.content) {
+                        // Remove typing indicator if present
+                        const typingIndicator = currentMessageElement.querySelector('.typing-indicator-modern');
+                        if (typingIndicator) {
+                            typingIndicator.remove();
+                        }
+
+                        // Get or create content span
+                        let contentSpan = currentMessageElement.querySelector('.content');
+                        if (!contentSpan) {
+                            contentSpan = document.createElement('div');
+                            contentSpan.className = 'content';
+                            currentMessageElement.appendChild(contentSpan);
+                        }
+
+                        // Append the delta content (incremental) - keep as plain text during streaming
+                        contentSpan.textContent += data.content;
+                    }
+                    break;
+
+                case 'message_complete':
+                    if (currentMessageElement && data.content) {
+                        // Ensure typing indicator is removed
+                        const typingIndicator = currentMessageElement.querySelector('.typing-indicator-modern');
+                        if (typingIndicator) {
+                            typingIndicator.remove();
+                        }
+
+                        // Get or create content span
+                        let contentSpan = currentMessageElement.querySelector('.content');
+                        if (!contentSpan) {
+                            contentSpan = document.createElement('div');
+                            contentSpan.className = 'content';
+                            currentMessageElement.appendChild(contentSpan);
+                        }
+
+                        // Render the final content as markdown
+                        const html = marked.parse(data.content);
+                        const sanitizedHtml = DOMPurify.sanitize(html);
+                        contentSpan.innerHTML = sanitizedHtml;
+
+                        // Add to messages history
+                        messages.push({ role: 'assistant', content: data.content });
                     }
                     break;
 
                 case 'tool_start':
-                    if (currentMessageElement) {
+                    if (currentMessageElement && data.tool_call) {
                         const toolDiv = document.createElement('div');
                         toolDiv.className = 'tool-call';
-                        toolDiv.innerHTML = `<strong>🔧 Calling ${data.name}:</strong><br><pre>${JSON.stringify(data.arguments, null, 2)}</pre>`;
+
+                        // Format arguments nicely
+                        let formattedArgs = '';
+                        try {
+                            const args = typeof data.tool_call.function.arguments === 'string'
+                                ? JSON.parse(data.tool_call.function.arguments)
+                                : data.tool_call.function.arguments;
+                            formattedArgs = JSON.stringify(args, null, 2);
+                        } catch {
+                            formattedArgs = data.tool_call.function.arguments || '{}';
+                        }
+
+                        toolDiv.innerHTML = `<strong>🔧 Calling ${data.tool_call.function.name}:</strong><br><pre>${formattedArgs}</pre>`;
                         currentMessageElement.appendChild(toolDiv);
                     }
                     break;
 
-                case 'tool_result':
-                    if (currentMessageElement) {
+                case 'tool_done':
+                    if (currentMessageElement && data.result) {
                         const resultDiv = document.createElement('div');
                         resultDiv.className = 'tool-result';
-                        resultDiv.innerHTML = `<strong>✅ Result:</strong><br>${data.result}`;
+
+                        // Format result nicely
+                        let formattedResult = data.result.output || data.result.error || 'No result';
+
+                        // Try to parse and format JSON-like results
+                        try {
+                            if (formattedResult.includes('{') && formattedResult.includes('}')) {
+                                // Extract JSON part and format it
+                                const jsonMatch = formattedResult.match(/\{[^}]+\}/);
+                                if (jsonMatch) {
+                                    const jsonPart = JSON.parse(jsonMatch[0]);
+                                    const nonJsonPart = formattedResult.replace(jsonMatch[0], '').trim();
+                                    const formattedJson = JSON.stringify(jsonPart, null, 2);
+                                    formattedResult = nonJsonPart ? `${formattedJson}\n\n${nonJsonPart}` : formattedJson;
+                                }
+                            }
+                        } catch {
+                            // Keep original format if parsing fails
+                        }
+
+                        resultDiv.innerHTML = `<strong>✅ Result:</strong><br><pre style="white-space: pre-wrap;">${formattedResult}</pre>`;
                         currentMessageElement.appendChild(resultDiv);
                     }
                     break;
@@ -861,6 +1382,8 @@
                 case 'stream_complete':
                     isStreaming = false;
                     currentMessageElement = null;
+                    currentMessageModel = null;
+                    currentMessageClass = null;
                     document.getElementById('stopBtn').style.display = 'none';
                     document.getElementById('sendBtn').style.display = 'flex';
                     break;
@@ -868,6 +1391,8 @@
                 case 'stream_aborted':
                     isStreaming = false;
                     currentMessageElement = null;
+                    currentMessageModel = null;
+                    currentMessageClass = null;
                     document.getElementById('stopBtn').style.display = 'none';
                     document.getElementById('sendBtn').style.display = 'flex';
                     if (currentMessageElement) {
@@ -893,13 +1418,13 @@
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const text = input.value.trim();
-            
+
             if (!text || !isConnected || isStreaming) return;
 
             // Add user message
             addMessage('user', text);
             messages.push({ role: 'user', content: text });
-            
+
             // Clear input
             input.value = '';
             input.style.height = 'auto';
@@ -909,18 +1434,35 @@
             const modelClass = document.getElementById('modelClassSelect').value;
             const maxTokens = parseInt(document.getElementById('maxTokens').value);
             const temperature = parseFloat(document.getElementById('temperature').value);
+            const topP = parseFloat(document.getElementById('topP').value);
+            const frequencyPenalty = parseFloat(document.getElementById('frequencyPenalty').value);
+            const presencePenalty = parseFloat(document.getElementById('presencePenalty').value);
+            const seed = document.getElementById('seed').value ? parseInt(document.getElementById('seed').value) : undefined;
             const toolsEnabled = document.getElementById('enableTools').checked;
 
+            // Clear previous model info - will be set by agent_start event
+            currentMessageModel = null;
+            currentMessageClass = null;
+
             // Send to server
-            ws.send(JSON.stringify({
+            const requestData = {
                 type: 'chat',
                 messages,
                 ...(model && { model }),
                 ...(modelClass && { modelClass }),
                 maxTokens,
-                temperature,
                 toolsEnabled
-            }));
+            };
+
+            // Only include advanced parameters if they differ from defaults
+            if (temperature !== 1.0) requestData.temperature = temperature;
+            if (topP !== 1.0) requestData.topP = topP;
+            if (frequencyPenalty !== 0) requestData.frequencyPenalty = frequencyPenalty;
+            if (presencePenalty !== 0) requestData.presencePenalty = presencePenalty;
+            if (seed !== undefined) requestData.seed = seed;
+            // Always include toolsEnabled in the request data (it's always needed)
+
+            ws.send(JSON.stringify(requestData));
         }
 
         // Stop streaming
@@ -933,41 +1475,93 @@
         // Add message to chat
         function addMessage(role, content, isStreaming = false) {
             const container = document.getElementById('messagesContainer');
-            
+
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
-            
+
+            // Create metadata (always, for all message types)
+            const metadata = document.createElement('div');
+            metadata.className = 'message-metadata';
+
+            if (role === 'user') {
+                metadata.textContent = 'User';
+            } else if (role === 'assistant' && (currentMessageModel || currentMessageClass || isStreaming)) {
+                if (isStreaming && !currentMessageModel && !currentMessageClass) {
+                    metadata.textContent = 'Responding...';
+                } else {
+                    // Build the metadata text
+                    let metadataText = '';
+                    if (currentMessageClass && currentMessageModel) {
+                        metadataText = `Class: ${currentMessageClass} • Model: ${currentMessageModel}`;
+                    } else if (currentMessageClass) {
+                        metadataText = `Class: ${currentMessageClass}`;
+                    } else if (currentMessageModel) {
+                        metadataText = `Model: ${currentMessageModel}`;
+                    }
+                    metadata.textContent = metadataText;
+                }
+            }
+
+            // Add metadata to message (above avatar)
+            messageDiv.appendChild(metadata);
+
+            // Create message row container
+            const messageRow = document.createElement('div');
+            messageRow.className = 'message-row';
+
             const avatar = document.createElement('div');
             avatar.className = 'message-avatar';
             avatar.textContent = role === 'user' ? 'U' : role === 'assistant' ? 'A' : 'S';
-            
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            
+
+            // Create message body container
+            const messageBody = document.createElement('div');
+            messageBody.className = 'message-body';
+
             if (isStreaming) {
                 const typingIndicator = document.createElement('div');
-                typingIndicator.className = 'typing-indicator';
-                typingIndicator.innerHTML = '<span></span><span></span><span></span>';
-                contentDiv.appendChild(typingIndicator);
-                
-                currentMessageElement = contentDiv;
-                
-                // Remove typing indicator after first content
-                setTimeout(() => {
-                    const indicator = contentDiv.querySelector('.typing-indicator');
-                    if (indicator) indicator.remove();
-                }, 100);
+                typingIndicator.className = 'typing-indicator-modern';
+                typingIndicator.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                `;
+                messageBody.appendChild(typingIndicator);
+
+                currentMessageElement = messageBody;
             } else {
-                contentDiv.textContent = content;
-                if (role === 'assistant') {
-                    messages.push({ role: 'assistant', content });
+                // Render content as markdown for non-streaming messages
+                if (role === 'assistant' && content) {
+                    const contentElement = document.createElement('div');
+                    contentElement.className = 'content';
+                    const html = marked.parse(content);
+                    const sanitizedHtml = DOMPurify.sanitize(html);
+                    contentElement.innerHTML = sanitizedHtml;
+                    messageBody.appendChild(contentElement);
+                } else {
+                    const contentElement = document.createElement('div');
+                    contentElement.className = 'content';
+                    contentElement.textContent = content;
+                    messageBody.appendChild(contentElement);
                 }
             }
-            
-            messageDiv.appendChild(avatar);
-            messageDiv.appendChild(contentDiv);
+
+            // Add message body to content div
+            contentDiv.appendChild(messageBody);
+
+            // Add avatar and content to message row
+            messageRow.appendChild(avatar);
+            messageRow.appendChild(contentDiv);
+
+            // Add message row to message div
+            messageDiv.appendChild(messageRow);
             container.appendChild(messageDiv);
-            
+
             // Scroll to bottom
             container.scrollTop = container.scrollHeight;
         }
@@ -986,7 +1580,7 @@
             const input = document.getElementById('messageInput');
             input.value = examples[type] || '';
             input.focus();
-            
+
             // Auto-send if connected
             if (isConnected && !isStreaming) {
                 setTimeout(sendMessage, 100);
@@ -1022,6 +1616,67 @@
             `).join('');
         }
 
+        // Populate model select dropdown
+        function populateModelSelect() {
+            const select = document.getElementById('modelSelect');
+
+            // Keep the "Use Model Class" option
+            select.innerHTML = '<option value="">Use Model Class</option>';
+
+            // Filter models to only include those with text input and text output
+            const textModels = availableModels.filter(model => {
+                const features = model.features || {};
+                const inputModalities = features.input_modality || [];
+                const outputModalities = features.output_modality || [];
+
+                return inputModalities.includes('text') && outputModalities.includes('text');
+            });
+
+            // Group filtered models by provider
+            const modelsByProvider = {};
+            textModels.forEach(model => {
+                if (!modelsByProvider[model.provider]) {
+                    modelsByProvider[model.provider] = [];
+                }
+                modelsByProvider[model.provider].push(model);
+            });
+
+            // Add optgroups for each provider
+            Object.entries(modelsByProvider).forEach(([provider, models]) => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.id;
+                    optgroup.appendChild(option);
+                });
+
+                select.appendChild(optgroup);
+            });
+        }
+
+        // Populate model class select dropdown
+        function populateModelClassSelect() {
+            const select = document.getElementById('modelClassSelect');
+            select.innerHTML = '';
+
+            // Add model classes
+            availableModelClasses.forEach((modelClass, index) => {
+                const option = document.createElement('option');
+                option.value = modelClass.id;
+                option.textContent = modelClass.id;
+
+                // Select 'standard' by default
+                if (modelClass.id === 'standard') {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            });
+        }
+
         // Show error
         function showError(message) {
             const messageDiv = document.createElement('div');
@@ -1032,7 +1687,7 @@
                 </svg>
                 ${message}
             `;
-            
+
             const container = document.getElementById('messagesContainer');
             container.appendChild(messageDiv);
             container.scrollTop = container.scrollHeight;
@@ -1051,6 +1706,328 @@
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 200) + 'px';
         });
+
+        // Advanced settings toggle
+        function toggleAdvanced() {
+            const toggle = document.querySelector('.advanced-toggle');
+            const content = document.getElementById('advancedContent');
+
+            toggle.classList.toggle('expanded');
+            content.classList.toggle('expanded');
+        }
+
+        // Code generation functions
+        function showCodeModal() {
+            const model = document.getElementById('modelSelect').value;
+            const modelClass = document.getElementById('modelClassSelect').value;
+            const maxTokens = document.getElementById('maxTokens').value;
+            const temperature = document.getElementById('temperature').value;
+            const topP = document.getElementById('topP').value;
+            const frequencyPenalty = document.getElementById('frequencyPenalty').value;
+            const presencePenalty = document.getElementById('presencePenalty').value;
+            const seed = document.getElementById('seed').value;
+            const toolsEnabled = document.getElementById('enableTools').checked;
+
+            // Generate server code
+            const serverCode = generateServerCode(model, modelClass, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, seed, toolsEnabled);
+            document.getElementById('serverCodeContent').textContent = serverCode;
+
+            // Generate client code
+            const clientCode = generateClientCode(model, modelClass, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, seed, toolsEnabled);
+            document.getElementById('clientCodeContent').textContent = clientCode;
+
+            // Show modal
+            document.getElementById('codeModal').classList.add('active');
+        }
+
+        function hideCodeModal() {
+            document.getElementById('codeModal').classList.remove('active');
+        }
+
+        function switchCodeTab(tab) {
+            const tabs = document.querySelectorAll('.code-tab');
+            const containers = document.querySelectorAll('.code-container');
+
+            tabs.forEach(t => t.classList.remove('active'));
+            containers.forEach(c => c.style.display = 'none');
+
+            if (tab === 'server') {
+                tabs[0].classList.add('active');
+                document.getElementById('serverCode').style.display = 'block';
+            } else {
+                tabs[1].classList.add('active');
+                document.getElementById('clientCode').style.display = 'block';
+            }
+        }
+
+        function copyCode(type) {
+            const content = type === 'server'
+                ? document.getElementById('serverCodeContent').textContent
+                : document.getElementById('clientCodeContent').textContent;
+
+            navigator.clipboard.writeText(content).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function generateServerCode(model, modelClass, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, seed, toolsEnabled) {
+            const modelLine = model ? `model: '${model}',` : `modelClass: '${modelClass}',`;
+
+            // Build advanced parameters only if they differ from defaults
+            let advancedParams = '';
+            if (temperature !== '0.7') advancedParams += `\n                temperature: ${temperature},`;
+            if (topP !== '1') advancedParams += `\n                topP: ${topP},`;
+            if (frequencyPenalty !== '0') advancedParams += `\n                frequencyPenalty: ${frequencyPenalty},`;
+            if (presencePenalty !== '0') advancedParams += `\n                presencePenalty: ${presencePenalty},`;
+            if (seed) advancedParams += `\n                seed: ${seed},`;
+
+            // Always include tools code and handling when enabled
+            const toolsParam = toolsEnabled ? ', { tools }' : '';
+
+            const toolsCode = toolsEnabled ? `
+// Example tools
+const tools = [
+    {
+        function: async ({ location }) => {
+            // Mock weather API
+            return \`Weather in \${location}: 22°C, partly cloudy\`;
+        },
+        definition: {
+            type: 'function',
+            function: {
+                name: 'get_weather',
+                description: 'Get weather for a location',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        location: { type: 'string', description: 'City name' }
+                    },
+                    required: ['location']
+                }
+            }
+        }
+    }
+];` : '';
+
+            return `import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
+import express from 'express';
+import { ensembleRequest } from '@just-every/ensemble';
+
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+${toolsCode}
+
+wss.on('connection', (ws) => {
+    console.log('Client connected');
+
+    ws.on('message', async (data) => {
+        const message = JSON.parse(data.toString());
+
+        if (message.type === 'chat') {
+            const { messages } = message;
+
+            const agent = {
+                ${modelLine}
+                maxTokens: ${maxTokens},${advancedParams}
+            };
+
+            try {
+                for await (const event of ensembleRequest(messages, agent${toolsParam})) {
+                    ws.send(JSON.stringify(event));
+                }
+
+                ws.send(JSON.stringify({ type: 'stream_complete' }));
+            } catch (error) {
+                ws.send(JSON.stringify({
+                    type: 'error',
+                    error: error.message
+                }));
+            }
+        }
+    });
+
+    ws.on('close', () => console.log('Client disconnected'));
+});
+
+server.listen(3005, () => {
+    console.log('WebSocket server running on ws://localhost:3005');
+});`;
+        }
+
+        function generateClientCode(model, modelClass, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, seed, toolsEnabled) {
+            return `<!DOCTYPE html>
+<html>
+<head>
+    <title>Ensemble Chat Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #messages {
+            border: 1px solid #ccc;
+            height: 400px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message { margin: 10px 0; padding: 8px; border-radius: 5px; }
+        .user { background: #e3f2fd; }
+        .assistant { background: #f5f5f5; }
+        .tool-call { background: #fff3cd; font-family: monospace; }
+        .tool-result { background: #d1f7d1; }
+        input { width: 70%; padding: 8px; }
+        button { padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h1>Ensemble Chat Demo</h1>
+    <div id="messages"></div>
+    <input type="text" id="input" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:3005');
+        const messages = [];
+        let currentMessage = null;
+
+        ws.onopen = () => {
+            console.log('Connected to server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            switch (data.type) {
+                case 'agent_start':
+                    currentMessage = addMessage('assistant', '');
+                    break;
+
+                case 'message_delta':
+                    if (currentMessage && data.content) {
+                        currentMessage.textContent += data.content;
+                    }
+                    break;
+
+                case 'message_complete':
+                    if (data.content) {
+                        currentMessage.textContent = data.content;
+                        messages.push({ role: 'assistant', content: data.content });
+                    }
+                    break;
+
+                case 'tool_start':
+                    if (data.tool_call) {
+                        addToolCall(data.tool_call.function.name, data.tool_call.function.arguments);
+                    }
+                    break;
+
+                case 'tool_done':
+                    if (data.result) {
+                        addToolResult(data.result.output || data.result.error || 'No result');
+                    }
+                    break;
+
+                case 'stream_complete':
+                    currentMessage = null;
+                    break;
+            }
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('input');
+            const content = input.value.trim();
+            if (!content) return;
+
+            addMessage('user', content);
+            messages.push({ role: 'user', content });
+
+            const requestData = {
+                type: 'chat',
+                messages: messages,
+                model: ${model ? `'${model}'` : 'null'},
+                modelClass: ${modelClass ? `'${modelClass}'` : 'null'},
+                maxTokens: ${maxTokens},
+                toolsEnabled: ${toolsEnabled}
+            };
+
+            // Only include advanced parameters if they differ from defaults
+            ${temperature !== '0.7' ? `requestData.temperature = ${temperature};` : ''}
+            ${topP !== '1' ? `requestData.topP = ${topP};` : ''}
+            ${frequencyPenalty !== '0' ? `requestData.frequencyPenalty = ${frequencyPenalty};` : ''}
+            ${presencePenalty !== '0' ? `requestData.presencePenalty = ${presencePenalty};` : ''}
+            ${seed ? `requestData.seed = ${seed};` : ''}
+
+            ws.send(JSON.stringify(requestData));
+
+            input.value = '';
+        }
+
+        function addMessage(role, content) {
+            const div = document.createElement('div');
+            div.className = \`message \${role}\`;
+            div.textContent = content;
+            document.getElementById('messages').appendChild(div);
+            div.scrollIntoView();
+            return div;
+        }
+
+        function addToolCall(name, args) {
+            const div = document.createElement('div');
+            div.className = 'message tool-call';
+
+            // Format arguments nicely
+            let formattedArgs = '';
+            try {
+                const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
+                formattedArgs = JSON.stringify(parsedArgs, null, 2);
+            } catch {
+                formattedArgs = args || '{}';
+            }
+
+            div.innerHTML = \`🔧 Calling \${name}:<br><pre>\${formattedArgs}</pre>\`;
+            document.getElementById('messages').appendChild(div);
+        }
+
+        function addToolResult(result) {
+            const div = document.createElement('div');
+            div.className = 'message tool-result';
+
+            // Format result nicely
+            let formattedResult = result;
+            try {
+                if (result.includes('{') && result.includes('}')) {
+                    const jsonMatch = result.match(/\\{[^}]+\\}/);
+                    if (jsonMatch) {
+                        const jsonPart = JSON.parse(jsonMatch[0]);
+                        const nonJsonPart = result.replace(jsonMatch[0], '').trim();
+                        const formattedJson = JSON.stringify(jsonPart, null, 2);
+                        formattedResult = nonJsonPart ? \`\${formattedJson}\\n\\n\${nonJsonPart}\` : formattedJson;
+                    }
+                }
+            } catch {
+                // Keep original format if parsing fails
+            }
+
+            div.innerHTML = \`✅ Result:<br><pre style="white-space: pre-wrap;">\${formattedResult}</pre>\`;
+            document.getElementById('messages').appendChild(div);
+        }
+
+        // Enter key to send
+        document.getElementById('input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    <\/script>
+</body>
+</html>`;
+        }
     </script>
 </body>
 </html>

@@ -130,7 +130,7 @@ npm run lint:fix      # Auto-fix lint issues
 3. Copy `.env.example` to `.env`
 4. Add provider API keys
 5. Run `npm test` to verify setup
-6. Run examples to test providers
+6. Run `npm run demo` to test providers with interactive demos
 
 ## Package Management
 
