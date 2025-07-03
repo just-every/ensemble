@@ -4,18 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ensemble Transcription Client</title>
+    <link rel="stylesheet" href="glassmorphism.css">
     <style>
         :root {
-            --primary: #1a73e8;
-            --primary-dark: #1557b0;
-            --success: #34a853;
-            --warning: #fbbc04;
-            --error: #ea4335;
-            --background: #f5f5f5;
-            --surface: #ffffff;
-            --text: #202124;
-            --text-secondary: #5f6368;
-            --border: #e0e0e0;
+            /* Legacy variables for compatibility */
+            --primary: #4a9eff;
+            --primary-dark: #2d7dd2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --background: #0f0f0f;
+            --surface: rgba(255, 255, 255, 0.05);
+            --text: rgba(255, 255, 255, 0.95);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-tertiary: rgba(255, 255, 255, 0.5);
+            --code-bg: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
         }
 
         * {
@@ -29,55 +33,52 @@
             background: var(--background);
             color: var(--text);
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
 
         .card {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-glass);
             margin-bottom: 20px;
         }
 
-        h1 {
-            color: var(--primary);
-            margin-bottom: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
 
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
 
         .generate-code-btn {
-            background: var(--surface);
-            border: 2px solid var(--primary);
-            color: var(--primary);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
+            position: relative;
+            overflow: hidden;
         }
 
         .generate-code-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         /* Modal styles */
@@ -99,20 +100,23 @@
         }
 
         .modal {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-heavy);
+            -webkit-backdrop-filter: var(--blur-heavy);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             max-width: 800px;
             width: 90%;
             max-height: 80vh;
             overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
             display: flex;
             flex-direction: column;
         }
 
         .modal-tabs-section {
-            border-bottom: 1px solid var(--border);
-            background: var(--surface);
+            border-bottom: 1px solid var(--border-glass);
+            background: rgba(255, 255, 255, 0.03);
         }
 
         .modal-header {
@@ -120,7 +124,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--border-glass);
         }
 
         .modal-title {
@@ -141,8 +145,8 @@
         }
 
         .modal-close:hover {
-            background: #f0f0f0;
-            color: var(--text);
+            background: var(--surface-glass-hover);
+            color: var(--text-primary);
         }
 
         .modal-body {
@@ -171,19 +175,23 @@
         }
 
         .code-tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
         }
 
         .code-container {
             position: relative;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--code-bg);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 20px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
             overflow-x: auto;
+            color: var(--text-primary);
         }
 
         .code-container pre {
@@ -196,38 +204,69 @@
             position: absolute;
             top: 12px;
             right: 12px;
-            background: var(--primary);
-            color: white;
-            border: none;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 12px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .copy-button:hover {
-            background: var(--primary-dark);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px var(--accent-primary-glow);
         }
 
         .copy-button.copied {
-            background: var(--success);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+            border-color: var(--accent-success);
+            color: var(--accent-success);
         }
 
         .status-section {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 20px;
+            padding: 0px 0px 10px 12px;
+        }
+
+        .control-header {
+            display: flex;
             align-items: center;
-            margin-bottom: 24px;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .control-header .status {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .control-header .model-select {
+            min-width: 250px;
+            max-width: 350px;
+            flex: 1;
+        }
+
+        .control-header .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-header .controls button {
+            white-space: nowrap;
         }
 
         .status {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 500;
+            color: var(--text);
         }
 
         .status-indicator {
@@ -265,14 +304,31 @@
         button {
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .glass-button {
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text);
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .glass-button:hover {
+            background: var(--surface-glass-hover);
+            border-color: var(--accent-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         button:disabled {
@@ -281,22 +337,33 @@
         }
 
         .primary-btn {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         .primary-btn:hover:not(:disabled) {
-            background: var(--primary-dark);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(74, 158, 255, 0.2));
             transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .danger-btn {
-            background: var(--error);
-            color: white;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-error);
+            color: var(--accent-error);
         }
 
         .danger-btn:hover:not(:disabled) {
-            background: #d33b2c;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.2));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
         }
 
         .transcript-section {
@@ -307,12 +374,22 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
+        }
+
+        .transcript-header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
         }
 
         .transcript-container {
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 20px;
             min-height: 300px;
             max-height: 500px;
@@ -335,9 +412,10 @@
         }
 
         .transcript-line.preview {
-            color: var(--primary);
+            color: var(--accent-primary);
             font-style: italic;
             opacity: 0.9;
+            text-shadow: 0 0 5px var(--accent-primary-glow);
         }
 
         @keyframes fadeIn {
@@ -353,16 +431,27 @@
         }
 
         .stat-card {
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 16px;
             text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border-color: var(--border-glass-strong);
         }
 
         .stat-value {
             font-size: 24px;
             font-weight: bold;
-            color: var(--primary);
+            color: var(--accent-primary);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .stat-label {
@@ -372,60 +461,88 @@
         }
 
         .error-message {
-            background: #fce8e6;
-            color: var(--error);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-error);
             padding: 12px 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-top: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
+            box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.1);
         }
 
         .audio-visualizer {
-            height: 60px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin: 16px 0;
+            height: 120px;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.05), rgba(74, 158, 255, 0.02));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            margin: 20px 0;
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 100%;
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2), 0 4px 20px rgba(74, 158, 255, 0.1);
+            position: relative;
             gap: 2px;
             padding: 0 20px;
         }
 
         .audio-bar {
             width: 3px;
-            background: var(--primary);
+            background: linear-gradient(to top, var(--accent-primary), var(--accent-secondary));
             border-radius: 2px;
             transition: height 0.1s ease;
+            box-shadow: 0 0 4px var(--accent-primary-glow);
         }
 
         .settings-section {
             margin-top: 20px;
             padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
         }
 
         .setting-row {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .setting-label {
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--text-secondary);
         }
 
         .setting-label {
             font-weight: 500;
         }
 
-        .server-url-input,
         .model-select {
-            padding: 8px 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 14px;
-            width: 300px;
-            background-color: var(--surface);
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            font-size: 15px;
+            min-width: 320px;
+            color: var(--text);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .model-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: var(--surface-glass-active);
+            box-shadow: 0 0 0 3px var(--accent-primary-glow);
         }
 
         .model-select optgroup {
@@ -435,7 +552,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="card">
+        <!-- Header section above everything -->
+        <div class="header-card">
             <div class="header-row">
                 <h1>
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
@@ -448,39 +566,58 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
                     </svg>
-                    Generate Code
+                    Show Code
                 </button>
             </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="card">
 
             <div class="status-section">
-                <div id="status" class="status">
-                    <span class="status-indicator"></span>
-                    <span class="status-text">Disconnected</span>
-                </div>
-                <div class="controls">
-                    <button id="connectBtn" class="primary-btn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                        </svg>
-                        Connect & Start
-                    </button>
-                    <button id="stopBtn" class="danger-btn" disabled>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M6 6h12v12H6z"/>
-                        </svg>
-                        Stop
-                    </button>
+                <div class="control-header">
+                    <div id="status" class="status">
+                        <span class="status-indicator"></span>
+                        <span class="status-text">Disconnected</span>
+                    </div>
+
+                    <select id="modelSelect" class="model-select">
+                        <optgroup label="OpenAI Models">
+                            <option value="gpt-4o-transcribe">GPT-4o Transcribe (Streaming)</option>
+                            <option value="gpt-4o-mini-transcribe">GPT-4o Mini Transcribe (Streaming)</option>
+                            <option value="whisper-1">Whisper-1 (Complete at once)</option>
+                        </optgroup>
+                        <optgroup label="Gemini Models">
+                            <option value="gemini-live-2.5-flash-preview" selected>Gemini Live 2.5 Flash Preview</option>
+                            <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
+                        </optgroup>
+                    </select>
+
+                    <div class="controls">
+                        <button id="connectBtn" class="primary-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            Connect
+                        </button>
+                        <button id="stopBtn" class="danger-btn" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 6h12v12H6z"/>
+                            </svg>
+                            Stop
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="audio-visualizer" id="visualizer">
-                <!-- Audio bars will be inserted here -->
+            <div class="audio-visualizer" id="audioVisualizer">
+                <div id="visualizer" style="display: flex; align-items: center; justify-content: space-between; height: 100%; width: 100%; gap: 2px;"></div>
             </div>
 
             <div class="transcript-section">
                 <div class="transcript-header">
                     <h2>Live Transcript</h2>
-                    <button id="clearBtn" onclick="clearTranscript()">Clear</button>
+                    <button id="clearBtn" class="glass-button" onclick="clearTranscript()">Clear</button>
                 </div>
                 <div id="transcript" class="transcript-container">
                     <div class="transcript-empty">Transcript will appear here...</div>
@@ -508,33 +645,6 @@
 
             <div id="errorContainer"></div>
 
-            <div class="settings-section">
-                <h3>Settings</h3>
-                <div class="setting-row">
-                    <span class="setting-label">Server URL:</span>
-                    <input
-                        type="text"
-                        id="serverUrl"
-                        class="server-url-input"
-                        value="ws://localhost:3003"
-                        placeholder="ws://localhost:3003"
-                    >
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Model:</span>
-                    <select id="modelSelect" class="model-select">
-                        <optgroup label="OpenAI Models">
-                            <option value="gpt-4o-transcribe">GPT-4o Transcribe (Streaming)</option>
-                            <option value="gpt-4o-mini-transcribe">GPT-4o Mini Transcribe (Streaming)</option>
-                            <option value="whisper-1">Whisper-1 (Complete at once)</option>
-                        </optgroup>
-                        <optgroup label="Gemini Models">
-                            <option value="gemini-live-2.5-flash-preview" selected>Gemini Live 2.5 Flash Preview</option>
-                            <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
-                        </optgroup>
-                    </select>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -557,11 +667,11 @@
             </div>
             <div class="modal-body">
                 <div id="serverCode" class="code-container">
-                    <button class="copy-button" onclick="copyCode('server')">Copy</button>
+                    <button class="copy-button" onclick="copyCode('server', event)">Copy</button>
                     <pre id="serverCodeContent"></pre>
                 </div>
                 <div id="clientCode" class="code-container" style="display: none;">
-                    <button class="copy-button" onclick="copyCode('client')">Copy</button>
+                    <button class="copy-button" onclick="copyCode('client', event)">Copy</button>
                     <pre id="clientCodeContent"></pre>
                 </div>
             </div>
@@ -586,6 +696,7 @@
                 // Audio visualization
                 this.analyser = null;
                 this.visualizerBars = [];
+                this.resizeListenerAdded = false;
 
                 // Setup UI event handlers
                 this.setupEventHandlers();
@@ -599,13 +710,37 @@
 
             createVisualizer() {
                 const visualizer = document.getElementById('visualizer');
-                for (let i = 0; i < 32; i++) {
+                const container = document.getElementById('audioVisualizer');
+
+                // Calculate optimal bar count based on container width
+                // Target: ~4px per bar with 2px gap = 6px total per bar
+                const containerWidth = container.offsetWidth || 800; // fallback
+                const pixelsPerBar = 6;
+                const barCount = Math.max(32, Math.floor(containerWidth / pixelsPerBar)); // minimum 32 bars
+
+                console.log(`Creating ${barCount} bars for ${containerWidth}px width`);
+
+                for (let i = 0; i < barCount; i++) {
                     const bar = document.createElement('div');
                     bar.className = 'audio-bar';
                     bar.style.height = '4px';
+                    bar.style.flex = '1'; // Make bars flexible to fill width
                     visualizer.appendChild(bar);
                     this.visualizerBars.push(bar);
                 }
+
+                // Recreate visualizer on window resize
+                window.addEventListener('resize', () => this.recreateVisualizer());
+            }
+
+            recreateVisualizer() {
+                // Clear existing bars
+                const visualizer = document.getElementById('visualizer');
+                visualizer.innerHTML = '';
+                this.visualizerBars = [];
+
+                // Recreate with new bar count
+                this.createVisualizer();
             }
 
             async connect() {
@@ -626,7 +761,7 @@
                     this.updateStatus('connecting', 'Connecting to server...');
 
                     // Connect to WebSocket server
-                    const serverUrl = document.getElementById('serverUrl').value;
+                    const serverUrl = 'ws://localhost:3003';
                     this.ws = new WebSocket(serverUrl);
                     this.ws.binaryType = 'arraybuffer';
 
@@ -644,9 +779,9 @@
                             model: model
                         }));
 
-                        // Update UI
-                        document.getElementById('connectBtn').disabled = true;
-                        document.getElementById('stopBtn').disabled = false;
+                        // Update UI - show Stop button, hide Connect button
+                        document.getElementById('connectBtn').style.display = 'none';
+                        document.getElementById('stopBtn').style.display = 'flex';
                     };
 
                     this.ws.onmessage = (event) => {
@@ -673,16 +808,22 @@
             }
 
             startAudioCapture() {
-                this.audioContext = new AudioContext({ sampleRate: 16000 });
+                this.audioContext = new AudioContext({
+                    sampleRate: 16000,
+                    latencyHint: 'interactive'  // Minimize latency
+                });
                 this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
 
-                // Create analyser for visualization
+                // Create analyser for visualization with minimal latency
                 this.analyser = this.audioContext.createAnalyser();
-                this.analyser.fftSize = 64;
+                this.analyser.fftSize = 256;  // Smaller for faster processing
+                this.analyser.smoothingTimeConstant = 0.1;  // Much less smoothing
+                this.analyser.minDecibels = -90;
+                this.analyser.maxDecibels = -10;
                 this.source.connect(this.analyser);
 
-                // Create script processor for capturing audio
-                this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+                // Create script processor with smaller buffer for lower latency
+                this.processor = this.audioContext.createScriptProcessor(1024, 1, 1);
 
                 this.processor.onaudioprocess = (e) => {
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -709,16 +850,36 @@
             visualize() {
                 if (!this.analyser) return;
 
-                const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-                this.analyser.getByteFrequencyData(dataArray);
+                const dataArray = new Uint8Array(this.analyser.fftSize);
+                this.analyser.getByteTimeDomainData(dataArray);
 
-                // Update bars
+                // Update bars with waveform data for realistic voice visualization
                 const barCount = this.visualizerBars.length;
                 const step = Math.floor(dataArray.length / barCount);
 
+                // Fast volume calculation for dynamic scaling
+                let sum = 0;
+                const sampleStep = Math.max(1, Math.floor(dataArray.length / 32));
+                for (let i = 0; i < dataArray.length; i += sampleStep) {
+                    const amplitude = Math.abs(dataArray[i] - 128);
+                    sum += amplitude;
+                }
+                const avgAmplitude = sum / (dataArray.length / sampleStep);
+                const volumeMultiplier = Math.max(1.05, avgAmplitude / 7); // Reduced scaling (was 1.5 and /5)
+
                 for (let i = 0; i < barCount; i++) {
-                    const value = dataArray[i * step];
-                    const height = Math.max(4, (value / 255) * 60);
+                    // Sample different points in the waveform for each bar
+                    const sampleIndex = Math.floor((i / barCount) * dataArray.length);
+                    const value = dataArray[sampleIndex];
+
+                    // Convert from 0-255 range to amplitude (128 is center/silence)
+                    let amplitude = Math.abs(value - 128);
+
+                    // Apply dynamic scaling based on overall volume - reduced by 30%
+                    amplitude = amplitude * volumeMultiplier * 1.96; // Was 2.8, now 2.8 * 0.7 = 1.96
+
+                    // Convert to height with good range and responsiveness - reduced by 30%
+                    const height = Math.max(8, Math.min(amplitude * 1.54, 77)); // Was 2.2 and 110, now 2.2*0.7=1.54, 110*0.7=77
                     this.visualizerBars[i].style.height = `${height}px`;
                 }
 
@@ -864,6 +1025,11 @@
             cleanup() {
                 this.isConnected = false;
 
+                // Reset visualizer bars
+                this.visualizerBars.forEach(bar => {
+                    bar.style.height = '4px';
+                });
+
                 // Close WebSocket
                 if (this.ws) {
                     this.ws.close();
@@ -907,9 +1073,9 @@
                     bar.style.height = '4px';
                 });
 
-                // Update UI
-                document.getElementById('connectBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
+                // Update UI - show Connect button, hide Stop button
+                document.getElementById('connectBtn').style.display = 'flex';
+                document.getElementById('stopBtn').style.display = 'none';
                 this.updateStatus('disconnected', 'Disconnected');
             }
         }
@@ -934,7 +1100,7 @@
                 console.log('Updating WebSocket URL from parent:', event.data.url);
 
                 // Update the server URL input
-                document.getElementById('serverUrl').value = event.data.url;
+                // Server URL update removed
 
                 // If connected, disconnect and reconnect with new URL
                 if (client.isConnected) {
@@ -988,22 +1154,63 @@
             }
         }
 
-        function copyCode(type) {
+        function copyCode(type, event) {
             const content = type === 'server'
                 ? document.getElementById('serverCodeContent').textContent
                 : document.getElementById('clientCodeContent').textContent;
 
-            navigator.clipboard.writeText(content).then(() => {
-                const button = event.target;
-                const originalText = button.textContent;
-                button.textContent = 'Copied!';
-                button.classList.add('copied');
+            const button = event.target;
+            const originalText = button.textContent;
 
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.classList.remove('copied');
-                }, 2000);
-            });
+            // Try modern clipboard API first, fallback to legacy method
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(content).then(() => {
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    fallbackCopy(content, button, originalText);
+                });
+            } else {
+                // Fallback for non-HTTPS environments
+                fallbackCopy(content, button, originalText);
+            }
+        }
+
+        function fallbackCopy(text, button, originalText) {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                textarea.style.pointerEvents = 'none';
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, 99999); // For mobile devices
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+
+                if (successful) {
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                } else {
+                    throw new Error('execCommand failed');
+                }
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+                alert('Failed to copy to clipboard. Please copy manually.');
+            }
         }
 
         function generateServerCode(model) {
@@ -1155,17 +1362,6 @@ server.listen(PORT, () => {
         .status-connected { background: #e6f4ea; color: #1e8e3e; }
         .status-error { background: #fce8e6; color: #d93025; }
         .status-info { background: #e8f0fe; color: #1a73e8; }
-        .audio-visualizer {
-            height: 60px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin: 15px 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 2px;
-            padding: 0 20px;
-        }
         .audio-bar {
             width: 3px;
             background: #1a73e8;
@@ -1188,7 +1384,7 @@ server.listen(PORT, () => {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
                     </svg>
-                    Generate Code
+                    Show Code
                 </button>
             </div>
 
@@ -1213,7 +1409,7 @@ server.listen(PORT, () => {
             </div>
 
             <div class="audio-visualizer" id="audioVisualizer" style="display: none;">
-                <canvas id="visualizer" width="600" height="100"></canvas>
+                <canvas id="visualizer"></canvas>
             </div>
 
             <div class="results-container" id="resultsContainer" style="display: none;">
@@ -1451,7 +1647,21 @@ wss.on('connection', (ws) => {
                 analyser.fftSize = 256;
 
                 // Start visualization
-                document.getElementById('audioVisualizer').style.display = 'block';
+                const visualizerElement = document.getElementById('audioVisualizer');
+                visualizerElement.style.display = 'block';
+                visualizerElement.classList.add('active');
+
+                // Handle canvas resize
+                const resizeCanvas = () => {
+                    const canvas = document.getElementById('visualizer');
+                    const container = document.getElementById('audioVisualizer');
+                    canvas.width = container.offsetWidth;
+                    canvas.height = container.offsetHeight;
+                };
+
+                window.addEventListener('resize', resizeCanvas);
+                resizeCanvas(); // Initial sizing
+
                 visualize();
 
                 // Create media recorder
@@ -1519,6 +1729,12 @@ wss.on('connection', (ws) => {
                 // Update UI
                 document.getElementById('startBtn').style.display = 'inline-flex';
                 document.getElementById('stopBtn').style.display = 'none';
+
+                // Hide visualizer
+                const visualizerElement = document.getElementById('audioVisualizer');
+                visualizerElement.style.display = 'none';
+                visualizerElement.classList.remove('active');
+
                 updateStatus('Processing...', 'default');
             }
         }
@@ -1526,6 +1742,12 @@ wss.on('connection', (ws) => {
         // Audio visualization
         function visualize() {
             const canvas = document.getElementById('visualizer');
+            const container = document.getElementById('audioVisualizer');
+
+            // Set canvas size to match container
+            canvas.width = container.offsetWidth;
+            canvas.height = container.offsetHeight;
+
             const canvasContext = canvas.getContext('2d');
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
@@ -1535,20 +1757,34 @@ wss.on('connection', (ws) => {
 
                 analyser.getByteFrequencyData(dataArray);
 
-                canvasContext.fillStyle = '#f5f5f5';
+                // Clear with a slight fade effect
+                canvasContext.fillStyle = 'rgba(15, 15, 15, 0.1)';
                 canvasContext.fillRect(0, 0, canvas.width, canvas.height);
 
-                const barWidth = (canvas.width / bufferLength) * 2.5;
-                let barHeight;
+                // Calculate number of bars to fit the width perfectly
+                const barCount = 64; // Optimal number of bars for visualization
+                const gap = 2; // Gap between bars
+                const totalGaps = gap * (barCount - 1);
+                const barWidth = Math.max(2, (canvas.width - totalGaps) / barCount);
+
                 let x = 0;
 
-                for (let i = 0; i < bufferLength; i++) {
-                    barHeight = (dataArray[i] / 255) * canvas.height;
+                // Sample the frequency data evenly
+                for (let i = 0; i < barCount; i++) {
+                    // Map bar index to frequency data index
+                    const dataIndex = Math.floor((i / barCount) * bufferLength);
+                    const barHeight = (dataArray[dataIndex] / 255) * canvas.height * 0.8;
 
-                    canvasContext.fillStyle = '#1a73e8';
+                    // Gradient effect for bars
+                    const gradient = canvasContext.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+                    gradient.addColorStop(0, 'rgba(74, 158, 255, 0.9)');
+                    gradient.addColorStop(0.5, 'rgba(74, 158, 255, 0.6)');
+                    gradient.addColorStop(1, 'rgba(74, 158, 255, 0.2)');
+
+                    canvasContext.fillStyle = gradient;
                     canvasContext.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
 
-                    x += barWidth + 1;
+                    x += barWidth + gap;
                 }
             }
 
@@ -1576,8 +1812,8 @@ wss.on('connection', (ws) => {
             document.getElementById(tab + 'Code').classList.add('active');
         }
 
-        // Initialize connection
-        connect();
+        // Initialize transcription client
+        const client = new TranscriptionClient();
         <\/script>
 </body>
 </html>`;

@@ -475,14 +475,20 @@ async function handleAnalyze(connectionId: string, message: any) {
             modelClass: 'mini',
         };
 
+        // Create a list of pairwise similarities (excluding self-comparisons)
+        const pairwiseSimilarities: string[] = [];
+        for (let i = 0; i < embeddings.length; i++) {
+            for (let j = i + 1; j < embeddings.length; j++) {
+                pairwiseSimilarities.push(`Text ${i + 1} vs Text ${j + 1}: ${similarities[i][j].toFixed(3)}`);
+            }
+        }
+
         const analysisPrompt = `Analyze the semantic relationships between these texts based on their cosine similarities:
 
 ${embeddings.map((e, i) => `Text ${i + 1}: "${e.text}"`).join('\n')}
 
-Similarity matrix (values from -1 to 1, where 1 = identical):
-${similarities
-    .map((row, i) => `Text ${i + 1}: [${row.map((s, j) => `${j + 1}:${s.toFixed(3)}`).join(', ')}]`)
-    .join('\n')}
+Cosine similarities (values from -1 to 1, where 1 = identical):
+${pairwiseSimilarities.join('\n')}
 
 Provide a brief analysis of:
 1. Which texts are most similar and why

@@ -202,6 +202,13 @@ export function createToolFunction(
         if (paramType === 'object') {
             if (paramInfoObj?.properties) {
                 paramDef.properties = paramInfoObj.properties;
+            } else {
+                // Object parameters without properties will cause errors with strict mode
+                throw new Error(
+                    `[createToolFunction] Parameter '${cleanParamName}' is of type 'object' but has no 'properties' defined. ` +
+                        `Object parameters must define their structure when used with strict mode. ` +
+                        `Either provide a 'properties' field or use a different type like 'string' for JSON data.`
+                );
             }
             if (paramInfoObj?.required) {
                 paramDef.required = paramInfoObj.required;

@@ -7,19 +7,20 @@
     <!-- Markdown renderer -->
     <script src="https://cdn.jsdelivr.net/npm/marked@14.1.2/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="glassmorphism.css">
     <style>
         :root {
-            --primary: #1a73e8;
-            --primary-dark: #1557b0;
-            --success: #34a853;
-            --warning: #fbbc04;
-            --error: #ea4335;
-            --background: #f5f5f5;
-            --surface: #ffffff;
-            --text: #202124;
-            --text-secondary: #959595;
-            --code-bg: #f8f9fa;
-            --border: #e0e0e0;
+            --primary: #4a9eff;
+            --primary-dark: #2d7dd2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --background: #0f0f0f;
+            --surface: rgba(255, 255, 255, 0.05);
+            --text: rgba(255, 255, 255, 0.95);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --code-bg: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
         }
 
         * {
@@ -35,13 +36,16 @@
             line-height: 1.6;
         }
 
-        .container {
-            max-width: 1200px;
+        .page-wrapper {
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
+        }
+
+        .container {
             display: flex;
             gap: 20px;
-            height: 100vh;
+            align-items: flex-start;
         }
 
         .sidebar {
@@ -49,6 +53,18 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            position: sticky;
+            top: 20px;
+        }
+
+        /* Hide scrollbar by default, show only when scrolling */
+        .sidebar {
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+
+        .sidebar::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
         }
 
         .main-content {
@@ -56,49 +72,59 @@
             display: flex;
             flex-direction: column;
             min-width: 0;
+            height: calc(100vh - 200px);
+            min-height: 200px;
         }
 
         .card {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-glass);
         }
 
-        h1 {
-            color: var(--primary);
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 28px;
+        .header-card {
+            background: none;
+            border: none;
+            border-radius: 0;
+            padding: 40px 0 20px;
+            box-shadow: none;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
 
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
+        .sidebar .card {
+            flex-shrink: 0;
         }
+
 
         .generate-code-btn {
-            background: var(--surface);
-            border: 2px solid var(--primary);
-            color: var(--primary);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
+            position: relative;
+            overflow: hidden;
         }
 
         .generate-code-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         /* Modal styles */
@@ -120,13 +146,16 @@
         }
 
         .modal {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-heavy);
+            -webkit-backdrop-filter: var(--blur-heavy);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             max-width: 800px;
             width: 90%;
             max-height: 80vh;
             overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
             display: flex;
             flex-direction: column;
         }
@@ -198,8 +227,11 @@
 
         .code-container {
             position: relative;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 20px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
@@ -217,22 +249,29 @@
             position: absolute;
             top: 12px;
             right: 12px;
-            background: var(--primary);
-            color: white;
-            border: none;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             padding: 6px 12px;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 12px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
         }
 
         .copy-button:hover {
-            background: var(--primary-dark);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(74, 158, 255, 0.2));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
         }
 
         .copy-button.copied {
-            background: var(--success);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.2));
+            border-color: var(--accent-success);
+            color: var(--accent-success);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
         }
 
         h2 {
@@ -246,9 +285,7 @@
             align-items: center;
             gap: 20px;
             margin-bottom: 24px;
-            padding: 16px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            justify-content: flex-end;
         }
 
         .status {
@@ -257,6 +294,7 @@
             gap: 12px;
             font-size: 16px;
             font-weight: 500;
+            flex: 1;
         }
 
         .status-indicator {
@@ -268,8 +306,9 @@
         }
 
         .status.connected .status-indicator {
-            background: var(--success);
+            background: var(--accent-success);
             animation: pulse 2s infinite;
+            box-shadow: 0 0 10px var(--accent-success);
         }
 
         .status.connecting .status-indicator {
@@ -290,18 +329,22 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            height: 100%;
-            overflow: hidden;
+            min-height: 0;
         }
 
         .messages-container {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 16px;
             min-height: 0;
+            padding: 0px 5px 40px;
+        }
+
+        .input-section {
+            flex-shrink: 0;
+            padding-top: 20px;
         }
 
         .message {
@@ -336,11 +379,13 @@
         }
 
         .message.user .message-avatar {
-            background: var(--primary);
+            background: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .message.assistant .message-avatar {
-            background: var(--success);
+            background: var(--accent-success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         }
 
         .message.system .message-avatar {
@@ -362,29 +407,41 @@
         }
 
         .message-body {
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 12px 16px;
         }
 
         .message-content pre {
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            background: var(--surface-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
             padding: 12px;
             overflow-x: auto;
             margin: 8px 0;
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
         }
 
         .message-content code {
-            background: var(--code-bg);
+            background: rgba(74, 158, 255, 0.1);
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
+            border: 1px solid rgba(74, 158, 255, 0.2);
         }
 
         /* Markdown content styling */
+        .message-content .content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1em;
+        }
+
         .message-content .content h1,
         .message-content .content h2,
         .message-content .content h3,
@@ -394,6 +451,7 @@
             margin: 16px 0 8px 0;
             color: var(--text);
             font-weight: 600;
+            white-space: normal;
         }
 
         .message-content .content h1 { font-size: 1.5em; }
@@ -401,24 +459,25 @@
         .message-content .content h3 { font-size: 1.1em; }
 
         .message-content .content p {
-            margin: 8px 0;
+            margin: 0;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         .message-content .content ul,
         .message-content .content ol {
-            margin: 8px 0;
+            margin: 0;
             padding-left: 20px;
         }
 
         .message-content .content li {
-            margin: 4px 0;
+            margin: 0;
         }
 
         .message-content .content blockquote {
             border-left: 4px solid var(--primary);
             padding-left: 16px;
-            margin: 16px 0;
+            margin: 10px 0;
             color: var(--text-secondary);
             font-style: italic;
         }
@@ -426,7 +485,7 @@
         .message-content .content table {
             border-collapse: collapse;
             width: 100%;
-            margin: 16px 0;
+            margin: 10px 0;
         }
 
         .message-content .content th,
@@ -471,21 +530,37 @@
         }
 
         .tool-call {
-            background: #e8f0fe;
-            border: 1px solid #c2d9ff;
-            border-radius: 6px;
+            border-radius: 12px;
             padding: 12px;
             margin: 8px 0;
             font-family: monospace;
             font-size: 14px;
         }
+        .tool-call pre {
+            background: rgba(74, 158, 255, 0.1);
+            border: 1px solid rgba(74, 158, 255, 0.3);
+        }
 
         .tool-result {
-            background: #e6f4ea;
-            border: 1px solid #ceead6;
-            border-radius: 6px;
+            border-radius: 12px;
             padding: 12px;
             margin: 8px 0;
+        }
+        .tool-result pre {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        /* Container for tool calls */
+        .tools-container {
+            margin-bottom: 8px;
+        }
+
+        /* Separator between tool calls and content */
+        .content-separator {
+            border-top: 1px solid var(--border-glass);
+            margin: 15px 0 25px;
+            opacity: 0.5;
         }
 
         .typing-indicator {
@@ -515,11 +590,6 @@
             30% { opacity: 1; transform: scale(1); }
         }
 
-        .input-section {
-            padding: 20px;
-            border-top: 1px solid var(--border);
-            background: var(--surface);
-        }
 
         .input-wrapper {
             display: flex;
@@ -532,17 +602,23 @@
             min-height: 60px;
             max-height: 200px;
             padding: 12px;
-            border: 2px solid var(--border);
-            border-radius: 8px;
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             font-size: 16px;
             font-family: inherit;
             resize: vertical;
-            transition: border-color 0.2s;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         textarea:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-primary-glow);
+            background: var(--surface-glass-active);
         }
 
         button {
@@ -564,31 +640,48 @@
         }
 
         .primary-btn {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         .primary-btn:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(74, 158, 255, 0.2));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .secondary-btn {
-            background: #e8e8e8;
-            color: var(--text);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text-secondary);
         }
 
         .secondary-btn:hover:not(:disabled) {
-            background: #d8d8d8;
+            background: var(--surface-glass-hover);
+            border-color: var(--border-glass-strong);
+            color: var(--text-primary);
+            transform: translateY(-1px);
         }
 
         .danger-btn {
-            background: var(--error);
-            color: white;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-error);
+            color: var(--accent-error);
         }
 
         .danger-btn:hover:not(:disabled) {
-            background: #c5221f;
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.2));
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
         }
 
         .settings-section {
@@ -611,21 +704,26 @@
 
         select, input[type="number"] {
             padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
             font-size: 14px;
-            background-color: var(--surface);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            color: var(--text-primary);
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: all 0.3s ease;
         }
 
         select:hover, input[type="number"]:hover {
-            border-color: #c0c0c0;
+            border-color: var(--border-glass-strong);
+            background: var(--surface-glass-hover);
         }
 
         select:focus, input[type="number"]:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-primary-glow);
         }
 
         .checkbox-group {
@@ -650,7 +748,7 @@
             flex: 1;
             -webkit-appearance: none;
             height: 6px;
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
             outline: none;
         }
@@ -659,9 +757,10 @@
             -webkit-appearance: none;
             width: 18px;
             height: 18px;
-            background: var(--primary);
+            background: var(--accent-primary);
             border-radius: 50%;
             cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .slider-value {
@@ -678,8 +777,11 @@
         }
 
         .stat-card {
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 12px;
             text-align: center;
         }
@@ -687,7 +789,8 @@
         .stat-value {
             font-size: 20px;
             font-weight: bold;
-            color: var(--primary);
+            color: var(--accent-primary);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .stat-label {
@@ -696,31 +799,14 @@
             margin-top: 4px;
         }
 
-        .tools-section {
-            margin-top: 16px;
-            padding: 16px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .tools-list {
-            margin-top: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
         .tool-item {
             font-size: 14px;
-            padding: 8px;
-            background: white;
-            border-radius: 6px;
-            border: 1px solid var(--border);
         }
 
         .tool-name {
             font-weight: 600;
-            color: var(--primary);
+            color: var(--accent-primary);
+            text-shadow: 0 0 5px var(--accent-primary-glow);
         }
 
         .tool-description {
@@ -737,33 +823,25 @@
             width: 100%;
             padding: 10px;
             margin-bottom: 8px;
-            background: white;
-            border: 1px solid var(--primary);
-            color: var(--primary);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             font-size: 14px;
             text-align: left;
             justify-content: flex-start;
+            border-radius: 12px;
+            transition: all 0.3s ease;
         }
 
         .example-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
-        .server-url-container {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-        }
-
-        .server-url-input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 14px;
-            margin-top: 8px;
-        }
 
         .advanced-section {
             margin: 10px 0;
@@ -804,12 +882,11 @@
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease-out;
-            background: #f9f9f9;
         }
 
         .advanced-content.expanded {
             max-height: 600px;
-            padding: 10px;
+            padding: 20px 0;
         }
 
         .advanced-content .checkbox-group {
@@ -836,8 +913,27 @@
             gap: 8px;
         }
 
+        .connection-warning {
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-warning);
+            color: var(--accent-warning);
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
         /* Mobile responsive */
         @media (max-width: 768px) {
+            .page-wrapper {
+                height: auto;
+            }
+
             .container {
                 flex-direction: column;
                 height: auto;
@@ -845,6 +941,7 @@
 
             .sidebar {
                 width: 100%;
+                height: auto;
             }
 
             .messages-container {
@@ -854,8 +951,35 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="sidebar">
+    <div class="page-wrapper">
+        <!-- Header section above everything -->
+        <div class="header-card">
+            <div class="header-row">
+                <h1>
+                    <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
+                        <path d="M64 0C28.7 0 0 28.7 0 64L0 256c0 35.3 28.7 64 64 64l32 0 0 48c0 6.1 3.4 11.6 8.8 14.3s11.9 2.1 16.8-1.5L202.7 320 352 320c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64L64 0zM352 352l-96 0 0 32c0 35.3 28.7 64 64 64l117.3 0 81.1 60.8c4.8 3.6 11.3 4.2 16.8 1.5s8.8-8.2 8.8-14.3l0-48 32 0c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64l-128 0 0 128c0 53-43 96-96 96z"/>
+                    </svg>
+                    Request Demo
+                </h1>
+                <button class="generate-code-btn" onclick="showCodeModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+                    </svg>
+                    Show Code
+                </button>
+            </div>
+        </div>
+
+        <!-- Connection warning -->
+        <div id="connectionWarning" class="connection-warning" style="display: none;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            Unable to connect to server. Please ensure the server is running on port 3005.
+        </div>
+
+        <div class="container">
+            <div class="sidebar">
             <div class="card">
                 <h2>Settings</h2>
                 <div class="settings-section">
@@ -943,79 +1067,33 @@
                     </div>
                 </div>
 
-                <div class="tools-section" id="toolsSection">
-                    <strong>Available Tools:</strong>
-                    <div class="tools-list" id="toolsList">
-                        <div class="tool-item">
-                            <div class="tool-name">Loading...</div>
-                            <div class="tool-description">Connecting to server...</div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="card">
                 <h2>Examples</h2>
                 <div class="examples-section">
                     <button class="example-btn" onclick="sendExample('weather')">
-                        ☀️ Ask about weather
+                        ☀️ &nbsp; Ask about weather
                     </button>
                     <button class="example-btn" onclick="sendExample('math')">
-                        🧮 Solve math problem
+                        🧮 &nbsp; Solve math problem
                     </button>
                     <button class="example-btn" onclick="sendExample('search')">
-                        🔍 Search for information
+                        🔍 &nbsp; Search for information
                     </button>
                     <button class="example-btn" onclick="sendExample('code')">
-                        💻 Write some code
+                        💻 &nbsp; Write some code
                     </button>
                     <button class="example-btn" onclick="sendExample('creative')">
-                        ✨ Creative writing
+                        ✨ &nbsp; Creative writing
                     </button>
                 </div>
 
-                <div class="server-url-container">
-                    <label class="setting-label">Server URL:</label>
-                    <input
-                        type="text"
-                        id="serverUrl"
-                        class="server-url-input"
-                        value="ws://localhost:3005"
-                        placeholder="ws://localhost:3005"
-                    >
-                </div>
             </div>
         </div>
 
         <div class="main-content">
             <div class="card chat-container">
-                <div class="header-row">
-                    <h1>
-                        <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
-                            <path d="M64 0C28.7 0 0 28.7 0 64L0 256c0 35.3 28.7 64 64 64l32 0 0 48c0 6.1 3.4 11.6 8.8 14.3s11.9 2.1 16.8-1.5L202.7 320 352 320c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64L64 0zM352 352l-96 0 0 32c0 35.3 28.7 64 64 64l117.3 0 81.1 60.8c4.8 3.6 11.3 4.2 16.8 1.5s8.8-8.2 8.8-14.3l0-48 32 0c35.3 0 64-28.7 64-64l0-192c0-35.3-28.7-64-64-64l-128 0 0 128c0 53-43 96-96 96z"/>
-                        </svg>
-                        Ensemble Request Demo
-                    </h1>
-                    <button class="generate-code-btn" onclick="showCodeModal()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
-                        </svg>
-                        Generate Code
-                    </button>
-                </div>
-
-                <div class="status-section">
-                    <div id="status" class="status">
-                        <span class="status-indicator"></span>
-                        <span class="status-text">Disconnected</span>
-                    </div>
-                    <button id="connectBtn" class="secondary-btn">
-                        Connect to Server
-                    </button>
-                    <button id="clearBtn" class="secondary-btn" onclick="clearChat()">
-                        Clear Chat
-                    </button>
-                </div>
 
                 <div class="messages-container" id="messagesContainer"></div>
 
@@ -1063,11 +1141,11 @@
             </div>
             <div class="modal-body">
                 <div id="serverCode" class="code-container">
-                    <button class="copy-button" onclick="copyCode('server')">Copy</button>
+                    <button class="copy-button" onclick="copyCode('server', event)">Copy</button>
                     <pre id="serverCodeContent"></pre>
                 </div>
                 <div id="clientCode" class="code-container" style="display: none;">
-                    <button class="copy-button" onclick="copyCode('client')">Copy</button>
+                    <button class="copy-button" onclick="copyCode('client', event)">Copy</button>
                     <pre id="clientCodeContent"></pre>
                 </div>
             </div>
@@ -1075,6 +1153,14 @@
     </div>
 
     <script>
+        // Configure marked for consistent markdown rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            pedantic: false,
+            smartypants: false
+        });
+
         // State management
         let ws = null;
         let isConnected = false;
@@ -1083,11 +1169,17 @@
         let currentMessageElement = null;
         let currentMessageModel = null;
         let currentMessageClass = null;
+        let messageCompleted = false;
         let totalTokens = 0;
         let totalCost = 0;
         let availableTools = [];
+        let connectionTimeout = null;
         let availableModels = [];
         let availableModelClasses = [];
+
+        // Auto-scroll management
+        let userHasScrolled = false;
+        let scrollCheckTimer = null;
 
         // Example prompts
         const examples = {
@@ -1098,14 +1190,7 @@
             creative: "Write a short story about a robot who discovers it can dream. Make it philosophical and touching."
         };
 
-        // Initialize event handlers
-        document.getElementById('connectBtn').addEventListener('click', () => {
-            if (isConnected) {
-                disconnect();
-            } else {
-                connect();
-            }
-        });
+        // connectBtn removed - auto-connects on page load
 
         document.getElementById('modelSelect').addEventListener('change', (e) => {
             if (e.target.value) {
@@ -1135,8 +1220,47 @@
             document.getElementById('presencePenaltyValue').textContent = e.target.value;
         });
 
+        // Show introduction text
+        function showIntroduction() {
+            const introHTML = `<p><strong>@just-every/ensemble</strong> is a unified interface for multiple AI providers that enables easy chaining of LLM outputs - you can send the response from one model directly as input to another model from a different provider seamlessly.</p>
+<p>&nbsp;</p>
+<p>The package includes <strong>automatic model selection</strong> capabilities, allowing you to specify task-based model classes (like <em>"mini"</em> for simple tasks, <em>"large"</em> for complex reasoning) and let the system choose the optimal model and provider for each specific use case. It also provides unified APIs for <strong>voice generation</strong>, <strong>speech-to-text transcription</strong>, and <strong>text embeddings</strong> across different providers.</p>
+<p>&nbsp;</p>
+<p><strong>Try out the demo below!</strong></p>`;
+
+            // Add intro text to the chat container
+            const container = document.getElementById('messagesContainer');
+            const introDiv = document.createElement('div');
+            introDiv.id = 'introText';
+            introDiv.style.cssText = `
+                padding: 20px;
+                color: var(--text-secondary);
+                line-height: 1.6;
+                text-align: left;
+                border-bottom: 1px solid var(--border-glass);
+                margin-bottom: 20px;
+                opacity: 0.8;
+            `;
+            introDiv.innerHTML = introHTML;
+            container.appendChild(introDiv);
+        }
+
+        // Remove introduction text
+        function removeIntroduction() {
+            const introDiv = document.getElementById('introText');
+            if (introDiv) {
+                introDiv.remove();
+            }
+        }
+
         // Auto-connect on load
         window.addEventListener('load', () => {
+            // Initialize scroll management
+            initScrollManagement();
+
+            // Show introduction message
+            showIntroduction();
+
             // Always connect immediately
             setTimeout(connect, 500);
         });
@@ -1147,7 +1271,7 @@
                 console.log('Updating WebSocket URL from parent:', event.data.url);
 
                 // Update the server URL input
-                document.getElementById('serverUrl').value = event.data.url;
+                // Server URL update removed
 
                 // If connected, disconnect and reconnect with new URL
                 if (isConnected) {
@@ -1159,18 +1283,54 @@
             }
         });
 
+        // Auto-scroll functionality
+        function initScrollManagement() {
+            const container = document.getElementById('messagesContainer');
+
+            // Check if user has manually scrolled
+            container.addEventListener('scroll', () => {
+                clearTimeout(scrollCheckTimer);
+                scrollCheckTimer = setTimeout(() => {
+                    const threshold = 50; // pixels from bottom
+                    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+                    userHasScrolled = !isAtBottom;
+                }, 100);
+            });
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('messagesContainer');
+            if (!userHasScrolled) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function forceScrollToBottom() {
+            const container = document.getElementById('messagesContainer');
+            container.scrollTop = container.scrollHeight;
+            userHasScrolled = false;
+        }
+
         // Connect to WebSocket server
         function connect() {
             try {
-                updateStatus('connecting', 'Connecting to server...');
+                // Connecting to server...
 
-                const serverUrl = document.getElementById('serverUrl').value;
+                // Show connection warning after 3 seconds if not connected
+                connectionTimeout = setTimeout(() => {
+                    if (!isConnected) {
+                        document.getElementById('connectionWarning').style.display = 'flex';
+                    }
+                }, 3000);
+
+                const serverUrl = 'ws://localhost:3005';
                 ws = new WebSocket(serverUrl);
 
                 ws.onopen = () => {
-                    updateStatus('connected', 'Connected to server');
+                    // Connected to server
                     isConnected = true;
-                    document.getElementById('connectBtn').textContent = 'Disconnect';
+                    clearTimeout(connectionTimeout);
+                    document.getElementById('connectionWarning').style.display = 'none';
                     document.getElementById('sendBtn').disabled = false;
                 };
 
@@ -1185,10 +1345,8 @@
                 };
 
                 ws.onclose = () => {
-                    updateStatus('disconnected', 'Disconnected from server');
                     isConnected = false;
                     isStreaming = false;
-                    document.getElementById('connectBtn').textContent = 'Connect to Server';
                     document.getElementById('sendBtn').disabled = true;
                     document.getElementById('stopBtn').style.display = 'none';
                     document.getElementById('sendBtn').style.display = 'flex';
@@ -1197,7 +1355,6 @@
             } catch (error) {
                 console.error('Connection error:', error);
                 showError(error.message);
-                updateStatus('error', 'Failed to connect');
             }
         }
 
@@ -1215,7 +1372,6 @@
                     console.log('Connected with ID:', data.connectionId);
                     if (data.availableTools) {
                         availableTools = data.availableTools;
-                        updateToolsList();
                     }
                     if (data.models) {
                         availableModels = data.models;
@@ -1258,6 +1414,7 @@
 
                 case 'stream_start':
                     isStreaming = true;
+                    messageCompleted = false;
                     // Update model if server provides it, otherwise keep the one we sent
                     if (data.model) {
                         currentMessageModel = data.model;
@@ -1275,41 +1432,92 @@
                     break;
 
                 case 'message_delta':
-                    if (currentMessageElement && data.content) {
+                    if (currentMessageElement && data.content && !messageCompleted) {
                         // Remove typing indicator if present
                         const typingIndicator = currentMessageElement.querySelector('.typing-indicator-modern');
                         if (typingIndicator) {
                             typingIndicator.remove();
                         }
 
-                        // Get or create content span
-                        let contentSpan = currentMessageElement.querySelector('.content');
+                        // Get or create content container
+                        let contentContainer = currentMessageElement.querySelector('.content-container');
+                        if (!contentContainer) {
+                            // Check if there are any tool calls first
+                            const hasToolCalls = currentMessageElement.querySelector('.tools-container') !== null;
+
+                            // If there are tool calls, add a separator
+                            if (hasToolCalls) {
+                                const separator = document.createElement('div');
+                                separator.className = 'content-separator';
+                                currentMessageElement.appendChild(separator);
+                            }
+
+                            contentContainer = document.createElement('div');
+                            contentContainer.className = 'content-container';
+                            currentMessageElement.appendChild(contentContainer);
+                        }
+
+                        // Get or create content span within the container
+                        let contentSpan = contentContainer.querySelector('.content');
                         if (!contentSpan) {
                             contentSpan = document.createElement('div');
                             contentSpan.className = 'content';
-                            currentMessageElement.appendChild(contentSpan);
+                            contentContainer.appendChild(contentSpan);
+                            // Store accumulated content as data attribute
+                            contentSpan.dataset.accumulatedContent = '';
                         }
 
-                        // Append the delta content (incremental) - keep as plain text during streaming
-                        contentSpan.textContent += data.content;
+                        // Accumulate content
+                        contentSpan.dataset.accumulatedContent = (contentSpan.dataset.accumulatedContent || '') + data.content;
+
+                        // Render accumulated content as markdown
+                        const html = marked.parse(contentSpan.dataset.accumulatedContent);
+                        const sanitizedHtml = DOMPurify.sanitize(html);
+                        contentSpan.innerHTML = sanitizedHtml;
+
+                        // Auto-scroll as content streams in
+                        scrollToBottom();
                     }
                     break;
 
                 case 'message_complete':
                     if (currentMessageElement && data.content) {
+                        messageCompleted = true;
+
                         // Ensure typing indicator is removed
                         const typingIndicator = currentMessageElement.querySelector('.typing-indicator-modern');
                         if (typingIndicator) {
                             typingIndicator.remove();
                         }
 
-                        // Get or create content span
-                        let contentSpan = currentMessageElement.querySelector('.content');
+                        // Get or create content container
+                        let contentContainer = currentMessageElement.querySelector('.content-container');
+                        if (!contentContainer) {
+                            // Check if there are any tool calls first
+                            const hasToolCalls = currentMessageElement.querySelector('.tools-container') !== null;
+
+                            // If there are tool calls, add a separator
+                            if (hasToolCalls) {
+                                const separator = document.createElement('div');
+                                separator.className = 'content-separator';
+                                currentMessageElement.appendChild(separator);
+                            }
+
+                            contentContainer = document.createElement('div');
+                            contentContainer.className = 'content-container';
+                            currentMessageElement.appendChild(contentContainer);
+                        }
+
+                        // Get or create content span within the container
+                        let contentSpan = contentContainer.querySelector('.content');
                         if (!contentSpan) {
                             contentSpan = document.createElement('div');
                             contentSpan.className = 'content';
-                            currentMessageElement.appendChild(contentSpan);
+                            contentContainer.appendChild(contentSpan);
                         }
+
+                        // Clear any accumulated content data
+                        delete contentSpan.dataset.accumulatedContent;
 
                         // Render the final content as markdown
                         const html = marked.parse(data.content);
@@ -1323,6 +1531,15 @@
 
                 case 'tool_start':
                     if (currentMessageElement && data.tool_call) {
+                        // Get or create tools container
+                        let toolsContainer = currentMessageElement.querySelector('.tools-container');
+                        if (!toolsContainer) {
+                            toolsContainer = document.createElement('div');
+                            toolsContainer.className = 'tools-container';
+                            // Insert at the beginning (before any content container)
+                            currentMessageElement.insertBefore(toolsContainer, currentMessageElement.firstChild);
+                        }
+
                         const toolDiv = document.createElement('div');
                         toolDiv.className = 'tool-call';
 
@@ -1338,12 +1555,21 @@
                         }
 
                         toolDiv.innerHTML = `<strong>🔧 Calling ${data.tool_call.function.name}:</strong><br><pre>${formattedArgs}</pre>`;
-                        currentMessageElement.appendChild(toolDiv);
+                        toolsContainer.appendChild(toolDiv);
                     }
                     break;
 
                 case 'tool_done':
                     if (currentMessageElement && data.result) {
+                        // Get or create tools container
+                        let toolsContainer = currentMessageElement.querySelector('.tools-container');
+                        if (!toolsContainer) {
+                            toolsContainer = document.createElement('div');
+                            toolsContainer.className = 'tools-container';
+                            // Insert at the beginning (before any content container)
+                            currentMessageElement.insertBefore(toolsContainer, currentMessageElement.firstChild);
+                        }
+
                         const resultDiv = document.createElement('div');
                         resultDiv.className = 'tool-result';
 
@@ -1367,7 +1593,7 @@
                         }
 
                         resultDiv.innerHTML = `<strong>✅ Result:</strong><br><pre style="white-space: pre-wrap;">${formattedResult}</pre>`;
-                        currentMessageElement.appendChild(resultDiv);
+                        toolsContainer.appendChild(resultDiv);
                     }
                     break;
 
@@ -1384,6 +1610,7 @@
                     currentMessageElement = null;
                     currentMessageModel = null;
                     currentMessageClass = null;
+                    messageCompleted = false;
                     document.getElementById('stopBtn').style.display = 'none';
                     document.getElementById('sendBtn').style.display = 'flex';
                     break;
@@ -1421,6 +1648,9 @@
 
             if (!text || !isConnected || isStreaming) return;
 
+            // Remove introduction text when first message is sent
+            removeIntroduction();
+
             // Add user message
             addMessage('user', text);
             messages.push({ role: 'user', content: text });
@@ -1428,6 +1658,9 @@
             // Clear input
             input.value = '';
             input.style.height = 'auto';
+
+            // Reset scroll state when user sends a message
+            forceScrollToBottom();
 
             // Get settings
             const model = document.getElementById('modelSelect').value;
@@ -1524,9 +1757,6 @@
                 const typingIndicator = document.createElement('div');
                 typingIndicator.className = 'typing-indicator-modern';
                 typingIndicator.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-                    </svg>
                     <div class="typing-dots">
                         <span></span><span></span><span></span>
                     </div>
@@ -1562,8 +1792,8 @@
             messageDiv.appendChild(messageRow);
             container.appendChild(messageDiv);
 
-            // Scroll to bottom
-            container.scrollTop = container.scrollHeight;
+            // Scroll to bottom with delay to ensure DOM update
+            setTimeout(scrollToBottom, 10);
         }
 
         // Clear chat
@@ -1587,33 +1817,12 @@
             }
         }
 
-        // Update status
-        function updateStatus(state, text) {
-            const statusEl = document.getElementById('status');
-            statusEl.className = `status ${state}`;
-            statusEl.querySelector('.status-text').textContent = text;
-        }
+        // updateStatus function removed - no status section to update
 
         // Update stats
         function updateStats() {
             document.getElementById('tokenCount').textContent = totalTokens.toLocaleString();
             document.getElementById('costValue').textContent = `$${totalCost.toFixed(4)}`;
-        }
-
-        // Update tools list
-        function updateToolsList() {
-            const container = document.getElementById('toolsList');
-            if (!availableTools || availableTools.length === 0) {
-                container.innerHTML = '<div class="tool-item"><div class="tool-description">No tools available</div></div>';
-                return;
-            }
-
-            container.innerHTML = availableTools.map(tool => `
-                <div class="tool-item">
-                    <div class="tool-name">${tool.name}</div>
-                    <div class="tool-description">${tool.description}</div>
-                </div>
-            `).join('');
         }
 
         // Populate model select dropdown
@@ -1690,7 +1899,7 @@
 
             const container = document.getElementById('messagesContainer');
             container.appendChild(messageDiv);
-            container.scrollTop = container.scrollHeight;
+            setTimeout(scrollToBottom, 10);
         }
 
         // Handle key press
@@ -1760,22 +1969,63 @@
             }
         }
 
-        function copyCode(type) {
+        function copyCode(type, event) {
             const content = type === 'server'
                 ? document.getElementById('serverCodeContent').textContent
                 : document.getElementById('clientCodeContent').textContent;
 
-            navigator.clipboard.writeText(content).then(() => {
-                const button = event.target;
-                const originalText = button.textContent;
-                button.textContent = 'Copied!';
-                button.classList.add('copied');
+            const button = event.target;
+            const originalText = button.textContent;
 
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.classList.remove('copied');
-                }, 2000);
-            });
+            // Try modern clipboard API first, fallback to legacy method
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(content).then(() => {
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    fallbackCopy(content, button, originalText);
+                });
+            } else {
+                // Fallback for non-HTTPS environments
+                fallbackCopy(content, button, originalText);
+            }
+        }
+
+        function fallbackCopy(text, button, originalText) {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                textarea.style.pointerEvents = 'none';
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, 99999); // For mobile devices
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textarea);
+
+                if (successful) {
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                } else {
+                    throw new Error('execCommand failed');
+                }
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+                alert('Failed to copy to clipboard. Please copy manually.');
+            }
         }
 
         function generateServerCode(model, modelClass, maxTokens, temperature, topP, frequencyPenalty, presencePenalty, seed, toolsEnabled) {
@@ -2029,5 +2279,7 @@ server.listen(3005, () => {
 </html>`;
         }
     </script>
+        </div> <!-- Close container -->
+    </div> <!-- Close page-wrapper -->
 </body>
 </html>

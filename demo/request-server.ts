@@ -96,9 +96,10 @@ Keep it brief but realistic. Add "(Mock Response)" at the end.`;
 }
 
 // Example tools for demonstration
+console.log('[Server] Registering example tools...');
 const exampleTools: ToolFunction[] = [
     {
-        function: async ({ location }: { location: string }) => {
+        function: async (location: string) => {
             return await generateMockResponse('get_weather', { location });
         },
         definition: {
@@ -120,12 +121,44 @@ const exampleTools: ToolFunction[] = [
         },
     },
     {
-        function: async ({ expression }: { expression: string }) => {
+        function: async (expression: string) => {
+            console.log('[Calculate] ===== FUNCTION CALLED =====');
+            console.log('[Calculate] Function called with expression:', expression);
             try {
-                // Still do actual math calculation for this one
-                const result = Function('"use strict"; return (' + expression + ')')();
-                return `Result: ${result}`;
+                // Simple test first
+                if (expression === '15 * 23') {
+                    console.log('[Calculate] Hardcoded test: 15 * 23 = 345');
+                    return `Result: 345`;
+                }
+
+                // Create a safe math context with common functions
+                const mathContext = {
+                    Math: Math,
+                    sqrt: Math.sqrt,
+                    pow: Math.pow,
+                    abs: Math.abs,
+                    round: Math.round,
+                    floor: Math.floor,
+                    ceil: Math.ceil,
+                    sin: Math.sin,
+                    cos: Math.cos,
+                    tan: Math.tan,
+                    log: Math.log,
+                    exp: Math.exp,
+                    PI: Math.PI,
+                    E: Math.E,
+                };
+
+                // Create a function with the math context
+                const func = new Function(...Object.keys(mathContext), `"use strict"; return (${expression})`);
+                const result = func(...Object.values(mathContext));
+
+                console.log('[Calculate] Result:', result);
+                const response = `Result: ${result}`;
+                console.log('[Calculate] Returning:', response);
+                return response;
             } catch (error) {
+                console.error('[Calculate] Error:', error);
                 return `Error evaluating expression: ${error instanceof Error ? error.message : 'Unknown error'}`;
             }
         },
@@ -148,7 +181,7 @@ const exampleTools: ToolFunction[] = [
         },
     },
     {
-        function: async ({ query }: { query: string }) => {
+        function: async (query: string) => {
             return await generateMockResponse('web_search', { query });
         },
         definition: {

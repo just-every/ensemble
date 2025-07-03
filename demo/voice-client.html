@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ensemble Voice Generation Client</title>
+    <link rel="stylesheet" href="glassmorphism.css">
     <style>
         :root {
-            --primary: #1a73e8;
-            --primary-dark: #1557b0;
-            --success: #34a853;
-            --warning: #fbbc04;
-            --error: #ea4335;
-            --background: #f5f5f5;
-            --surface: #ffffff;
-            --text: #202124;
-            --text-secondary: #5f6368;
+            --primary: #4a9eff;
+            --primary-dark: #2d7dd2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --background: #0f0f0f;
+            --surface: rgba(255, 255, 255, 0.05);
+            --text: rgba(255, 255, 255, 0.95);
+            --text-secondary: rgba(255, 255, 255, 0.7);
         }
 
         * {
@@ -28,55 +29,52 @@
             background: var(--background);
             color: var(--text);
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
 
         .card {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-glass);
             margin-bottom: 20px;
         }
 
-        h1 {
-            color: var(--primary);
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
 
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
 
         .generate-code-btn {
-            background: var(--surface);
-            border: 2px solid var(--primary);
-            color: var(--primary);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             padding: 8px 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 8px;
+            position: relative;
+            overflow: hidden;
         }
 
         .generate-code-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         h2 {
@@ -91,8 +89,12 @@
             gap: 20px;
             margin-bottom: 24px;
             padding: 16px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            box-shadow: inset 0 0 20px rgba(74, 158, 255, 0.05);
         }
 
         .status {
@@ -143,17 +145,23 @@
             width: 100%;
             min-height: 120px;
             padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text-primary);
+            border-radius: 12px;
             font-size: 16px;
             font-family: inherit;
             resize: vertical;
-            transition: border-color 0.2s;
+            transition: all 0.3s ease;
         }
 
         textarea:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--accent-primary);
+            background: var(--surface-glass-active);
+            box-shadow: 0 0 0 3px var(--accent-primary-glow);
         }
 
         .char-counter {
@@ -193,22 +201,33 @@
         }
 
         .primary-btn {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         .primary-btn:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(74, 158, 255, 0.2));
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .secondary-btn {
-            background: #e8e8e8;
-            color: var(--text);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            color: var(--text-secondary);
         }
 
         .secondary-btn:hover:not(:disabled) {
-            background: #d8d8d8;
+            background: var(--surface-glass-hover);
+            border-color: var(--border-glass-strong);
+            color: var(--text-primary);
+            transform: translateY(-1px);
         }
 
         .settings-grid {
@@ -232,21 +251,26 @@
 
         select {
             padding: 10px 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
             font-size: 14px;
-            background-color: var(--surface);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            color: var(--text-primary);
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: all 0.3s ease;
         }
 
         select:hover {
-            border-color: #c0c0c0;
+            border-color: var(--border-glass-strong);
+            background: var(--surface-glass-hover);
         }
 
         select:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-primary-glow);
         }
 
         .slider-container {
@@ -259,7 +283,7 @@
             flex: 1;
             -webkit-appearance: none;
             height: 6px;
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
             outline: none;
         }
@@ -268,9 +292,10 @@
             -webkit-appearance: none;
             width: 18px;
             height: 18px;
-            background: var(--primary);
+            background: var(--accent-primary);
             border-radius: 50%;
             cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .slider-value {
@@ -282,8 +307,11 @@
         .audio-player-section {
             margin-top: 24px;
             padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
         }
 
         .audio-player {
@@ -293,18 +321,25 @@
 
         .download-btn {
             margin-top: 12px;
-            background: var(--success);
-            color: white;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-success);
+            color: var(--accent-success);
         }
 
         .download-btn:hover:not(:disabled) {
-            background: #2d8e46;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.2));
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
         }
 
         .progress-bar {
             width: 100%;
             height: 8px;
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
             border-radius: 4px;
             overflow: hidden;
             margin: 16px 0;
@@ -317,9 +352,10 @@
 
         .progress-fill {
             height: 100%;
-            background: var(--primary);
+            background: linear-gradient(90deg, var(--accent-primary), rgba(74, 158, 255, 0.6));
             width: 0;
             transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .stats-grid {
@@ -330,16 +366,27 @@
         }
 
         .stat-card {
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 16px;
             text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            border-color: var(--border-glass-strong);
         }
 
         .stat-value {
             font-size: 24px;
             font-weight: bold;
-            color: var(--primary);
+            color: var(--accent-primary);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
         .stat-label {
@@ -349,14 +396,33 @@
         }
 
         .error-message {
-            background: #fce8e6;
-            color: var(--error);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-error);
             padding: 12px 16px;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-top: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
+            box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.1);
+        }
+
+        .connection-warning {
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-warning);
+            color: var(--accent-warning);
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
         }
 
         .history-section {
@@ -365,12 +431,16 @@
 
         .history-item {
             padding: 12px;
-            background: #f8f9fa;
-            border-radius: 6px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
             margin-bottom: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.3s ease;
         }
 
         .history-text {
@@ -393,39 +463,31 @@
 
         .examples-section {
             margin-top: 20px;
-            padding: 16px;
-            background: #e8f0fe;
-            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .example-btn {
             padding: 8px 16px;
-            margin: 4px;
-            background: white;
-            border: 1px solid var(--primary);
-            color: var(--primary);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
             font-size: 14px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
         }
 
         .example-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-primary-glow);
+            text-shadow: 0 0 10px var(--accent-primary-glow);
         }
 
-        .server-url-container {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .server-url-input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 14px;
-            margin-top: 8px;
-        }
 
         /* Modal styles */
         .modal-overlay {
@@ -446,25 +508,30 @@
         }
 
         .modal {
-            background: var(--surface);
-            border-radius: 12px;
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-heavy);
+            -webkit-backdrop-filter: var(--blur-heavy);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
             width: 90%;
             max-width: 800px;
             max-height: 90vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            box-shadow: var(--shadow-glass);
         }
 
         .modal-tabs-section {
-            border-bottom: 1px solid #e0e0e0;
-            background: var(--surface);
+            border-bottom: 1px solid var(--border-glass);
+            background: var(--surface-glass);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
         }
 
         .modal-header {
             padding: 20px 24px;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid var(--border-glass);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -487,7 +554,7 @@
         }
 
         .modal-close:hover {
-            background: #f0f0f0;
+            background: var(--surface-glass-hover);
         }
 
         .modal-body {
@@ -522,13 +589,17 @@
 
         .code-container {
             position: relative;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: var(--blur-glass);
+            -webkit-backdrop-filter: var(--blur-glass);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
             padding: 20px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
             overflow-x: auto;
+            color: var(--text-primary);
         }
 
         .code-container pre {
@@ -562,7 +633,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="card">
+        <!-- Header section above everything -->
+        <div class="header-card">
             <div class="header-row">
                 <h1>
                     <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
@@ -574,19 +646,22 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
                     </svg>
-                    Generate Code
+                    Show Code
                 </button>
             </div>
+        </div>
 
-            <div class="status-section">
-                <div id="status" class="status">
-                    <span class="status-indicator"></span>
-                    <span class="status-text">Disconnected</span>
-                </div>
-                <button id="connectBtn" class="secondary-btn">
-                    Connect to Server
-                </button>
-            </div>
+        <!-- Connection warning -->
+        <div id="connectionWarning" class="connection-warning" style="display: none;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            Unable to connect to server. Please ensure the server is running on port 3004.
+        </div>
+
+        <!-- Main content -->
+        <div class="card">
+
 
             <div class="input-section">
                 <h2>Text to Speech</h2>
@@ -718,16 +793,6 @@
                 </div>
             </div>
 
-            <div class="server-url-container">
-                <label class="setting-label">Server URL:</label>
-                <input
-                    type="text"
-                    id="serverUrl"
-                    class="server-url-input"
-                    value="ws://localhost:3004"
-                    placeholder="ws://localhost:3004"
-                >
-            </div>
         </div>
     </div>
 
@@ -750,11 +815,11 @@
             </div>
             <div class="modal-body">
                 <div id="serverCode" class="code-container">
-                    <button class="copy-button" onclick="client.copyCode('server')">Copy</button>
+                    <button class="copy-button" onclick="client.copyCode('server', event)">Copy</button>
                     <pre id="serverCodeContent"></pre>
                 </div>
                 <div id="clientCode" class="code-container" style="display: none;">
-                    <button class="copy-button" onclick="client.copyCode('client')">Copy</button>
+                    <button class="copy-button" onclick="client.copyCode('client', event)">Copy</button>
                     <pre id="clientCodeContent"></pre>
                 </div>
             </div>
@@ -863,6 +928,7 @@
                 this.audioChunks = [];
                 this.generationHistory = [];
                 this.currentAudioBlob = null;
+                this.connectionTimeout = null;
 
                 // Audio streaming
                 // AudioStreamPlayer will be created when needed with callback
@@ -884,18 +950,7 @@
             }
 
             setupEventHandlers() {
-                // Connection
-                document.getElementById('connectBtn').addEventListener('click', async () => {
-                    if (this.isConnected) {
-                        this.disconnect();
-                    } else {
-                        // Create a temporary audio player just to init the context
-                        // The actual player will be created during generation
-                        const tempPlayer = new window.AudioStreamPlayer();
-                        await tempPlayer.initAudioContext();
-                        this.connect();
-                    }
-                });
+                // connectBtn removed - auto-connects on page load
 
                 // Generation
                 document.getElementById('generateBtn').addEventListener('click', () => this.generate());
@@ -1020,16 +1075,23 @@
 
             async connect() {
                 try {
-                    this.updateStatus('connecting', 'Connecting to server...');
+                    // Connecting to server...
 
-                    const serverUrl = document.getElementById('serverUrl').value;
+                    // Show connection warning after 3 seconds if not connected
+                    this.connectionTimeout = setTimeout(() => {
+                        if (!this.isConnected) {
+                            document.getElementById('connectionWarning').style.display = 'flex';
+                        }
+                    }, 3000);
+
+                    const serverUrl = 'ws://localhost:3004';
                     this.ws = new WebSocket(serverUrl);
 
                     this.ws.onopen = () => {
-                        this.updateStatus('connected', 'Connected to server');
+                        // Connected to server
                         this.isConnected = true;
-
-                        document.getElementById('connectBtn').textContent = 'Disconnect';
+                        clearTimeout(this.connectionTimeout);
+                        document.getElementById('connectionWarning').style.display = 'none';
                         document.getElementById('generateBtn').disabled = false;
                     };
 
@@ -1044,19 +1106,23 @@
                     };
 
                     this.ws.onclose = () => {
-                        this.updateStatus('disconnected', 'Disconnected from server');
+                        // Disconnected from server
                         this.isConnected = false;
                         this.isGenerating = false;
 
-                        document.getElementById('connectBtn').textContent = 'Connect to Server';
                         document.getElementById('generateBtn').disabled = true;
                         document.getElementById('stopBtn').disabled = true;
+                        // Show warning if disconnected after initial connection
+                        if (this.connectionTimeout) {
+                            document.getElementById('connectionWarning').style.display = 'flex';
+                        }
                     };
 
                 } catch (error) {
                     console.error('Connection error:', error);
                     this.showError(error.message);
-                    this.updateStatus('error', 'Failed to connect');
+                    // Failed to connect
+                    document.getElementById('connectionWarning').style.display = 'flex';
                 }
             }
 
@@ -1417,11 +1483,7 @@
                 this.updateCharCounter();
             }
 
-            updateStatus(state, text) {
-                const statusEl = document.getElementById('status');
-                statusEl.className = `status ${state}`;
-                statusEl.querySelector('.status-text').textContent = text;
-            }
+            // updateStatus method removed - no status section to update
 
             showCodeModal() {
                 const model = document.getElementById('modelSelect').value;
@@ -1461,22 +1523,63 @@
                 }
             }
 
-            copyCode(type) {
+            copyCode(type, event) {
                 const content = type === 'server'
                     ? document.getElementById('serverCodeContent').textContent
                     : document.getElementById('clientCodeContent').textContent;
 
-                navigator.clipboard.writeText(content).then(() => {
-                    const button = event.target;
-                    const originalText = button.textContent;
-                    button.textContent = 'Copied!';
-                    button.classList.add('copied');
+                const button = event.target;
+                const originalText = button.textContent;
 
-                    setTimeout(() => {
-                        button.textContent = originalText;
-                        button.classList.remove('copied');
-                    }, 2000);
-                });
+                // Try modern clipboard API first, fallback to legacy method
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(content).then(() => {
+                        button.textContent = 'Copied!';
+                        button.classList.add('copied');
+
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy:', err);
+                        this.fallbackCopy(content, button, originalText);
+                    });
+                } else {
+                    // Fallback for non-HTTPS environments
+                    this.fallbackCopy(content, button, originalText);
+                }
+            }
+
+            fallbackCopy(text, button, originalText) {
+                try {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    textarea.style.pointerEvents = 'none';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    textarea.setSelectionRange(0, 99999); // For mobile devices
+
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+
+                    if (successful) {
+                        button.textContent = 'Copied!';
+                        button.classList.add('copied');
+
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 2000);
+                    } else {
+                        throw new Error('execCommand failed');
+                    }
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    alert('Failed to copy to clipboard. Please copy manually.');
+                }
             }
 
             generateServerCode(model, voice, format, speed) {
@@ -1647,6 +1750,7 @@ server.listen(PORT, () => {
         let audioPlayer = null;
         let audioChunks = [];
         let reconnectAttempts = 0;
+        let connectionTimeout = null;
 
         // Helper function to convert base64 to Uint8Array
         function base64ToUint8Array(base64) {
@@ -1834,8 +1938,8 @@ server.listen(PORT, () => {
         window.addEventListener('message', (event) => {
             if (event.data.type === 'updateWsUrl' && event.data.url) {
                 console.log('Updating WebSocket URL from parent:', event.data.url);
-                document.getElementById('serverUrl').value = event.data.url;
-                
+                // Server URL update removed
+
                 // If already connected, reconnect with new URL
                 if (client && client.isConnected) {
                     client.disconnect();
