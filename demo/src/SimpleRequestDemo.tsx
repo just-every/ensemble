@@ -53,7 +53,7 @@ export default function SimpleRequestDemo() {
 
     // Settings
     const [selectedModel, setSelectedModel] = useState('');
-    const [selectedModelClass, setSelectedModelClass] = useState('');
+    const [selectedModelClass, setSelectedModelClass] = useState('standard');
     const [enableTools, setEnableTools] = useState(true);
     const [maxTokens, setMaxTokens] = useState(1000);
     const [temperature, setTemperature] = useState(1.0);
@@ -98,7 +98,13 @@ export default function SimpleRequestDemo() {
                 case 'connected':
                     console.log('Connected with ID:', data.connectionId);
                     if (data.models) setAvailableModels(data.models);
-                    if (data.modelClasses) setAvailableModelClasses(data.modelClasses);
+                    if (data.modelClasses) {
+                        setAvailableModelClasses(data.modelClasses);
+                        // Set 'standard' as default if available and no model class is selected
+                        if (!selectedModelClass && data.modelClasses.includes('standard')) {
+                            setSelectedModelClass('standard');
+                        }
+                    }
                     break;
 
                 case 'agent_start':
@@ -255,6 +261,171 @@ export default function SimpleRequestDemo() {
         setInputValue(examples[type]);
     };
 
+    const generateServerCode = (
+        model: string,
+        modelClass: string,
+        maxTokens: number,
+        temperature: number,
+        topP: number,
+        frequencyPenalty: number,
+        presencePenalty: number,
+        seed: string,
+        toolsEnabled: boolean
+    ) => {
+        const modelLine = model ? `model: '${model}',` : `modelClass: '${modelClass}',`;
+
+        let advancedParams = '';
+        if (temperature !== 1.0) advancedParams += `\n                temperature: ${temperature},`;
+        if (topP !== 1.0) advancedParams += `\n                topP: ${topP},`;
+        if (frequencyPenalty !== 0) advancedParams += `\n                frequencyPenalty: ${frequencyPenalty},`;
+        if (presencePenalty !== 0) advancedParams += `\n                presencePenalty: ${presencePenalty},`;
+        if (seed) advancedParams += `\n                seed: ${seed},`;
+
+        const toolsParam = toolsEnabled ? ', { tools }' : '';
+
+        const toolsCode = toolsEnabled
+            ? `
+// Example tools
+const tools = [
+    {
+        function: async ({ location }) => {
+            // Mock weather API
+            return \`Weather in \${location}: 22°C, partly cloudy\`;
+        },
+        definition: {
+            type: 'function',
+            function: {
+                name: 'get_weather',
+                description: 'Get weather for a location',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        location: { type: 'string', description: 'City name' }
+                    },
+                    required: ['location']
+                }
+            }
+        }
+    }
+];`
+            : '';
+
+        return `import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
+import express from 'express';
+import { ensembleRequest } from '@just-every/ensemble';
+
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+${toolsCode}
+
+wss.on('connection', (ws) => {
+    console.log('Client connected');
+
+    ws.on('message', async (data) => {
+        const message = JSON.parse(data.toString());
+
+        if (message.type === 'chat') {
+            const { messages } = message;
+
+            const agent = {
+                ${modelLine}
+                maxTokens: ${maxTokens},${advancedParams}
+            };
+
+            try {
+                for await (const event of ensembleRequest(messages, agent${toolsParam})) {
+                    ws.send(JSON.stringify(event));
+                }
+
+                ws.send(JSON.stringify({ type: 'stream_complete' }));
+            } catch (error) {
+                ws.send(JSON.stringify({
+                    type: 'error',
+                    error: error.message
+                }));
+            }
+        }
+    });
+
+    ws.on('close', () => console.log('Client disconnected'));
+});
+
+server.listen(3005, () => {
+    console.log('WebSocket server running on ws://localhost:3005');
+});`;
+    };
+
+    const generateClientCode = (
+        model: string,
+        modelClass: string,
+        maxTokens: number,
+        temperature: number,
+        topP: number,
+        frequencyPenalty: number,
+        presencePenalty: number,
+        seed: string,
+        toolsEnabled: boolean
+    ) => {
+        return `<!DOCTYPE html>
+<html>
+<head>
+    <title>Ensemble Chat Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #messages {
+            border: 1px solid #ccc;
+            height: 400px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .message { margin: 10px 0; padding: 8px; border-radius: 5px; }
+        .user { background: #e3f2fd; }
+        .assistant { background: #f5f5f5; }
+        input { width: 70%; padding: 8px; }
+        button { padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h1>Ensemble Chat Demo</h1>
+    <div id="messages"></div>
+    <input type="text" id="input" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:3005');
+        const messages = [];
+        let currentMessage = null;
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Handle WebSocket events
+            // Implementation here...
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('input');
+            const content = input.value.trim();
+            if (!content) return;
+
+            const requestData = {
+                type: 'chat',
+                messages: messages,
+                ${model ? `model: '${model}',` : `modelClass: '${modelClass}',`}
+                maxTokens: ${maxTokens},
+                toolsEnabled: ${toolsEnabled}
+            };
+
+            ws.send(JSON.stringify(requestData));
+            input.value = '';
+        }
+    </script>
+</body>
+</html>`;
+    };
+
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -267,35 +438,113 @@ export default function SimpleRequestDemo() {
 
         return (
             <div key={index} className={`message ${isUser ? 'user' : 'assistant'}`}>
-                <div className="message-row">
-                    <div className="message-content">
-                        {!isUser && (message.model || message.modelClass) && (
-                            <div className="message-metadata">
-                                {message.modelClass && message.model
-                                    ? `Class: ${message.modelClass} • Model: ${message.model}`
-                                    : message.modelClass
-                                      ? `Class: ${message.modelClass}`
-                                      : `Model: ${message.model}`}
-                            </div>
-                        )}
+                {/* Metadata above the message row */}
+                <div
+                    className="message-metadata"
+                    style={{
+                        fontSize: '12px',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 400,
+                        padding: 0,
+                        margin: '0 0 0 48px', // Offset by avatar width + gap
+                    }}>
+                    {isUser
+                        ? 'User'
+                        : message.streaming && !message.model && !message.modelClass
+                          ? 'Responding...'
+                          : message.modelClass && message.model
+                            ? `Class: ${message.modelClass} • Model: ${message.model}`
+                            : message.modelClass
+                              ? `Class: ${message.modelClass}`
+                              : message.model
+                                ? `Model: ${message.model}`
+                                : ''}
+                </div>
 
-                        <div className="message-body">
+                <div className="message-row">
+                    <div
+                        className="message-avatar"
+                        style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            color: 'white',
+                            flexShrink: 0,
+                            marginTop: '2px', // Slightly offset to align with first line of text
+                            background: isUser ? 'var(--accent-primary)' : 'var(--accent-success)',
+                            boxShadow: isUser
+                                ? '0 0 10px var(--accent-primary-glow)'
+                                : '0 0 10px rgba(16, 185, 129, 0.4)',
+                        }}>
+                        {isUser ? 'U' : 'A'}
+                    </div>
+
+                    <div className="message-content" style={{ flex: 1, wordWrap: 'break-word', position: 'relative' }}>
+                        <div
+                            className="message-body"
+                            style={{
+                                background: 'var(--surface-glass)',
+                                backdropFilter: 'var(--blur-glass)',
+                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                border: '1px solid var(--border-glass)',
+                                borderRadius: '12px',
+                                padding: '12px 16px',
+                            }}>
                             {!isUser && message.tools && message.tools.length > 0 && (
-                                <div className="tools-container">
+                                <div className="tools-container" style={{ marginBottom: '8px' }}>
                                     {message.tools.map((tool, i) => (
                                         <div key={i}>
-                                            <div className="tool-call">
+                                            <div
+                                                className="tool-call"
+                                                style={{
+                                                    borderRadius: '12px',
+                                                    padding: '12px',
+                                                    margin: '8px 0',
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '14px',
+                                                }}>
                                                 <strong>🔧 Calling {tool.function.name}:</strong>
                                                 <br />
-                                                <pre>
+                                                <pre
+                                                    style={{
+                                                        background: 'rgba(74, 158, 255, 0.1)',
+                                                        border: '1px solid rgba(74, 158, 255, 0.3)',
+                                                        borderRadius: '8px',
+                                                        padding: '12px',
+                                                        overflowX: 'auto',
+                                                        margin: '8px 0',
+                                                        backdropFilter: 'var(--blur-glass)',
+                                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                                    }}>
                                                     {JSON.stringify(JSON.parse(tool.function.arguments), null, 2)}
                                                 </pre>
                                             </div>
                                             {tool.result && (
-                                                <div className="tool-result">
+                                                <div
+                                                    className="tool-result"
+                                                    style={{
+                                                        borderRadius: '12px',
+                                                        padding: '12px',
+                                                        margin: '8px 0',
+                                                    }}>
                                                     <strong>✅ Result:</strong>
                                                     <br />
-                                                    <pre style={{ whiteSpace: 'pre-wrap' }}>
+                                                    <pre
+                                                        style={{
+                                                            background: 'rgba(16, 185, 129, 0.1)',
+                                                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                                                            borderRadius: '8px',
+                                                            padding: '12px',
+                                                            overflowX: 'auto',
+                                                            margin: '8px 0',
+                                                            backdropFilter: 'var(--blur-glass)',
+                                                            WebkitBackdropFilter: 'var(--blur-glass)',
+                                                            whiteSpace: 'pre-wrap',
+                                                        }}>
                                                         {tool.result.output || tool.result.error || 'No result'}
                                                     </pre>
                                                 </div>
@@ -308,11 +557,23 @@ export default function SimpleRequestDemo() {
                             {message.content && (
                                 <>
                                     {!isUser && message.tools && message.tools.length > 0 && (
-                                        <div className="content-separator" />
+                                        <div
+                                            className="content-separator"
+                                            style={{
+                                                borderTop: '1px solid var(--border-glass)',
+                                                margin: '15px 0 25px',
+                                                opacity: 0.5,
+                                            }}
+                                        />
                                     )}
                                     <div className="content-container">
                                         <div
                                             className="content"
+                                            style={{
+                                                whiteSpace: 'pre-wrap',
+                                                wordWrap: 'break-word',
+                                                lineHeight: '1.6',
+                                            }}
                                             dangerouslySetInnerHTML={{
                                                 __html: isUser
                                                     ? message.content
@@ -324,12 +585,42 @@ export default function SimpleRequestDemo() {
                             )}
 
                             {message.streaming && !message.content && (
-                                <div className="typing-indicator-modern">
-                                    <span>Thinking</span>
-                                    <div className="typing-dots">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
+                                <div
+                                    className="typing-indicator-modern"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        color: 'var(--text-secondary)',
+                                        fontStyle: 'italic',
+                                    }}>
+                                    <div className="typing-dots" style={{ display: 'flex', gap: '2px' }}>
+                                        <span
+                                            style={{
+                                                width: '4px',
+                                                height: '4px',
+                                                background: 'var(--text-secondary)',
+                                                borderRadius: '50%',
+                                                animation: 'typing 1.4s infinite',
+                                            }}></span>
+                                        <span
+                                            style={{
+                                                width: '4px',
+                                                height: '4px',
+                                                background: 'var(--text-secondary)',
+                                                borderRadius: '50%',
+                                                animation: 'typing 1.4s infinite',
+                                                animationDelay: '0.2s',
+                                            }}></span>
+                                        <span
+                                            style={{
+                                                width: '4px',
+                                                height: '4px',
+                                                background: 'var(--text-secondary)',
+                                                borderRadius: '50%',
+                                                animation: 'typing 1.4s infinite',
+                                                animationDelay: '0.4s',
+                                            }}></span>
                                     </div>
                                 </div>
                             )}
@@ -372,7 +663,7 @@ export default function SimpleRequestDemo() {
                 </div>
             </nav>
 
-            <div className="page-wrapper">
+            <div className="page-wrapper" style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
                 <div className="header-card">
                     <div className="header-row">
                         <h1>
@@ -381,7 +672,27 @@ export default function SimpleRequestDemo() {
                             </svg>
                             Request Demo
                         </h1>
-                        <button className="generate-code-btn" onClick={() => setShowCodeModal(true)}>
+                        <button
+                            className="generate-code-btn"
+                            onClick={() => setShowCodeModal(true)}
+                            style={{
+                                background: 'var(--surface-glass)',
+                                backdropFilter: 'var(--blur-glass)',
+                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                border: '1px solid var(--accent-primary)',
+                                color: 'var(--accent-primary)',
+                                padding: '8px 16px',
+                                borderRadius: '12px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                position: 'relative',
+                                overflow: 'hidden',
+                            }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
                             </svg>
@@ -391,7 +702,22 @@ export default function SimpleRequestDemo() {
                 </div>
 
                 {readyState !== ReadyState.OPEN && (
-                    <div className="connection-warning">
+                    <div
+                        className="connection-warning"
+                        style={{
+                            background: 'var(--surface-glass)',
+                            backdropFilter: 'var(--blur-glass)',
+                            WebkitBackdropFilter: 'var(--blur-glass)',
+                            border: '1px solid var(--accent-warning)',
+                            color: 'var(--accent-warning)',
+                            padding: '12px 16px',
+                            borderRadius: '12px',
+                            marginBottom: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            animation: 'fadeIn 0.3s ease',
+                        }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
                         </svg>
@@ -399,13 +725,40 @@ export default function SimpleRequestDemo() {
                     </div>
                 )}
 
-                <div className="container">
-                    <div className="sidebar">
-                        <div className="card">
-                            <h2>Settings</h2>
-                            <div className="settings-section">
-                                <div className="setting-group">
-                                    <label className="setting-label">Model</label>
+                <div className="container" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                    <div
+                        className="sidebar"
+                        style={{
+                            width: '300px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '20px',
+                            position: 'sticky',
+                            top: '20px',
+                        }}>
+                        <div
+                            className="card"
+                            style={{
+                                background: 'var(--surface-glass)',
+                                backdropFilter: 'var(--blur-glass)',
+                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                border: '1px solid var(--border-glass)',
+                                borderRadius: '16px',
+                                padding: '24px',
+                                boxShadow: 'var(--shadow-glass)',
+                            }}>
+                            <h2 style={{ marginBottom: '16px', color: 'var(--text)', fontSize: '18px' }}>Settings</h2>
+                            <div
+                                className="settings-section"
+                                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div
+                                    className="setting-group"
+                                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label
+                                        className="setting-label"
+                                        style={{ fontWeight: '500', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                                        Model
+                                    </label>
                                     <select
                                         className="glass-select"
                                         value={selectedModel}
@@ -422,8 +775,14 @@ export default function SimpleRequestDemo() {
                                     </select>
                                 </div>
 
-                                <div className="setting-group">
-                                    <label className="setting-label">Model Class</label>
+                                <div
+                                    className="setting-group"
+                                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label
+                                        className="setting-label"
+                                        style={{ fontWeight: '500', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                                        Model Class
+                                    </label>
                                     <select
                                         className="glass-select"
                                         value={selectedModelClass}
@@ -431,7 +790,6 @@ export default function SimpleRequestDemo() {
                                             setSelectedModelClass(e.target.value);
                                             if (e.target.value) setSelectedModel('');
                                         }}>
-                                        <option value="">Select a class</option>
                                         {availableModelClasses.map(cls => (
                                             <option key={cls} value={cls}>
                                                 {cls}
@@ -440,161 +798,583 @@ export default function SimpleRequestDemo() {
                                     </select>
                                 </div>
 
-                                <div className="advanced-section">
+                                <div
+                                    className="advanced-section"
+                                    style={{
+                                        margin: '10px 0',
+                                        padding: '16px 0',
+                                        borderTop: '1px solid var(--border)',
+                                        borderBottom: '1px solid var(--border)',
+                                    }}>
                                     <button
                                         type="button"
-                                        className="advanced-toggle"
-                                        onClick={() => setShowAdvanced(!showAdvanced)}>
+                                        className={`advanced-toggle ${showAdvanced ? 'expanded' : ''}`}
+                                        onClick={() => setShowAdvanced(!showAdvanced)}
+                                        style={{
+                                            width: '100%',
+                                            background: 'none',
+                                            border: 'none',
+                                            padding: '8px 0',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            textAlign: 'left',
+                                            transition: 'color 0.2s',
+                                        }}>
                                         <svg
                                             width="16"
                                             height="16"
                                             viewBox="0 0 24 24"
                                             fill="currentColor"
-                                            className={`chevron ${showAdvanced ? 'rotate-180' : ''}`}
-                                            style={{ transition: 'transform 0.2s' }}>
+                                            className="chevron"
+                                            style={{
+                                                transition: 'transform 0.2s',
+                                                transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)',
+                                            }}>
                                             <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
                                         </svg>
                                         Advanced Settings
                                     </button>
 
-                                    {showAdvanced && (
-                                        <div className="advanced-content">
-                                            <div className="checkbox-group">
+                                    <div
+                                        className={`advanced-content ${showAdvanced ? 'expanded' : ''}`}
+                                        style={{
+                                            maxHeight: showAdvanced ? '600px' : '0',
+                                            overflow: 'hidden',
+                                            transition: 'max-height 0.3s ease-out',
+                                            padding: showAdvanced ? '20px 0' : '0',
+                                        }}>
+                                        <div
+                                            className="checkbox-group"
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <input
+                                                type="checkbox"
+                                                id="enableTools"
+                                                checked={enableTools}
+                                                onChange={e => setEnableTools(e.target.checked)}
+                                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                            />
+                                            <label
+                                                htmlFor="enableTools"
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                }}>
+                                                Enable Tool Calling
+                                            </label>
+                                        </div>
+
+                                        <div
+                                            className="setting-group"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Max Tokens
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={maxTokens}
+                                                onChange={e => setMaxTokens(Number(e.target.value))}
+                                                min="1"
+                                                max="8192"
+                                                style={{
+                                                    padding: '10px 12px',
+                                                    border: '1px solid var(--border-glass)',
+                                                    borderRadius: '8px',
+                                                    fontSize: '14px',
+                                                    background: 'var(--surface-glass)',
+                                                    backdropFilter: 'var(--blur-glass)',
+                                                    WebkitBackdropFilter: 'var(--blur-glass)',
+                                                    color: 'var(--text-primary)',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease',
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div
+                                            className="setting-group"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Temperature
+                                            </label>
+                                            <div
+                                                className="slider-container"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <input
-                                                    type="checkbox"
-                                                    id="enableTools"
-                                                    checked={enableTools}
-                                                    onChange={e => setEnableTools(e.target.checked)}
+                                                    type="range"
+                                                    min="0"
+                                                    max="2"
+                                                    step="0.1"
+                                                    value={temperature}
+                                                    onChange={e => setTemperature(Number(e.target.value))}
+                                                    style={{
+                                                        flex: 1,
+                                                        WebkitAppearance: 'none',
+                                                        height: '6px',
+                                                        background: 'rgba(255, 255, 255, 0.1)',
+                                                        borderRadius: '3px',
+                                                        outline: 'none',
+                                                    }}
                                                 />
-                                                <label htmlFor="enableTools" className="setting-label">
-                                                    Enable Tool Calling
-                                                </label>
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Max Tokens</label>
-                                                <input
-                                                    type="number"
-                                                    className="glass-input"
-                                                    value={maxTokens}
-                                                    onChange={e => setMaxTokens(Number(e.target.value))}
-                                                    min="1"
-                                                    max="8192"
-                                                />
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Temperature</label>
-                                                <div className="slider-container">
-                                                    <input
-                                                        type="range"
-                                                        min="0"
-                                                        max="2"
-                                                        step="0.1"
-                                                        value={temperature}
-                                                        onChange={e => setTemperature(Number(e.target.value))}
-                                                    />
-                                                    <span className="slider-value">{temperature.toFixed(1)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Top P</label>
-                                                <div className="slider-container">
-                                                    <input
-                                                        type="range"
-                                                        min="0"
-                                                        max="1"
-                                                        step="0.01"
-                                                        value={topP}
-                                                        onChange={e => setTopP(Number(e.target.value))}
-                                                    />
-                                                    <span className="slider-value">{topP.toFixed(2)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Frequency Penalty</label>
-                                                <div className="slider-container">
-                                                    <input
-                                                        type="range"
-                                                        min="-2"
-                                                        max="2"
-                                                        step="0.1"
-                                                        value={frequencyPenalty}
-                                                        onChange={e => setFrequencyPenalty(Number(e.target.value))}
-                                                    />
-                                                    <span className="slider-value">{frequencyPenalty.toFixed(1)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Presence Penalty</label>
-                                                <div className="slider-container">
-                                                    <input
-                                                        type="range"
-                                                        min="-2"
-                                                        max="2"
-                                                        step="0.1"
-                                                        value={presencePenalty}
-                                                        onChange={e => setPresencePenalty(Number(e.target.value))}
-                                                    />
-                                                    <span className="slider-value">{presencePenalty.toFixed(1)}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="setting-group">
-                                                <label className="setting-label">Seed (for reproducible outputs)</label>
-                                                <input
-                                                    type="number"
-                                                    className="glass-input"
-                                                    value={seed}
-                                                    onChange={e => setSeed(e.target.value)}
-                                                    placeholder="Leave empty for random"
-                                                />
+                                                <span
+                                                    className="slider-value"
+                                                    style={{
+                                                        minWidth: '50px',
+                                                        textAlign: 'right',
+                                                        fontWeight: '500',
+                                                    }}>
+                                                    {temperature.toFixed(1)}
+                                                </span>
                                             </div>
                                         </div>
-                                    )}
+
+                                        <div
+                                            className="setting-group"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Top P
+                                            </label>
+                                            <div
+                                                className="slider-container"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="1"
+                                                    step="0.01"
+                                                    value={topP}
+                                                    onChange={e => setTopP(Number(e.target.value))}
+                                                    style={{
+                                                        flex: 1,
+                                                        WebkitAppearance: 'none',
+                                                        height: '6px',
+                                                        background: 'rgba(255, 255, 255, 0.1)',
+                                                        borderRadius: '3px',
+                                                        outline: 'none',
+                                                    }}
+                                                />
+                                                <span
+                                                    className="slider-value"
+                                                    style={{
+                                                        minWidth: '50px',
+                                                        textAlign: 'right',
+                                                        fontWeight: '500',
+                                                    }}>
+                                                    {topP.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className="setting-group"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Frequency Penalty
+                                            </label>
+                                            <div
+                                                className="slider-container"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <input
+                                                    type="range"
+                                                    min="-2"
+                                                    max="2"
+                                                    step="0.1"
+                                                    value={frequencyPenalty}
+                                                    onChange={e => setFrequencyPenalty(Number(e.target.value))}
+                                                    style={{
+                                                        flex: 1,
+                                                        WebkitAppearance: 'none',
+                                                        height: '6px',
+                                                        background: 'rgba(255, 255, 255, 0.1)',
+                                                        borderRadius: '3px',
+                                                        outline: 'none',
+                                                    }}
+                                                />
+                                                <span
+                                                    className="slider-value"
+                                                    style={{
+                                                        minWidth: '50px',
+                                                        textAlign: 'right',
+                                                        fontWeight: '500',
+                                                    }}>
+                                                    {frequencyPenalty.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className="setting-group"
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px',
+                                                marginBottom: '20px',
+                                            }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Presence Penalty
+                                            </label>
+                                            <div
+                                                className="slider-container"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <input
+                                                    type="range"
+                                                    min="-2"
+                                                    max="2"
+                                                    step="0.1"
+                                                    value={presencePenalty}
+                                                    onChange={e => setPresencePenalty(Number(e.target.value))}
+                                                    style={{
+                                                        flex: 1,
+                                                        WebkitAppearance: 'none',
+                                                        height: '6px',
+                                                        background: 'rgba(255, 255, 255, 0.1)',
+                                                        borderRadius: '3px',
+                                                        outline: 'none',
+                                                    }}
+                                                />
+                                                <span
+                                                    className="slider-value"
+                                                    style={{
+                                                        minWidth: '50px',
+                                                        textAlign: 'right',
+                                                        fontWeight: '500',
+                                                    }}>
+                                                    {presencePenalty.toFixed(1)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            className="setting-group"
+                                            style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <label
+                                                className="setting-label"
+                                                style={{
+                                                    fontWeight: '500',
+                                                    fontSize: '14px',
+                                                    color: 'var(--text-secondary)',
+                                                }}>
+                                                Seed (for reproducible outputs)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={seed}
+                                                onChange={e => setSeed(e.target.value)}
+                                                placeholder="Leave empty for random"
+                                                style={{
+                                                    padding: '10px 12px',
+                                                    border: '1px solid var(--border-glass)',
+                                                    borderRadius: '8px',
+                                                    fontSize: '14px',
+                                                    background: 'var(--surface-glass)',
+                                                    backdropFilter: 'var(--blur-glass)',
+                                                    WebkitBackdropFilter: 'var(--blur-glass)',
+                                                    color: 'var(--text-primary)',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.3s ease',
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="stats-section">
-                                <div className="stat-card">
-                                    <div className="stat-value">{totalTokens.toLocaleString()}</div>
-                                    <div className="stat-label">Tokens</div>
+                            <div
+                                className="stats-section"
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '12px',
+                                    marginTop: '16px',
+                                }}>
+                                <div
+                                    className="stat-card"
+                                    style={{
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--border-glass)',
+                                        borderRadius: '12px',
+                                        padding: '12px',
+                                        textAlign: 'center',
+                                    }}>
+                                    <div
+                                        className="stat-value"
+                                        style={{
+                                            fontSize: '20px',
+                                            fontWeight: 'bold',
+                                            color: 'var(--accent-primary)',
+                                            textShadow: '0 0 10px var(--accent-primary-glow)',
+                                        }}>
+                                        {totalTokens.toLocaleString()}
+                                    </div>
+                                    <div
+                                        className="stat-label"
+                                        style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                        Tokens
+                                    </div>
                                 </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">${totalCost.toFixed(2)}</div>
-                                    <div className="stat-label">Cost</div>
+                                <div
+                                    className="stat-card"
+                                    style={{
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--border-glass)',
+                                        borderRadius: '12px',
+                                        padding: '12px',
+                                        textAlign: 'center',
+                                    }}>
+                                    <div
+                                        className="stat-value"
+                                        style={{
+                                            fontSize: '20px',
+                                            fontWeight: 'bold',
+                                            color: 'var(--accent-primary)',
+                                            textShadow: '0 0 10px var(--accent-primary-glow)',
+                                        }}>
+                                        ${totalCost.toFixed(2)}
+                                    </div>
+                                    <div
+                                        className="stat-label"
+                                        style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                        Cost
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="card">
-                            <h2>Examples</h2>
+                        <div
+                            className="card"
+                            style={{
+                                background: 'var(--surface-glass)',
+                                backdropFilter: 'var(--blur-glass)',
+                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                border: '1px solid var(--border-glass)',
+                                borderRadius: '16px',
+                                padding: '24px',
+                                boxShadow: 'var(--shadow-glass)',
+                            }}>
+                            <h2 style={{ marginBottom: '16px', color: 'var(--text)', fontSize: '18px' }}>Examples</h2>
                             <div className="examples-section">
-                                <button className="example-btn" onClick={() => sendExample('weather')}>
+                                <button
+                                    className="example-btn"
+                                    onClick={() => sendExample('weather')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        marginBottom: '8px',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--accent-primary)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '14px',
+                                        textAlign: 'left',
+                                        justifyContent: 'flex-start',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}>
                                     ☀️ &nbsp; Ask about weather
                                 </button>
-                                <button className="example-btn" onClick={() => sendExample('math')}>
+                                <button
+                                    className="example-btn"
+                                    onClick={() => sendExample('math')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        marginBottom: '8px',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--accent-primary)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '14px',
+                                        textAlign: 'left',
+                                        justifyContent: 'flex-start',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}>
                                     🧮 &nbsp; Solve math problem
                                 </button>
-                                <button className="example-btn" onClick={() => sendExample('search')}>
+                                <button
+                                    className="example-btn"
+                                    onClick={() => sendExample('search')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        marginBottom: '8px',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--accent-primary)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '14px',
+                                        textAlign: 'left',
+                                        justifyContent: 'flex-start',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}>
                                     🔍 &nbsp; Search for information
                                 </button>
-                                <button className="example-btn" onClick={() => sendExample('code')}>
+                                <button
+                                    className="example-btn"
+                                    onClick={() => sendExample('code')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        marginBottom: '8px',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--accent-primary)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '14px',
+                                        textAlign: 'left',
+                                        justifyContent: 'flex-start',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}>
                                     💻 &nbsp; Write some code
                                 </button>
-                                <button className="example-btn" onClick={() => sendExample('creative')}>
+                                <button
+                                    className="example-btn"
+                                    onClick={() => sendExample('creative')}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--accent-primary)',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '14px',
+                                        textAlign: 'left',
+                                        justifyContent: 'flex-start',
+                                        borderRadius: '12px',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                    }}>
                                     ✨ &nbsp; Creative writing
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div className="main-content">
-                        <div className="card chat-container">
-                            <div className="messages-container" ref={messagesContainerRef} onScroll={handleScroll}>
+                    <div
+                        className="main-content"
+                        style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            minWidth: 0,
+                            height: 'calc(100vh - 200px)',
+                            minHeight: '200px',
+                        }}>
+                        <div
+                            className="card chat-container"
+                            style={{
+                                background: 'var(--surface-glass)',
+                                backdropFilter: 'var(--blur-glass)',
+                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                border: '1px solid var(--border-glass)',
+                                borderRadius: '16px',
+                                padding: '24px',
+                                boxShadow: 'var(--shadow-glass)',
+                                flex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                minHeight: 0,
+                            }}>
+                            <div
+                                className="messages-container"
+                                ref={messagesContainerRef}
+                                onScroll={handleScroll}
+                                style={{
+                                    flex: 1,
+                                    overflowY: 'auto',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '16px',
+                                    minHeight: 0,
+                                    padding: '0px 5px 40px',
+                                }}>
                                 {showIntro && (
                                     <div
                                         style={{
@@ -633,18 +1413,54 @@ export default function SimpleRequestDemo() {
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            <div className="input-section">
-                                <div className="input-wrapper">
+                            <div className="input-section" style={{ flexShrink: 0, paddingTop: '20px' }}>
+                                <div
+                                    className="input-wrapper"
+                                    style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
                                     <textarea
-                                        className="glass-textarea"
                                         value={inputValue}
                                         onChange={e => setInputValue(e.target.value)}
                                         onKeyDown={handleKeyPress}
                                         placeholder="Type your message..."
                                         disabled={readyState !== ReadyState.OPEN}
+                                        style={{
+                                            flex: 1,
+                                            minHeight: '60px',
+                                            maxHeight: '200px',
+                                            padding: '12px',
+                                            border: '1px solid var(--border-glass)',
+                                            borderRadius: '12px',
+                                            fontSize: '16px',
+                                            fontFamily: 'inherit',
+                                            resize: 'vertical',
+                                            background: 'var(--surface-glass)',
+                                            backdropFilter: 'var(--blur-glass)',
+                                            WebkitBackdropFilter: 'var(--blur-glass)',
+                                            color: 'var(--text-primary)',
+                                            transition: 'all 0.3s ease',
+                                        }}
                                     />
                                     {isStreaming ? (
-                                        <button className="danger-btn" onClick={stopStreaming}>
+                                        <button
+                                            className="danger-btn"
+                                            onClick={stopStreaming}
+                                            style={{
+                                                background:
+                                                    'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))',
+                                                backdropFilter: 'var(--blur-glass)',
+                                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                                border: '1px solid var(--accent-error)',
+                                                color: 'var(--accent-error)',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                fontSize: '16px',
+                                                fontWeight: '500',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                            }}>
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                                 <path d="M6 6h12v12H6z" />
                                             </svg>
@@ -654,7 +1470,25 @@ export default function SimpleRequestDemo() {
                                         <button
                                             className="primary-btn"
                                             onClick={sendMessage}
-                                            disabled={readyState !== ReadyState.OPEN || !inputValue.trim()}>
+                                            disabled={readyState !== ReadyState.OPEN || !inputValue.trim()}
+                                            style={{
+                                                background:
+                                                    'linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1))',
+                                                backdropFilter: 'var(--blur-glass)',
+                                                WebkitBackdropFilter: 'var(--blur-glass)',
+                                                border: '1px solid var(--accent-primary)',
+                                                color: 'var(--accent-primary)',
+                                                padding: '12px 24px',
+                                                borderRadius: '8px',
+                                                fontSize: '16px',
+                                                fontWeight: '500',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                opacity: readyState !== ReadyState.OPEN || !inputValue.trim() ? 0.5 : 1,
+                                            }}>
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                                             </svg>
@@ -673,58 +1507,414 @@ export default function SimpleRequestDemo() {
                     className="modal-overlay"
                     onClick={e => {
                         if (e.target === e.currentTarget) setShowCodeModal(false);
+                    }}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
                     }}>
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2 className="modal-title">Generated Code</h2>
-                            <button className="modal-close" onClick={() => setShowCodeModal(false)}>
+                    <div
+                        className="modal"
+                        style={{
+                            background: 'var(--surface-glass)',
+                            backdropFilter: 'var(--blur-heavy)',
+                            WebkitBackdropFilter: 'var(--blur-heavy)',
+                            border: '1px solid var(--border-glass)',
+                            borderRadius: '16px',
+                            maxWidth: '800px',
+                            width: '90%',
+                            maxHeight: '80vh',
+                            overflow: 'hidden',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}>
+                        <div
+                            className="modal-header"
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '20px 24px',
+                                borderBottom: '1px solid var(--border-glass)',
+                            }}>
+                            <h2 className="modal-title" style={{ margin: 0, fontSize: '20px', color: 'var(--text)' }}>
+                                Generated Code
+                            </h2>
+                            <button
+                                className="modal-close"
+                                onClick={() => setShowCodeModal(false)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '24px',
+                                    cursor: 'pointer',
+                                    color: 'var(--text-secondary)',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    transition: 'all 0.2s',
+                                }}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
                                 </svg>
                             </button>
                         </div>
-                        <div className="modal-tabs-section">
-                            <div className="code-tabs">
+                        <div
+                            className="modal-tabs-section"
+                            style={{ borderBottom: '1px solid var(--border-glass)', background: 'var(--surface)' }}>
+                            <div className="code-tabs" style={{ display: 'flex', gap: '8px', padding: '0 24px' }}>
                                 <button
                                     className={`code-tab ${activeCodeTab === 'server' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('server')}>
+                                    onClick={() => setActiveCodeTab('server')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        padding: '12px 16px',
+                                        cursor: 'pointer',
+                                        borderBottom:
+                                            activeCodeTab === 'server'
+                                                ? '2px solid var(--primary)'
+                                                : '2px solid transparent',
+                                        borderRadius: 0,
+                                        fontSize: '16px',
+                                        fontWeight: '500',
+                                        color: activeCodeTab === 'server' ? 'var(--primary)' : 'var(--text-secondary)',
+                                        transition: 'all 0.2s',
+                                    }}>
                                     Server Code
                                 </button>
                                 <button
                                     className={`code-tab ${activeCodeTab === 'client' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('client')}>
+                                    onClick={() => setActiveCodeTab('client')}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        padding: '12px 16px',
+                                        cursor: 'pointer',
+                                        borderBottom:
+                                            activeCodeTab === 'client'
+                                                ? '2px solid var(--primary)'
+                                                : '2px solid transparent',
+                                        borderRadius: 0,
+                                        fontSize: '16px',
+                                        fontWeight: '500',
+                                        color: activeCodeTab === 'client' ? 'var(--primary)' : 'var(--text-secondary)',
+                                        transition: 'all 0.2s',
+                                    }}>
                                     Client Code
                                 </button>
                             </div>
                         </div>
-                        <div className="modal-body">
+                        <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
                             {activeCodeTab === 'server' ? (
-                                <div className="code-container">
+                                <div
+                                    className="code-container"
+                                    style={{
+                                        position: 'relative',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--border-glass)',
+                                        borderRadius: '12px',
+                                        padding: '20px',
+                                        fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
+                                        fontSize: '14px',
+                                        lineHeight: '1.5',
+                                        overflowX: 'auto',
+                                    }}>
                                     <button
                                         className="copy-button"
                                         onClick={() => {
-                                            navigator.clipboard.writeText('// Server code here');
+                                            const code = generateServerCode(
+                                                selectedModel,
+                                                selectedModelClass,
+                                                maxTokens,
+                                                temperature,
+                                                topP,
+                                                frequencyPenalty,
+                                                presencePenalty,
+                                                seed,
+                                                enableTools
+                                            );
+                                            navigator.clipboard.writeText(code);
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '12px',
+                                            right: '12px',
+                                            background:
+                                                'linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1))',
+                                            backdropFilter: 'var(--blur-glass)',
+                                            WebkitBackdropFilter: 'var(--blur-glass)',
+                                            border: '1px solid var(--accent-primary)',
+                                            color: 'var(--accent-primary)',
+                                            padding: '6px 12px',
+                                            borderRadius: '8px',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
                                         }}>
                                         Copy
                                     </button>
-                                    <pre>// Server code implementation</pre>
+                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                                        {generateServerCode(
+                                            selectedModel,
+                                            selectedModelClass,
+                                            maxTokens,
+                                            temperature,
+                                            topP,
+                                            frequencyPenalty,
+                                            presencePenalty,
+                                            seed,
+                                            enableTools
+                                        )}
+                                    </pre>
                                 </div>
                             ) : (
-                                <div className="code-container">
+                                <div
+                                    className="code-container"
+                                    style={{
+                                        position: 'relative',
+                                        background: 'var(--surface-glass)',
+                                        backdropFilter: 'var(--blur-glass)',
+                                        WebkitBackdropFilter: 'var(--blur-glass)',
+                                        border: '1px solid var(--border-glass)',
+                                        borderRadius: '12px',
+                                        padding: '20px',
+                                        fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
+                                        fontSize: '14px',
+                                        lineHeight: '1.5',
+                                        overflowX: 'auto',
+                                    }}>
                                     <button
                                         className="copy-button"
                                         onClick={() => {
-                                            navigator.clipboard.writeText('// Client code here');
+                                            const code = generateClientCode(
+                                                selectedModel,
+                                                selectedModelClass,
+                                                maxTokens,
+                                                temperature,
+                                                topP,
+                                                frequencyPenalty,
+                                                presencePenalty,
+                                                seed,
+                                                enableTools
+                                            );
+                                            navigator.clipboard.writeText(code);
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '12px',
+                                            right: '12px',
+                                            background:
+                                                'linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 158, 255, 0.1))',
+                                            backdropFilter: 'var(--blur-glass)',
+                                            WebkitBackdropFilter: 'var(--blur-glass)',
+                                            border: '1px solid var(--accent-primary)',
+                                            color: 'var(--accent-primary)',
+                                            padding: '6px 12px',
+                                            borderRadius: '8px',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
                                         }}>
                                         Copy
                                     </button>
-                                    <pre>// Client code implementation</pre>
+                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                                        {generateClientCode(
+                                            selectedModel,
+                                            selectedModelClass,
+                                            maxTokens,
+                                            temperature,
+                                            topP,
+                                            frequencyPenalty,
+                                            presencePenalty,
+                                            seed,
+                                            enableTools
+                                        )}
+                                    </pre>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
+            <style>{`
+                :root {
+                    --primary: #4a9eff;
+                    --primary-dark: #2d7dd2;
+                    --success: #10b981;
+                    --warning: #f59e0b;
+                    --error: #ef4444;
+                    --background: #0f0f0f;
+                    --surface: rgba(255, 255, 255, 0.05);
+                    --text: rgba(255, 255, 255, 0.95);
+                    --text-secondary: rgba(255, 255, 255, 0.7);
+                    --code-bg: rgba(255, 255, 255, 0.03);
+                    --border: rgba(255, 255, 255, 0.1);
+                }
+                
+                * {
+                    box-sizing: border-box;
+                }
+                
+                /* Custom slider styles */
+                input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    width: 18px;
+                    height: 18px;
+                    background: var(--accent-primary);
+                    border-radius: 50%;
+                    cursor: pointer;
+                    box-shadow: 0 0 10px var(--accent-primary-glow);
+                }
+                
+                input[type="range"]::-moz-range-thumb {
+                    width: 18px;
+                    height: 18px;
+                    background: var(--accent-primary);
+                    border-radius: 50%;
+                    cursor: pointer;
+                    box-shadow: 0 0 10px var(--accent-primary-glow);
+                    border: none;
+                }
+                
+                /* Message styling */
+                .message {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    animation: fadeIn 0.3s ease;
+                }
+                
+                .message-row {
+                    display: flex;
+                    gap: 12px;
+                    align-items: flex-start;
+                }
+                
+                .message-content .content {
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    line-height: 1.6;
+                }
+                
+                .message-content .content h1,
+                .message-content .content h2,
+                .message-content .content h3,
+                .message-content .content h4,
+                .message-content .content h5,
+                .message-content .content h6 {
+                    margin: 16px 0 8px 0;
+                    color: var(--text);
+                    font-weight: 600;
+                    white-space: normal;
+                }
+                
+                .message-content .content h1 { font-size: 1.5em; }
+                .message-content .content h2 { font-size: 1.3em; }
+                .message-content .content h3 { font-size: 1.1em; }
+                
+                .message-content .content p {
+                    margin: 0;
+                    line-height: 1.6;
+                    white-space: pre-wrap;
+                }
+                
+                .message-content .content ul,
+                .message-content .content ol {
+                    margin: 0;
+                    padding-left: 20px;
+                }
+                
+                .message-content .content li {
+                    margin: 0;
+                }
+                
+                .message-content .content blockquote {
+                    border-left: 4px solid var(--primary);
+                    padding-left: 16px;
+                    margin: 10px 0;
+                    color: var(--text-secondary);
+                    font-style: italic;
+                }
+                
+                .message-content .content table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 10px 0;
+                }
+                
+                .message-content .content th,
+                .message-content .content td {
+                    border: 1px solid var(--border);
+                    padding: 8px 12px;
+                    text-align: left;
+                }
+                
+                .message-content .content th {
+                    background: #f0f0f0;
+                    font-weight: 600;
+                }
+                
+                .message-content pre {
+                    background: var(--surface-glass);
+                    border: 1px solid var(--border-glass);
+                    border-radius: 8px;
+                    padding: 12px;
+                    overflow-x: auto;
+                    margin: 8px 0;
+                    backdrop-filter: var(--blur-glass);
+                    -webkit-backdrop-filter: var(--blur-glass);
+                }
+                
+                .message-content code {
+                    background: rgba(74, 158, 255, 0.1);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                    font-size: 14px;
+                    border: 1px solid rgba(74, 158, 255, 0.2);
+                }
+                
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                
+                @keyframes typing {
+                    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+                    30% { opacity: 1; transform: scale(1); }
+                }
+                
+                /* Mobile responsive */
+                @media (max-width: 768px) {
+                    .page-wrapper {
+                        height: auto;
+                    }
+                    
+                    .container {
+                        flex-direction: column;
+                        height: auto;
+                    }
+                    
+                    .sidebar {
+                        width: 100%;
+                        height: auto;
+                    }
+                    
+                    .messages-container {
+                        min-height: 400px;
+                    }
+                }
+            `}</style>
         </div>
     );
 }
