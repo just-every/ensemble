@@ -1,5 +1,5 @@
 import React from 'react';
-import './glassmorphism.css';
+import './style.scss';
 
 interface StatusIndicatorProps {
     status: 'connected' | 'connecting' | 'disconnected' | 'processing';

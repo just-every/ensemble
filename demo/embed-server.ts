@@ -21,11 +21,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Load .env from root directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
-// Debug: Log which API keys were loaded
-console.log('🔐 Environment variables loaded:');
-console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✅ Set' : '❌ Not set');
-
 const app = express();
 const server = createServer(app);
 const PORT = process.env.EMBED_PORT || process.env.PORT || 3006;
@@ -85,7 +80,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // Handle WebSocket connections
 wss.on('connection', ws => {
     const connectionId = Math.random().toString(36).substring(7);
-    console.log(`🔢 New client connected: ${connectionId}`);
+    console.log(`New client connected: ${connectionId}`);
 
     // Store connection info
     activeConnections.set(connectionId, {
@@ -203,7 +198,7 @@ wss.on('connection', ws => {
 
     // Handle client disconnect
     ws.on('close', () => {
-        console.log(`👋 Client disconnected: ${connectionId}`);
+        console.log(`Client disconnected: ${connectionId}`);
 
         const connInfo = activeConnections.get(connectionId);
         if (connInfo) {
@@ -239,7 +234,7 @@ async function handleEmbed(connectionId: string, message: any) {
         return;
     }
 
-    console.log(`🧮 Generating embeddings for ${connectionId}:`);
+    console.log(`Generating embeddings for ${connectionId}:`);
     console.log(`   Model: ${model}`);
     console.log(`   Dimensions: ${dimensions || 'default'}`);
     console.log(`   Texts: ${texts.length}`);
@@ -342,7 +337,7 @@ async function handleSearch(connectionId: string, message: any) {
         return;
     }
 
-    console.log(`🔍 Searching for ${connectionId}: "${query}"`);
+    console.log(`Searching for ${connectionId}: "${query}"`);
 
     try {
         // Send start event
@@ -430,7 +425,7 @@ async function handleAnalyze(connectionId: string, message: any) {
         return;
     }
 
-    console.log(`📊 Analyzing embeddings for ${connectionId}`);
+    console.log(`Analyzing embeddings for ${connectionId}`);
 
     try {
         // Get embeddings
@@ -507,9 +502,9 @@ Provide a brief analysis of:
             }
         }
 
-        console.log(`📊 Analysis result for ${connectionId}: ${aiAnalysis.length} characters`);
+        console.log(`Analysis result for ${connectionId}: ${aiAnalysis.length} characters`);
         if (!aiAnalysis) {
-            console.warn('⚠️ Analysis was empty! Sending default message.');
+            console.warn('Analysis was empty! Sending default message.');
             aiAnalysis = 'Analysis generation failed. Please try again.';
         }
 
@@ -545,7 +540,5 @@ Provide a brief analysis of:
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`\n🚀 Ensemble Embed server running on port ${PORT}`);
-    console.log(`📡 WebSocket: ws://localhost:${PORT}`);
-    console.log(`🌐 Open http://localhost:${PORT}/embed-client.html to test\n`);
+    console.log(`Embed server running on port ${PORT}`);
 });

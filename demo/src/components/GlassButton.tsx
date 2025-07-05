@@ -1,5 +1,5 @@
 import React from 'react';
-import './glassmorphism.css';
+import './style.scss';
 
 interface GlassButtonProps {
     children: React.ReactNode;
@@ -20,14 +20,28 @@ export const GlassButton: React.FC<GlassButtonProps> = ({
     className = '',
     style = {},
 }) => {
-    const variantClass = variant !== 'default' ? ` ${variant}` : '';
+    // Map variants to actual button classes
+    const getButtonClass = () => {
+        switch (variant) {
+            case 'primary':
+                return 'primary-btn';
+            case 'danger':
+                return 'danger-btn';
+            case 'success':
+                return 'success-btn';
+            case 'warning':
+                return 'warning-btn';
+            default:
+                return 'glass-button';
+        }
+    };
 
     return (
         <button
             type={type}
             onClick={onClick}
             disabled={disabled}
-            className={`glass-button${variantClass} ${className}`}
+            className={`${getButtonClass()} ${className}`}
             style={style}>
             {children}
         </button>

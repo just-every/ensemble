@@ -1,5 +1,5 @@
 import React from 'react';
-import './glassmorphism.css';
+import './style.scss';
 
 interface ProgressBarProps {
     progress: number; // 0-100

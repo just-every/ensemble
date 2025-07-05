@@ -229,7 +229,6 @@ async function convertToGeminiFunctionDeclarations(tools: ToolFunction[]): Promi
         tools.map(async tool => {
             // Special handling for Google web search
             if (tool.definition.function.name === 'google_web_search') {
-                console.log('[Gemini] Enabling Google Search grounding');
                 // Return null for this special tool - we'll handle it separately in the config
                 return null;
             }

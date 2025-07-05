@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import './glassmorphism.css';
+import './style.scss';
 
 interface ModalProps {
     isOpen: boolean;

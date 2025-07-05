@@ -21,11 +21,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Load .env from root directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
-// Debug: Log which API keys were loaded
-console.log('🔐 Environment variables loaded:');
-console.log('   GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
-
 const app = express();
 const server = createServer(app);
 const PORT = process.env.TRANSCRIPTION_PORT || process.env.PORT || 3003;
@@ -219,28 +214,7 @@ app.get('/', (req, res) => {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`
-🚀 Ensemble Transcription Server
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📡 Server running at: http://localhost:${PORT}
-🌐 Client URL: http://localhost:${PORT}/listen-client.html
-🔑 API Keys:
-   Gemini: ${process.env.GOOGLE_API_KEY ? '✅ Found' : '❌ Missing (set GOOGLE_API_KEY)'}
-   OpenAI: ${process.env.OPENAI_API_KEY ? '✅ Found' : '❌ Missing (set OPENAI_API_KEY)'}
-
-📝 Features:
-  • Real-time audio streaming via WebSocket
-  • Multiple model support (Gemini & OpenAI)
-  • Automatic buffering and chunk management
-  • Cost tracking per session
-
-💡 Usage:
-  1. Set your API keys (GOOGLE_API_KEY and/or OPENAI_API_KEY)
-  2. Run: npm run demo:transcription
-  3. Open the client URL in your browser
-  4. Select a model and allow microphone access
-`);
+    console.log(`Transcription server running on port ${PORT}`);
 });
 
 // Graceful shutdown

@@ -715,9 +715,32 @@ export class OpenAIProvider extends BaseModelProvider {
                 // Keep the original model for class comparison
                 const originalModel: string | undefined = (message as any).model;
 
-                delete (message as any).timestamp;
-                delete (message as any).model;
-                delete (message as any).pinned;
+                // Whitelist approach - only keep properties that OpenAI accepts
+                const allowedMessageProps = [
+                    'type',
+                    'role',
+                    'content',
+                    'status',
+                    'id',
+                    'name',
+                    // For thinking messages
+                    'thinking_id',
+                    // For function calls
+                    'function_name',
+                    'function_arguments',
+                    // For function call outputs
+                    'output',
+                    // For images
+                    'images',
+                    'image_detail',
+                ];
+
+                // Remove any properties not in the whitelist
+                Object.keys(message).forEach(key => {
+                    if (!allowedMessageProps.includes(key)) {
+                        delete (message as any)[key];
+                    }
+                });
 
                 // Handle thinking messages
                 if (message.type === 'thinking') {

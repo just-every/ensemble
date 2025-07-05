@@ -1,7 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import NavBar from './components/NavBar';
-import './components/glassmorphism.css';
+import './components/style.scss';
+import ConnectionWarning from './components/ConnectionWarning';
+import { LISTEN_WS_URL } from './config/websocket';
+import {
+    DemoHeader,
+    Card,
+    GlassButton,
+    ConnectionStatus,
+    StatsGrid,
+    ModelSelector,
+    ShowCodeButton,
+    CodeModal,
+    formatDuration,
+    formatBytes,
+    formatNumber,
+    formatCurrency,
+} from '@just-every/demo-ui';
 
 const ListenDemo: React.FC = () => {
     // State management
@@ -17,8 +32,9 @@ const ListenDemo: React.FC = () => {
     const [totalTokens, setTotalTokens] = useState(0);
     const [cost, setCost] = useState(0);
     const [showCodeModal, setShowCodeModal] = useState(false);
-    const [activeCodeTab, setActiveCodeTab] = useState<'server' | 'client'>('server');
-
+    const [, setHasAttemptedConnection] = useState(false);
+    const [showConnectionWarning, setShowConnectionWarning] = useState(false);
+    const [audioChunksSent, setAudioChunksSent] = useState(0);
     // Refs
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -27,62 +43,71 @@ const ListenDemo: React.FC = () => {
     const analyserRef = useRef<AnalyserNode | null>(null);
     const visualizerBarsRef = useRef<HTMLDivElement[]>([]);
     const startTimeRef = useRef<number | null>(null);
-    const animationFrameRef = useRef<number | null>(null);
     const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const transcriptContainerRef = useRef<HTMLDivElement>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const shouldVisualizeRef = useRef<boolean>(false);
 
     // WebSocket configuration
-    const socketUrl = 'ws://localhost:3003';
-    const { sendMessage, lastMessage, readyState } = useWebSocket(isRecording ? socketUrl : null, {
+    const { sendMessage, lastMessage, readyState, getWebSocket } = useWebSocket(isRecording ? LISTEN_WS_URL : null, {
         shouldReconnect: () => true,
         reconnectAttempts: 10,
         reconnectInterval: 3000,
+        onOpen: () => {
+            console.log('🔌 WebSocket opened - connection established');
+        },
+        onError: error => {
+            console.error('❌ WebSocket error:', error);
+        },
+        onMessage: event => {
+            console.log('📨 Raw WebSocket message received:', event);
+        },
     });
-
-    // Create visualizer bars
-    useEffect(() => {
-        const visualizer = document.getElementById('visualizer');
-        if (!visualizer) return;
-
-        const container = document.getElementById('audioVisualizer');
-        const containerWidth = container?.offsetWidth || 800;
-        const pixelsPerBar = 6;
-        const barCount = Math.max(32, Math.floor(containerWidth / pixelsPerBar));
-
-        visualizer.innerHTML = '';
-        visualizerBarsRef.current = [];
-
-        for (let i = 0; i < barCount; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'audio-bar';
-            bar.style.height = '4px';
-            bar.style.flex = '1';
-            visualizer.appendChild(bar);
-            visualizerBarsRef.current.push(bar);
-        }
-    }, []);
 
     // Handle WebSocket connection status
     useEffect(() => {
+        console.log('🔄 WebSocket state change - readyState:', readyState, 'isRecording:', isRecording);
+
         if (!isRecording) {
+            console.log('📴 Not recording - setting status to disconnected');
             setConnectionStatus('disconnected');
+            setShowConnectionWarning(false);
             return;
         }
 
         switch (readyState) {
             case ReadyState.CONNECTING:
+                console.log('🔄 WebSocket connecting...');
                 setConnectionStatus('connecting');
                 break;
-            case ReadyState.OPEN:
+            case ReadyState.OPEN: {
+                console.log('✅ WebSocket connected successfully');
                 setConnectionStatus('connected');
-                sendMessage(
-                    JSON.stringify({
-                        type: 'start',
-                        model: selectedModel,
-                    })
-                );
+                setShowConnectionWarning(false);
+
+                // Set binary type for audio data
+                const ws = getWebSocket();
+                if (ws && 'binaryType' in ws) {
+                    (ws as WebSocket).binaryType = 'arraybuffer';
+                    console.log('🔧 WebSocket binary type set to arraybuffer');
+                } else {
+                    console.warn('⚠️ WebSocket is null when trying to set binary type');
+                }
+
+                const startMessage = {
+                    type: 'start',
+                    model: selectedModel,
+                };
+                console.log('📤 Sending start message:', startMessage);
+                sendMessage(JSON.stringify(startMessage));
                 break;
+            }
             case ReadyState.CLOSING:
+                console.log('⏹️ WebSocket closing...');
+                setConnectionStatus('disconnected');
+                break;
             case ReadyState.CLOSED:
+                console.log('❌ WebSocket closed');
                 setConnectionStatus('disconnected');
                 break;
         }
@@ -92,63 +117,78 @@ const ListenDemo: React.FC = () => {
     useEffect(() => {
         if (!lastMessage) return;
 
+        console.log('📥 New WebSocket message received:', lastMessage.data);
+
         try {
             const data = JSON.parse(lastMessage.data);
+            console.log('📋 Parsed message data:', data);
             handleServerMessage(data);
         } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
+            console.error('❌ Failed to parse WebSocket message:', error, 'Raw data:', lastMessage.data);
         }
     }, [lastMessage]);
 
-    // Update duration timer
+    // Create visualizer bars on component mount
     useEffect(() => {
-        if (isRecording && startTimeRef.current) {
-            durationIntervalRef.current = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
-                setDuration(elapsed);
-            }, 1000);
-        } else {
-            if (durationIntervalRef.current) {
-                clearInterval(durationIntervalRef.current);
-                durationIntervalRef.current = null;
-            }
-        }
+        const createVisualizer = () => {
+            const visualizer = document.getElementById('visualizer');
+            const container = document.getElementById('audioVisualizer');
+            if (!visualizer || !container) return;
 
-        return () => {
-            if (durationIntervalRef.current) {
-                clearInterval(durationIntervalRef.current);
+            // Clear any existing bars
+            visualizer.innerHTML = '';
+            visualizerBarsRef.current = [];
+
+            // Calculate optimal bar count based on container width
+            const containerWidth = container.offsetWidth || 800;
+            const pixelsPerBar = 10; // Adjusted for narrower bars
+            const barCount = Math.min(64, Math.max(32, Math.floor(containerWidth / pixelsPerBar)));
+
+            for (let i = 0; i < barCount; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'audio-bar';
+                bar.style.height = '4px';
+                bar.style.flex = '1';
+                visualizer.appendChild(bar);
+                visualizerBarsRef.current.push(bar);
             }
         };
-    }, [isRecording]);
 
+        createVisualizer();
+
+        // Recreate on window resize
+        const handleResize = () => createVisualizer();
+        window.addEventListener('resize', handleResize);
+
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Message handler functions
     const handleServerMessage = (data: {
         type: string;
         delta?: string;
         text?: string;
         error?: string;
-        message?: string;
-        usage?: {
-            total_tokens?: number;
-            input_tokens?: number;
-            output_tokens?: number;
-        };
+        [key: string]: unknown;
     }) => {
+        console.log('🎯 Handling server message - type:', data.type, 'data:', data);
+
         switch (data.type) {
             case 'transcription_start':
-                console.log('Transcription started');
+                console.log('🎙️ Transcription started - server is ready to receive audio');
                 break;
-
             case 'transcription_turn_delta':
-                appendTranscript(data.delta || '', 'preview');
+                console.log('📝 Transcription delta received:', data.delta);
+                // Append delta text directly like original
+                handleTranscription({ text: data.delta || '' });
                 break;
-
             case 'transcription_turn_complete':
-                console.log('Turn complete:', data.text);
-                appendTranscript(data.text || '');
-                appendTranscript('\n--- Turn Complete ---\n');
+                console.log('✅ Turn complete:', data.text);
+                // Add turn complete separator like original
+                handleTranscription({ text: '\n\n--- Turn Complete ---\n\n' });
                 break;
-
             case 'cost_update':
+                console.log('💰 Cost update received:', data.usage);
                 if (data.usage) {
                     setTotalTokens(data.usage.total_tokens || 0);
                     const inputCost = ((data.usage.input_tokens || 0) * 0.2) / 1_000_000;
@@ -156,171 +196,295 @@ const ListenDemo: React.FC = () => {
                     setCost(inputCost + outputCost);
                 }
                 break;
-
-            case 'transcription_complete':
-                console.log('Transcription complete:', data.text);
-                break;
-
             case 'error':
-                showError(data.error || 'Unknown error');
+                console.error('❌ Server error received:', data.error);
+                setError(data.error || 'An error occurred');
+                stopRecording();
                 break;
-
             case 'status':
-                console.log('Server status:', data.message);
+                console.log('📊 Server status:', data.message);
                 break;
+            default:
+                console.warn('⚠️ Unknown message type received:', data.type);
         }
     };
 
-    const appendTranscript = (text: string, type: 'default' | 'preview' = 'default') => {
-        const container = document.getElementById('transcript');
-        if (!container) return;
+    const handleTranscription = (data: { text?: string; [key: string]: unknown }) => {
+        const containerEl = transcriptContainerRef.current;
+        if (!containerEl) return;
 
         // Remove empty state message if present
-        const emptyMsg = container.querySelector('.transcript-empty');
+        const emptyMsg = containerEl.querySelector('.transcript-empty');
         if (emptyMsg) {
             emptyMsg.remove();
         }
 
-        // Check if we can append to existing preview line
-        if (type === 'preview') {
-            const lastLine = container.lastElementChild;
-            if (lastLine && lastLine.classList.contains('preview')) {
-                // Append to existing preview line
-                lastLine.textContent = (lastLine.textContent || '') + text;
-                setTranscript(prev => prev + text);
-                container.scrollTop = container.scrollHeight;
-                return;
-            }
-        }
-
-        // Add new transcript line
-        const line = document.createElement('div');
-        line.className = type === 'preview' ? 'transcript-line preview' : 'transcript-line';
-        line.textContent = text;
-        container.appendChild(line);
-
-        // Update full transcript
-        setTranscript(prev => prev + text);
-
-        // Auto-scroll to bottom
-        container.scrollTop = container.scrollHeight;
+        // Simple append like the original
+        containerEl.textContent += data.text;
+        containerEl.scrollTop = containerEl.scrollHeight;
     };
 
-    const startRecording = async () => {
+    // Audio setup
+    const startAudioCapture = async () => {
         try {
-            setConnectionStatus('connecting');
+            console.log('🎤 Starting audio capture...');
 
-            // Get microphone access
-            mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+            if (!navigator.mediaDevices?.getUserMedia) {
+                console.error('❌ Browser does not support getUserMedia');
+                throw new Error('Browser does not support audio capture');
+            }
+
+            console.log('🎧 Requesting microphone access...');
+            const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
                     sampleRate: 16000,
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true,
                 },
             });
+            console.log('✅ Microphone access granted, stream:', stream);
 
-            setIsRecording(true);
-            startTimeRef.current = Date.now();
-            setError(null);
+            mediaStreamRef.current = stream;
 
-            // Start audio capture
-            startAudioCapture();
-        } catch (error) {
-            console.error('Failed to start recording:', error);
-            showError((error as Error).message || 'Failed to access microphone');
-            setConnectionStatus('error');
-        }
-    };
+            console.log('🎵 Creating audio context...');
+            audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)({
+                sampleRate: 16000,
+            });
+            console.log('✅ Audio context created:', audioContextRef.current);
 
-    const startAudioCapture = () => {
-        if (!mediaStreamRef.current) return;
+            console.log('🔗 Creating audio nodes...');
+            sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
+            processorRef.current = audioContextRef.current.createScriptProcessor(1024, 1, 1);
 
-        audioContextRef.current = new AudioContext({
-            sampleRate: 16000,
-            latencyHint: 'interactive',
-        });
+            // Create analyser for visualization with proper settings
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 512; // Higher for better frequency resolution
+            analyserRef.current.smoothingTimeConstant = 0.8; // More smoothing for frequency display
+            analyserRef.current.minDecibels = -70; // Less sensitive to quiet sounds
+            analyserRef.current.maxDecibels = -20; // More headroom for loud sounds
+            console.log(
+                '✅ Audio nodes created - source:',
+                sourceRef.current,
+                'processor:',
+                processorRef.current,
+                'analyser:',
+                analyserRef.current
+            );
 
-        sourceRef.current = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+            console.log('🔌 Connecting audio nodes...');
+            sourceRef.current.connect(analyserRef.current);
+            sourceRef.current.connect(processorRef.current);
+            processorRef.current.connect(audioContextRef.current.destination);
+            console.log('✅ Audio nodes connected');
 
-        // Create analyser for visualization
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.1;
-        analyserRef.current.minDecibels = -90;
-        analyserRef.current.maxDecibels = -10;
-        sourceRef.current.connect(analyserRef.current);
+            let audioChunkCount = 0;
+            let totalAudioBytesSent = 0;
 
-        // Create script processor
-        processorRef.current = audioContextRef.current.createScriptProcessor(1024, 1, 1);
+            processorRef.current.onaudioprocess = (e: AudioProcessingEvent) => {
+                audioChunkCount++;
 
-        processorRef.current.onaudioprocess = e => {
-            if (readyState === ReadyState.OPEN) {
-                const float32Audio = e.inputBuffer.getChannelData(0);
-                const int16Audio = convertFloat32ToInt16(float32Audio);
+                // Log every 100 audio chunks to avoid spam
+                if (audioChunkCount % 100 === 0) {
+                    console.log(
+                        `🎵 Audio processor called ${audioChunkCount} times, connection status:`,
+                        connectionStatus
+                    );
+                }
 
-                // Send audio data
-                sendMessage(int16Audio.buffer);
-                setTotalBytes(prev => prev + int16Audio.buffer.byteLength);
+                const ws = getWebSocket();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const int16Array = new Int16Array(inputData.length);
+
+                    // Check if we have actual audio data
+                    let hasAudioData = false;
+                    for (let i = 0; i < inputData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+                        if (Math.abs(inputData[i]) > 0.01) {
+                            hasAudioData = true;
+                        }
+                    }
+
+                    if ('send' in ws) {
+                        (ws as WebSocket).send(int16Array.buffer);
+                    }
+                    totalAudioBytesSent += int16Array.buffer.byteLength;
+                    setTotalBytes(prev => prev + int16Array.buffer.byteLength);
+                    setAudioChunksSent(prev => prev + 1);
+
+                    // Log first few audio sends for debugging
+                    if (audioChunkCount <= 10) {
+                        console.log(
+                            `📤 Sent audio chunk ${audioChunkCount}, size: ${int16Array.buffer.byteLength} bytes, has audio data: ${hasAudioData}, WebSocket readyState: ${ws.readyState}`
+                        );
+                    }
+
+                    // Log every 1000 chunks with summary
+                    if (audioChunkCount % 1000 === 0) {
+                        console.log(
+                            `📊 Audio summary - ${audioChunkCount} chunks sent, ${totalAudioBytesSent} total bytes, WebSocket state: ${ws.readyState}`
+                        );
+                    }
+                } else {
+                    // Only log first few times to avoid spam
+                    if (audioChunkCount <= 5) {
+                        console.log(
+                            `🔄 Audio processor called but WebSocket not ready - state: ${ws?.readyState || 'null'}, chunk ${audioChunkCount}`
+                        );
+                    }
+                }
+            };
+
+            // Ensure visualizer bars exist before starting visualization
+            const visualizer = document.getElementById('visualizer');
+            const container = document.getElementById('audioVisualizer');
+
+            if (visualizer && visualizerBarsRef.current.length === 0) {
+                const containerWidth = container?.offsetWidth || 800;
+                const pixelsPerBar = 10; // Adjusted for narrower bars
+                const barCount = Math.min(64, Math.max(32, Math.floor(containerWidth / pixelsPerBar)));
+
+                visualizer.innerHTML = '';
+                visualizerBarsRef.current = [];
+
+                for (let i = 0; i < barCount; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'audio-bar';
+                    bar.style.height = '4px';
+                    bar.style.flex = '1';
+                    visualizer.appendChild(bar);
+                    visualizerBarsRef.current.push(bar);
+                }
             }
-        };
 
-        sourceRef.current.connect(processorRef.current);
-        processorRef.current.connect(audioContextRef.current.destination);
+            // Set flag to start visualization
+            shouldVisualizeRef.current = true;
 
-        // Start visualization
-        visualize();
+            // Start visualization
+            visualize();
+
+            console.log('✅ Audio processor event handler set up');
+            return true;
+        } catch (err) {
+            console.error('❌ Failed to start audio capture:', err);
+            setError(err instanceof Error ? err.message : 'Failed to access microphone');
+            return false;
+        }
     };
 
-    const convertFloat32ToInt16 = (float32Array: Float32Array): Int16Array => {
-        const int16Array = new Int16Array(float32Array.length);
-        for (let i = 0; i < float32Array.length; i++) {
-            const s = Math.max(-1, Math.min(1, float32Array[i]));
-            int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    // Recording controls
+    const startRecording = async () => {
+        console.log('🎬 Starting recording session...');
+        setError(null);
+        setHasAttemptedConnection(true);
+
+        // Immediately set to connecting state for UI feedback
+        setConnectionStatus('connecting');
+
+        console.log('🎤 Initializing audio capture...');
+        const audioStarted = await startAudioCapture();
+        if (!audioStarted) {
+            console.error('❌ Audio capture failed to start');
+            return;
         }
-        return int16Array;
+        console.log('✅ Audio capture started successfully');
+
+        setIsRecording(true);
+        startTimeRef.current = Date.now();
+        console.log('⏰ Recording timer started at:', new Date(startTimeRef.current));
+
+        // Show connection warning after a delay if still not connected
+        setTimeout(() => {
+            if (connectionStatus !== 'connected') {
+                console.warn('⚠️ Connection timeout - showing warning after 3 seconds');
+                setShowConnectionWarning(true);
+            }
+        }, 3000);
+
+        durationIntervalRef.current = setInterval(() => {
+            if (startTimeRef.current) {
+                setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+            }
+        }, 100);
+
+        console.log('🎥 Recording session initialized');
     };
 
     const visualize = () => {
-        if (!analyserRef.current) return;
+        if (!analyserRef.current || !shouldVisualizeRef.current) {
+            return;
+        }
 
-        const dataArray = new Uint8Array(analyserRef.current.fftSize);
-        analyserRef.current.getByteTimeDomainData(dataArray);
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyserRef.current.getByteFrequencyData(dataArray);
 
-        // Update bars with waveform data
         const barCount = visualizerBarsRef.current.length;
+        if (barCount === 0) return;
 
-        // Fast volume calculation
-        let sum = 0;
-        const sampleStep = Math.max(1, Math.floor(dataArray.length / 32));
-        for (let i = 0; i < dataArray.length; i += sampleStep) {
-            const amplitude = Math.abs(dataArray[i] - 128);
-            sum += amplitude;
+        // Focus on voice frequency range (roughly 80Hz to 2000Hz)
+        // At 16kHz sample rate, each bin represents ~31.25Hz
+        const minFreqBin = Math.floor(80 / 31.25); // ~2-3
+        const maxFreqBin = Math.floor(2000 / 31.25); // ~64
+        const usefulBins = maxFreqBin - minFreqBin;
+
+        // Map bars to frequency bins - create symmetric visualization
+        const heights: string[] = new Array(barCount);
+        const halfBarCount = Math.floor(barCount / 2);
+
+        // Process frequency data for half the bars
+        const halfHeights: number[] = new Array(halfBarCount);
+
+        for (let i = 0; i < halfBarCount; i++) {
+            // Map to frequency bins, starting from low frequencies
+            const binIndex = minFreqBin + Math.floor((i / halfBarCount) * usefulBins);
+            const value = dataArray[binIndex] || 0;
+
+            // Convert byte (0-255) to height with logarithmic scaling
+            const normalizedValue = value / 255;
+            const scaledValue = Math.pow(normalizedValue, 0.7);
+            const height = Math.max(4, scaledValue * 60);
+            halfHeights[i] = height;
         }
-        const avgAmplitude = sum / (dataArray.length / sampleStep);
-        const volumeMultiplier = Math.max(1.05, avgAmplitude / 7);
 
+        // Create symmetric visualization - low frequencies in center
         for (let i = 0; i < barCount; i++) {
-            const sampleIndex = Math.floor((i / barCount) * dataArray.length);
-            const value = dataArray[sampleIndex];
-            let amplitude = Math.abs(value - 128);
-            amplitude = amplitude * volumeMultiplier * 1.96;
-            const height = Math.max(8, Math.min(amplitude * 1.54, 77));
-            visualizerBarsRef.current[i].style.height = `${height}px`;
+            if (i < halfBarCount) {
+                // Left side - reversed (high to low frequencies)
+                const sourceIndex = halfBarCount - 1 - i;
+                heights[i] = `${halfHeights[sourceIndex]}px`;
+            } else {
+                // Right side - normal (low to high frequencies)
+                const sourceIndex = i - halfBarCount;
+                heights[i] = `${halfHeights[sourceIndex]}px`;
+            }
         }
 
-        if (isRecording) {
-            animationFrameRef.current = requestAnimationFrame(visualize);
-        }
+        // Apply all height changes at once
+        requestAnimationFrame(() => {
+            for (let i = 0; i < barCount; i++) {
+                if (visualizerBarsRef.current[i]) {
+                    visualizerBarsRef.current[i].style.height = heights[i];
+                }
+            }
+        });
+
+        animationFrameRef.current = requestAnimationFrame(visualize);
     };
 
     const stopRecording = () => {
-        setIsRecording(false);
-        cleanup();
-    };
+        console.log('🛑 Stopping recording session...');
 
-    const cleanup = () => {
+        shouldVisualizeRef.current = false;
+
+        if (durationIntervalRef.current) {
+            clearInterval(durationIntervalRef.current);
+            durationIntervalRef.current = null;
+            console.log('⏰ Duration timer cleared');
+        }
+
         // Reset visualizer bars
         visualizerBarsRef.current.forEach(bar => {
             bar.style.height = '4px';
@@ -332,674 +496,440 @@ const ListenDemo: React.FC = () => {
             animationFrameRef.current = null;
         }
 
-        // Stop audio
         if (processorRef.current) {
             processorRef.current.disconnect();
             processorRef.current = null;
+            console.log('🔌 Audio processor disconnected');
         }
 
         if (sourceRef.current) {
             sourceRef.current.disconnect();
             sourceRef.current = null;
+            console.log('🔌 Audio source disconnected');
         }
 
         if (analyserRef.current) {
             analyserRef.current.disconnect();
             analyserRef.current = null;
+            console.log('🔌 Audio analyser disconnected');
         }
 
-        if (audioContextRef.current) {
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
             audioContextRef.current.close();
             audioContextRef.current = null;
+            console.log('🔌 Audio context closed');
         }
 
         if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current.getTracks().forEach(track => {
+                track.stop();
+                console.log('🔌 Media track stopped:', track.kind);
+            });
             mediaStreamRef.current = null;
+            console.log('🔌 Media stream cleared');
         }
 
-        setConnectionStatus('disconnected');
+        setIsRecording(false);
+
+        const ws = getWebSocket();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const stopMessage = { type: 'stop' };
+            console.log('📤 Sending stop message to server:', stopMessage);
+            if ('send' in ws) {
+                (ws as WebSocket).send(JSON.stringify(stopMessage));
+            }
+        } else {
+            console.warn('⚠️ Cannot send stop message - WebSocket state:', ws?.readyState || 'null');
+        }
+
+        console.log('✅ Recording session stopped');
     };
 
     const clearTranscript = () => {
-        setTranscript('');
-        const container = document.getElementById('transcript');
-        if (container) {
-            container.innerHTML = '<div class="transcript-empty">Transcript will appear here...</div>';
+        if (transcriptContainerRef.current) {
+            transcriptContainerRef.current.innerHTML =
+                '<div class="transcript-empty" style="color: var(--text-secondary); text-align: center; padding: 40px;">Press "Connect" to begin live transcription</div>';
         }
+        setTranscript('');
+        setDuration(0);
+        setTotalBytes(0);
+        setTotalTokens(0);
+        setCost(0);
+        setError(null);
+        setAudioChunksSent(0);
+        console.log('🧹 Cleared all stats and transcript');
     };
 
-    const showError = (message: string) => {
-        setError(message);
-        setTimeout(() => setError(null), 5000);
-    };
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (isRecording) {
+                stopRecording();
+            }
+        };
+    }, [isRecording]);
 
-    const formatDuration = (seconds: number): string => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
+    const modelOptions = [
+        {
+            label: 'OpenAI Models',
+            options: [
+                { value: 'gpt-4o-transcribe', label: 'GPT-4o Transcribe (Streaming)' },
+                { value: 'gpt-4o-mini-transcribe', label: 'GPT-4o Mini Transcribe (Streaming)' },
+                { value: 'whisper-1', label: 'Whisper-1 (Complete at once)' },
+            ],
+        },
+        {
+            label: 'Gemini Models',
+            options: [
+                { value: 'gemini-live-2.5-flash-preview', label: 'Gemini Live 2.5 Flash Preview' },
+                { value: 'gemini-2.0-flash-live-001', label: 'Gemini 2.0 Flash Live' },
+            ],
+        },
+    ];
 
-    const generateServerCode = (): string => {
-        return `#!/usr/bin/env node
-// Real-time transcription server using ensembleListen
-// Model: ${selectedModel}
-
-import dotenv from 'dotenv';
-import express from 'express';
-import { WebSocketServer } from 'ws';
+    const generateCode = () => ({
+        server: `import WebSocket from 'ws';
 import { createServer } from 'http';
-import { ensembleListen } from '@just-every/ensemble';
-
-dotenv.config();
+import express from 'express';
+import { ensembleVoiceToText } from '@just-every/ensemble';
 
 const app = express();
 const server = createServer(app);
-const PORT = process.env.PORT || 3003;
-
-// Serve static files
-app.use(express.static('public'));
-
-// WebSocket server for real-time audio streaming
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
-    console.log('Client connected for transcription');
-    let transcriptionStream = null;
+    let currentStream = null;
 
     ws.on('message', async (data) => {
-        try {
-            // Handle text messages (commands)
-            if (data.toString().length < 1000) {
-                const message = JSON.parse(data.toString());
+        if (typeof data === 'string') {
+            const message = JSON.parse(data);
 
-                if (message.type === 'start') {
-                    console.log('Starting transcription with model:', message.model);
-
-                    // Start the transcription stream
-                    transcriptionStream = ensembleListen({
-                        model: message.model || '${selectedModel}',
-                        language: 'en'
-                    });
-
-                    // Forward all transcription events to the client
-                    for await (const event of transcriptionStream) {
-                        ws.send(JSON.stringify(event));
+            if (message.type === 'start') {
+                currentStream = await ensembleVoiceToText({
+                    model: message.model,
+                    onPartialTranscript: (text) => {
+                        ws.send(JSON.stringify({
+                            type: 'transcription',
+                            text,
+                            isPartial: true
+                        }));
+                    },
+                    onFinalTranscript: (text) => {
+                        ws.send(JSON.stringify({
+                            type: 'transcription',
+                            text,
+                            isPartial: false
+                        }));
+                    },
+                    onCostUpdate: (cost) => {
+                        ws.send(JSON.stringify({
+                            type: 'cost_update',
+                            cost
+                        }));
                     }
-                }
-            } else {
-                // Handle binary audio data
-                if (transcriptionStream) {
-                    // Send audio data to the transcription stream
-                    transcriptionStream.sendAudio(data);
-                }
+                });
+            } else if (message.type === 'stop' && currentStream) {
+                currentStream.stop();
+                currentStream = null;
             }
-        } catch (error) {
-            console.error('Transcription error:', error);
-            ws.send(JSON.stringify({
-                type: 'error',
-                error: error.message
-            }));
+        } else if (currentStream) {
+            // Binary audio data
+            currentStream.write(data);
         }
-    });
-
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
     });
 
     ws.on('close', () => {
-        console.log('Client disconnected');
-        if (transcriptionStream) {
-            transcriptionStream.close();
+        if (currentStream) {
+            currentStream.stop();
         }
     });
-
-    // Send connection confirmation
-    ws.send(JSON.stringify({
-        type: 'connected',
-        message: 'Transcription server ready'
-    }));
 });
 
-server.listen(PORT, () => {
-    console.log(\`Transcription server running on port \${PORT}\`);
-    console.log(\`WebSocket: ws://localhost:\${PORT}\`);
-});`;
-    };
-
-    const generateClientCode = (): string => {
-        return `<!DOCTYPE html>
-<html lang="en">
+server.listen(3003, () => {
+    console.log('WebSocket server running on ws://localhost:3003');
+});`,
+        client: `<!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-time Transcription - ${selectedModel}</title>
+    <title>Live Transcription Demo</title>
     <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 { color: #333; margin-bottom: 20px; }
-        .controls {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        button {
-            background: #1a73e8;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background: #1557b0; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button.stop { background: #ea4335; }
-        button.stop:hover { background: #d33b2c; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
         #transcript {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            min-height: 200px;
-            font-family: monospace;
-            font-size: 14px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            overflow-y: auto;
-            border: 1px solid #e0e0e0;
-        }
-        #status {
-            margin-top: 15px;
+            border: 1px solid #ccc;
+            height: 300px;
+            overflow-y: scroll;
             padding: 10px;
-            border-radius: 6px;
-            font-weight: 500;
+            margin: 20px 0;
         }
-        .status-connected { background: #e6f4ea; color: #1e8e3e; }
-        .status-error { background: #fce8e6; color: #d93025; }
-        .status-info { background: #e8f0fe; color: #1a73e8; }
-        .audio-bar {
-            width: 3px;
-            background: #1a73e8;
-            border-radius: 2px;
-            transition: height 0.1s ease;
-        }
+        .transcript-line { margin: 5px 0; }
+        .transcript-line.preview { color: #666; font-style: italic; }
+        button { padding: 10px 20px; margin: 5px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Real-time Transcription</h1>
-        <p>Model: ${selectedModel}</p>
+    <h1>Live Transcription Demo</h1>
 
-        <div class="controls">
-            <button id="startBtn" onclick="startRecording()">Start Recording</button>
-            <button id="stopBtn" style="display: none;" onclick="stopRecording()" class="stop">Stop Recording</button>
-        </div>
+    <select id="modelSelect">
+        <option value="gemini-live-2.5-flash-preview">Gemini 2.0 Flash</option>
+        <option value="deepseek-r1-voice-preview">DeepSeek r1-voice</option>
+    </select>
 
-        <div id="status" class="status-info">Ready to record</div>
+    <button id="startBtn" onclick="startRecording()">Start Recording</button>
+    <button id="stopBtn" onclick="stopRecording()" disabled>Stop Recording</button>
 
-        <div id="audioVisualizer" style="display: none; height: 120px; background: #f0f0f0; border-radius: 8px; margin: 20px 0; position: relative;">
-            <div id="visualizer" style="display: flex; align-items: center; justify-content: center; height: 100%; gap: 2px; padding: 0 20px;"></div>
-        </div>
-
-        <h3>Transcript:</h3>
-        <div id="transcript">Transcript will appear here...</div>
-    </div>
+    <div id="transcript"></div>
 
     <script>
         let ws = null;
-        let mediaRecorder = null;
+        let mediaStream = null;
         let audioContext = null;
         let processor = null;
         let source = null;
-        let analyser = null;
-        let visualizerBars = [];
-        let isRecording = false;
-        let animationId = null;
 
-        // Create visualizer bars
-        function createVisualizer() {
-            const visualizer = document.getElementById('visualizer');
-            const barCount = 64;
-            
-            for (let i = 0; i < barCount; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'audio-bar';
-                bar.style.height = '4px';
-                bar.style.flex = '1';
-                visualizer.appendChild(bar);
-                visualizerBars.push(bar);
-            }
-        }
+        async function startRecording() {
+            const model = document.getElementById('modelSelect').value;
 
-        // Connect to WebSocket server
-        function connectWebSocket() {
+            // Get microphone access
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    channelCount: 1,
+                    sampleRate: 16000
+                }
+            });
+
+            // Setup WebSocket
             ws = new WebSocket('ws://localhost:3003');
-            ws.binaryType = 'arraybuffer';
 
             ws.onopen = () => {
-                console.log('Connected to server');
-                updateStatus('Connected - Speak into your microphone', 'status-connected');
-                
-                // Send start message
-                ws.send(JSON.stringify({
-                    type: 'start',
-                    model: '${selectedModel}'
-                }));
+                ws.send(JSON.stringify({ type: 'start', model }));
+                setupAudioProcessing();
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                handleServerMessage(data);
+                handleTranscription(data);
             };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                updateStatus('Connection error', 'status-error');
-            };
-
-            ws.onclose = () => {
-                console.log('Disconnected from server');
-                updateStatus('Disconnected', 'status-info');
-            };
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
         }
 
-        // Handle server messages
-        function handleServerMessage(data) {
+        function setupAudioProcessing() {
+            audioContext = new AudioContext({ sampleRate: 16000 });
+            source = audioContext.createMediaStreamSource(mediaStream);
+            processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+            processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                const int16Array = new Int16Array(inputData.length);
+
+                for (let i = 0; i < inputData.length; i++) {
+                    const s = Math.max(-1, Math.min(1, inputData[i]));
+                    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(int16Array.buffer);
+                }
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+        }
+
+        function handleTranscription(data) {
             const transcript = document.getElementById('transcript');
-            
-            switch (data.type) {
-                case 'transcription_turn_delta':
-                    // Append preview text
-                    transcript.textContent += data.delta;
-                    transcript.scrollTop = transcript.scrollHeight;
-                    break;
-                    
-                case 'transcription_turn_complete':
-                    // Add completed turn
-                    transcript.textContent += '\n--- Turn Complete ---\n';
-                    transcript.scrollTop = transcript.scrollHeight;
-                    break;
-                    
-                case 'error':
-                    updateStatus('Error: ' + data.error, 'status-error');
-                    break;
-            }
-        }
 
-        // Update status display
-        function updateStatus(text, className) {
-            const status = document.getElementById('status');
-            status.textContent = text;
-            status.className = className;
-        }
-
-        // Convert float32 audio to int16
-        function convertFloat32ToInt16(float32Array) {
-            const int16Array = new Int16Array(float32Array.length);
-            for (let i = 0; i < float32Array.length; i++) {
-                const s = Math.max(-1, Math.min(1, float32Array[i]));
-                int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-            return int16Array;
-        }
-
-        // Visualize audio
-        function visualize() {
-            if (!analyser || !isRecording) return;
-
-            const dataArray = new Uint8Array(analyser.fftSize);
-            analyser.getByteTimeDomainData(dataArray);
-
-            // Update bars
-            for (let i = 0; i < visualizerBars.length; i++) {
-                const index = Math.floor(i * dataArray.length / visualizerBars.length);
-                const value = dataArray[index];
-                const amplitude = Math.abs(value - 128);
-                const height = Math.max(4, amplitude * 0.8);
-                visualizerBars[i].style.height = height + 'px';
-            }
-
-            animationId = requestAnimationFrame(visualize);
-        }
-
-        // Start recording
-        async function startRecording() {
-            try {
-                updateStatus('Requesting microphone access...', 'status-info');
-                
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        channelCount: 1,
-                        sampleRate: 16000,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
+            if (data.type === 'transcription') {
+                if (data.isPartial) {
+                    // Update or create preview
+                    let preview = transcript.querySelector('.preview');
+                    if (!preview) {
+                        preview = document.createElement('div');
+                        preview.className = 'transcript-line preview';
+                        transcript.appendChild(preview);
                     }
-                });
+                    preview.textContent = data.text;
+                } else {
+                    // Remove preview and add final
+                    const preview = transcript.querySelector('.preview');
+                    if (preview) preview.remove();
 
-                isRecording = true;
-                connectWebSocket();
+                    const line = document.createElement('div');
+                    line.className = 'transcript-line';
+                    line.textContent = data.text;
+                    transcript.appendChild(line);
+                }
 
-                // Setup audio processing
-                audioContext = new AudioContext({ sampleRate: 16000 });
-                source = audioContext.createMediaStreamSource(stream);
-                
-                // Create analyser for visualization
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                source.connect(analyser);
-
-                // Create processor
-                processor = audioContext.createScriptProcessor(1024, 1, 1);
-                processor.onaudioprocess = (e) => {
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        const float32Audio = e.inputBuffer.getChannelData(0);
-                        const int16Audio = convertFloat32ToInt16(float32Audio);
-                        ws.send(int16Audio.buffer);
-                    }
-                };
-
-                source.connect(processor);
-                processor.connect(audioContext.destination);
-
-                // Show visualizer
-                document.getElementById('audioVisualizer').style.display = 'block';
-                visualize();
-
-                // Update UI
-                document.getElementById('startBtn').style.display = 'none';
-                document.getElementById('stopBtn').style.display = 'inline-block';
-                document.getElementById('transcript').textContent = '';
-
-            } catch (error) {
-                console.error('Error starting recording:', error);
-                updateStatus('Failed to access microphone', 'status-error');
+                transcript.scrollTop = transcript.scrollHeight;
             }
         }
 
-        // Stop recording
         function stopRecording() {
-            isRecording = false;
-
-            // Stop audio
-            if (processor) {
-                processor.disconnect();
-                processor = null;
-            }
-            if (source) {
-                source.disconnect();
-                source = null;
-            }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-            }
-
-            // Stop animation
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-
-            // Close WebSocket
+            if (processor) processor.disconnect();
+            if (source) source.disconnect();
+            if (audioContext) audioContext.close();
+            if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
             if (ws) {
+                ws.send(JSON.stringify({ type: 'stop' }));
                 ws.close();
-                ws = null;
             }
 
-            // Hide visualizer
-            document.getElementById('audioVisualizer').style.display = 'none';
-
-            // Update UI
-            document.getElementById('startBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            updateStatus('Recording stopped', 'status-info');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
         }
-
-        // Initialize
-        createVisualizer();
     </script>
 </body>
-</html>`;
-    };
+</html>`,
+    });
 
     return (
-        <>
-            <NavBar />
-            <div className="min-h-screen" style={{ background: 'var(--bg-primary)', paddingTop: '80px' }}>
-                <div className="container mx-auto px-4 py-8">
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                            <svg
-                                width="32"
-                                height="32"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                                className="inline-block mr-3">
-                                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z" />
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                            </svg>
-                            Ensemble Listen Demo
-                        </h1>
-                        <button onClick={() => setShowCodeModal(true)} className="glass-button">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
-                            </svg>
-                            Show Code
-                        </button>
-                    </div>
+        <div className="container">
+            <DemoHeader
+                title="Listen Demo"
+                icon={
+                    <svg width="32" height="32" viewBox="0 0 384 512" fill="currentColor">
+                        <path d="M192 0C139 0 96 43 96 96V256c0 53 43 96 96 96s96-43 96-96V96c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 89.1 66.2 162.7 152 174.4V464H112c-13.3 0-24 10.7-24 24s10.7 24 24 24h160c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c85.8-11.7 152-85.3 152-174.4V216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 70.7-57.3 128-128 128s-128-57.3-128-128V216z" />
+                    </svg>
+                }>
+                <ShowCodeButton onClick={() => setShowCodeModal(true)} />
+            </DemoHeader>
 
-                    {/* Main Content */}
-                    <div className="glass-card">
-                        {/* Control Header */}
-                        <div className="status-section">
-                            <div className="control-header">
-                                <div id="status" className={`status ${connectionStatus}`}>
-                                    <span className="status-indicator"></span>
-                                    <span className="status-text">
-                                        {connectionStatus === 'connected'
-                                            ? 'Connected - Speak into your microphone'
-                                            : connectionStatus === 'connecting'
-                                              ? 'Connecting...'
-                                              : connectionStatus === 'error'
-                                                ? 'Connection error'
-                                                : 'Disconnected'}
-                                    </span>
-                                </div>
+            {showConnectionWarning && connectionStatus === 'disconnected' && (
+                <ConnectionWarning readyState={readyState} port={3003} />
+            )}
 
-                                <select
-                                    id="modelSelect"
-                                    value={selectedModel}
-                                    onChange={e => setSelectedModel(e.target.value)}
-                                    className="model-select"
-                                    disabled={isRecording}>
-                                    <optgroup label="OpenAI Models">
-                                        <option value="gpt-4o-transcribe">GPT-4o Transcribe (Streaming)</option>
-                                        <option value="gpt-4o-mini-transcribe">
-                                            GPT-4o Mini Transcribe (Streaming)
-                                        </option>
-                                        <option value="whisper-1">Whisper-1 (Complete at once)</option>
-                                    </optgroup>
-                                    <optgroup label="Gemini Models">
-                                        <option value="gemini-live-2.5-flash-preview">
-                                            Gemini Live 2.5 Flash Preview
-                                        </option>
-                                        <option value="gemini-2.0-flash-live-001">Gemini 2.0 Flash Live</option>
-                                    </optgroup>
-                                </select>
+            <Card style={{ marginBottom: '20px' }}>
+                <div className="status-section">
+                    <div className="control-header">
+                        <ConnectionStatus status={connectionStatus} />
 
-                                <div className="controls">
-                                    <button
-                                        id="connectBtn"
-                                        className={isRecording ? 'danger-btn' : 'primary-btn'}
-                                        onClick={() => (isRecording ? stopRecording() : startRecording())}>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            {isRecording ? (
-                                                <path d="M6 6h12v12H6z" />
-                                            ) : (
-                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                                            )}
-                                        </svg>
-                                        {isRecording ? 'Stop' : 'Connect'}
-                                    </button>
-                                </div>
-                            </div>
+                        <div style={{ flex: 1, minWidth: '250px', maxWidth: '350px' }}>
+                            <ModelSelector
+                                groups={modelOptions}
+                                selectedValue={selectedModel}
+                                onChange={setSelectedModel}
+                                disabled={isRecording}
+                            />
                         </div>
 
-                        {/* Audio Visualizer */}
-                        <div className="audio-visualizer" id="audioVisualizer">
-                            <div
-                                id="visualizer"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    height: '100%',
-                                    width: '100%',
-                                    gap: '2px',
-                                }}></div>
+                        <div className="controls">
+                            {!isRecording ? (
+                                <GlassButton
+                                    variant="primary"
+                                    onClick={startRecording}
+                                    disabled={connectionStatus === 'connecting'}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                    </svg>
+                                    <span>{connectionStatus === 'connecting' ? 'Connecting...' : 'Connect'}</span>
+                                </GlassButton>
+                            ) : (
+                                <GlassButton variant="danger" onClick={stopRecording}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M6 6h12v12H6z" />
+                                    </svg>
+                                    <span>Stop</span>
+                                </GlassButton>
+                            )}
                         </div>
-                        {/* Transcript Section */}
-                        <div className="transcript-section">
-                            <div className="transcript-header">
-                                <h2>Live Transcript</h2>
-                                <button id="clearBtn" className="glass-button" onClick={clearTranscript}>
-                                    Clear
-                                </button>
-                            </div>
-                            <div id="transcript" className="transcript-container">
-                                <div className="transcript-empty">Transcript will appear here...</div>
-                            </div>
-                        </div>
-                        {/* Stats Grid */}
-                        <div className="stats-grid">
-                            <div className="stat-card">
-                                <div className="stat-value" id="duration">
-                                    {formatDuration(duration)}
-                                </div>
-                                <div className="stat-label">Duration</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-value" id="dataSize">
-                                    {(totalBytes / 1024).toFixed(1)} KB
-                                </div>
-                                <div className="stat-label">Audio Data</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-value" id="tokenCount">
-                                    {totalTokens.toLocaleString()}
-                                </div>
-                                <div className="stat-label">Tokens Used</div>
-                            </div>
-                            <div className="stat-card">
-                                <div className="stat-value" id="cost">
-                                    ${cost.toFixed(4)}
-                                </div>
-                                <div className="stat-label">Estimated Cost</div>
-                            </div>
-                        </div>
-
-                        {/* Error Container */}
-                        {error && (
-                            <div className="error-message">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                                </svg>
-                                {error}
-                            </div>
-                        )}
                     </div>
                 </div>
+
+                {error && (
+                    <div
+                        style={{
+                            marginTop: '16px',
+                            color: 'var(--error)',
+                            padding: '12px',
+                            background: 'var(--surface-glass)',
+                            borderRadius: '8px',
+                            border: '1px solid var(--error)',
+                        }}>
+                        {error}
+                    </div>
+                )}
+            </Card>
+
+            <div className="audio-visualizer" id="audioVisualizer">
+                <div
+                    id="visualizer"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '100%',
+                        width: '100%',
+                        gap: '2px',
+                        padding: '0 20px',
+                    }}></div>
             </div>
 
-            {/* Code Generation Modal */}
-            {showCodeModal && (
-                <div
-                    className="modal-overlay active"
-                    onClick={e => {
-                        if (e.target === e.currentTarget) setShowCodeModal(false);
-                    }}>
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2 className="modal-title">Generated Code</h2>
-                            <button className="modal-close" onClick={() => setShowCodeModal(false)}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="modal-tabs-section">
-                            <div className="code-tabs">
-                                <button
-                                    className={`code-tab ${activeCodeTab === 'server' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('server')}>
-                                    Server Code
-                                </button>
-                                <button
-                                    className={`code-tab ${activeCodeTab === 'client' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('client')}>
-                                    Client Code
-                                </button>
-                            </div>
-                        </div>
-                        <div className="modal-body">
-                            <div
-                                className="code-container"
-                                style={{ display: activeCodeTab === 'server' ? 'block' : 'none' }}>
-                                <button
-                                    className="copy-button"
-                                    onClick={e => {
-                                        const code = generateServerCode();
-                                        navigator.clipboard.writeText(code);
-                                        const btn = e.currentTarget;
-                                        btn.textContent = 'Copied!';
-                                        btn.classList.add('copied');
-                                        setTimeout(() => {
-                                            btn.textContent = 'Copy';
-                                            btn.classList.remove('copied');
-                                        }, 2000);
-                                    }}>
-                                    Copy
-                                </button>
-                                <pre>{generateServerCode()}</pre>
-                            </div>
-                            <div
-                                className="code-container"
-                                style={{ display: activeCodeTab === 'client' ? 'block' : 'none' }}>
-                                <button
-                                    className="copy-button"
-                                    onClick={e => {
-                                        const code = generateClientCode();
-                                        navigator.clipboard.writeText(code);
-                                        const btn = e.currentTarget;
-                                        btn.textContent = 'Copied!';
-                                        btn.classList.add('copied');
-                                        setTimeout(() => {
-                                            btn.textContent = 'Copy';
-                                            btn.classList.remove('copied');
-                                        }, 2000);
-                                    }}>
-                                    Copy
-                                </button>
-                                <pre>{generateClientCode()}</pre>
-                            </div>
+            <Card style={{ marginBottom: '20px' }}>
+                <StatsGrid
+                    stats={[
+                        { label: 'Duration', value: formatDuration(duration * 1000), icon: '⏱️' },
+                        { label: 'Data Sent', value: formatBytes(totalBytes), icon: '📊' },
+                        { label: 'Audio Chunks', value: formatNumber(audioChunksSent), icon: '🎵' },
+                        { label: 'Tokens', value: formatNumber(totalTokens), icon: '🔤' },
+                        { label: 'Cost', value: formatCurrency(cost), icon: '💰' },
+                    ]}
+                    columns={4}
+                />
+            </Card>
+
+            <Card>
+                <div className="transcript-section">
+                    <div className="transcript-header">
+                        <h2>Live Transcript</h2>
+                        <button id="clearBtn" className="glass-button" onClick={clearTranscript}>
+                            <span>Clear</span>
+                        </button>
+                    </div>
+                    <div
+                        id="transcript"
+                        ref={transcriptContainerRef}
+                        className="transcript-container"
+                        style={{
+                            background: 'var(--surface-glass)',
+                            backdropFilter: 'var(--blur-glass)',
+                            WebkitBackdropFilter: 'var(--blur-glass)',
+                            border: '1px solid var(--border-glass)',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            minHeight: '300px',
+                            maxHeight: '500px',
+                            overflowY: 'auto',
+                            fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                            fontSize: '14px',
+                            lineHeight: '2',
+                            whiteSpace: 'pre-line',
+                        }}>
+                        <div
+                            className="transcript-empty"
+                            style={{
+                                color: 'var(--text-secondary)',
+                                textAlign: 'center',
+                                padding: '40px',
+                            }}>
+                            Transcript will appear here...
                         </div>
                     </div>
                 </div>
+            </Card>
+
+            {showCodeModal && (
+                <CodeModal
+                    isOpen={showCodeModal}
+                    onClose={() => setShowCodeModal(false)}
+                    title="Generated Code"
+                    tabs={[
+                        { id: 'server', label: 'Server Code', code: generateCode().server },
+                        { id: 'client', label: 'Client Code', code: generateCode().client },
+                    ]}
+                />
             )}
-        </>
+        </div>
     );
 };
 

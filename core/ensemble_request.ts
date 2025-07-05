@@ -271,7 +271,7 @@ async function* executeRound(
                     // Find the tool definition to get parameter order
                     const tool = agent.tools?.find(t => t.definition.function.name === toolCall.function.name);
 
-                    if (tool && 'definition' in tool) {
+                    if (tool && 'definition' in tool && tool.definition.function.parameters.properties) {
                         const parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
                         if (typeof parsedArgs === 'object' && parsedArgs !== null && !Array.isArray(parsedArgs)) {
                             // Get parameter names in the correct order

@@ -173,8 +173,11 @@ export const MODEL_CLASSES = {
     // Mini models with vision capabilities
     vision_mini: {
         models: [
-            'gpt-4.1-mini', // OpenAI
+            'gpt-4.1', // OpenAI
+            'o3-low', // OpenAI
+            'o4-mini-low', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
+            'gemini-2.5-flash-preview-05-20', // Google
             'claude-sonnet-4-20250514-low', // Anthropic
         ],
         random: true,

@@ -10,7 +10,6 @@ import { spawn, exec } from 'child_process';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import express from 'express';
 import open from 'open';
 import { promisify } from 'util';
 import net from 'net';
@@ -71,25 +70,25 @@ const demos = [
         name: 'Voice Generation',
         script: 'voice-server.ts',
         port: 3004,
-        path: '/voice-client.html',
+        path: '/voice',
     },
     {
         name: 'Live Transcription',
         script: 'listen-server.ts',
         port: 3003,
-        path: '/listen-client.html',
+        path: '/listen',
     },
     {
         name: 'Chat Request',
         script: 'request-server.ts',
         port: 3005,
-        path: '/request-client.html',
+        path: '/request',
     },
     {
         name: 'Text Embeddings',
         script: 'embed-server.ts',
         port: 3006,
-        path: '/embed-client.html',
+        path: '/embed',
     },
 ];
 
@@ -98,7 +97,7 @@ async function startDemoServers() {
     console.log('🚀 Starting Ensemble demo servers...\n');
 
     // Get all ports that will be used
-    const allPorts = [...demos.map(d => d.port), 3000]; // Include menu port
+    const allPorts = [...demos.map(d => d.port), 3000]; // Include React dev server port
 
     // Kill any existing processes on these ports
     await killExistingProcesses(allPorts);
@@ -118,6 +117,39 @@ async function startDemoServers() {
 
     const processes: any[] = [];
 
+    // Start the React dev server first
+    console.log('Starting React dev server on port 3000...');
+    const reactProc = spawn('npm', ['run', 'dev'], {
+        cwd: __dirname,
+        stdio: 'pipe',
+        shell: true,
+    });
+
+    reactProc.stdout.on('data', data => {
+        const output = data.toString().trim();
+        if (output) {
+            console.log(`[React] ${output}`);
+        }
+    });
+
+    reactProc.stderr.on('data', data => {
+        const output = data.toString().trim();
+        // Filter out non-error messages from stderr
+        if (output && !output.includes('deprecation') && !output.includes('warning')) {
+            console.error(`[React] ${output}`);
+        }
+    });
+
+    reactProc.on('error', error => {
+        console.error(`Failed to start React dev server: ${error.message}`);
+    });
+
+    processes.push(reactProc);
+
+    // Wait a bit for React server to start
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Start backend demo servers
     demos.forEach(demo => {
         console.log(`Starting ${demo.name} server on port ${demo.port}...`);
 
@@ -141,246 +173,25 @@ async function startDemoServers() {
         processes.push(proc);
     });
 
-    // Create menu server
-    const app = express();
-    const MENU_PORT = 3000;
+    // Wait for all servers to be ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    app.use(express.static(__dirname));
-
-    // Create a simple menu page
-    app.get('/', (req, res) => {
-        res.send(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ensemble Demo</title>
-    <style>
-        :root {
-            --primary: #1a73e8;
-            --primary-dark: #1557b0;
-            --success: #34a853;
-            --background: #f5f5f5;
-            --surface: #ffffff;
-            --text: #202124;
-            --text-secondary: #5f6368;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--background);
-            color: var(--text);
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: var(--surface);
-            border-radius: 16px;
-            padding: 48px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-            max-width: 800px;
-            width: 100%;
-        }
-
-        h1 {
-            color: var(--primary);
-            margin-bottom: 16px;
-            font-size: 36px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 18px;
-            margin-bottom: 40px;
-        }
-
-        .demo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
-            margin-bottom: 40px;
-        }
-
-        .demo-card {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 24px;
-            text-decoration: none;
-            color: var(--text);
-            transition: all 0.2s;
-            display: block;
-            border: 2px solid transparent;
-        }
-
-        .demo-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            border-color: var(--primary);
-        }
-
-        .demo-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .demo-icon {
-            font-size: 32px;
-        }
-
-        .demo-title {
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .demo-description {
-            color: var(--text-secondary);
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 12px;
-        }
-
-        .demo-port {
-            font-size: 12px;
-            color: var(--primary);
-            font-weight: 500;
-        }
-
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px;
-            background: #e8f5e9;
-            border-radius: 8px;
-            color: var(--success);
-            font-weight: 500;
-        }
-
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.2); }
-        }
-
-        .instructions {
-            margin-top: 40px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .instructions code {
-            background: #e8eaed;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/>
-            </svg>
-            Ensemble Demo
-        </h1>
-        <p class="subtitle">Interactive demonstrations of the Ensemble AI library</p>
-
-        <div class="status">
-            <span class="status-indicator"></span>
-            All demo servers are running
-        </div>
-
-        <div class="demo-grid">
-            ${demos
-                .map(
-                    demo => `
-                <a href="http://localhost:${demo.port}${demo.path}" class="demo-card" target="_blank">
-                    <div class="demo-header">
-                        <div class="demo-icon">${
-                            demo.name.includes('Voice')
-                                ? '🎤'
-                                : demo.name.includes('Transcription')
-                                  ? '🎧'
-                                  : demo.name.includes('Chat')
-                                    ? '💬'
-                                    : '📊'
-                        }</div>
-                        <div class="demo-title">${demo.name}</div>
-                    </div>
-                    <div class="demo-description">${
-                        demo.name.includes('Voice')
-                            ? 'Convert text to natural-sounding speech with multiple voices and providers'
-                            : demo.name.includes('Transcription')
-                              ? 'Real-time speech-to-text with streaming audio processing'
-                              : demo.name.includes('Chat')
-                                ? 'Streaming AI responses with tool calling and multi-model support'
-                                : 'Generate vector embeddings and perform similarity search'
-                    }</div>
-                    <div class="demo-port">Port ${demo.port} →</div>
-                </a>
-            `
-                )
-                .join('')}
-        </div>
-
-        <div class="instructions">
-            <strong>Instructions:</strong>
-            <ul style="margin-left: 20px; margin-top: 8px;">
-                <li>Click on any demo card to open it in a new tab</li>
-                <li>Each demo runs on its own port for better performance</li>
-                <li>Make sure you have API keys set in your <code>.env</code> file</li>
-                <li>To stop all servers, press <code>Ctrl+C</code> in the terminal</li>
-            </ul>
-        </div>
-    </div>
-</body>
-</html>
-        `);
+    console.log(`\n✅ All demo servers started!`);
+    console.log(`\n🚀 React App: http://localhost:3000`);
+    console.log('\nBackend API servers:');
+    demos.forEach(demo => {
+        console.log(`   • ${demo.name}: http://localhost:${demo.port} (API)`);
     });
-
-    // Start menu server
-    app.listen(MENU_PORT, () => {
-        console.log(`\n✅ All demo servers started!`);
-        console.log(`\n📋 Demo Menu: http://localhost:${MENU_PORT}`);
-        console.log('\nIndividual demos:');
-        demos.forEach(demo => {
-            console.log(`   • ${demo.name}: http://localhost:${demo.port}${demo.path}`);
-        });
-        console.log('\nPress Ctrl+C to stop all servers\n');
-
-        // Open the menu in the default browser
-        setTimeout(() => {
-            open(`http://localhost:${MENU_PORT}`);
-        }, 2000);
+    console.log('\nDemo pages:');
+    demos.forEach(demo => {
+        console.log(`   • ${demo.name}: http://localhost:3000${demo.path}`);
     });
+    console.log('\nPress Ctrl+C to stop all servers\n');
+
+    // Open the React app in the default browser
+    setTimeout(() => {
+        open(`http://localhost:3000`);
+    }, 1000);
 
     // Handle cleanup
     process.on('SIGINT', () => {

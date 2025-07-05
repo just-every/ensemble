@@ -1,20 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
+import './components/style.scss';
 import { AudioStreamPlayer } from '../../dist/utils/audio_stream_player.js';
 import ConnectionWarning from './components/ConnectionWarning';
-import { VOICE_WS_URL } from './config/websocket';
-import {
-    DemoHeader,
-    Card,
-    GlassButton,
-    StatsGrid,
-    ModelSelector,
-    ProgressBar,
-    ShowCodeButton,
-    CodeModal,
-    formatBytes,
-    formatCurrency,
-} from '@just-every/demo-ui';
 
 // Remove duplicate styles that are already in glassmorphism.css
 // Only keep styles that are truly unique to this component
@@ -48,6 +36,8 @@ const VoiceDemo: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [history, setHistory] = useState<GenerationHistory[]>([]);
     const [showCodeModal, setShowCodeModal] = useState(false);
+    const [activeCodeTab, setActiveCodeTab] = useState<'server' | 'client'>('server');
+    const [charCounter, setCharCounter] = useState(text.length);
 
     // Refs
     const audioPlayerRef = useRef<AudioStreamPlayer | null>(null);
@@ -58,7 +48,8 @@ const VoiceDemo: React.FC = () => {
     const isInitializingRef = useRef(true);
 
     // WebSocket configuration
-    const { sendMessage, lastMessage, readyState } = useWebSocket(VOICE_WS_URL, {
+    const socketUrl = 'ws://localhost:3004';
+    const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
         shouldReconnect: () => true,
         reconnectAttempts: 10,
         reconnectInterval: 3000,
@@ -145,6 +136,11 @@ const VoiceDemo: React.FC = () => {
             isInitializingRef.current = false;
         }, 100);
     }, []);
+
+    // Update char counter
+    useEffect(() => {
+        setCharCounter(text.length);
+    }, [text]);
 
     // Get current provider from model
     const getCurrentProvider = useCallback(() => {
@@ -846,228 +842,315 @@ server.listen(PORT, () => {
         <>
             <div>
                 <div className="container">
-                    <DemoHeader
-                        title="Voice Demo"
-                        icon={
-                            <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
-                                <path d="M320 0c12 0 22.1 8.8 23.8 20.7l42 304.4L424.3 84.2c1.9-11.7 12-20.3 23.9-20.2s21.9 8.9 23.6 20.6l28.2 197.3 20.5-102.6c2.2-10.8 11.3-18.7 22.3-19.3s20.9 6.4 24.2 16.9L593.7 264l22.3 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-40 0c-10.5 0-19.8-6.9-22.9-16.9l-4.1-13.4-29.4 147c-2.3 11.5-12.5 19.6-24.2 19.3s-21.4-9-23.1-20.6L446.7 248.3l-39 243.5c-1.9 11.7-12.1 20.3-24 20.2s-21.9-8.9-23.5-20.7L320 199.6 279.8 491.3c-1.6 11.8-11.6 20.6-23.5 20.7s-22.1-8.5-24-20.2l-39-243.5L167.8 427.4c-1.7 11.6-11.4 20.3-23.1 20.6s-21.9-7.8-24.2-19.3l-29.4-147-4.1 13.4C83.8 305.1 74.5 312 64 312l-40 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l22.3 0 26.8-87.1c3.2-10.5 13.2-17.5 24.2-16.9s20.2 8.5 22.3 19.3l20.5 102.6L168.2 84.6c1.7-11.7 11.7-20.5 23.6-20.6s22 8.5 23.9 20.2l38.5 240.9 42-304.4C297.9 8.8 308 0 320 0z" />
-                            </svg>
-                        }>
-                        <ShowCodeButton onClick={() => setShowCodeModal(true)} />
-                    </DemoHeader>
+                    {/* Header section above everything */}
+                    <div className="header-card">
+                        <div className="header-row">
+                            <h1>
+                                <svg width="32" height="32" viewBox="0 0 640 512" fill="currentColor">
+                                    <path d="M320 0c12 0 22.1 8.8 23.8 20.7l42 304.4L424.3 84.2c1.9-11.7 12-20.3 23.9-20.2s21.9 8.9 23.6 20.6l28.2 197.3 20.5-102.6c2.2-10.8 11.3-18.7 22.3-19.3s20.9 6.4 24.2 16.9L593.7 264l22.3 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-40 0c-10.5 0-19.8-6.9-22.9-16.9l-4.1-13.4-29.4 147c-2.3 11.5-12.5 19.6-24.2 19.3s-21.4-9-23.1-20.6L446.7 248.3l-39 243.5c-1.9 11.7-12.1 20.3-24 20.2s-21.9-8.9-23.5-20.7L320 199.6 279.8 491.3c-1.6 11.8-11.6 20.6-23.5 20.7s-22.1-8.5-24-20.2l-39-243.5L167.8 427.4c-1.7 11.6-11.4 20.3-23.1 20.6s-21.9-7.8-24.2-19.3l-29.4-147-4.1 13.4C83.8 305.1 74.5 312 64 312l-40 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l22.3 0 26.8-87.1c3.2-10.5 13.2-17.5 24.2-16.9s20.2 8.5 22.3 19.3l20.5 102.6L168.2 84.6c1.7-11.7 11.7-20.5 23.6-20.6s22 8.5 23.9 20.2l38.5 240.9 42-304.4C297.9 8.8 308 0 320 0z" />
+                                </svg>
+                                Ensemble Voice Generation
+                            </h1>
+                            <button className="glass-button" onClick={() => setShowCodeModal(true)}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
+                                </svg>
+                                <span>Show Code</span>
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Connection warning */}
                     <ConnectionWarning readyState={readyState} port={3004} />
 
                     {/* Main content */}
-                    <Card style={{ marginBottom: '20px' }}>
-                        <h2>Text to Speech</h2>
-                        <div className="textarea-wrapper">
-                            <textarea
-                                value={text}
-                                onChange={e => setText(e.target.value)}
-                                placeholder="Enter the text you want to convert to speech..."
-                                maxLength={5000}></textarea>
-                            <span className="char-counter">{text.length} / 5000</span>
-                        </div>
-
-                        <div className="examples-section">
-                            <div style={{ flex: 1, display: 'flex', gap: '1em', alignItems: 'center' }}>
-                                <strong>Example texts:</strong>
-                                <GlassButton onClick={() => setText(exampleTexts.news)}>
-                                    <span>News</span>
-                                </GlassButton>
-                                <GlassButton onClick={() => setText(exampleTexts.story)}>
-                                    <span>Story</span>
-                                </GlassButton>
-                                <GlassButton onClick={() => setText(exampleTexts.technical)}>
-                                    <span>Technical</span>
-                                </GlassButton>
-                                <GlassButton onClick={() => setText(exampleTexts.poetry)}>
-                                    <span>Poetry</span>
-                                </GlassButton>
-                            </div>
-                            <div className="generate-button-container">
-                                {!isGenerating ? (
-                                    <GlassButton
-                                        variant="primary"
-                                        onClick={generateSpeech}
-                                        disabled={!text.trim() || readyState !== ReadyState.OPEN}>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                        <span>Generate Speech</span>
-                                    </GlassButton>
-                                ) : (
-                                    <GlassButton variant="danger" onClick={stopGeneration}>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M6 6h12v12H6z" />
-                                        </svg>
-                                        <span>Stop</span>
-                                    </GlassButton>
-                                )}
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card style={{ marginBottom: '20px' }}>
-                        <h2>Voice Settings</h2>
-                        <div className="settings-grid">
-                            <div className="setting-group">
-                                <label className="setting-label">Model</label>
-                                <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}>
-                                    <optgroup label="OpenAI Models">
-                                        <option value="gpt-4o-mini-tts">GPT-4o mini TTS (Latest)</option>
-                                        <option value="tts-1-hd">TTS-1-HD (High Quality)</option>
-                                        <option value="tts-1">TTS-1 (Standard)</option>
-                                    </optgroup>
-                                    <optgroup label="ElevenLabs Models">
-                                        <option value="eleven_turbo_v2_5">Turbo V2.5 (Balanced)</option>
-                                        <option value="eleven_flash_v2_5">Flash V2.5 (Ultra Low Latency)</option>
-                                        <option value="eleven_multilingual_v2">Multilingual V2 (High Quality)</option>
-                                    </optgroup>
-                                    <optgroup label="Gemini Models">
-                                        <option value="gemini-2.5-pro-preview-tts">
-                                            Gemini 2.5 Pro TTS (High Quality)
-                                        </option>
-                                        <option value="gemini-2.5-flash-preview-tts">
-                                            Gemini 2.5 Flash TTS (Fast)
-                                        </option>
-                                    </optgroup>
-                                </select>
+                    <div className="card input-section">
+                        <div className="">
+                            <h2>Text to Speech</h2>
+                            <div className="textarea-wrapper">
+                                <textarea
+                                    value={text}
+                                    onChange={e => setText(e.target.value)}
+                                    placeholder="Enter the text you want to convert to speech..."
+                                    maxLength={5000}></textarea>
+                                <span className="char-counter">{charCounter} / 5000</span>
                             </div>
 
-                            <div className="setting-group">
-                                <label className="setting-label">Voice</label>
-                                <ModelSelector
-                                    groups={[
-                                        {
-                                            label:
-                                                getCurrentProvider().charAt(0).toUpperCase() +
-                                                getCurrentProvider().slice(1) +
-                                                ' Voices',
-                                            options: getAvailableVoices(),
-                                        },
-                                    ]}
-                                    selectedValue={selectedVoice}
-                                    onChange={setSelectedVoice}
-                                />
-                            </div>
-
-                            <div className="setting-group">
-                                <label className="setting-label">Format</label>
-                                <ModelSelector
-                                    groups={[
-                                        {
-                                            label: 'Audio Formats',
-                                            options: getFormatOptions(),
-                                        },
-                                    ]}
-                                    selectedValue={selectedFormat}
-                                    onChange={setSelectedFormat}
-                                />
-                            </div>
-
-                            <div className="setting-group">
-                                <label className="setting-label">Speed</label>
-                                <div className="slider-container">
-                                    <input
-                                        type="range"
-                                        min="0.25"
-                                        max="4"
-                                        step="0.05"
-                                        value={speed}
-                                        onChange={e => setSpeed(parseFloat(e.target.value))}
-                                    />
-                                    <span className="slider-value">{speed}x</span>
+                            <div className="examples-section">
+                                <div style={{ flex: 1, display: 'flex', gap: '1em', alignItems: 'center' }}>
+                                    <strong>Example texts:</strong>
+                                    <button className="glass-button" onClick={() => setText(exampleTexts.news)}>
+                                        <span>News</span>
+                                    </button>
+                                    <button className="glass-button" onClick={() => setText(exampleTexts.story)}>
+                                        <span>Story</span>
+                                    </button>
+                                    <button className="glass-button" onClick={() => setText(exampleTexts.technical)}>
+                                        <span>Technical</span>
+                                    </button>
+                                    <button className="glass-button" onClick={() => setText(exampleTexts.poetry)}>
+                                        <span>Poetry</span>
+                                    </button>
+                                </div>
+                                <div className="generate-button-container">
+                                    {!isGenerating ? (
+                                        <button
+                                            className="primary-btn"
+                                            onClick={generateSpeech}
+                                            disabled={!text.trim() || readyState !== ReadyState.OPEN}>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M8 5v14l11-7z" />
+                                            </svg>
+                                            <span>Generate Speech</span>
+                                        </button>
+                                    ) : (
+                                        <button className="danger-btn" onClick={stopGeneration}>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M6 6h12v12H6z" />
+                                            </svg>
+                                            <span>Stop</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
-                    </Card>
 
-                    <div style={{ marginBottom: '20px' }}>
-                        <ProgressBar progress={progress} />
-                    </div>
+                        <div className="settings-section">
+                            <h2>Voice Settings</h2>
+                            <div className="settings-grid">
+                                <div className="setting-group">
+                                    <label className="setting-label">Model</label>
+                                    <select value={selectedModel} onChange={e => setSelectedModel(e.target.value)}>
+                                        <optgroup label="OpenAI Models">
+                                            <option value="gpt-4o-mini-tts">GPT-4o mini TTS (Latest)</option>
+                                            <option value="tts-1-hd">TTS-1-HD (High Quality)</option>
+                                            <option value="tts-1">TTS-1 (Standard)</option>
+                                        </optgroup>
+                                        <optgroup label="ElevenLabs Models">
+                                            <option value="eleven_turbo_v2_5">Turbo V2.5 (Balanced)</option>
+                                            <option value="eleven_flash_v2_5">Flash V2.5 (Ultra Low Latency)</option>
+                                            <option value="eleven_multilingual_v2">
+                                                Multilingual V2 (High Quality)
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="Gemini Models">
+                                            <option value="gemini-2.5-pro-preview-tts">
+                                                Gemini 2.5 Pro TTS (High Quality)
+                                            </option>
+                                            <option value="gemini-2.5-flash-preview-tts">
+                                                Gemini 2.5 Flash TTS (Fast)
+                                            </option>
+                                        </optgroup>
+                                    </select>
+                                </div>
 
-                    {audioUrl && (
-                        <Card style={{ marginBottom: '20px' }}>
-                            <h3>Generated Audio</h3>
-                            <audio ref={audioElementRef} className="audio-player" controls src={audioUrl} />
-                            <GlassButton onClick={downloadAudio}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                                </svg>
-                                Download Audio
-                            </GlassButton>
-                        </Card>
-                    )}
+                                <div className="setting-group">
+                                    <label className="setting-label">Voice</label>
+                                    <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)}>
+                                        {getAvailableVoices().map(voice => (
+                                            <option key={voice.value} value={voice.value}>
+                                                {voice.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                    <Card style={{ marginBottom: '20px' }}>
-                        <StatsGrid
-                            stats={[
-                                { label: 'Latency', value: latency ? `${latency}ms` : '-', icon: '⏱️' },
-                                { label: 'Generation Time', value: `${duration.toFixed(1)}s`, icon: '⏳' },
-                                { label: 'Audio Size', value: formatBytes(dataSize), icon: '📊' },
-                                { label: 'Estimated Cost', value: formatCurrency(cost), icon: '💰' },
-                            ]}
-                            columns={4}
-                        />
-                    </Card>
+                                <div className="setting-group">
+                                    <label className="setting-label">Format</label>
+                                    <select value={selectedFormat} onChange={e => setSelectedFormat(e.target.value)}>
+                                        {getFormatOptions().map(format => (
+                                            <option key={format.value} value={format.value}>
+                                                {format.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                    {error && (
-                        <div
-                            style={{
-                                marginBottom: '20px',
-                                color: 'var(--error)',
-                                padding: '12px',
-                                background: 'var(--surface-glass)',
-                                borderRadius: '8px',
-                                border: '1px solid var(--error)',
-                            }}>
-                            {error}
-                        </div>
-                    )}
-
-                    <Card style={{ marginBottom: '20px' }}>
-                        <h3>Generation History</h3>
-                        <div>
-                            {history.length === 0 ? (
-                                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' }}>
-                                    No generations yet
-                                </p>
-                            ) : (
-                                history.map((item, index) => (
-                                    <div key={index} className="history-item">
-                                        <div className="history-text">
-                                            {item.text.substring(0, 50)}
-                                            {item.text.length > 50 ? '...' : ''}
-                                        </div>
-                                        <div className="history-controls">
-                                            <GlassButton onClick={() => playHistoryItem(index)}>
-                                                <span>Play</span>
-                                            </GlassButton>
-                                            <GlassButton onClick={() => useHistoryText(index)}>
-                                                <span>Use Text</span>
-                                            </GlassButton>
-                                        </div>
+                                <div className="setting-group">
+                                    <label className="setting-label">Speed</label>
+                                    <div className="slider-container">
+                                        <input
+                                            type="range"
+                                            min="0.25"
+                                            max="4"
+                                            step="0.05"
+                                            value={speed}
+                                            onChange={e => setSpeed(parseFloat(e.target.value))}
+                                        />
+                                        <span className="slider-value">{speed}x</span>
                                     </div>
-                                ))
-                            )}
+                                </div>
+                            </div>
                         </div>
-                    </Card>
+
+                        <div className={`progress-bar ${isGenerating ? 'active' : ''}`}>
+                            <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                        </div>
+
+                        {audioUrl && (
+                            <div className="audio-player-section">
+                                <h3>Generated Audio</h3>
+                                <audio ref={audioElementRef} className="audio-player" controls src={audioUrl} />
+                                <button className="download-btn" onClick={downloadAudio}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                                    </svg>
+                                    Download Audio
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="stats-grid">
+                            <div className="stat-card">
+                                <div className="stat-value">{latency ? `${latency}ms` : '-'}</div>
+                                <div className="stat-label">Latency</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="stat-value">{duration.toFixed(1)}s</div>
+                                <div className="stat-label">Generation Time</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="stat-value">{(dataSize / 1024).toFixed(1)} KB</div>
+                                <div className="stat-label">Audio Size</div>
+                            </div>
+                            <div className="stat-card">
+                                <div className="stat-value">${cost.toFixed(4)}</div>
+                                <div className="stat-label">Estimated Cost</div>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="error-message">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                                </svg>
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="history-section">
+                            <h3>Generation History</h3>
+                            <div>
+                                {history.length === 0 ? (
+                                    <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' }}>
+                                        No generations yet
+                                    </p>
+                                ) : (
+                                    history.map((item, index) => (
+                                        <div key={index} className="history-item">
+                                            <div className="history-text">
+                                                {item.text.substring(0, 50)}
+                                                {item.text.length > 50 ? '...' : ''}
+                                            </div>
+                                            <div className="history-controls">
+                                                <button
+                                                    className="glass-button history-btn"
+                                                    onClick={() => playHistoryItem(index)}>
+                                                    <span>Play</span>
+                                                </button>
+                                                <button
+                                                    className="glass-button history-btn"
+                                                    onClick={() => useHistoryText(index)}>
+                                                    <span>Use Text</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {/* Code Generation Modal */}
             {showCodeModal && (
-                <CodeModal
-                    isOpen={showCodeModal}
-                    onClose={() => setShowCodeModal(false)}
-                    title="Generated Code"
-                    tabs={[
-                        { id: 'server', label: 'Server Code', code: generateServerCode() },
-                        { id: 'client', label: 'Client Code', code: generateClientCode() },
-                    ]}
-                />
+                <div
+                    className="modal-overlay active"
+                    onClick={e => {
+                        if (e.target === e.currentTarget) setShowCodeModal(false);
+                    }}>
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h2 className="modal-title">Generated Code</h2>
+                            <button className="modal-close" onClick={() => setShowCodeModal(false)}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="modal-tabs-section">
+                            <div className="code-tabs">
+                                <button
+                                    className={`code-tab ${activeCodeTab === 'server' ? 'active' : ''}`}
+                                    onClick={() => setActiveCodeTab('server')}>
+                                    Server Code
+                                </button>
+                                <button
+                                    className={`code-tab ${activeCodeTab === 'client' ? 'active' : ''}`}
+                                    onClick={() => setActiveCodeTab('client')}>
+                                    Client Code
+                                </button>
+                            </div>
+                        </div>
+                        <div className="modal-body">
+                            <div
+                                className="code-container"
+                                style={{ display: activeCodeTab === 'server' ? 'block' : 'none' }}>
+                                <button
+                                    className="glass-button"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        padding: '6px 12px',
+                                        fontSize: '12px',
+                                    }}
+                                    onClick={e => {
+                                        const code = generateServerCode();
+                                        navigator.clipboard.writeText(code);
+                                        const btn = e.currentTarget;
+                                        btn.textContent = 'Copied!';
+                                        btn.classList.add('copied');
+                                        setTimeout(() => {
+                                            btn.textContent = 'Copy';
+                                            btn.classList.remove('copied');
+                                        }, 2000);
+                                    }}>
+                                    <span>Copy</span>
+                                </button>
+                                <pre>{generateServerCode()}</pre>
+                            </div>
+                            <div
+                                className="code-container"
+                                style={{ display: activeCodeTab === 'client' ? 'block' : 'none' }}>
+                                <button
+                                    className="glass-button"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        padding: '6px 12px',
+                                        fontSize: '12px',
+                                    }}
+                                    onClick={e => {
+                                        const code = generateClientCode();
+                                        navigator.clipboard.writeText(code);
+                                        const btn = e.currentTarget;
+                                        btn.textContent = 'Copied!';
+                                        btn.classList.add('copied');
+                                        setTimeout(() => {
+                                            btn.textContent = 'Copy';
+                                            btn.classList.remove('copied');
+                                        }, 2000);
+                                    }}>
+                                    <span>Copy</span>
+                                </button>
+                                <pre>{generateClientCode()}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </>
     );

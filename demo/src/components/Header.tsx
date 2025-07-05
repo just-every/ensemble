@@ -1,6 +1,6 @@
 import React from 'react';
 import { GlassButton } from './GlassButton';
-import './glassmorphism.css';
+import './style.scss';
 
 interface HeaderProps {
     title: string;

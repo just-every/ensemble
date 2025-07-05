@@ -25,6 +25,7 @@
         "node_modules",
         "examples",
         "demo",
+        "demo-ui",
         "test",
         "scripts",
         "**/*.test.ts",

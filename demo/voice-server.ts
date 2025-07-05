@@ -20,11 +20,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Load .env from root directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
-// Debug: Log which API keys were loaded
-console.log('🔐 Environment variables loaded:');
-console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   ELEVENLABS_API_KEY:', process.env.ELEVENLABS_API_KEY ? '✅ Set' : '❌ Not set');
-
 const app = express();
 const server = createServer(app);
 const PORT = process.env.VOICE_PORT || process.env.PORT || 3004;
@@ -52,7 +47,7 @@ const activeConnections = new Map<
 // Handle WebSocket connections
 wss.on('connection', ws => {
     const connectionId = Math.random().toString(36).substring(7);
-    console.log(`🔊 New client connected: ${connectionId}`);
+    console.log(`New client connected: ${connectionId}`);
 
     // Store connection info
     activeConnections.set(connectionId, {
@@ -115,7 +110,7 @@ wss.on('connection', ws => {
 
     // Handle client disconnect
     ws.on('close', () => {
-        console.log(`👋 Client disconnected: ${connectionId}`);
+        console.log(`Client disconnected: ${connectionId}`);
 
         const connInfo = activeConnections.get(connectionId);
         if (connInfo) {
@@ -151,7 +146,7 @@ async function handleGenerate(connectionId: string, message: any) {
         return;
     }
 
-    console.log(`🎤 Generating speech for ${connectionId}:`);
+    console.log(`Generating speech for ${connectionId}:`);
     console.log(`   Model: ${model}`);
     console.log(`   Voice: ${options?.voice || 'default'}`);
     console.log(`   Text length: ${text.length} characters`);
@@ -237,7 +232,7 @@ async function handleGenerate(connectionId: string, message: any) {
             })
         );
 
-        console.log(`✅ Generation complete for ${connectionId}:`);
+        console.log(`Generation complete for ${connectionId}:`);
         console.log(`   Total chunks: ${chunkCount}`);
         console.log(`   Total audio: ${(totalAudioBytes / 1024).toFixed(1)}KB`);
         console.log(`   Duration: ${duration.toFixed(2)}s`);
@@ -254,15 +249,12 @@ async function handleGenerate(connectionId: string, message: any) {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`\n🚀 Voice generation server running on port ${PORT}`);
-    console.log(`   Open http://localhost:${PORT}/voice-client.html in your browser`);
-    console.log(`   WebSocket endpoint: ws://localhost:${PORT}`);
-    console.log('\n📡 Waiting for connections...\n');
+    console.log(`Voice server running on port ${PORT}`);
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('\n\n👋 Shutting down server...');
+    console.log('\n\nShutting down server...');
 
     // Close all active connections
     activeConnections.forEach((connInfo, connectionId) => {
@@ -271,7 +263,7 @@ process.on('SIGINT', () => {
     });
 
     server.close(() => {
-        console.log('✅ Server closed');
+        console.log('Server closed');
         process.exit(0);
     });
 });

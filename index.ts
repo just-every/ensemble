@@ -24,16 +24,10 @@ export {
 } from './utils/external_models.js';
 
 // Export all model data (excluding ModelClassID to avoid conflict)
-export {
-    MODEL_REGISTRY,
-    MODEL_CLASSES,
-    findModel,
-    ModelProviderID,
-    ModelUsage,
-    TieredPrice,
-    TimeBasedPrice,
-    ModelEntry,
-} from './data/model_data.js';
+export { MODEL_REGISTRY, MODEL_CLASSES, findModel } from './data/model_data.js';
+
+// Export model types
+export type { ModelProviderID, ModelUsage, TieredPrice, TimeBasedPrice, ModelEntry } from './data/model_data.js';
 
 // Export all utils
 export * from './utils/delta_buffer.js';

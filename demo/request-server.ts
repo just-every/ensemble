@@ -22,17 +22,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Load .env from root directory
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
-// Debug: Log which API keys were loaded
-console.log('🔐 Environment variables loaded:');
-console.log('   OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   ANTHROPIC_API_KEY:', process.env.ANTHROPIC_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   XAI_API_KEY:', process.env.XAI_API_KEY ? '✅ Set' : '❌ Not set');
-console.log('   DEEPSEEK_API_KEY:', process.env.DEEPSEEK_API_KEY ? '✅ Set' : '❌ Not set');
-
 const app = express();
 const server = createServer(app);
 const PORT = process.env.REQUEST_PORT || process.env.PORT || 3005;
+
+// Utility function to remove code block wrapping from responses
+function removeCodeBlockWrapping(text: string): string {
+    if (!text || typeof text !== 'string') return text;
+
+    // Remove leading/trailing whitespace
+    let cleaned = text.trim();
+
+    // Check for code block patterns and remove them
+    // Patterns: ```json, ```javascript, ```js, ```typescript, ```ts, ```python, ```py, ```
+    const codeBlockRegex = /^```[\w]*\n?([\s\S]*?)\n?```$/;
+    const match = cleaned.match(codeBlockRegex);
+
+    if (match) {
+        // Extract content between code blocks
+        cleaned = match[1].trim();
+    }
+
+    return cleaned;
+}
 
 // Serve static files
 app.use(express.static(__dirname));
@@ -47,8 +59,8 @@ const wss = new WebSocketServer({ server });
 async function generateMockResponse(toolName: string, args: any): Promise<string> {
     try {
         // Use a mini model to generate more realistic mock responses
-        const prompt = `Generate a realistic mock response for a tool called "${toolName}" with arguments: ${JSON.stringify(args)}. 
-Keep it brief but realistic. Add "(Mock Response)" at the end.`;
+        const prompt = `Generate a realistic mock response for a tool called "${toolName}" with arguments: ${JSON.stringify(args)}.
+Keep it brief but realistic. Only return the response content in JSON form without any additional text or formatting.`;
 
         const mockAgent: AgentDefinition = {
             agent_id: 'mock-tool-response',
@@ -64,7 +76,9 @@ Keep it brief but realistic. Add "(Mock Response)" at the end.`;
             }
         }
 
-        return response || `Mock response for ${toolName} (Mock Response)`;
+        // Remove code block wrapping from the response
+        const cleanedResponse = removeCodeBlockWrapping(response);
+        return cleanedResponse ? `Mock Response:\n${cleanedResponse}` : `Mock response for ${toolName}`;
     } catch (error) {
         // Fallback to simple mock responses if mini model fails
         console.log(`Failed to generate mock response with mini model: ${error}`);
@@ -76,27 +90,26 @@ Keep it brief but realistic. Add "(Mock Response)" at the end.`;
                 const temp = Math.floor(Math.random() * 20) + 15;
                 const conditions = ['sunny', 'partly cloudy', 'cloudy', 'rainy'];
                 const condition = conditions[Math.floor(Math.random() * conditions.length)];
-                return `Weather in ${location}: ${temp}°C, ${condition}. Humidity: ${60 + Math.floor(Math.random() * 30)}%. Wind: ${5 + Math.floor(Math.random() * 15)} km/h. (Mock Response)`;
+                return `Mock Response:\n$Weather in ${location}: ${temp}°C, ${condition}. Humidity: ${60 + Math.floor(Math.random() * 30)}%. Wind: ${5 + Math.floor(Math.random() * 15)} km/h`;
             }
 
             case 'web_search': {
                 const query = args.query || 'search term';
-                return `Search results for "${query}":
+                return `Mock Response:
+Search results for "${query}"
 1. ${query} - Wikipedia: Comprehensive overview and history
 2. Latest ${query} news and updates - TechCrunch
 3. Understanding ${query}: A beginner's guide - Medium
-4. ${query} best practices and tips - Stack Overflow
-(Mock Response)`;
+4. ${query} best practices and tips - Stack Overflow`;
             }
 
             default:
-                return `Mock response for ${toolName} with args: ${JSON.stringify(args)} (Mock Response)`;
+                return `Mock response for ${toolName} with args: ${JSON.stringify(args)}`;
         }
     }
 }
 
 // Example tools for demonstration
-console.log('[Server] Registering example tools...');
 const exampleTools: ToolFunction[] = [
     {
         function: async (location: string) => {
@@ -219,7 +232,7 @@ const activeConnections = new Map<
 // Handle WebSocket connections
 wss.on('connection', ws => {
     const connectionId = Math.random().toString(36).substring(7);
-    console.log(`💬 New client connected: ${connectionId}`);
+    console.log(`New client connected: ${connectionId}`);
 
     // Store connection info
     activeConnections.set(connectionId, {
@@ -276,19 +289,37 @@ wss.on('connection', ws => {
 
                     connInfo.isStreaming = true;
                     connInfo.messageCount++;
-                    await handleChat(connectionId, message);
+
+                    // Handle follow-up requests separately
+                    console.log('📨 Chat message received, isFollowUp:', message.isFollowUp);
+                    if (message.isFollowUp) {
+                        await handleFollowUpRequest(ws, message);
+                    } else {
+                        await handleChat(connectionId, message);
+                    }
+
                     connInfo.isStreaming = false;
                     break;
 
                 case 'stop':
                     if (connInfo.abortController) {
                         connInfo.abortController.abort();
-                        console.log(`🛑 Aborted stream for ${connectionId}`);
+                        console.log(`Aborted stream for ${connectionId}`);
                     }
                     break;
 
                 case 'ping':
                     ws.send(JSON.stringify({ type: 'pong' }));
+                    break;
+
+                case 'get_models':
+                    ws.send(
+                        JSON.stringify({
+                            type: 'models_list',
+                            models: Object.keys(MODEL_REGISTRY),
+                            modelClasses: Object.keys(MODEL_CLASSES),
+                        })
+                    );
                     break;
 
                 default:
@@ -307,7 +338,7 @@ wss.on('connection', ws => {
 
     // Handle client disconnect
     ws.on('close', () => {
-        console.log(`👋 Client disconnected: ${connectionId}`);
+        console.log(`Client disconnected: ${connectionId}`);
 
         const connInfo = activeConnections.get(connectionId);
         if (connInfo) {
@@ -327,6 +358,45 @@ wss.on('connection', ws => {
         console.error(`WebSocket error for ${connectionId}:`, error);
     });
 });
+
+// Handle follow-up request separately
+async function handleFollowUpRequest(ws: any, message: any) {
+    const { messages, modelClass, maxTokens, temperature } = message;
+
+    console.log('🔮 Handling follow-up request separately');
+
+    try {
+        // Create a simple agent for follow-up generation
+        const agent: AgentDefinition = {
+            agent_id: 'follow-up-generator',
+            modelClass: modelClass || 'mini',
+            maxTokens: maxTokens || 100,
+            temperature: temperature || 0.8,
+        };
+
+        // Collect the full response without sending any events
+        let followUpContent = '';
+
+        for await (const event of ensembleRequest(messages, agent)) {
+            if (event.type === 'message_delta' && event.content) {
+                followUpContent += event.content;
+            } else if (event.type === 'message_complete' && event.content) {
+                followUpContent = event.content;
+            }
+        }
+
+        // Send only the final follow-up suggestion
+        ws.send(
+            JSON.stringify({
+                type: 'follow_up_suggestion',
+                content: followUpContent.trim(),
+            })
+        );
+    } catch (err) {
+        console.error('Error generating follow-up:', err);
+        // Don't send error to client for follow-up generation
+    }
+}
 
 // Handle chat request
 async function handleChat(connectionId: string, message: any) {
@@ -357,7 +427,7 @@ async function handleChat(connectionId: string, message: any) {
         return;
     }
 
-    console.log(`🤖 Processing chat for ${connectionId}:`);
+    console.log(`Processing chat for ${connectionId}:`);
     console.log(`   Model: ${model || modelClass || 'default'}`);
     console.log(`   Messages: ${messages.length}`);
     console.log(`   Tools enabled: ${toolsEnabled}`);
@@ -365,15 +435,6 @@ async function handleChat(connectionId: string, message: any) {
     try {
         // Create abort controller
         connInfo.abortController = new AbortController();
-
-        // Send stream start event
-        ws.send(
-            JSON.stringify({
-                type: 'stream_start',
-                model: model || modelClass,
-                messageCount: messages.length,
-            })
-        );
 
         // Create agent definition
         const agent: AgentDefinition = {
@@ -389,7 +450,16 @@ async function handleChat(connectionId: string, message: any) {
             abortSignal: connInfo.abortController.signal,
         };
 
-        // Stream the response
+        // Send stream start event
+        ws.send(
+            JSON.stringify({
+                type: 'stream_start',
+                model: model || modelClass,
+                messageCount: messages.length,
+            })
+        );
+
+        // Normal streaming for regular messages
         for await (const event of ensembleRequest(messages, agent)) {
             // Forward all events to the client
             ws.send(JSON.stringify(event));
@@ -421,7 +491,5 @@ async function handleChat(connectionId: string, message: any) {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`\n🚀 Ensemble Request server running on port ${PORT}`);
-    console.log(`📡 WebSocket: ws://localhost:${PORT}`);
-    console.log(`🌐 Open http://localhost:${PORT}/request-client.html to test\n`);
+    console.log(`Request server running on port ${PORT}`);
 });

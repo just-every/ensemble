@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import NavBar from './components/NavBar';
-import './components/glassmorphism.css';
-
-interface Embedding {
-    id: string;
-    text: string;
-    model: string;
-    dimensions: number;
-    timestamp: number;
-    embedding?: number[];
-}
-
-interface SearchResult {
-    text: string;
-    model: string;
-    similarity: number;
-    timestamp: number;
-}
+import './components/style.scss';
+import ConnectionWarning from './components/ConnectionWarning';
+import { EMBED_WS_URL } from './config/websocket';
+import {
+    DemoHeader,
+    Card,
+    GlassButton,
+    GlassInput,
+    StatsGrid,
+    ModelSelector,
+    ShowCodeButton,
+    CodeModal,
+    EmbeddingsList,
+    SearchInput,
+    SearchResults,
+    type EmbeddingData,
+    type SearchResult,
+    formatNumber,
+} from '@just-every/demo-ui';
 
 const EmbedDemo: React.FC = () => {
     // State management
@@ -25,34 +26,26 @@ const EmbedDemo: React.FC = () => {
     const [selectedModel, setSelectedModel] = useState('text-embedding-3-small');
     const [dimensions, setDimensions] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [storedEmbeddings, setStoredEmbeddings] = useState<Embedding[]>([]);
+    const [storedEmbeddings, setStoredEmbeddings] = useState<EmbeddingData[]>([]);
     const [selectedEmbeddings, setSelectedEmbeddings] = useState<Set<string>>(new Set());
     const [searchQuery, setSearchQuery] = useState('');
     const [searchModel, setSearchModel] = useState('text-embedding-3-small');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisText, setAnalysisText] = useState('');
     const [showAnalysis, setShowAnalysis] = useState(false);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
     const [showCodeModal, setShowCodeModal] = useState(false);
-    const [activeCodeTab, setActiveCodeTab] = useState<'server' | 'client'>('server');
 
     // WebSocket configuration
-    const socketUrl = 'ws://localhost:3006';
-    const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
+    const { sendMessage, lastMessage, readyState } = useWebSocket(EMBED_WS_URL, {
         shouldReconnect: () => true,
         reconnectAttempts: 10,
         reconnectInterval: 3000,
     });
-
-    // Model options
-    const modelOptions = [
-        { value: 'text-embedding-3-small', label: 'OpenAI Small (1536d)' },
-        { value: 'text-embedding-3-large', label: 'OpenAI Large (3072d)' },
-        { value: 'text-embedding-ada-002', label: 'OpenAI Ada v2 (1536d)' },
-        { value: 'gemini-embedding-exp-03-07', label: 'Gemini Experimental (768d)' },
-    ];
 
     // Example sets
     const exampleSets = {
@@ -76,6 +69,32 @@ const EmbedDemo: React.FC = () => {
             'We sat on the bank watching the sunset',
         ],
     };
+
+    // Model options
+    const modelGroups = [
+        {
+            label: 'OpenAI Models',
+            options: [
+                { value: 'text-embedding-3-small', label: 'OpenAI Small (1536d)' },
+                { value: 'text-embedding-3-large', label: 'OpenAI Large (3072d)' },
+                { value: 'text-embedding-ada-002', label: 'OpenAI Ada v2 (1536d)' },
+            ],
+        },
+        {
+            label: 'Gemini Models',
+            options: [{ value: 'gemini-embedding-exp-03-07', label: 'Gemini Experimental (768d)' }],
+        },
+    ];
+
+    const dimensionOptions = [
+        { value: '', label: 'Model Default' },
+        { value: '256', label: '256' },
+        { value: '512', label: '512' },
+        { value: '768', label: '768' },
+        { value: '1024', label: '1024' },
+        { value: '1536', label: '1536' },
+        { value: '3072', label: '3072' },
+    ];
 
     // Handle WebSocket messages
     useEffect(() => {
@@ -102,7 +121,14 @@ const EmbedDemo: React.FC = () => {
         storeCount?: number;
         current?: number;
         total?: number;
-        embeddings?: Embedding[];
+        embeddings?: Array<{
+            id: string;
+            text: string;
+            model: string;
+            dimensions: number;
+            embedding: number[];
+            timestamp: number;
+        }>;
         duration?: number;
         averageTime?: number;
         results?: SearchResult[];
@@ -133,16 +159,40 @@ const EmbedDemo: React.FC = () => {
             case 'embed_complete':
                 setIsProcessing(false);
                 setProgress(100);
-                console.log(`Generated ${data.embeddings?.length || 0} embeddings in ${(data.duration || 0).toFixed(2)}s`);
+                console.log(
+                    `Generated ${data.embeddings?.length || 0} embeddings in ${(data.duration || 0).toFixed(2)}s`
+                );
                 console.log(`Average time: ${(data.averageTime || 0).toFixed(3)}s per embedding`);
                 refreshStore();
                 clearTextInputs();
                 setTimeout(() => setProgress(0), 1000);
                 break;
 
-            case 'store_data':
-                setStoredEmbeddings(data.embeddings || []);
+            case 'store_data': {
+                // Convert server embeddings to EmbeddingData format
+                const embeddings =
+                    data.embeddings?.map(emb => ({
+                        id: emb.id,
+                        text: emb.text,
+                        model: emb.model,
+                        dimensions: emb.dimensions,
+                        embedding: emb.embedding,
+                        timestamp: emb.timestamp,
+                    })) || [];
+                setStoredEmbeddings(embeddings);
+                // Clean up selectedEmbeddings to remove any IDs that no longer exist
+                setSelectedEmbeddings(prev => {
+                    const validIds = new Set(embeddings.map(emb => emb.id));
+                    const newSet = new Set<string>();
+                    prev.forEach(id => {
+                        if (validIds.has(id)) {
+                            newSet.add(id);
+                        }
+                    });
+                    return newSet;
+                });
                 break;
+            }
 
             case 'search_start':
                 setIsSearching(true);
@@ -153,7 +203,15 @@ const EmbedDemo: React.FC = () => {
                 setSearchResults(data.results || []);
                 break;
 
+            case 'analyze_start':
+                console.log('Received analyze_start message');
+                setIsAnalyzing(true);
+                setShowAnalysisModal(true);
+                break;
+
             case 'analyze_complete':
+                console.log('Received analyze_complete message', data.analysis);
+                setIsAnalyzing(false);
                 setAnalysisText(data.analysis || 'No analysis available.');
                 setShowAnalysis(true);
                 break;
@@ -176,6 +234,9 @@ const EmbedDemo: React.FC = () => {
                 showError(data.error || 'Unknown error');
                 setIsProcessing(false);
                 setIsSearching(false);
+                setIsAnalyzing(false);
+                setShowAnalysisModal(false);
+                setShowAnalysis(false);
                 setProgress(0);
                 break;
         }
@@ -228,8 +289,26 @@ const EmbedDemo: React.FC = () => {
     };
 
     const analyzeSelected = () => {
-        if (readyState !== ReadyState.OPEN || selectedEmbeddings.size < 2) return;
+        console.log('analyzeSelected called', {
+            readyState,
+            isOpen: readyState === ReadyState.OPEN,
+            selectedCount: selectedEmbeddings.size,
+            selectedIds: Array.from(selectedEmbeddings),
+        });
 
+        if (readyState !== ReadyState.OPEN) {
+            console.log('WebSocket not open');
+            showError('WebSocket connection not established');
+            return;
+        }
+
+        if (selectedEmbeddings.size < 2) {
+            console.log('Not enough embeddings selected');
+            showError('Please select at least 2 embeddings to analyze');
+            return;
+        }
+
+        console.log('Sending analyze request with IDs:', Array.from(selectedEmbeddings));
         sendMessage(
             JSON.stringify({
                 type: 'analyze',
@@ -250,19 +329,7 @@ const EmbedDemo: React.FC = () => {
         }
     };
 
-    const deleteEmbedding = (id: string, event: React.MouseEvent) => {
-        event.stopPropagation();
-        if (readyState !== ReadyState.OPEN) return;
-
-        sendMessage(
-            JSON.stringify({
-                type: 'delete',
-                id,
-            })
-        );
-    };
-
-    const toggleSelection = (id: string) => {
+    const handleEmbeddingSelect = (id: string) => {
         setSelectedEmbeddings(prev => {
             const newSet = new Set(prev);
             if (newSet.has(id)) {
@@ -272,6 +339,17 @@ const EmbedDemo: React.FC = () => {
             }
             return newSet;
         });
+    };
+
+    const handleEmbeddingDelete = (id: string) => {
+        if (readyState !== ReadyState.OPEN) return;
+
+        sendMessage(
+            JSON.stringify({
+                type: 'delete',
+                id,
+            })
+        );
     };
 
     const addTextInput = () => {
@@ -426,380 +504,270 @@ demo().catch(console.error);`;
 
     return (
         <>
-            <NavBar />
-            <div className="min-h-screen" style={{ background: 'var(--bg-primary)', paddingTop: '80px' }}>
-                <div className="container mx-auto px-4 py-8">
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                            <svg
-                                width="32"
-                                height="32"
-                                viewBox="0 0 448 512"
-                                fill="currentColor"
-                                className="inline-block mr-3">
-                                <path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z" />
-                            </svg>
-                            Ensemble Embed Demo
-                        </h1>
-                        <button onClick={() => setShowCodeModal(true)} className="glass-button">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
-                            </svg>
-                            Show Code
-                        </button>
-                    </div>
+            <div className="container">
+                <DemoHeader
+                    title="Embed Demo"
+                    icon={
+                        <svg width="32" height="32" viewBox="0 0 448 512" fill="currentColor">
+                            <path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z" />
+                        </svg>
+                    }>
+                    <ShowCodeButton onClick={() => setShowCodeModal(true)} />
+                </DemoHeader>
 
-                    {/* Connection warning */}
-                    {readyState !== ReadyState.OPEN && (
-                        <div className="connection-warning mb-4" style={{ display: 'flex' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
-                            </svg>
-                            Unable to connect to server. Please ensure the server is running on port 3006.
-                        </div>
-                    )}
+                {/* Connection warning */}
+                <ConnectionWarning readyState={readyState} port={3006} />
 
-                    <div className="main-grid">
-                        {/* Embedding Creation */}
-                        <div className="glass-card">
-                            <h2>Create Embeddings</h2>
+                <div className="main-grid">
+                    {/* Embedding Creation */}
+                    <Card>
+                        <h2>Create Embeddings</h2>
 
-                            <div className="input-section">
-                                <div className="settings-grid mb-4">
-                                    <div className="setting-group">
-                                        <label className="setting-label">Model</label>
-                                        <select
-                                            id="modelSelect"
-                                            value={selectedModel}
-                                            onChange={e => setSelectedModel(e.target.value)}
-                                            className="model-select">
-                                            {modelOptions.map(model => (
-                                                <option key={model.value} value={model.value}>
-                                                    {model.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="setting-group">
-                                        <label className="setting-label">Dimensions (optional)</label>
-                                        <select
-                                            id="dimensionsSelect"
-                                            value={dimensions}
-                                            onChange={e => setDimensions(e.target.value)}
-                                            className="model-select">
-                                            <option value="">Model Default</option>
-                                            <option value="256">256</option>
-                                            <option value="512">512</option>
-                                            <option value="768">768</option>
-                                            <option value="1024">1024</option>
-                                            <option value="1536">1536</option>
-                                            <option value="3072">3072</option>
-                                        </select>
-                                    </div>
+                        <div className="input-section">
+                            <div className="settings-grid">
+                                <div className="setting-group">
+                                    <label className="setting-label">Model</label>
+                                    <ModelSelector
+                                        groups={modelGroups}
+                                        selectedValue={selectedModel}
+                                        onChange={setSelectedModel}
+                                    />
                                 </div>
-
-                                <h3 className="font-semibold mb-3">Text Inputs</h3>
-                                <div className="text-inputs" id="textInputs">
-                                    {texts.map((text, index) => (
-                                        <div key={index} className="text-input-wrapper">
-                                            <input
-                                                type="text"
-                                                placeholder="Enter text to embed..."
-                                                value={text}
-                                                onChange={e => updateText(index, e.target.value)}
-                                                className="text-input"
-                                            />
-                                            <button className="icon-btn" onClick={() => removeTextInput(index)}>
-                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="controls">
-                                    <button className="secondary-btn" onClick={addTextInput}>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                                        </svg>
-                                        Add Text
-                                    </button>
-                                    <button
-                                        id="embedBtn"
-                                        className="primary-btn"
-                                        onClick={createEmbeddings}
-                                        disabled={
-                                            readyState !== ReadyState.OPEN ||
-                                            isProcessing ||
-                                            texts.every(t => !t.trim())
-                                        }>
-                                        <svg width="20" height="20" viewBox="0 0 448 512" fill="currentColor">
-                                            <path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z" />
-                                        </svg>
-                                        Generate Embeddings
-                                    </button>
-                                </div>
-
-                                <div className={`progress-bar ${isProcessing ? 'active' : ''}`} id="embedProgress">
-                                    <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                                <div className="setting-group">
+                                    <label className="setting-label">Dimensions (optional)</label>
+                                    <ModelSelector
+                                        groups={[{ label: 'Dimensions', options: dimensionOptions }]}
+                                        selectedValue={dimensions}
+                                        onChange={setDimensions}
+                                    />
                                 </div>
                             </div>
 
                             <div className="examples-section">
                                 <strong>Example Sets:</strong>
-                                <button className="example-btn" onClick={() => loadExampleSet('similar')}>
-                                    Similar Sentences
-                                </button>
-                                <button className="example-btn" onClick={() => loadExampleSet('different')}>
-                                    Different Topics
-                                </button>
-                                <button className="example-btn" onClick={() => loadExampleSet('languages')}>
-                                    Multiple Languages
-                                </button>
-                                <button className="example-btn" onClick={() => loadExampleSet('semantic')}>
-                                    Semantic Variations
-                                </button>
+                                <GlassButton onClick={() => loadExampleSet('similar')}>
+                                    <span>Similar Sentences</span>
+                                </GlassButton>
+                                <GlassButton onClick={() => loadExampleSet('different')}>
+                                    <span>Different Topics</span>
+                                </GlassButton>
+                                <GlassButton onClick={() => loadExampleSet('languages')}>
+                                    <span>Multiple Languages</span>
+                                </GlassButton>
+                                <GlassButton onClick={() => loadExampleSet('semantic')}>
+                                    <span>Semantic Variations</span>
+                                </GlassButton>
                             </div>
 
-                            {error && (
-                                <div className="error-message">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
-                                    </svg>
-                                    {error}
+                            <div className="text-inputs">
+                                <h3>Text Inputs</h3>
+                                {texts.map((text, index) => (
+                                    <div key={index} className="text-input-wrapper">
+                                        <GlassInput
+                                            type="text"
+                                            placeholder="Enter text to embed..."
+                                            value={text}
+                                            onChange={(value: string) => updateText(index, value)}
+                                        />
+                                        <button className="icon-btn" onClick={() => removeTextInput(index)}>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <div className="controls">
+                                    <GlassButton onClick={addTextInput}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                                        </svg>
+                                        <span>Add Text</span>
+                                    </GlassButton>
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="controls">
+                                <GlassButton
+                                    variant="primary"
+                                    onClick={createEmbeddings}
+                                    disabled={
+                                        readyState !== ReadyState.OPEN || isProcessing || texts.every(t => !t.trim())
+                                    }>
+                                    <svg width="20" height="20" viewBox="0 0 448 512" fill="currentColor">
+                                        <path d="M160 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 64-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l96 0c17.7 0 32-14.3 32-32l0-96zM32 320c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0 0 64c0 17.7 14.3 32 32 32s32-14.3 32-32l0-96c0-17.7-14.3-32-32-32l-96 0zM352 64c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-64 0 0-64zM320 320c-17.7 0-32 14.3-32 32l0 96c0 17.7 14.3 32 32 32s32-14.3 32-32l0-64 64 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-96 0z" />
+                                    </svg>
+                                    <span>Generate Embeddings</span>
+                                </GlassButton>
+                            </div>
+
+                            <div className={`progress-bar ${isProcessing ? 'active' : ''}`}>
+                                <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+                            </div>
                         </div>
 
-                        {/* Stored Embeddings */}
-                        <div className="glass-card">
-                            <h2>Stored Embeddings</h2>
+                        {error && (
+                            <div className="error-message" style={{ marginTop: '16px' }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                                </svg>
+                                {error}
+                            </div>
+                        )}
+                    </Card>
 
-                            <div className="controls mb-4">
-                                <button className="secondary-btn" onClick={refreshStore}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-                                    </svg>
-                                    Refresh
-                                </button>
-                                <button className="danger-btn" onClick={clearStore}>
+                    {/* Stored Embeddings */}
+                    <Card>
+                        <h2>Stored Embeddings</h2>
+
+                        <div className="controls" style={{ marginBottom: '16px', justifyContent: 'space-between' }}>
+                            <GlassButton onClick={refreshStore}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                                </svg>
+                                <span>Refresh</span>
+                            </GlassButton>
+                            {storedEmbeddings.length > 0 && (
+                                <GlassButton variant="danger" onClick={clearStore}>
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                                     </svg>
-                                    Clear All
-                                </button>
-                                <button
-                                    className="primary-btn"
-                                    onClick={analyzeSelected}
-                                    id="analyzeBtn"
-                                    disabled={selectedEmbeddings.size < 2}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
-                                    </svg>
-                                    Analyze Selected
-                                </button>
-                            </div>
-
-                            <div className="embeddings-list" id="embeddingsList">
-                                {storedEmbeddings.length === 0 ? (
-                                    <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
-                                        No embeddings yet. Create some to get started!
-                                    </p>
-                                ) : (
-                                    storedEmbeddings.map(emb => (
-                                        <div
-                                            key={emb.id}
-                                            className={`embedding-item ${selectedEmbeddings.has(emb.id) ? 'selected' : ''}`}
-                                            onClick={() => toggleSelection(emb.id)}>
-                                            <div className="embedding-header">
-                                                <div className="embedding-text">{emb.text}</div>
-                                                <button className="icon-btn" onClick={e => deleteEmbedding(emb.id, e)}>
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                            <div className="embedding-meta">
-                                                <span>Model: {emb.model}</span>
-                                                <span>Dimensions: {emb.dimensions}</span>
-                                                <span>Created: {new Date(emb.timestamp).toLocaleTimeString()}</span>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            <div className="stats-grid">
-                                <div className="stat-card">
-                                    <div className="stat-value">{storedEmbeddings.length}</div>
-                                    <div className="stat-label">Total Embeddings</div>
-                                </div>
-                                <div className="stat-card">
-                                    <div className="stat-value">{selectedEmbeddings.size}</div>
-                                    <div className="stat-label">Selected</div>
-                                </div>
-                            </div>
-                        </div>
-                        {/* Similarity Search */}
-                        <div className="glass-card full-width">
-                            <h2>Similarity Search</h2>
-
-                            <div className="search-section">
-                                <div className="search-input-wrapper">
-                                    <input
-                                        type="text"
-                                        id="searchQuery"
-                                        placeholder="Enter text to find similar embeddings..."
-                                        value={searchQuery}
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && performSearch()}
-                                        className="text-input"
-                                    />
-                                    <select
-                                        id="searchModel"
-                                        value={searchModel}
-                                        onChange={e => setSearchModel(e.target.value)}
-                                        className="model-select">
-                                        {modelOptions.map(model => (
-                                            <option key={model.value} value={model.value}>
-                                                {model.label.split(' ')[1]}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <button
-                                        className="primary-btn"
-                                        onClick={performSearch}
-                                        id="searchBtn"
-                                        disabled={readyState !== ReadyState.OPEN || isSearching}>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                                        </svg>
-                                        Search
-                                    </button>
-                                </div>
-
-                                <div className="search-results" id="searchResults">
-                                    {isSearching ? (
-                                        <p style={{ color: 'var(--text-secondary)' }}>Searching...</p>
-                                    ) : searchResults.length > 0 ? (
-                                        searchResults.map((result, index) => (
-                                            <div key={index} className="result-item">
-                                                <div className="result-header">
-                                                    <div>
-                                                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                                                            {result.text}
-                                                        </div>
-                                                        <div
-                                                            style={{
-                                                                fontSize: '12px',
-                                                                color: 'var(--text-secondary)',
-                                                            }}>
-                                                            Model: {result.model} | Created:{' '}
-                                                            {new Date(result.timestamp).toLocaleTimeString()}
-                                                        </div>
-                                                    </div>
-                                                    <div className="similarity-score">
-                                                        {(result.similarity * 100).toFixed(1)}%
-                                                    </div>
-                                                </div>
-                                                <div className="similarity-bar">
-                                                    <div
-                                                        className="similarity-fill"
-                                                        style={{ width: `${result.similarity * 100}%` }}></div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : null}
-                                </div>
-                            </div>
+                                    <span>Clear All</span>
+                                </GlassButton>
+                            )}
+                            <GlassButton
+                                variant="primary"
+                                onClick={analyzeSelected}
+                                disabled={selectedEmbeddings.size < 2 || isAnalyzing}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                                </svg>
+                                <span>Analyze Selected</span>
+                            </GlassButton>
                         </div>
 
-                        {/* Analysis Results */}
-                        {showAnalysis && (
-                            <div className="glass-card full-width" id="analysisCard">
-                                <h2>Embedding Analysis</h2>
-                                <div className="analysis-section">
-                                    <div className="analysis-content">{analysisText}</div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                        <EmbeddingsList
+                            embeddings={storedEmbeddings}
+                            selectedIds={selectedEmbeddings}
+                            onItemClick={handleEmbeddingSelect}
+                            onItemDelete={handleEmbeddingDelete}
+                        />
+
+                        <StatsGrid
+                            stats={[
+                                { label: 'Total Embeddings', value: formatNumber(storedEmbeddings.length), icon: '📊' },
+                                { label: 'Selected', value: formatNumber(selectedEmbeddings.size), icon: '✓' },
+                            ]}
+                            columns={2}
+                        />
+                    </Card>
+
+                    {/* Similarity Search */}
+                    <Card className="full-width">
+                        <h2>Similarity Search</h2>
+
+                        <SearchInput
+                            query={searchQuery}
+                            onQueryChange={setSearchQuery}
+                            onSearch={performSearch}
+                            placeholder="Enter text to find similar embeddings..."
+                            disabled={readyState !== ReadyState.OPEN || isSearching}
+                            models={modelGroups.flatMap(group => group.options)}
+                            selectedModel={searchModel}
+                            onModelChange={setSearchModel}
+                        />
+
+                        <SearchResults results={searchResults} isSearching={isSearching} />
+                    </Card>
                 </div>
             </div>
 
-            {/* Code Generation Modal */}
             {showCodeModal && (
+                <CodeModal
+                    isOpen={showCodeModal}
+                    onClose={() => setShowCodeModal(false)}
+                    title="Generated Code"
+                    tabs={[
+                        { id: 'server', label: 'Server Code', code: generateServerCode() },
+                        { id: 'client', label: 'Client Code', code: generateClientCode() },
+                    ]}
+                />
+            )}
+
+            {/* Analysis Modal */}
+            {showAnalysisModal && (
                 <div
                     className="modal-overlay active"
                     onClick={e => {
-                        if (e.target === e.currentTarget) setShowCodeModal(false);
+                        if (e.target === e.currentTarget && !isAnalyzing) {
+                            setShowAnalysisModal(false);
+                            setShowAnalysis(false);
+                        }
                     }}>
                     <div className="modal">
                         <div className="modal-header">
-                            <h2 className="modal-title">Generated Code</h2>
-                            <button className="modal-close" onClick={() => setShowCodeModal(false)}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="modal-tabs-section">
-                            <div className="code-tabs">
+                            <h2 className="modal-title">Embedding Analysis</h2>
+                            {!isAnalyzing && (
                                 <button
-                                    className={`code-tab ${activeCodeTab === 'server' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('server')}>
-                                    Server Code
+                                    className="modal-close"
+                                    onClick={() => {
+                                        setShowAnalysisModal(false);
+                                        setShowAnalysis(false);
+                                    }}>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                                    </svg>
                                 </button>
-                                <button
-                                    className={`code-tab ${activeCodeTab === 'client' ? 'active' : ''}`}
-                                    onClick={() => setActiveCodeTab('client')}>
-                                    Client Code
-                                </button>
-                            </div>
+                            )}
                         </div>
                         <div className="modal-body">
-                            <div
-                                className="code-container"
-                                style={{ display: activeCodeTab === 'server' ? 'block' : 'none' }}>
-                                <button
-                                    className="copy-button"
-                                    onClick={e => {
-                                        const code = generateServerCode();
-                                        navigator.clipboard.writeText(code);
-                                        const btn = e.currentTarget;
-                                        btn.textContent = 'Copied!';
-                                        btn.classList.add('copied');
-                                        setTimeout(() => {
-                                            btn.textContent = 'Copy';
-                                            btn.classList.remove('copied');
-                                        }, 2000);
-                                    }}>
-                                    Copy
-                                </button>
-                                <pre>{generateServerCode()}</pre>
-                            </div>
-                            <div
-                                className="code-container"
-                                style={{ display: activeCodeTab === 'client' ? 'block' : 'none' }}>
-                                <button
-                                    className="copy-button"
-                                    onClick={e => {
-                                        const code = generateClientCode();
-                                        navigator.clipboard.writeText(code);
-                                        const btn = e.currentTarget;
-                                        btn.textContent = 'Copied!';
-                                        btn.classList.add('copied');
-                                        setTimeout(() => {
-                                            btn.textContent = 'Copy';
-                                            btn.classList.remove('copied');
-                                        }, 2000);
-                                    }}>
-                                    Copy
-                                </button>
-                                <pre>{generateClientCode()}</pre>
-                            </div>
+                            {isAnalyzing ? (
+                                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <svg
+                                            width="48"
+                                            height="48"
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                            style={{ animation: 'spin 1s linear infinite' }}>
+                                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+                                        </svg>
+                                    </div>
+                                    <h3 style={{ marginBottom: '16px', color: 'var(--text-primary)' }}>
+                                        Analyzing Embeddings...
+                                    </h3>
+                                    <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                                        Computing similarity metrics and generating insights for your selected
+                                        embeddings.
+                                    </p>
+                                    <div className="progress-bar active" style={{ width: '80%', margin: '0 auto' }}>
+                                        <div
+                                            className="progress-fill"
+                                            style={{
+                                                width: '100%',
+                                                animation: 'pulse 2s ease-in-out infinite',
+                                            }}></div>
+                                    </div>
+                                </div>
+                            ) : showAnalysis ? (
+                                <div className="analysis-section">
+                                    <div
+                                        className="analysis-content"
+                                        style={{
+                                            background: 'var(--surface-glass)',
+                                            backdropFilter: 'var(--blur-glass)',
+                                            border: '1px solid var(--border-glass)',
+                                            borderRadius: '12px',
+                                            padding: '20px',
+                                            maxHeight: '400px',
+                                            overflowY: 'auto',
+                                            whiteSpace: 'pre-wrap',
+                                            lineHeight: '1.6',
+                                        }}>
+                                        {analysisText}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>
