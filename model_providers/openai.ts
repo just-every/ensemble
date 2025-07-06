@@ -728,6 +728,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     // For function calls
                     'function_name',
                     'function_arguments',
+                    'call_id',  // Required for function call responses
                     // For function call outputs
                     'output',
                     // For images
