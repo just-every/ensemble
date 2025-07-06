@@ -3,14 +3,59 @@ import { EnsembleLogger } from '../types/types.js';
 // Re-export for backward compatibility
 export type { EnsembleLogger };
 
-let globalLogger: EnsembleLogger | null = null;
+// Store multiple loggers
+let globalLoggers: EnsembleLogger[] = [];
 
+/**
+ * Add a logger to the ensemble logging system.
+ * Multiple loggers can be added and they will all be called.
+ * Pass null to clear all loggers.
+ */
 export function setEnsembleLogger(logger: EnsembleLogger | null): void {
-    globalLogger = logger;
+    if (logger === null) {
+        // Clear all loggers
+        globalLoggers = [];
+    } else {
+        // Add logger if not already present
+        if (!globalLoggers.includes(logger)) {
+            globalLoggers.push(logger);
+        }
+    }
 }
 
+/**
+ * Add a logger without removing existing ones.
+ * This is an alias for clarity.
+ */
+export function addEnsembleLogger(logger: EnsembleLogger): void {
+    if (!globalLoggers.includes(logger)) {
+        globalLoggers.push(logger);
+    }
+}
+
+/**
+ * Remove a specific logger from the ensemble logging system.
+ */
+export function removeEnsembleLogger(logger: EnsembleLogger): void {
+    const index = globalLoggers.indexOf(logger);
+    if (index > -1) {
+        globalLoggers.splice(index, 1);
+    }
+}
+
+/**
+ * Get all registered loggers.
+ * Returns the first logger for backward compatibility when used as a single logger.
+ */
 export function getEnsembleLogger(): EnsembleLogger | null {
-    return globalLogger;
+    return globalLoggers[0] || null;
+}
+
+/**
+ * Get all registered loggers.
+ */
+export function getAllEnsembleLoggers(): EnsembleLogger[] {
+    return [...globalLoggers];
 }
 
 export function log_llm_request(
@@ -20,20 +65,40 @@ export function log_llm_request(
     requestData: unknown,
     timestamp?: Date
 ): string {
-    if (globalLogger) {
-        return globalLogger.log_llm_request(agentId, providerName, model, requestData, timestamp);
+    // Collect request IDs from all loggers
+    const requestIds: string[] = [];
+    
+    for (const logger of globalLoggers) {
+        try {
+            const requestId = logger.log_llm_request(agentId, providerName, model, requestData, timestamp);
+            if (requestId) {
+                requestIds.push(requestId);
+            }
+        } catch (error) {
+            console.error('Error in logger.log_llm_request:', error);
+        }
     }
-    return '';
+    
+    // Return the first request ID for backward compatibility
+    return requestIds[0] || '';
 }
 
 export function log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void {
-    if (globalLogger) {
-        globalLogger.log_llm_response(requestId, responseData, timestamp);
+    for (const logger of globalLoggers) {
+        try {
+            logger.log_llm_response(requestId, responseData, timestamp);
+        } catch (error) {
+            console.error('Error in logger.log_llm_response:', error);
+        }
     }
 }
 
 export function log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void {
-    if (globalLogger) {
-        globalLogger.log_llm_error(requestId, errorData, timestamp);
+    for (const logger of globalLoggers) {
+        try {
+            logger.log_llm_error(requestId, errorData, timestamp);
+        } catch (error) {
+            console.error('Error in logger.log_llm_error:', error);
+        }
     }
 }
