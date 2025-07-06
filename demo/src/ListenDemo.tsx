@@ -189,10 +189,15 @@ const ListenDemo: React.FC = () => {
                 break;
             case 'cost_update':
                 console.log('💰 Cost update received:', data.usage);
-                if (data.usage) {
-                    setTotalTokens(data.usage.total_tokens || 0);
-                    const inputCost = ((data.usage.input_tokens || 0) * 0.2) / 1_000_000;
-                    const outputCost = ((data.usage.output_tokens || 0) * 0.8) / 1_000_000;
+                if (data.usage && typeof data.usage === 'object') {
+                    const usage = data.usage as {
+                        total_tokens?: number;
+                        input_tokens?: number;
+                        output_tokens?: number;
+                    };
+                    setTotalTokens(usage.total_tokens || 0);
+                    const inputCost = ((usage.input_tokens || 0) * 0.2) / 1_000_000;
+                    const outputCost = ((usage.output_tokens || 0) * 0.8) / 1_000_000;
                     setCost(inputCost + outputCost);
                 }
                 break;
@@ -220,7 +225,9 @@ const ListenDemo: React.FC = () => {
         }
 
         // Simple append like the original
-        containerEl.textContent += data.text;
+        if (containerEl.textContent !== null && data.text) {
+            containerEl.textContent += data.text;
+        }
         containerEl.scrollTop = containerEl.scrollHeight;
     };
 
@@ -248,7 +255,8 @@ const ListenDemo: React.FC = () => {
             mediaStreamRef.current = stream;
 
             console.log('🎵 Creating audio context...');
-            audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)({
+            audioContextRef.current = new (window.AudioContext ||
+                (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)({
                 sampleRate: 16000,
             });
             console.log('✅ Audio context created:', audioContextRef.current);

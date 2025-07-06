@@ -80,7 +80,7 @@ export function convertToFunctionCallOutput(
     return {
         id,
         type: 'function_call_output',
-        call_id: toolResult.call_id || toolResult.id,
+        call_id: toolResult.call_id || toolResult.toolCall.id,
         name: toolResult.toolCall.function.name,
         output: toolResult.output + (toolResult.error || ''),
         model,

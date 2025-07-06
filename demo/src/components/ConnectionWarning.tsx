@@ -18,7 +18,12 @@ export default function ConnectionWarning({ readyState, port, delay = 1000 }: Co
         }
 
         const timer = setTimeout(() => {
-            if (readyState !== ReadyState.OPEN) {
+            if (
+                readyState === ReadyState.UNINSTANTIATED ||
+                readyState === ReadyState.CONNECTING ||
+                readyState === ReadyState.CLOSING ||
+                readyState === ReadyState.CLOSED
+            ) {
                 setShowWarning(true);
             }
         }, delay);
