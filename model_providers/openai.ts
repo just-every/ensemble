@@ -826,6 +826,10 @@ export class OpenAIProvider extends BaseModelProvider {
                         // eslint-disable-next-line @typescript-eslint/no-unused-vars
                         const { id, ...rest } = message;
                         message = rest;
+                        // Ensure call_id is preserved - use the original id if call_id is missing
+                        if (!message.call_id && id) {
+                            message.call_id = id;
+                        }
                     }
 
                     message.status = message.status || 'completed';
