@@ -5,8 +5,22 @@
  */
 
 import { Buffer } from 'buffer';
-import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
+
+// Lazy-load sharp only when needed
+let sharpModule: any = null;
+
+async function getSharp() {
+    if (!sharpModule) {
+        try {
+            const module = await import('sharp');
+            sharpModule = module.default || module;
+        } catch (error) {
+            throw new Error('Sharp is required for image processing but not installed. Please install it with: npm install sharp');
+        }
+    }
+    return sharpModule;
+}
 
 // Constants for image processing
 export const MAX_IMAGE_HEIGHT = 2000;
@@ -155,6 +169,7 @@ export async function resizeAndSplitForOpenAI(imageData: string): Promise<string
     const imageBuffer = Buffer.from(base64Image, 'base64');
 
     // Quick-exit if already small enough
+    const sharp = await getSharp();
     const { width: origW = 0, height: origH = 0 } = await sharp(imageBuffer).metadata();
     if (origW <= MAX_WIDTH && origH <= MAX_HEIGHT) {
         return [imageData];
@@ -165,7 +180,7 @@ export async function resizeAndSplitForOpenAI(imageData: string): Promise<string
     const resizedBuffer = await sharp(imageBuffer)
         .resize({ width: newWidth })
         .flatten({ background: '#fff' }) // white background
-        .toFormat(imageFormat as keyof sharp.FormatEnum)
+        .toFormat(imageFormat as any)
         .toBuffer();
 
     // 2) Read the real resized height
@@ -183,7 +198,7 @@ export async function resizeAndSplitForOpenAI(imageData: string): Promise<string
 
             const segmentBuf = await sharp(resizedBuffer)
                 .extract({ left: 0, top, width: newWidth, height })
-                .toFormat(imageFormat as keyof sharp.FormatEnum)
+                .toFormat(imageFormat as any)
                 .toBuffer();
 
             const segmentDataUrl = `data:image/${imageFormat};base64,${segmentBuf.toString('base64')}`;
@@ -206,12 +221,13 @@ function stripDataUrl(dataUrl: string) {
 }
 
 async function processAndTruncate(imageBuffer: Buffer, format: string, maxW: number, maxH: number): Promise<Buffer> {
+    const sharp = await getSharp();
     // 1) Auto-orient, resize to max width, flatten transparency
     const resized = await sharp(imageBuffer)
         .rotate()
         .resize({ width: maxW, withoutEnlargement: true })
         .flatten({ background: '#fff' })
-        .toFormat(format as keyof sharp.FormatEnum)
+        .toFormat(format as any)
         .toBuffer();
 
     // 2) Pull actual size
@@ -221,7 +237,7 @@ async function processAndTruncate(imageBuffer: Buffer, format: string, maxW: num
     if (height! > maxH) {
         return await sharp(resized)
             .extract({ left: 0, top: 0, width: width!, height: maxH })
-            .toFormat(format as keyof sharp.FormatEnum)
+            .toFormat(format as any)
             .toBuffer();
     }
 
@@ -236,6 +252,7 @@ export async function resizeAndTruncateForClaude(imageData: string): Promise<str
     const buf = Buffer.from(base64, 'base64');
 
     // early-exit if already fits
+    const sharp = await getSharp();
     const meta = await sharp(buf).metadata();
     if (meta.width! <= CLAUDE_MAX_WIDTH && meta.height! <= CLAUDE_MAX_HEIGHT) {
         return imageData;
@@ -253,6 +270,7 @@ export async function resizeAndTruncateForGemini(imageData: string): Promise<str
     const buf = Buffer.from(base64, 'base64');
 
     // early-exit if already fits
+    const sharp = await getSharp();
     const meta = await sharp(buf).metadata();
     if (meta.width! <= GEMINI_MAX_WIDTH && meta.height! <= GEMINI_MAX_HEIGHT) {
         return imageData;

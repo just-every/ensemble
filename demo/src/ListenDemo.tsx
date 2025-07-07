@@ -874,20 +874,7 @@ server.listen(3003, () => {
             </div>
 
             <Card style={{ marginBottom: '20px' }}>
-                <StatsGrid
-                    stats={[
-                        { label: 'Duration', value: formatDuration(duration * 1000), icon: '⏱️' },
-                        { label: 'Data Sent', value: formatBytes(totalBytes), icon: '📊' },
-                        { label: 'Audio Chunks', value: formatNumber(audioChunksSent), icon: '🎵' },
-                        { label: 'Tokens', value: formatNumber(totalTokens), icon: '🔤' },
-                        { label: 'Cost', value: formatCurrency(cost), icon: '💰' },
-                    ]}
-                    columns={4}
-                />
-            </Card>
-
-            <Card>
-                <div className="transcript-section">
+                <div>
                     <div className="transcript-header">
                         <h2>Live Transcript</h2>
                         <button id="clearBtn" className="glass-button" onClick={clearTranscript}>
@@ -924,6 +911,19 @@ server.listen(3003, () => {
                         </div>
                     </div>
                 </div>
+            </Card>
+
+            <Card>
+                <StatsGrid
+                    stats={[
+                        { label: 'Duration', value: formatDuration(duration * 1000), icon: '⏱️' },
+                        { label: 'Data Sent', value: formatBytes(totalBytes), icon: '📊' },
+                        { label: 'Audio Chunks', value: formatNumber(audioChunksSent), icon: '🎵' },
+                        { label: 'Tokens', value: formatNumber(totalTokens), icon: '🔤' },
+                        { label: 'Cost', value: formatCurrency(cost), icon: '💰' },
+                    ]}
+                    columns={4}
+                />
             </Card>
 
             {showCodeModal && (
