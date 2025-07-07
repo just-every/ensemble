@@ -717,22 +717,54 @@ export class OpenAIProvider extends BaseModelProvider {
 
                 // Whitelist approach - only keep properties that OpenAI accepts
                 const allowedMessageProps = [
+                    // Common fields
                     'type',
                     'role',
                     'content',
                     'status',
                     'id',
                     'name',
+                    
                     // For thinking messages
                     'thinking_id',
+                    'signature',
+                    
                     // For function calls
                     'arguments',  // Required for function_call messages
                     'call_id',  // Required for function call responses
+                    
                     // For function call outputs
                     'output',
-                    // For images
+                    
+                    // For images and multimedia
                     'images',
                     'image_detail',
+                    'image_url',
+                    'detail',
+                    
+                    // For computer/shell/MCP calls (if used)
+                    'action',
+                    'command',
+                    'env',
+                    'timeout_ms',
+                    'user',
+                    'working_directory',
+                    'server_label',
+                    'tools',
+                    'error',
+                    'approval_request_id',
+                    'approve',
+                    'reason',
+                    
+                    // For references and metadata
+                    'acknowledged_safety_checks',
+                    'annotations',
+                    'input_schema',
+                    'description',
+                    
+                    // Additional fields that may be present
+                    'result',
+                    'generated',
                 ];
 
                 // Remove any properties not in the whitelist
