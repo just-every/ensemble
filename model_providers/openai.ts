@@ -724,24 +724,24 @@ export class OpenAIProvider extends BaseModelProvider {
                     'status',
                     'id',
                     'name',
-                    
+
                     // For thinking messages
                     'thinking_id',
                     'signature',
-                    
+
                     // For function calls
-                    'arguments',  // Required for function_call messages
-                    'call_id',  // Required for function call responses
-                    
+                    'arguments', // Required for function_call messages
+                    'call_id', // Required for function call responses
+
                     // For function call outputs
                     'output',
-                    
+
                     // For images and multimedia
                     'images',
                     'image_detail',
                     'image_url',
                     'detail',
-                    
+
                     // For computer/shell/MCP calls (if used)
                     'action',
                     'command',
@@ -755,13 +755,13 @@ export class OpenAIProvider extends BaseModelProvider {
                     'approval_request_id',
                     'approve',
                     'reason',
-                    
+
                     // For references and metadata
                     'acknowledged_safety_checks',
                     'annotations',
                     'input_schema',
                     'description',
-                    
+
                     // Additional fields that may be present
                     'result',
                     'generated',
@@ -854,7 +854,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     // Check if id doesn't start with 'fc_', and remove it if so
                     if (message.id && (!message.id.startsWith('fc_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'fc_', remove it
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
                         const { id, ...rest } = message;
                         message = rest;
                         // Ensure call_id is preserved - use the original id if call_id is missing

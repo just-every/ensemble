@@ -7,7 +7,7 @@ import {
     getEnsembleLogger,
     log_llm_request,
     log_llm_response,
-    log_llm_error
+    log_llm_error,
 } from '../utils/llm_logger.js';
 import { EnsembleLogger } from '../types/types.js';
 
@@ -24,19 +24,19 @@ describe('Multi-Logger Support', () => {
         logger1 = {
             log_llm_request: vi.fn().mockReturnValue('request-1'),
             log_llm_response: vi.fn(),
-            log_llm_error: vi.fn()
+            log_llm_error: vi.fn(),
         };
 
         logger2 = {
             log_llm_request: vi.fn().mockReturnValue('request-2'),
             log_llm_response: vi.fn(),
-            log_llm_error: vi.fn()
+            log_llm_error: vi.fn(),
         };
 
         logger3 = {
             log_llm_request: vi.fn().mockReturnValue('request-3'),
             log_llm_response: vi.fn(),
-            log_llm_error: vi.fn()
+            log_llm_error: vi.fn(),
         };
     });
 
@@ -129,9 +129,27 @@ describe('Multi-Logger Support', () => {
 
             const requestId = log_llm_request('agent-1', 'openai', 'gpt-4', { prompt: 'test' });
 
-            expect(logger1.log_llm_request).toHaveBeenCalledWith('agent-1', 'openai', 'gpt-4', { prompt: 'test' }, undefined);
-            expect(logger2.log_llm_request).toHaveBeenCalledWith('agent-1', 'openai', 'gpt-4', { prompt: 'test' }, undefined);
-            expect(logger3.log_llm_request).toHaveBeenCalledWith('agent-1', 'openai', 'gpt-4', { prompt: 'test' }, undefined);
+            expect(logger1.log_llm_request).toHaveBeenCalledWith(
+                'agent-1',
+                'openai',
+                'gpt-4',
+                { prompt: 'test' },
+                undefined
+            );
+            expect(logger2.log_llm_request).toHaveBeenCalledWith(
+                'agent-1',
+                'openai',
+                'gpt-4',
+                { prompt: 'test' },
+                undefined
+            );
+            expect(logger3.log_llm_request).toHaveBeenCalledWith(
+                'agent-1',
+                'openai',
+                'gpt-4',
+                { prompt: 'test' },
+                undefined
+            );
             expect(requestId).toBe('request-1');
         });
 
@@ -141,7 +159,7 @@ describe('Multi-Logger Support', () => {
                     throw new Error('Logger error');
                 }),
                 log_llm_response: vi.fn(),
-                log_llm_error: vi.fn()
+                log_llm_error: vi.fn(),
             };
 
             setEnsembleLogger(errorLogger);

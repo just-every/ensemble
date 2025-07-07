@@ -15,8 +15,10 @@ async function getSharp() {
         try {
             const module = await import('sharp');
             sharpModule = module.default || module;
-        } catch (error) {
-            throw new Error('Sharp is required for image processing but not installed. Please install it with: npm install sharp');
+        } catch {
+            throw new Error(
+                'Sharp is required for image processing but not installed. Please install it with: npm install sharp'
+            );
         }
     }
     return sharpModule;

@@ -885,7 +885,7 @@ export class GeminiProvider extends BaseModelProvider {
                 }
 
                 for (const candidate of chunk.candidates) {
-                    if (candidate.content.parts) {
+                    if (candidate.content?.parts) {
                         for (const part of candidate.content.parts) {
                             let text = '';
                             if (part.text) {

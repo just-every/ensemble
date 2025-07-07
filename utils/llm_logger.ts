@@ -67,7 +67,7 @@ export function log_llm_request(
 ): string {
     // Collect request IDs from all loggers
     const requestIds: string[] = [];
-    
+
     for (const logger of globalLoggers) {
         try {
             const requestId = logger.log_llm_request(agentId, providerName, model, requestData, timestamp);
@@ -78,7 +78,7 @@ export function log_llm_request(
             console.error('Error in logger.log_llm_request:', error);
         }
     }
-    
+
     // Return the first request ID for backward compatibility
     return requestIds[0] || '';
 }
