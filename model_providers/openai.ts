@@ -726,8 +726,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     // For thinking messages
                     'thinking_id',
                     // For function calls
-                    'function_name',
-                    'function_arguments',
+                    'arguments',  // Required for function_call messages
                     'call_id',  // Required for function call responses
                     // For function call outputs
                     'output',
