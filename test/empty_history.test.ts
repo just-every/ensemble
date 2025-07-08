@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ensembleRequest } from '../index.js';
+import { ensembleRequest } from '../core/ensemble_request.js';
 import { AgentDefinition } from '../types/types.js';
 
 describe('Empty History Thread Handling', () => {

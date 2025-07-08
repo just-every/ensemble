@@ -21,7 +21,7 @@ import {
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
 // import {v4 as uuidv4} from 'uuid';
-import { costTracker } from '../index.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
@@ -697,12 +697,12 @@ export class OpenAIProvider extends BaseModelProvider {
     async *createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         const { getToolsFromAgent } = await import('../utils/agent.js');
         const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;
-        let requestId: string | undefined;
 
         try {
             // Use a more compatible approach with reduce to build the array
@@ -1000,8 +1000,17 @@ export class OpenAIProvider extends BaseModelProvider {
                 requestParams = await convertToOpenAITools(requestParams, tools);
             }
 
-            // Log the request and save the requestId for later response logging
-            requestId = log_llm_request(agent.agent_id, 'openai', model, requestParams);
+            // Log the request using the provided requestId or generate a new one
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                'openai',
+                model,
+                requestParams,
+                new Date(),
+                requestId
+            );
+            // Use the logged request ID for consistency
+            requestId = loggedRequestId;
 
             // Wait while system is paused before making the API request
             const { waitWhilePaused } = await import('../utils/pause_controller.js');

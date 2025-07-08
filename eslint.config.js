@@ -42,6 +42,13 @@ export default [
                 { allowDeclarations: true },
             ],
             'no-console': 'off',
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                },
+            ],
         },
         files: ['**/*.ts'],
     },

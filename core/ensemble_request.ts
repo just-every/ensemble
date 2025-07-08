@@ -46,6 +46,7 @@ export async function* ensembleRequest(
             type: 'message',
             role: 'user',
             content: 'Begin.',
+            id: randomUUID(),
         });
     }
 
@@ -62,6 +63,7 @@ export async function* ensembleRequest(
                 type: 'message',
                 role: 'system',
                 content: agent.instructions,
+                id: randomUUID(),
             });
         }
     }
@@ -241,8 +243,8 @@ async function* executeRound(
     // Stream the response with retry support if available
     const stream =
         'createResponseStreamWithRetry' in provider
-            ? (provider as any).createResponseStreamWithRetry(messages, model, agent)
-            : provider.createResponseStream(messages, model, agent);
+            ? (provider as any).createResponseStreamWithRetry(messages, model, agent, requestId)
+            : provider.createResponseStream(messages, model, agent, requestId);
 
     const toolPromises: Promise<ToolCallResult>[] = [];
 
@@ -259,6 +261,9 @@ async function* executeRound(
     };
 
     for await (let event of stream) {
+        // Add request_id to all events from provider
+        event = { ...event, request_id: requestId };
+
         // Handle tool_start events specially to add formatted arguments
         if (event.type === 'tool_start') {
             const toolEvent = event as ToolEvent;
@@ -426,6 +431,7 @@ async function* executeRound(
 
         const toolDoneEvent: ProviderStreamEvent = {
             type: 'tool_done',
+            request_id: requestId,
             tool_call: toolCallWithFormattedArgs,
             result: {
                 call_id: toolResult.call_id || toolResult.id,
@@ -449,23 +455,25 @@ async function* executeRound(
     // Calculate full duration
     const duration_with_tools = Date.now() - startTime;
 
-    // Emit agent_done event through global event controller
-    await emitEvent(
-        {
-            type: 'agent_done',
-            request_id: requestId,
-            request_cost: totalCost > 0 ? totalCost : undefined,
-            request_duration,
-            duration_with_tools,
-            timestamp: new Date().toISOString(),
-        },
-        agent,
-        model
-    );
+    // Create agent_done event
+    const agentDoneEvent = {
+        type: 'agent_done' as const,
+        request_id: requestId,
+        request_cost: totalCost > 0 ? totalCost : undefined,
+        request_duration,
+        duration_with_tools,
+        timestamp: new Date().toISOString(),
+    };
+
+    // Yield to stream
+    yield agentDoneEvent;
+
+    // Also emit through global event controller
+    await emitEvent(agentDoneEvent, agent, model);
 
     // Yield any events that were buffered during tool execution
     for (const bufferedEvent of toolEventBuffer) {
-        yield bufferedEvent;
+        yield { ...bufferedEvent, request_id: requestId };
     }
 }
 

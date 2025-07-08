@@ -3,7 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Agent, ensembleRequest, createToolFunction } from '../index.js';
+import { Agent } from '../utils/agent.js';
+import { ensembleRequest } from '../core/ensemble_request.js';
+import { createToolFunction } from '../utils/create_tool_function.js';
 import type { ResponseInput } from '../types/types.js';
 import { testProviderConfig, resetTestProviderConfig } from '../model_providers/test_provider.js';
 

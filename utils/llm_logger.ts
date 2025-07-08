@@ -63,24 +63,32 @@ export function log_llm_request(
     providerName: string,
     model: string,
     requestData: unknown,
-    timestamp?: Date
+    timestamp?: Date,
+    requestId?: string
 ): string {
     // Collect request IDs from all loggers
     const requestIds: string[] = [];
 
     for (const logger of globalLoggers) {
         try {
-            const requestId = logger.log_llm_request(agentId, providerName, model, requestData, timestamp);
-            if (requestId) {
-                requestIds.push(requestId);
+            const loggerRequestId = logger.log_llm_request(
+                agentId,
+                providerName,
+                model,
+                requestData,
+                timestamp,
+                requestId
+            );
+            if (loggerRequestId) {
+                requestIds.push(loggerRequestId);
             }
         } catch (error) {
             console.error('Error in logger.log_llm_request:', error);
         }
     }
 
-    // Return the first request ID for backward compatibility
-    return requestIds[0] || '';
+    // Return the first request ID for backward compatibility, or the provided requestId if no loggers returned one
+    return requestIds[0] || requestId || '';
 }
 
 export function log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void {

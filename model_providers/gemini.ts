@@ -50,7 +50,7 @@ import {
     ResponseOutputMessage,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
-import { costTracker } from '../index.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, resizeAndTruncateForGemini } from '../utils/image_utils.js';
@@ -644,7 +644,8 @@ export class GeminiProvider extends BaseModelProvider {
     async *createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         const { getToolsFromAgent } = await import('../utils/agent.js');
         const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
@@ -657,7 +658,10 @@ export class GeminiProvider extends BaseModelProvider {
         // Track shown grounding URLs to avoid duplicates
         const shownGrounding = new Set<string>();
 
-        let requestId: string | undefined = undefined;
+        // Helper function to add request_id to all events
+        const withRequestId = (event: ProviderStreamEvent): ProviderStreamEvent => {
+            return requestId ? { ...event, request_id: requestId } : event;
+        };
         const chunks: GenerateContentResponse[] = [];
         try {
             // --- Prepare Request ---
@@ -832,7 +836,15 @@ export class GeminiProvider extends BaseModelProvider {
                 config,
             };
 
-            requestId = log_llm_request(agent.agent_id, 'google', model, requestParams);
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                'google',
+                model,
+                requestParams,
+                new Date(),
+                requestId
+            );
+            requestId = loggedRequestId;
 
             // Wait while system is paused before making the API request
             const { waitWhilePaused } = await import('../utils/pause_controller.js');
@@ -869,7 +881,7 @@ export class GeminiProvider extends BaseModelProvider {
                 if (chunk.functionCalls && chunk.functionCalls.length > 0) {
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
-                            yield {
+                            yield withRequestId({
                                 type: 'tool_start',
                                 tool_call: {
                                     id: fc.id || `call_${uuidv4()}`,
@@ -879,7 +891,7 @@ export class GeminiProvider extends BaseModelProvider {
                                         arguments: JSON.stringify(fc.args || {}),
                                     },
                                 },
-                            };
+                            });
                         }
                     }
                 }
@@ -920,14 +932,14 @@ export class GeminiProvider extends BaseModelProvider {
                                 yield ev as MessageEvent;
                             }
                             if (part.inlineData?.data) {
-                                yield {
+                                yield withRequestId({
                                     type: 'file_complete',
                                     data_format: 'base64',
                                     data: part.inlineData.data,
                                     mime_type: part.inlineData.mimeType || 'image/png',
                                     message_id: uuidv4(),
                                     order: eventOrder++,
-                                };
+                                });
                             }
                         }
                     }
@@ -937,12 +949,12 @@ export class GeminiProvider extends BaseModelProvider {
                         if (newChunks.length) {
                             newChunks.forEach(c => shownGrounding.add(c.web.uri));
                             const formatted = formatGroundingChunks(newChunks);
-                            yield {
+                            yield withRequestId({
                                 type: 'message_delta',
                                 content: '\n\nSearch Results:\n' + formatted + '\n',
                                 message_id: messageId,
                                 order: eventOrder++,
-                            };
+                            });
                             contentBuffer += '\n\nSearch Results:\n' + formatted + '\n';
                         }
                     }
@@ -969,13 +981,13 @@ export class GeminiProvider extends BaseModelProvider {
                 // Only yield cost_update event if no global event handler is set
                 // This prevents duplicate events when using the global EventController
                 if (!hasEventHandler()) {
-                    yield {
+                    yield withRequestId({
                         type: 'cost_update',
                         usage: {
                             ...calculatedUsage,
                             total_tokens: usageMetadata.totalTokenCount || 0,
                         },
-                    };
+                    });
                 }
             } else {
                 console.warn('[Gemini] No usage metadata found in the response. Using token estimation.');
@@ -1000,24 +1012,24 @@ export class GeminiProvider extends BaseModelProvider {
                 // Only yield cost_update event if no global event handler is set
                 // This prevents duplicate events when using the global EventController
                 if (!hasEventHandler()) {
-                    yield {
+                    yield withRequestId({
                         type: 'cost_update',
                         usage: {
                             ...calculatedUsage,
                             total_tokens: calculatedUsage.input_tokens + calculatedUsage.output_tokens,
                         },
-                    };
+                    });
                 }
             }
 
             // --- Stream Finished, Emit Final Events ---
             if (contentBuffer || thoughtBuffer) {
-                yield {
+                yield withRequestId({
                     type: 'message_complete',
                     content: contentBuffer,
                     thinking_content: thoughtBuffer,
                     message_id: messageId,
-                };
+                });
             }
         } catch (error) {
             log_llm_error(requestId, error);
@@ -1045,19 +1057,19 @@ export class GeminiProvider extends BaseModelProvider {
                 console.error(`${String(key)}:`, error[key]);
             }
 
-            yield {
+            yield withRequestId({
                 type: 'error',
                 error: `Gemini error ${model}: ${errorMessage}`,
-            };
+            });
 
             // Emit any partial content if we haven't yielded a tool call
             if (contentBuffer || thoughtBuffer) {
-                yield {
+                yield withRequestId({
                     type: 'message_complete',
                     content: contentBuffer,
                     thinking_content: thoughtBuffer,
                     message_id: messageId,
-                };
+                });
             }
         } finally {
             log_llm_response(requestId, chunks);

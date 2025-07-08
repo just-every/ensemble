@@ -303,6 +303,7 @@ export interface StreamEventBase {
     type: StreamEventType;
     timestamp?: string; // Timestamp for the event, shared by all event types
     agent?: AgentExportDefinition; // Optional agent context
+    request_id?: string; // Optional request ID to tie events to agent_start/agent_done blocks
 }
 
 /**
@@ -359,13 +360,7 @@ export interface ErrorEvent extends StreamEventBase {
 export interface TaskEvent extends StreamEventBase {
     type: 'task_complete' | 'task_fatal_error';
     result: string;
-    finalState?: {
-        metaFrequency?: string;
-        thoughtDelay?: string;
-        disabledModels?: string[];
-        modelScores?: Record<string, number>;
-        messages?: ResponseInput;
-    };
+    finalState?: any;
 }
 
 /**
@@ -442,7 +437,8 @@ export interface ModelProvider {
     createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent>;
 
     /**
@@ -709,7 +705,8 @@ export interface EnsembleLogger {
         providerName: string,
         model: string,
         requestData: unknown,
-        timestamp?: Date
+        timestamp?: Date,
+        requestId?: string
     ): string;
     log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void;
     log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void;

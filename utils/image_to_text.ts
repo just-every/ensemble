@@ -6,7 +6,8 @@
  */
 
 // import Anthropic from '@anthropic-ai/sdk';
-import { ensembleRequest, findModel } from '../index.js';
+import { ensembleRequest } from '../core/ensemble_request.js';
+import { findModel } from '../data/model_data.js';
 
 // Define the types we need based on the Anthropic SDK structure
 // type TextBlock = {

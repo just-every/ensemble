@@ -29,7 +29,7 @@ import {
     AgentDefinition,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
-import { costTracker } from '../index.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { findModel } from '../data/model_data.js';
@@ -578,7 +578,8 @@ export class ClaudeProvider extends BaseModelProvider {
     async *createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         // --- Usage Accumulators ---
         let totalInputTokens = 0;
@@ -587,7 +588,6 @@ export class ClaudeProvider extends BaseModelProvider {
         let totalCacheReadInputTokens = 0;
         let streamCompletedSuccessfully = false; // Flag to track successful stream completion
         let messageCompleteYielded = false; // Flag to track if message_complete was yielded
-        let requestId: string | undefined;
 
         try {
             const { getToolsFromAgent } = await import('../utils/agent.js');
@@ -697,8 +697,17 @@ export class ClaudeProvider extends BaseModelProvider {
                 ];
             }
 
-            // Log the request and save the requestId for later response logging
-            requestId = log_llm_request(agent.agent_id, 'anthropic', model, requestParams, new Date());
+            // Log the request using the provided requestId or generate a new one
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                'anthropic',
+                model,
+                requestParams,
+                new Date(),
+                requestId
+            );
+            // Use the logged request ID for consistency
+            requestId = loggedRequestId;
 
             // Track current tool call info
             let currentToolCall: any = null;

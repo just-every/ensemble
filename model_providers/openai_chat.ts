@@ -17,7 +17,7 @@ import {
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { APIError } from 'openai';
 import { v4 as uuidv4 } from 'uuid';
-import { costTracker } from '../index.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
@@ -580,14 +580,14 @@ export class OpenAIChat extends BaseModelProvider {
     async *createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         // Get tools asynchronously (getTools now returns a Promise)
         const { getToolsFromAgent } = await import('../utils/agent.js');
         const toolsPromise = agent ? getToolsFromAgent(agent) : Promise.resolve([]);
         const tools = await toolsPromise;
         const settings: ModelSettings | undefined = agent?.modelSettings;
-        let requestId: string | undefined;
 
         try {
             // --- Prepare Request ---
@@ -673,7 +673,16 @@ export class OpenAIChat extends BaseModelProvider {
             };
 
             requestParams = this.prepareParameters(requestParams);
-            requestId = log_llm_request(agent.agent_id, this.provider, model, requestParams);
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                this.provider,
+                model,
+                requestParams,
+                new Date(),
+                requestId
+            );
+            // Use the logged request ID for consistency
+            requestId = loggedRequestId;
 
             // Wait while system is paused before making the API request
             const { waitWhilePaused } = await import('../utils/pause_controller.js');

@@ -21,7 +21,8 @@ import {
     type ToolCallResult,
 } from '../types/types.js';
 
-import { createToolFunction, ensembleRequest } from '../index.js';
+import { createToolFunction } from './create_tool_function.js';
+import { ensembleRequest } from '../core/ensemble_request.js';
 
 import { v4 as uuid } from 'uuid';
 // Import removed to fix lint error

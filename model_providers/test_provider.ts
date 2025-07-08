@@ -10,7 +10,7 @@ import { ResponseInput, ProviderStreamEvent, ToolCall, ResponseInputItem, AgentD
 import { BaseModelProvider } from './base_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
-import { costTracker } from '../index.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 
 /**
@@ -115,7 +115,8 @@ export class TestProvider extends BaseModelProvider {
     async *createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        _requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         console.log(`[TestProvider] Creating response stream for model: ${model}`);
 

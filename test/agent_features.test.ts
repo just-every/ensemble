@@ -45,7 +45,12 @@ describe('Agent Features', () => {
             }
 
             // Should use historyThread instead of messages
-            expect(mockProvider.createResponseStream).toHaveBeenCalledWith(historyThread, 'test-model', agent);
+            expect(mockProvider.createResponseStream).toHaveBeenCalledWith(
+                historyThread,
+                'test-model',
+                agent,
+                expect.any(String)
+            );
         });
 
         it('should merge history threads', () => {

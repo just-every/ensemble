@@ -17,7 +17,8 @@ export abstract class BaseModelProvider implements ModelProvider {
     abstract createResponseStream(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent>;
 
     /**
@@ -26,7 +27,8 @@ export abstract class BaseModelProvider implements ModelProvider {
     async *createResponseStreamWithRetry(
         messages: ResponseInput,
         model: string,
-        agent: AgentDefinition
+        agent: AgentDefinition,
+        requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         const retryOptions: RetryOptions = {
             maxRetries: agent.retryOptions?.maxRetries ?? 3,
@@ -56,7 +58,7 @@ export abstract class BaseModelProvider implements ModelProvider {
             ]);
         }
 
-        yield* retryStreamWithBackoff(() => this.createResponseStream(messages, model, agent), retryOptions);
+        yield* retryStreamWithBackoff(() => this.createResponseStream(messages, model, agent, requestId), retryOptions);
     }
 
     /**
