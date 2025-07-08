@@ -40,16 +40,6 @@ export async function* ensembleRequest(
     // Use agent's historyThread if available, otherwise use provided messages
     const conversationHistory = agent?.historyThread || messages;
 
-    // Ensure we have at least one message to prevent provider errors
-    if (conversationHistory.length === 0) {
-        conversationHistory.push({
-            type: 'message',
-            role: 'user',
-            content: 'Begin.',
-            id: randomUUID(),
-        });
-    }
-
     if (agent.instructions) {
         const firstMsg = conversationHistory[0];
         const alreadyHasInstructions =
@@ -59,12 +49,17 @@ export async function* ensembleRequest(
             firstMsg.content.trim() === agent.instructions.trim();
 
         if (!alreadyHasInstructions) {
-            conversationHistory.unshift({
+            const instructionsMessage: ResponseInputMessage = {
                 type: 'message',
                 role: 'system',
                 content: agent.instructions,
                 id: randomUUID(),
-            });
+            };
+            conversationHistory.unshift(instructionsMessage);
+            yield {
+                type: 'response_output',
+                message: instructionsMessage,
+            };
         }
     }
 
