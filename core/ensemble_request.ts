@@ -114,7 +114,14 @@ export async function* ensembleRequest(
                     }
 
                     case 'tool_start': {
-                        hasToolCalls = true;
+                        const toolEvent = event as ToolEvent;
+                        if (toolEvent.tool_call) {
+                            const toolName = toolEvent.tool_call.function.name;
+                            // Don't count special tools as regular tool calls that need another round
+                            if (toolName !== 'task_complete' && toolName !== 'task_fatal_error') {
+                                hasToolCalls = true;
+                            }
+                        }
                         ++totalToolCalls;
                         break;
                     }
@@ -415,6 +422,9 @@ async function* executeRound(
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
 
     for (const toolResult of toolResults) {
+        const toolName = toolResult.toolCall.function.name;
+        const isSpecialTool = toolName === 'task_complete' || toolName === 'task_fatal_error';
+
         // Get the formatted arguments if we stored them
         const formattedArgs = toolCallFormattedArgs.get(toolResult.toolCall.id);
 
@@ -443,14 +453,17 @@ async function* executeRound(
         // Emit tool done event through global event controller
         await emitEvent(toolDoneEvent, agent, model);
 
-        const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
+        // For special tools, don't add the output to history or send back to LLM
+        if (!isSpecialTool) {
+            const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
 
-        history.add(functionOutput);
-        yield {
-            type: 'response_output',
-            message: functionOutput,
-            request_id: requestId,
-        };
+            history.add(functionOutput);
+            yield {
+                type: 'response_output',
+                message: functionOutput,
+                request_id: requestId,
+            };
+        }
     }
 
     // Calculate full duration
