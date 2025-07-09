@@ -59,6 +59,7 @@ export async function* ensembleRequest(
             yield {
                 type: 'response_output',
                 message: instructionsMessage,
+                request_id: randomUUID(),
             };
         }
     }
@@ -348,6 +349,7 @@ async function* executeRound(
                     yield {
                         type: 'response_output',
                         message: thinkingMessage,
+                        request_id: requestId,
                     };
                 }
                 if (messageEvent.content) {
@@ -361,6 +363,7 @@ async function* executeRound(
                     yield {
                         type: 'response_output',
                         message: contentMessage,
+                        request_id: requestId,
                     };
                 }
                 break;
@@ -392,6 +395,7 @@ async function* executeRound(
                 yield {
                     type: 'response_output',
                     message: functionCall,
+                    request_id: requestId,
                 };
                 break;
             }
@@ -445,6 +449,7 @@ async function* executeRound(
         yield {
             type: 'response_output',
             message: functionOutput,
+            request_id: requestId,
         };
     }
 
