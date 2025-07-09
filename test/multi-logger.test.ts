@@ -135,6 +135,7 @@ describe('Multi-Logger Support', () => {
                 'gpt-4',
                 { prompt: 'test' },
                 undefined,
+                undefined,
                 undefined
             );
             expect(logger2.log_llm_request).toHaveBeenCalledWith(
@@ -143,6 +144,7 @@ describe('Multi-Logger Support', () => {
                 'gpt-4',
                 { prompt: 'test' },
                 undefined,
+                undefined,
                 undefined
             );
             expect(logger3.log_llm_request).toHaveBeenCalledWith(
@@ -150,6 +152,7 @@ describe('Multi-Logger Support', () => {
                 'openai',
                 'gpt-4',
                 { prompt: 'test' },
+                undefined,
                 undefined,
                 undefined
             );

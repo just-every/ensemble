@@ -842,7 +842,8 @@ export class GeminiProvider extends BaseModelProvider {
                 model,
                 requestParams,
                 new Date(),
-                requestId
+                requestId,
+                agent.tags
             );
             requestId = loggedRequestId;
 

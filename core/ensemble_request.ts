@@ -216,6 +216,7 @@ async function* executeRound(
             cwd: agent.cwd,
             modelScores: agent.modelScores,
             disabledModels: agent.disabledModels,
+            tags: agent.tags,
         },
     };
 

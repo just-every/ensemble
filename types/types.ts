@@ -706,7 +706,8 @@ export interface EnsembleLogger {
         model: string,
         requestData: unknown,
         timestamp?: Date,
-        requestId?: string
+        requestId?: string,
+        tags?: string[]
     ): string;
     log_llm_response(requestId: string | undefined, responseData: unknown, timestamp?: Date): void;
     log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void;
@@ -866,6 +867,7 @@ export interface AgentExportDefinition {
     cwd?: string; // Working directory for model providers that need a real shell context
     modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
     disabledModels?: string[]; // Models to exclude from selection
+    tags?: string[]; // Optional tags for categorizing or grouping agents
 }
 
 /**
@@ -893,6 +895,7 @@ export interface AgentDefinition {
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
     modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
     disabledModels?: string[]; // Models to exclude from selection
+    tags?: string[]; // Optional tags for categorizing or grouping agents
 
     /** Optional callback for processing tool calls */
     getTools?: () => Promise<ToolFunction[]>;

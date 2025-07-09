@@ -64,7 +64,8 @@ export function log_llm_request(
     model: string,
     requestData: unknown,
     timestamp?: Date,
-    requestId?: string
+    requestId?: string,
+    tags?: string[]
 ): string {
     // Collect request IDs from all loggers
     const requestIds: string[] = [];
@@ -77,7 +78,8 @@ export function log_llm_request(
                 model,
                 requestData,
                 timestamp,
-                requestId
+                requestId,
+                tags
             );
             if (loggerRequestId) {
                 requestIds.push(loggerRequestId);

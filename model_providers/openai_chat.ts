@@ -679,7 +679,8 @@ export class OpenAIChat extends BaseModelProvider {
                 model,
                 requestParams,
                 new Date(),
-                requestId
+                requestId,
+                agent.tags
             );
             // Use the logged request ID for consistency
             requestId = loggedRequestId;
