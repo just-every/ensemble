@@ -64,7 +64,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
         for await (const _event of stream) {
             // Just consume the stream
         }
@@ -173,7 +173,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
         for await (const _event of stream) {
             // Just consume the stream
         }
@@ -221,7 +221,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
         for await (const _event of stream) {
             // Just consume the stream
         }
@@ -269,7 +269,7 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
         const stream = ensembleRequest(messages, agent);
 
         // Process the stream
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
         for await (const _event of stream) {
             // Just consume the stream
         }
@@ -316,7 +316,6 @@ describe('Tool Rounds Infinite Loop Prevention', () => {
 
         const stream = ensembleRequest(messages, agent);
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _event of stream) {
             // Just consume the stream
         }

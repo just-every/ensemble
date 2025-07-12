@@ -20,7 +20,7 @@ describe('Empty History Thread Handling', () => {
                     errorOccurred = true;
                 }
             }
-        } catch (error) {
+        } catch {
             errorOccurred = true;
         }
 
@@ -58,7 +58,7 @@ describe('Empty History Thread Handling', () => {
             { model: 'grok-3-mini-fast', provider: 'xai' },
         ];
 
-        for (const { provider } of providers) {
+        for (const _provider of providers) {
             const agent: AgentDefinition = {
                 model: 'test-model', // Use test model to avoid API calls
                 historyThread: [],
@@ -72,7 +72,7 @@ describe('Empty History Thread Handling', () => {
                         break;
                     }
                 }
-            } catch (error) {
+            } catch {
                 // Expected to throw errors
                 errorOccurred = true;
             }

@@ -15,9 +15,7 @@ describe('Special Tools (task_complete and task_fatal_error)', () => {
     });
 
     it('should not trigger another round when task_complete is called', async () => {
-        const messages: ResponseInput = [
-            { type: 'message', role: 'user', content: 'Test task_complete', id: '1' },
-        ];
+        const messages: ResponseInput = [{ type: 'message', role: 'user', content: 'Test task_complete', id: '1' }];
 
         let regularToolCalled = false;
         let taskCompleteCalled = false;
@@ -95,16 +93,12 @@ describe('Special Tools (task_complete and task_fatal_error)', () => {
 
         // Verify the task_complete output is NOT in response_output messages
         const responseOutputs = events.filter(e => e.type === 'response_output');
-        const functionOutputs = responseOutputs.filter(
-            e => e.message?.type === 'function_call_output'
-        );
+        const functionOutputs = responseOutputs.filter(e => e.message?.type === 'function_call_output');
         expect(functionOutputs).toHaveLength(0);
     });
 
     it('should not trigger another round when task_fatal_error is called', async () => {
-        const messages: ResponseInput = [
-            { type: 'message', role: 'user', content: 'Test task_fatal_error', id: '1' },
-        ];
+        const messages: ResponseInput = [{ type: 'message', role: 'user', content: 'Test task_fatal_error', id: '1' }];
 
         let regularToolCalled = false;
         let taskFatalErrorCalled = false;
@@ -182,9 +176,7 @@ describe('Special Tools (task_complete and task_fatal_error)', () => {
 
         // Verify the task_fatal_error output is NOT in response_output messages
         const responseOutputs = events.filter(e => e.type === 'response_output');
-        const functionOutputs = responseOutputs.filter(
-            e => e.message?.type === 'function_call_output'
-        );
+        const functionOutputs = responseOutputs.filter(e => e.message?.type === 'function_call_output');
         expect(functionOutputs).toHaveLength(0);
     });
 });

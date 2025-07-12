@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import '@just-every/demo-ui/dist/styles.css';
 import { REQUEST_WS_URL } from './config/websocket';
 import {
     DemoHeader,

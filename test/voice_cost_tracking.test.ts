@@ -88,12 +88,11 @@ describe('Voice Cost Tracking', () => {
         const text2 = 'Second voice generation with more text.';
 
         // Generate two voice outputs
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
         for await (const _event of ensembleVoice(text1, { model: 'tts-1' })) {
             // consume events
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _event of ensembleVoice(text2, { model: 'tts-1' })) {
             // consume events
         }

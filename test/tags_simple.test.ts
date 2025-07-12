@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ensembleRequest } from '../core/ensemble_request.js';
 import { AgentDefinition } from '../types/types.js';
 import { setEventHandler } from '../utils/event_controller.js';
@@ -8,9 +8,9 @@ describe('Tags Simple Tests', () => {
 
     beforeEach(() => {
         capturedEvents = [];
-        
+
         // Set global event handler to capture events
-        setEventHandler(async (event) => {
+        setEventHandler(async event => {
             capturedEvents.push(event);
         });
     });
@@ -39,7 +39,7 @@ describe('Tags Simple Tests', () => {
         }
 
         // Find agent_start event
-        const agentStartEvent = events.find((e) => e.type === 'agent_start');
+        const agentStartEvent = events.find(e => e.type === 'agent_start');
         expect(agentStartEvent).toBeDefined();
         expect(agentStartEvent.agent.tags).toEqual(['production', 'api-v2', 'customer-123']);
     });
@@ -68,7 +68,7 @@ describe('Tags Simple Tests', () => {
         }
 
         // Find agent_start event
-        const agentStartEvent = events.find((e) => e.type === 'agent_start');
+        const agentStartEvent = events.find(e => e.type === 'agent_start');
         expect(agentStartEvent).toBeDefined();
         expect(agentStartEvent.agent.tags).toBeUndefined();
     });
@@ -97,7 +97,7 @@ describe('Tags Simple Tests', () => {
         }
 
         // Find agent_start event
-        const agentStartEvent = events.find((e) => e.type === 'agent_start');
+        const agentStartEvent = events.find(e => e.type === 'agent_start');
         expect(agentStartEvent).toBeDefined();
         expect(agentStartEvent.agent.tags).toEqual([]);
     });

@@ -36,4 +36,4 @@ coverage/
 *.temp
 
 # Cache directories
-.cache/
+.cache/demo/dist-react/

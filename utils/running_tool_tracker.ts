@@ -66,11 +66,7 @@ export class RunningToolTracker {
     /**
      * Complete a running tool
      */
-    async completeRunningTool(
-        id: string,
-        result: string,
-        _agent?: AgentDefinition // eslint-disable-line @typescript-eslint/no-unused-vars
-    ): Promise<void> {
+    async completeRunningTool(id: string, result: string, _agent?: AgentDefinition): Promise<void> {
         const tool = this.runningTools.get(id);
         if (!tool) return;
 
@@ -101,11 +97,7 @@ export class RunningToolTracker {
     /**
      * Mark a tool as failed
      */
-    async failRunningTool(
-        id: string,
-        error: string,
-        _agent?: AgentDefinition // eslint-disable-line @typescript-eslint/no-unused-vars
-    ): Promise<void> {
+    async failRunningTool(id: string, error: string, _agent?: AgentDefinition): Promise<void> {
         const tool = this.runningTools.get(id);
         if (!tool) return;
 
