@@ -8,12 +8,25 @@ import {
     ResponseJSONSchema,
     ResponseOutputMessage,
     ResponseInputMessage,
+    ProviderStreamEvent,
 } from '../types/types.js';
-import { ensembleRequest } from '../core/ensemble_request.js';
 
 export interface VerificationResult {
     status: 'pass' | 'fail';
     reason?: string;
+}
+
+// Type for ensemble request function to avoid circular dependency
+type EnsembleRequestFunction = (messages: ResponseInput, agent: AgentDefinition) => AsyncGenerator<ProviderStreamEvent>;
+
+// Global reference to ensemble request function (set by ensemble_request.ts)
+let ensembleRequestFunction: EnsembleRequestFunction | null = null;
+
+/**
+ * Set the ensemble request function (called by ensemble_request.ts to avoid circular dependency)
+ */
+export function setEnsembleRequestFunction(fn: EnsembleRequestFunction): void {
+    ensembleRequestFunction = fn;
 }
 
 /**
@@ -62,8 +75,12 @@ Respond with JSON: {"status": "pass"} or {"status": "fail", "reason": "explanati
         } as ResponseJSONSchema,
     };
 
+    if (!ensembleRequestFunction) {
+        throw new Error('Ensemble request function not set. This is a circular dependency issue.');
+    }
+
     try {
-        const stream = ensembleRequest(verificationMessages, verifierWithSchema);
+        const stream = ensembleRequestFunction(verificationMessages, verifierWithSchema);
         let fullResponse = '';
 
         for await (const event of stream) {

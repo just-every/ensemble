@@ -18,7 +18,8 @@ import { getModelFromAgent, getModelProvider } from '../model_providers/model_pr
 import { MessageHistory } from '../utils/message_history.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
-import { verifyOutput } from '../utils/verification.js';
+import { verifyOutput, setEnsembleRequestFunction } from '../utils/verification.js';
+import { setEnsembleRequestFunction as setImageToTextFunction } from '../utils/image_to_text.js';
 import { waitWhilePaused } from '../utils/pause_controller.js';
 import { emitEvent } from '../utils/event_controller.js';
 import {
@@ -30,6 +31,10 @@ import {
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
+
+// Set the ensemble request function in verification and image-to-text modules to avoid circular dependency
+setEnsembleRequestFunction(ensembleRequest);
+setImageToTextFunction(ensembleRequest);
 
 /**
  * Unified request function that handles both standard and enhanced modes

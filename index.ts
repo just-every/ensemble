@@ -120,7 +120,7 @@ export { truncateLargeValues } from './utils/truncate_utils.js';
 export { mergeHistoryThread } from './core/ensemble_request.js';
 
 // Export Agent class and utilities
-export { Agent, cloneAgent, getAgentSpecificTools, agentToolCache } from './utils/agent.js';
+export { Agent, cloneAgent, getAgentSpecificTools, agentToolCache, exportAgent } from './utils/agent.js';
 
 // Export model configuration utilities
 export {

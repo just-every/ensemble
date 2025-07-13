@@ -6,8 +6,21 @@
  */
 
 // import Anthropic from '@anthropic-ai/sdk';
-import { ensembleRequest } from '../core/ensemble_request.js';
 import { findModel } from '../data/model_data.js';
+import { ResponseInput, AgentDefinition, ProviderStreamEvent } from '../types/types.js';
+
+// Type for ensemble request function to avoid circular dependency
+type EnsembleRequestFunction = (messages: ResponseInput, agent: AgentDefinition) => AsyncGenerator<ProviderStreamEvent>;
+
+// Global reference to ensemble request function (set by ensemble_request.ts)
+let ensembleRequestFunction: EnsembleRequestFunction | null = null;
+
+/**
+ * Set the ensemble request function (called by ensemble_request.ts to avoid circular dependency)
+ */
+export function setEnsembleRequestFunction(fn: EnsembleRequestFunction): void {
+    ensembleRequestFunction = fn;
+}
 
 // Define the types we need based on the Anthropic SDK structure
 // type TextBlock = {
@@ -78,9 +91,14 @@ export async function convertImageToText(imageData: string, modelId: string): Pr
         return imageDescriptionCache[imageHash];
     }
 
+    if (!ensembleRequestFunction) {
+        console.error('Ensemble request function not set for image-to-text conversion');
+        return 'Image found, but could not be converted to text (circular dependency issue)';
+    }
+
     // Use Claude to describe the image
     try {
-        const stream = ensembleRequest(
+        const stream = ensembleRequestFunction(
             [
                 {
                     type: 'message',

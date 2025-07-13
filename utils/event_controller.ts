@@ -6,7 +6,8 @@
  */
 
 import { ProviderStreamEvent, AgentDefinition } from '../types/types.js';
-import { exportAgent } from './agent.js';
+import { exportAgent } from './agent_export.js';
+import { setEventControllerFunctions } from './cost_tracker.js';
 
 export type EventHandler = (event: ProviderStreamEvent) => void | Promise<void>;
 
@@ -111,3 +112,6 @@ export async function emitEvent(event: ProviderStreamEvent, agent?: AgentDefinit
 export function hasEventHandler(): boolean {
     return getEventController().hasEventHandler();
 }
+
+// Set the event controller functions in cost_tracker to avoid circular dependency
+setEventControllerFunctions(emitEvent, hasEventHandler);
