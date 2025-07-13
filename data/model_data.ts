@@ -83,6 +83,7 @@ export const MODEL_CLASSES = {
             'claude-sonnet-4-20250514-max', // Anthropic
             'claude-3-7-sonnet-latest-max', // Anthropic
             'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
+            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -164,6 +165,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-pro-preview-06-05', // Google
             'claude-opus-4-20250514-low', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
+            'grok-4', // X.AI
             //'grok-2-vision', // X.AI
             //'gpt-4.1', // OpenAI
         ],
@@ -523,6 +525,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 50,
         },
         description: 'Grok-3 Mini on accelerated hardware for latency-critical use',
+    },
+
+    {
+        id: 'grok-4',
+        aliases: ['grok-4-2025-07-09'],
+        provider: 'xai',
+        cost: {
+            input_per_million: 10.0,
+            output_per_million: 30.0,
+        },
+        features: {
+            context_length: 131072,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        scores: {
+            monologue: 85,
+            code: 75,
+            reasoning: 70,
+        },
+        description: 'Most advanced Grok model with vision capabilities and complex reasoning',
     },
 
     //
