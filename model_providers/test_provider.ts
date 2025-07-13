@@ -6,11 +6,19 @@
  * and response patterns without needing real API calls.
  */
 
-import { ResponseInput, ProviderStreamEvent, ToolCall, ResponseInputItem, AgentDefinition } from '../types/types.js';
+import {
+    ResponseInput,
+    ProviderStreamEvent,
+    ToolCall,
+    ResponseInputItem,
+    AgentDefinition,
+    EmbedOpts,
+} from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import { v4 as uuidv4 } from 'uuid';
 // Minimal agent interface is used instead of full Agent class
 import { costTracker } from '../utils/cost_tracker.js';
+import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 
 /**
@@ -311,27 +319,80 @@ export class TestProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(input: string | string[], model: string, opts?: any): Promise<number[] | number[][]> {
-        // Simulate embedding generation with deterministic values based on input
-        const generateVector = (text: string): number[] => {
-            const dimension = opts?.dimension || 384; // Default dimension
-            const vector = new Array(dimension);
+    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
+        try {
+            // Log the request
+            const requestParams = {
+                model,
+                input_length: Array.isArray(input) ? input.length : 1,
+                dimension: opts?.dimensions || 384,
+            };
 
-            // Generate deterministic values based on text content
-            for (let i = 0; i < dimension; i++) {
-                // Use character codes and position to generate pseudo-random values
-                const charCode = text.charCodeAt(i % text.length) || 0;
-                const value = Math.sin(charCode * (i + 1) * 0.01) * 0.5 + 0.5;
-                vector[i] = value;
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'test',
+                'test',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
+            // Simulate embedding generation with deterministic values based on input
+            const generateVector = (text: string): number[] => {
+                const dimension = opts?.dimensions || 384; // Default dimension
+                const vector = new Array(dimension);
+
+                // Generate deterministic values based on text content
+                for (let i = 0; i < dimension; i++) {
+                    // Use character codes and position to generate pseudo-random values
+                    const charCode = text.charCodeAt(i % text.length) || 0;
+                    const value = Math.sin(charCode * (i + 1) * 0.01) * 0.5 + 0.5;
+                    vector[i] = value;
+                }
+
+                return vector;
+            };
+
+            let result: number[] | number[][];
+            if (Array.isArray(input)) {
+                result = input.map(text => generateVector(text));
+            } else {
+                result = generateVector(input);
             }
 
-            return vector;
-        };
+            // Track usage for test purposes
+            const estimatedTokens =
+                typeof input === 'string'
+                    ? Math.ceil(input.length / 4)
+                    : input.reduce((sum, text) => sum + Math.ceil(text.length / 4), 0);
 
-        if (Array.isArray(input)) {
-            return input.map(text => generateVector(text));
-        } else {
-            return generateVector(input);
+            costTracker.addUsage({
+                model,
+                input_tokens: estimatedTokens,
+                output_tokens: 0,
+                metadata: {
+                    dimensions: opts?.dimensions || 384,
+                    type: 'test_embedding',
+                },
+            });
+
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                dimensions: opts?.dimensions || 384,
+                vector_count: Array.isArray(input) ? input.length : 1,
+                estimated_tokens: estimatedTokens,
+            });
+
+            return result;
+        } catch (error) {
+            log_llm_error(finalRequestId, error);
+            throw error;
         }
     }
 }

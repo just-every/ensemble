@@ -55,6 +55,7 @@ import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_l
 import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, resizeAndTruncateForGemini } from '../utils/image_utils.js';
 import { hasEventHandler } from '../utils/event_controller.js';
+import { truncateLargeValues } from '../utils/truncate_utils.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -266,12 +267,12 @@ async function convertToGeminiFunctionDeclarations(tools: ToolFunction[]): Promi
  * Helper function to determine image MIME type from base64 data
  */
 export function getImageMimeType(imageData: string): string {
-    if (imageData.includes('data:image/jpeg')) return 'image/jpeg';
     if (imageData.includes('data:image/png')) return 'image/png';
+    if (imageData.includes('data:image/jpeg')) return 'image/jpeg';
     if (imageData.includes('data:image/gif')) return 'image/gif';
     if (imageData.includes('data:image/webp')) return 'image/webp';
     // Default to jpeg if no specific type found
-    return 'image/jpeg';
+    return 'image/png';
 }
 
 /**
@@ -312,7 +313,7 @@ async function addImagesToInput(input: Content[], images: Record<string, string>
             role: 'user',
             parts: [
                 {
-                    text: `This is [image #${image_id}] from the ${source}`,
+                    text: `[image #${image_id}] from the ${source}`,
                 },
                 {
                     inlineData: {
@@ -338,7 +339,11 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                 const parsedArgs = JSON.parse(msg.arguments || '{}');
                 args = typeof parsedArgs === 'object' && parsedArgs !== null ? parsedArgs : { value: parsedArgs };
             } catch (e) {
-                console.error(`Failed to parse function call arguments for ${msg.name}:`, msg.arguments, e);
+                console.error(
+                    `Failed to parse function call arguments for ${msg.name}:`,
+                    truncateLargeValues(msg.arguments),
+                    e
+                );
                 args = {
                     error: 'Invalid JSON arguments provided',
                     raw_args: msg.arguments,
@@ -478,6 +483,8 @@ export class GeminiProvider extends BaseModelProvider {
      * @returns Promise resolving to embedding vector(s)
      */
     async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         try {
             // Handle 'gemini/' prefix if present
             let actualModelId = model.startsWith('gemini/') ? model.substring(7) : model;
@@ -514,6 +521,22 @@ export class GeminiProvider extends BaseModelProvider {
                 payload.config.thinkingConfig = thinkingConfig;
             }
 
+            // Log the request
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'gemini',
+                actualModelId,
+                {
+                    ...payload,
+                    input_length: Array.isArray(input) ? input.length : 1,
+                },
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
             // Call the Gemini API
             const response = await this.client.models.embedContent(payload);
 
@@ -533,7 +556,7 @@ export class GeminiProvider extends BaseModelProvider {
             // Extract the embedding values correctly
             // Check if response has the embedding field with values
             if (!response.embeddings || !Array.isArray(response.embeddings)) {
-                console.error('[Gemini] Unexpected embedding response structure:', response);
+                console.error('[Gemini] Unexpected embedding response structure:', truncateLargeValues(response));
                 throw new Error('Invalid embedding response structure from Gemini API');
             }
 
@@ -571,6 +594,14 @@ export class GeminiProvider extends BaseModelProvider {
                 },
             });
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model: actualModelId,
+                dimensions,
+                vector_count: extractedValues.length,
+                estimated_tokens: estimatedTokens,
+            });
+
             // Extract and return the embeddings, ensuring correct type
             if (Array.isArray(input) && input.length > 1) {
                 // Handle the multi-input case - ensure we have an array of arrays
@@ -586,7 +617,10 @@ export class GeminiProvider extends BaseModelProvider {
                         result = firstValue;
                     } else {
                         // If somehow we got a single number or non-array, return empty array
-                        console.error('[Gemini] Unexpected format in embedding result:', firstValue);
+                        console.error(
+                            '[Gemini] Unexpected format in embedding result:',
+                            truncateLargeValues(firstValue)
+                        );
                         result = [];
                     }
                 } else {
@@ -597,7 +631,8 @@ export class GeminiProvider extends BaseModelProvider {
                 return result;
             }
         } catch (error) {
-            console.error('[Gemini] Error generating embedding:', error);
+            log_llm_error(finalRequestId, error);
+            console.error('[Gemini] Error generating embedding:', truncateLargeValues(error));
             throw error;
         }
     }
@@ -1050,12 +1085,12 @@ export class GeminiProvider extends BaseModelProvider {
 
             // 3️⃣  JSON-serialize every own property
             console.error('\n=== JSON dump of error ===');
-            console.error(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            console.error(truncateLargeValues(JSON.stringify(error, Object.getOwnPropertyNames(error), 2)));
 
             // 5️⃣  Fallback: iterate keys manually (helps spot symbols, etc.)
             console.error('\n=== Manual property walk ===');
             for (const key of Reflect.ownKeys(error)) {
-                console.error(`${String(key)}:`, error[key]);
+                console.error(`${String(key)}:`, truncateLargeValues(error[key]));
             }
 
             yield withRequestId({
@@ -1084,6 +1119,8 @@ export class GeminiProvider extends BaseModelProvider {
      * @returns Promise resolving to generated image data
      */
     async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         try {
             // Extract options with defaults
             model = model || 'imagen-3.0-generate-002';
@@ -1101,17 +1138,31 @@ export class GeminiProvider extends BaseModelProvider {
                 `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
 
-            // Use Gemini/Imagen API for image generation
-            const response = await this.client.models.generateImages({
+            const requestParams = {
                 model,
                 prompt,
                 config: {
                     numberOfImages,
                     aspectRatio,
                     includeSafetyAttributes: false,
-                    // personGeneration: 'allow_all', // Comment out for now - may need proper enum value
                 },
-            });
+            };
+
+            // Log the request
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'gemini',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
+            // Use Gemini/Imagen API for image generation
+            const response = await this.client.models.generateImages(requestParams);
 
             // Process the response
             const images: string[] = [];
@@ -1142,10 +1193,19 @@ export class GeminiProvider extends BaseModelProvider {
                 throw new Error('No images returned from Gemini/Imagen');
             }
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                image_count: images.length,
+                aspect_ratio: aspectRatio,
+                cost: images.length * this.getImageCost(model),
+            });
+
             // Return standardized result
             return images;
         } catch (error) {
-            console.error('[Gemini] Error generating image:', error);
+            log_llm_error(finalRequestId, error);
+            console.error('[Gemini] Error generating image:', truncateLargeValues(error));
             throw error;
         }
     }
@@ -1177,6 +1237,8 @@ export class GeminiProvider extends BaseModelProvider {
         model: string = 'gemini-2.5-flash-preview-tts',
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define finalRequestId in outer scope
         try {
             console.log(
                 `[Gemini] Generating speech with model ${model}, text: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`
@@ -1223,6 +1285,28 @@ export class GeminiProvider extends BaseModelProvider {
                     text = `${say_prefix} and say:\n${text}`;
                 }
             }
+
+            // Log the request
+            const requestParams = {
+                model,
+                text_length: text.length,
+                voice: voiceName,
+                speed: opts?.speed,
+                affect: opts?.affect,
+                config,
+            };
+
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'gemini',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
 
             // Use streaming API for better performance
             console.log(`[Gemini] Starting generateContentStream call...`);
@@ -1277,6 +1361,15 @@ export class GeminiProvider extends BaseModelProvider {
                     offset += chunk.length;
                 }
 
+                // Log the successful response
+                log_llm_response(finalRequestId, {
+                    model,
+                    text_length: textLength,
+                    voice: voiceName,
+                    audio_size: combined.length,
+                    stream: true,
+                });
+
                 // Return as a single-chunk stream for efficiency
                 return new ReadableStream<Uint8Array>({
                     start(controller) {
@@ -1314,10 +1407,20 @@ export class GeminiProvider extends BaseModelProvider {
                 throw new Error('No audio data generated from Gemini TTS');
             }
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                text_length: textLength,
+                voice: voiceName,
+                audio_size: allData.length,
+                stream: false,
+            });
+
             // Return as ArrayBuffer
             return allData.buffer;
         } catch (error) {
-            console.error('[Gemini] Error generating voice:', error);
+            log_llm_error(finalRequestId, error);
+            console.error('[Gemini] Error generating voice:', truncateLargeValues(error));
             throw error;
         }
     }
@@ -1392,6 +1495,8 @@ export class GeminiProvider extends BaseModelProvider {
         model: string,
         opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         let session: any = null;
         let isConnected = false;
 
@@ -1542,11 +1647,14 @@ export class GeminiProvider extends BaseModelProvider {
                                 }
                             },
                             onerror: (err: any) => {
-                                console.error('[Gemini] Live API error:', {
-                                    code: err.code,
-                                    reason: err.reason,
-                                    wasClean: err.wasClean,
-                                });
+                                console.error(
+                                    '[Gemini] Live API error:',
+                                    truncateLargeValues({
+                                        code: err.code,
+                                        reason: err.reason,
+                                        wasClean: err.wasClean,
+                                    })
+                                );
                                 connectionError = err;
                             },
                             onclose: (event?: any) => {
@@ -1574,6 +1682,27 @@ export class GeminiProvider extends BaseModelProvider {
             // Wait for connection
             await connectionPromise;
 
+            // Log the request
+            const requestParams = {
+                model,
+                systemInstruction,
+                realtimeInputConfig,
+                speechConfig,
+                mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+            };
+
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                'gemini',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                agent.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
             // Process audio stream
             const audioStream = normalizeAudioSource(audio);
             const reader = audioStream.getReader();
@@ -1590,7 +1719,7 @@ export class GeminiProvider extends BaseModelProvider {
                         },
                     });
                 } catch (err) {
-                    console.error('[Gemini] Error sending audio chunk:', err);
+                    console.error('[Gemini] Error sending audio chunk:', truncateLargeValues(err));
                     connectionError = err;
                     throw err;
                 }
@@ -1634,6 +1763,12 @@ export class GeminiProvider extends BaseModelProvider {
                         yield event;
                     }
                 }
+
+                // Log the successful response
+                log_llm_response(finalRequestId, {
+                    model,
+                    transcription_complete: true,
+                });
             } finally {
                 reader.releaseLock();
                 if (session) {
@@ -1641,7 +1776,8 @@ export class GeminiProvider extends BaseModelProvider {
                 }
             }
         } catch (error) {
-            console.error('[Gemini] Transcription error:', error);
+            log_llm_error(finalRequestId, error);
+            console.error('[Gemini] Transcription error:', truncateLargeValues(error));
             const errorEvent: TranscriptionEvent = {
                 type: 'error',
                 timestamp: new Date().toISOString(),
@@ -1863,8 +1999,8 @@ class GeminiLiveSession implements LiveSession {
                             this.handleMessage(msg);
                         },
                         onerror: (err: any) => {
-                            console.error('[Gemini] Live API error:', err);
-                            console.error('[Gemini] Error details:', JSON.stringify(err, null, 2));
+                            console.error('[Gemini] Live API error:', truncateLargeValues(err));
+                            console.error('[Gemini] Error details:', truncateLargeValues(JSON.stringify(err, null, 2)));
                             this.pushEvent({
                                 type: 'error',
                                 timestamp: new Date().toISOString(),
@@ -1902,7 +2038,7 @@ class GeminiLiveSession implements LiveSession {
 
         // Check for errors in the message
         if (msg.error) {
-            console.error('[Gemini] Error in message:', msg.error);
+            console.error('[Gemini] Error in message:', truncateLargeValues(msg.error));
             this.pushEvent({
                 type: 'error',
                 timestamp: new Date().toISOString(),
@@ -2094,7 +2230,7 @@ class GeminiLiveSession implements LiveSession {
             });
             console.log(`[GeminiLiveSession ${this.sessionId}] Audio sent successfully`);
         } catch (error) {
-            console.error(`[GeminiLiveSession ${this.sessionId}] Error sending audio:`, error);
+            console.error(`[GeminiLiveSession ${this.sessionId}] Error sending audio:`, truncateLargeValues(error));
             throw error;
         }
 

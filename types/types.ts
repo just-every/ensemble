@@ -749,6 +749,12 @@ export interface EmbedOpts {
 
     /** Whether to normalize vectors to unit length */
     normalize?: boolean;
+
+    /** Agent information for logging and context */
+    agent?: {
+        agent_id?: string;
+        tags?: string[];
+    };
 }
 
 // ================================================================
@@ -789,6 +795,12 @@ export interface ImageGenerationOpts {
 
     /** Mask for inpainting (base64 data) - areas to edit should be transparent */
     mask?: string;
+
+    /** Agent information for logging and context */
+    agent?: {
+        agent_id?: string;
+        tags?: string[];
+    };
 }
 
 // ================================================================
@@ -853,6 +865,12 @@ export interface VoiceGenerationOpts {
     /** Additional instructions to alter how the voice sounds */
     affect?: string;
     instructions?: string;
+
+    /** Agent information for logging and context */
+    agent?: {
+        agent_id?: string;
+        tags?: string[];
+    };
 }
 
 export type WorkerFunction = (...args: any[]) => AgentDefinition;
@@ -1015,6 +1033,12 @@ export interface TranscriptionOpts {
 
     /** Noise reduction type (OpenAI) */
     noiseReduction?: 'near_field' | 'far_field' | null;
+
+    /** Agent information for logging and context */
+    agent?: {
+        agent_id?: string;
+        tags?: string[];
+    };
 }
 
 /**

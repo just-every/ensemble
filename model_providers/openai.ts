@@ -17,6 +17,7 @@ import {
     TranscriptionEvent,
     TranscriptionAudioSource,
     TranscriptionOpts,
+    EmbedOpts,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI, { toFile } from 'openai';
@@ -287,13 +288,13 @@ async function addImagesToInput(
                 // Single image (no splitting needed)
                 messageContent.push({
                     type: 'input_text',
-                    text: `This is [image #${image_id}] from the ${source}`,
+                    text: `[image #${image_id}] from the ${source}`,
                 });
             } else {
                 // Multiple segments - explain the splitting
                 messageContent.push({
                     type: 'input_text',
-                    text: `This is [image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
+                    text: `[image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
                 });
             }
 
@@ -373,11 +374,9 @@ export class OpenAIProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(
-        input: string | string[],
-        model: string,
-        opts?: { dimensions?: number; normalize?: boolean }
-    ): Promise<number[] | number[][]> {
+    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         try {
             // Prepare options
             const options: any = {
@@ -390,6 +389,22 @@ export class OpenAIProvider extends BaseModelProvider {
             if (opts?.dimensions) {
                 options.dimensions = opts.dimensions;
             }
+
+            // Log the request
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'openai',
+                model,
+                {
+                    ...options,
+                    input_length: Array.isArray(input) ? input.length : 1,
+                },
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
 
             //console.log(`[OpenAI] Generating embedding with model ${model}`);
 
@@ -412,6 +427,14 @@ export class OpenAIProvider extends BaseModelProvider {
                 },
             });
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                usage: response.usage,
+                dimensions: response.data[0]?.embedding.length,
+                vector_count: response.data.length,
+            });
+
             // Extract the embedding vectors - handle single vs. multiple inputs
             if (Array.isArray(input) && input.length > 1) {
                 return response.data.map(item => item.embedding);
@@ -419,6 +442,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 return response.data[0].embedding;
             }
         } catch (error) {
+            log_llm_error(finalRequestId, error);
             console.error('[OpenAI] Error generating embedding:', error);
             throw error;
         }
@@ -432,6 +456,8 @@ export class OpenAIProvider extends BaseModelProvider {
      * @returns A promise that resolves to
      */
     async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         try {
             // Extract options with defaults, mapping to the original function parameters
             model = model || 'gpt-image-1';
@@ -460,6 +486,30 @@ export class OpenAIProvider extends BaseModelProvider {
 
             // Get source images if provided
             const source_images = opts?.source_images;
+
+            // Prepare request params for logging
+            const requestParams = {
+                model,
+                prompt,
+                n: number_of_images,
+                quality,
+                size,
+                background,
+                source_images: source_images ? true : false, // Don't log actual image data
+            };
+
+            // Log the request
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'openai',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
 
             console.log(
                 `[OpenAI] Generating ${number_of_images} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
@@ -581,9 +631,19 @@ export class OpenAIProvider extends BaseModelProvider {
                 throw new Error('No images returned from OpenAI');
             }
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                image_count: imageDataUrls.length,
+                quality,
+                size,
+                cost: response.data.length * this.getImageCost(model, quality),
+            });
+
             // Return standardized result
             return imageDataUrls;
         } catch (error) {
+            log_llm_error(finalRequestId, error);
             console.error('[OpenAI] Error generating image:', error);
             throw error;
         }
@@ -621,6 +681,8 @@ export class OpenAIProvider extends BaseModelProvider {
         model: string,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         try {
             // Default voice and parameters
             const voice = opts?.voice || 'alloy';
@@ -640,6 +702,28 @@ export class OpenAIProvider extends BaseModelProvider {
             if (opts?.affect) {
                 instructions = `Sound ${opts.affect}${instructions ? ' and ' + instructions : ''}`;
             }
+
+            const requestParams = {
+                model,
+                input_length: text.length,
+                instructions,
+                voice,
+                speed,
+                response_format,
+            };
+
+            // Log the request
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'openai',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
 
             // Create the speech request
             const response = await this.client.audio.speech.create({
@@ -666,6 +750,16 @@ export class OpenAIProvider extends BaseModelProvider {
                 },
             });
 
+            // Log the successful response
+            log_llm_response(finalRequestId, {
+                model,
+                character_count: characterCount,
+                voice,
+                format: response_format,
+                cost,
+                stream: opts?.stream || false,
+            });
+
             // Handle streaming vs buffer response
             if (opts?.stream) {
                 // Return the response body as a ReadableStream
@@ -686,6 +780,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 return buffer;
             }
         } catch (error) {
+            log_llm_error(finalRequestId, error);
             console.error('[OpenAI] Error generating speech:', error);
             throw error;
         }
@@ -1410,6 +1505,8 @@ export class OpenAIProvider extends BaseModelProvider {
         model: string,
         opts?: TranscriptionOpts
     ): AsyncGenerator<TranscriptionEvent> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define in outer scope
         const transcriptionModels = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
         if (!transcriptionModels.includes(model)) {
             throw new Error(
@@ -1566,6 +1663,28 @@ export class OpenAIProvider extends BaseModelProvider {
             // Wait for connection
             await connectionPromise;
 
+            // Log the request
+            const requestParams = {
+                model,
+                audioFormat: opts?.audioFormat || { encoding: 'pcm16' },
+                prompt: opts?.prompt,
+                language: opts?.language || 'en',
+                vad: opts?.vad !== false,
+                noiseReduction: opts?.noiseReduction,
+            };
+
+            const loggedRequestId = log_llm_request(
+                agent.agent_id,
+                'openai',
+                model,
+                requestParams,
+                new Date(),
+                requestId,
+                agent.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
             // Process audio stream
             const audioStream = normalizeAudioSource(audio);
             const reader = audioStream.getReader();
@@ -1615,6 +1734,12 @@ export class OpenAIProvider extends BaseModelProvider {
                     }
                 }
 
+                // Log the successful response
+                log_llm_response(finalRequestId, {
+                    model,
+                    transcription_complete: true,
+                });
+
                 // Send completion event
                 const completeEvent: TranscriptionEvent = {
                     type: 'transcription_complete',
@@ -1628,6 +1753,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
             }
         } catch (error) {
+            log_llm_error(finalRequestId, error);
             console.error('[OpenAI] Transcription error:', error);
             const errorEvent: TranscriptionEvent = {
                 type: 'error',

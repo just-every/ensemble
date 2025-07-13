@@ -1,5 +1,6 @@
 import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../utils/cost_tracker.js';
+import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { VoiceGenerationOpts } from '../types/types.js';
 
 // ElevenLabs Voice ID mappings for convenience
@@ -92,6 +93,8 @@ class ElevenLabsProvider extends BaseModelProvider {
         model: string,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        let finalRequestId = requestId; // Define finalRequestId in outer scope
         try {
             // Use the model ID as-is (ElevenLabs expects the full ID including prefix)
             const modelId = model;
@@ -131,6 +134,28 @@ class ElevenLabsProvider extends BaseModelProvider {
                 (requestBody.voice_settings as any).speed = opts.speed;
             }
 
+            // Log the request
+            const requestParams = {
+                model: modelId,
+                text_length: text.length,
+                voice: voiceId,
+                format: outputFormat,
+                stream: opts?.stream || false,
+                voice_settings: requestBody.voice_settings,
+            };
+
+            const loggedRequestId = log_llm_request(
+                opts?.agent?.agent_id || 'default',
+                'elevenlabs',
+                modelId,
+                requestParams,
+                new Date(),
+                requestId,
+                opts?.agent?.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
             // Use streaming endpoint if streaming is requested
             const endpoint = opts?.stream ? 'stream' : '';
             const url = `${this.baseUrl}/text-to-speech/${voiceId}${endpoint ? '/stream' : ''}?output_format=${outputFormat}`;
@@ -166,14 +191,34 @@ class ElevenLabsProvider extends BaseModelProvider {
 
             // Handle streaming vs buffer response
             if (opts?.stream && response.body) {
+                // Log the successful response
+                log_llm_response(finalRequestId, {
+                    model: modelId,
+                    character_count: characterCount,
+                    voice: voiceId,
+                    format: outputFormat,
+                    stream: true,
+                });
                 // Return the response body as a ReadableStream
                 return response.body;
             } else {
                 // Return as ArrayBuffer
                 const buffer = await response.arrayBuffer();
+
+                // Log the successful response
+                log_llm_response(finalRequestId, {
+                    model: modelId,
+                    character_count: characterCount,
+                    voice: voiceId,
+                    format: outputFormat,
+                    stream: false,
+                    audio_size: buffer.byteLength,
+                });
+
                 return buffer;
             }
         } catch (error) {
+            log_llm_error(finalRequestId, error);
             console.error('[ElevenLabs] Error generating speech:', error);
             throw error;
         }

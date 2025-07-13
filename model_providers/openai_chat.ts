@@ -173,13 +173,13 @@ export async function addImagesToInput(
                 // Single image (no splitting needed)
                 messageContent.push({
                     type: 'text',
-                    text: `This is [image #${image_id}] from the ${source}`,
+                    text: `[image #${image_id}] from the ${source}`,
                 });
             } else {
                 // Multiple segments - explain the splitting
                 messageContent.push({
                     type: 'text',
-                    text: `This is [image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
+                    text: `[image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
                 });
             }
 
@@ -206,7 +206,7 @@ export async function addImagesToInput(
                 content: [
                     {
                         type: 'text',
-                        text: `This is [image #${image_id}] from the ${source} (raw image)`,
+                        text: `[image #${image_id}] from the ${source} (raw image)`,
                     },
                     {
                         type: 'image_url',

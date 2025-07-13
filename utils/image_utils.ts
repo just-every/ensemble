@@ -120,8 +120,8 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     if (!content.includes('data:image/')) return result;
 
     // Find all image data using regex
-    // This pattern matches data URIs for images, allowing whitespace in base64 data
-    const imgRegex = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/g;
+    // This pattern matches data URIs for images with proper base64 termination
+    const imgRegex = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/\s]*={0,2}/g;
 
     // Replace all instances and build a map of image_id -> image_data
     const images: Record<string, string> = {};
@@ -129,8 +129,27 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     // Replace all images with placeholders and collect them in the images map
     const replaceContent = content.replace(imgRegex, match => {
         const id = uuidv4();
-        // Remove any whitespace from the base64 data for clean storage
-        images[id] = match.replace(/\s+/g, '');
+
+        // Extract the actual base64 data
+        const base64Start = match.indexOf('base64,') + 7;
+        let base64Data = match.substring(base64Start);
+
+        // Find where the base64 data actually ends
+        // Base64 can only contain A-Z, a-z, 0-9, +, /, = and whitespace
+        // It typically ends with 0-2 '=' characters
+        // If we see text after a newline that starts with a capital letter, it's likely not part of the base64
+        const cleanedMatch = base64Data.match(/^([A-Za-z0-9+/\s]*?)(={0,2})(\s*)([^A-Za-z0-9+/=\s].*)?$/);
+
+        if (cleanedMatch) {
+            // Reconstruct just the base64 part
+            base64Data = (cleanedMatch[1] + cleanedMatch[2]).replace(/\s+/g, '');
+        } else {
+            // Fallback: just remove whitespace
+            base64Data = base64Data.replace(/\s+/g, '');
+        }
+
+        // Store the complete data URI with cleaned base64
+        images[id] = match.substring(0, base64Start) + base64Data;
         return `[image #${id}]`;
     });
 

@@ -151,12 +151,12 @@ type ClaudeMessage = {
  * Helper function to determine image media type from base64 data
  */
 function getImageMediaType(imageData: string): string {
-    if (imageData.includes('data:image/jpeg')) return 'image/jpeg';
     if (imageData.includes('data:image/png')) return 'image/png';
+    if (imageData.includes('data:image/jpeg')) return 'image/jpeg';
     if (imageData.includes('data:image/gif')) return 'image/gif';
     if (imageData.includes('data:image/webp')) return 'image/webp';
     // Default to jpeg if no specific type found
-    return 'image/jpeg';
+    return 'image/png';
 }
 
 /**

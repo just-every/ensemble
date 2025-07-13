@@ -113,6 +113,9 @@ export * from './config/tool_execution.js';
 // Export verification utilities
 export { verifyOutput, VerificationResult } from './utils/verification.js';
 
+// Export truncation utilities
+export { truncateLargeValues } from './utils/truncate_utils.js';
+
 // Export mergeHistoryThread utility
 export { mergeHistoryThread } from './core/ensemble_request.js';
 

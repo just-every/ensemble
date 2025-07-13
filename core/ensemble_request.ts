@@ -27,6 +27,7 @@ import {
     convertToFunctionCall,
     convertToFunctionCallOutput,
 } from '../utils/message_converter.js';
+import { truncateLargeValues } from '../utils/truncate_utils.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 
@@ -409,7 +410,7 @@ async function* executeRound(
 
             case 'error': {
                 // Log errors but don't add them to messages
-                console.error('[executeRound] Error event:', (event as any).error);
+                console.error('[executeRound] Error event:', truncateLargeValues((event as any).error));
                 break;
             }
         }
