@@ -117,11 +117,12 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     if (typeof content !== 'string') return result;
 
     // Quick check if there's any image data
-    if (!content.includes('data:image/')) return result;
+    if (!content.includes('data:') || !content.includes('base64,')) return result;
 
     // Find all image data using regex
     // This pattern matches data URIs for images with proper base64 termination
-    const imgRegex = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/\s]*={0,2}/g;
+    // Supports both "data:image/png;base64," and "data:png;base64," formats
+    const imgRegex = /data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,[A-Za-z0-9+/\s]*={0,2}/g;
 
     // Replace all instances and build a map of image_id -> image_data
     const images: Record<string, string> = {};
@@ -130,26 +131,73 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     const replaceContent = content.replace(imgRegex, match => {
         const id = uuidv4();
 
+        // Extract the mime type
+        const mimeMatch = match.match(/data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,/);
+        const mime = mimeMatch ? mimeMatch[1] : '';
+
         // Extract the actual base64 data
         const base64Start = match.indexOf('base64,') + 7;
         let base64Data = match.substring(base64Start);
 
-        // Find where the base64 data actually ends
-        // Base64 can only contain A-Z, a-z, 0-9, +, /, = and whitespace
-        // It typically ends with 0-2 '=' characters
-        // If we see text after a newline that starts with a capital letter, it's likely not part of the base64
-        const cleanedMatch = base64Data.match(/^([A-Za-z0-9+/\s]*?)(={0,2})(\s*)([^A-Za-z0-9+/=\s].*)?$/);
+        // Remove all whitespace from base64Data
+        base64Data = base64Data.replace(/\s+/g, '');
 
-        if (cleanedMatch) {
-            // Reconstruct just the base64 part
-            base64Data = (cleanedMatch[1] + cleanedMatch[2]).replace(/\s+/g, '');
+        // Define magic headers and footers based on mime
+        let startBinary = '';
+        let endBinary = '';
+        if (mime === 'png') {
+            startBinary = '\x89PNG\r\n\x1A\n';
+            endBinary = '\x00\x00\x00\x00IEND\xAE\x42\x60\x82';
+        } else if (mime === 'jpeg' || mime === 'jpg') {
+            startBinary = '\xFF\xD8\xFF';
+            endBinary = '\xFF\xD9';
+        } else if (mime === 'gif') {
+            startBinary = 'GIF87a';
+            if (base64Data.startsWith('R0lGODlh') || base64Data.startsWith('R0lGODdh')) {
+                // base64 of GIF89a or GIF87a
+                startBinary = 'GIF89a';
+            }
+            endBinary = '\x3B';
+        } // Add more if needed
+
+        let goodBase64 = base64Data;
+
+        if (startBinary && endBinary) {
+            let l = Math.floor(base64Data.length / 4) * 4;
+            let found = false;
+            while (l >= ((startBinary.length + endBinary.length) * 4) / 3) {
+                // Rough minimal size estimate
+                try {
+                    const bin = atob(base64Data.substr(0, l));
+                    if (bin.startsWith(startBinary) && bin.endsWith(endBinary)) {
+                        goodBase64 = base64Data.substr(0, l);
+                        found = true;
+                        break;
+                    }
+                } catch {
+                    // Invalid base64, continue
+                }
+                l -= 4;
+            }
+            if (!found) {
+                // Fallback to original cleaning if validation fails
+                const cleanedMatch = base64Data.match(/^([A-Za-z0-9+/]*)(={0,2})$/);
+                if (cleanedMatch) {
+                    goodBase64 = cleanedMatch[1] + cleanedMatch[2];
+                }
+            }
         } else {
-            // Fallback: just remove whitespace
-            base64Data = base64Data.replace(/\s+/g, '');
+            // Original cleaning for unsupported types
+            const cleanedMatch = base64Data.match(/^([A-Za-z0-9+/]*)(={0,2})$/);
+            if (cleanedMatch) {
+                goodBase64 = cleanedMatch[1] + cleanedMatch[2];
+            }
         }
 
         // Store the complete data URI with cleaned base64
-        images[id] = match.substring(0, base64Start) + base64Data;
+        // Ensure we always have the "image/" prefix for consistency
+        const prefix = mime.includes('/') ? 'data:' : 'data:image/';
+        images[id] = `${prefix}${mime};base64,${goodBase64}`;
         return `[image #${id}]`;
     });
 

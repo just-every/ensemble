@@ -34,5 +34,5 @@ export async function ensembleImage(
         throw new Error(`Provider for model ${model} does not support image generation`);
     }
 
-    return provider.createImage(prompt, model, options);
+    return provider.createImage(prompt, model, agent, options);
 }

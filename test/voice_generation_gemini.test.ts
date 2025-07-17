@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { GeminiProvider } from '../model_providers/gemini.js';
-import type { VoiceGenerationOpts } from '../types/types.js';
+import type { VoiceGenerationOpts, AgentDefinition } from '../types/types.js';
 
 // Mock the Google GenAI SDK
 vi.mock('@google/genai', () => ({
@@ -53,17 +53,24 @@ vi.mock('@google/genai', () => ({
 
 describe('Gemini Voice Generation', () => {
     let provider: GeminiProvider;
+    let mockAgent: AgentDefinition;
 
     beforeEach(() => {
         vi.clearAllMocks();
         provider = new GeminiProvider('test-api-key');
+        mockAgent = {
+            agent_id: 'test-agent',
+            name: 'Test Agent',
+            model: 'gemini-2.5-flash',
+            tags: ['test'],
+        };
     });
 
     test('should generate voice with default settings', async () => {
         const text = 'Hello, world!';
         const model = 'gemini-2.5-flash-preview-tts';
 
-        const result = await provider.createVoice(text, model);
+        const result = await provider.createVoice(text, model, mockAgent);
 
         expect(result).toBeInstanceOf(ArrayBuffer);
         expect(result.byteLength).toBeGreaterThan(0);
@@ -76,7 +83,7 @@ describe('Gemini Voice Generation', () => {
             voice: 'Puck',
         };
 
-        const result = await provider.createVoice(text, model, opts);
+        const result = await provider.createVoice(text, model, mockAgent, opts);
 
         expect(result).toBeInstanceOf(ArrayBuffer);
     });
@@ -93,7 +100,7 @@ describe('Gemini Voice Generation', () => {
 
         for (const { input } of voiceMappings) {
             const opts: VoiceGenerationOpts = { voice: input };
-            const result = await provider.createVoice(text, model, opts);
+            const result = await provider.createVoice(text, model, mockAgent, opts);
             expect(result).toBeInstanceOf(ArrayBuffer);
         }
     });
@@ -105,7 +112,7 @@ describe('Gemini Voice Generation', () => {
             stream: true,
         };
 
-        const result = await provider.createVoice(text, model, opts);
+        const result = await provider.createVoice(text, model, mockAgent, opts);
 
         expect(result).toBeInstanceOf(ReadableStream);
 
@@ -124,7 +131,7 @@ describe('Gemini Voice Generation', () => {
             speed: 1.5,
         };
 
-        const result = await provider.createVoice(text, model, opts);
+        const result = await provider.createVoice(text, model, mockAgent, opts);
 
         expect(result).toBeInstanceOf(ArrayBuffer);
         // The speed adjustment should be reflected in the prompt sent to the API
@@ -138,7 +145,7 @@ describe('Gemini Voice Generation', () => {
         const mockGenAI = vi.mocked((provider as any).client.models.generateContentStream);
         mockGenAI.mockRejectedValueOnce(new Error('API Error'));
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('API Error');
+        await expect(provider.createVoice(text, model, mockAgent)).rejects.toThrow('API Error');
     });
 
     test('should handle empty response', async () => {
@@ -153,7 +160,9 @@ describe('Gemini Voice Generation', () => {
             })()
         );
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data generated from Gemini TTS');
+        await expect(provider.createVoice(text, model, mockAgent)).rejects.toThrow(
+            'No audio data generated from Gemini TTS'
+        );
     });
 
     test('should handle response without audio parts', async () => {
@@ -180,6 +189,8 @@ describe('Gemini Voice Generation', () => {
             })()
         );
 
-        await expect(provider.createVoice(text, model)).rejects.toThrow('No audio data generated from Gemini TTS');
+        await expect(provider.createVoice(text, model, mockAgent)).rejects.toThrow(
+            'No audio data generated from Gemini TTS'
+        );
     });
 });

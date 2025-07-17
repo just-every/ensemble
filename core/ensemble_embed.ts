@@ -105,7 +105,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         }
 
         // Get embeddings for all chunks in a single batch request
-        const result = await provider.createEmbedding(chunks, model, { ...options, dimensions });
+        const result = await provider.createEmbedding(chunks, model, agent, { ...options, dimensions });
 
         // Result should be an array of embeddings
         const embeddings = result as number[][];
@@ -119,7 +119,7 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         }
     } else {
         // Generate single embedding
-        const result = await provider.createEmbedding(text, model, { ...options, dimensions });
+        const result = await provider.createEmbedding(text, model, agent, { ...options, dimensions });
 
         // Handle array result (single text input should return single vector)
         embedding = Array.isArray(result[0]) ? result[0] : (result as number[]);

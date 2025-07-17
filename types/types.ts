@@ -41,6 +41,7 @@ export interface ToolFunction {
     definition: ToolDefinition;
     injectAgentId?: boolean;
     injectAbortSignal?: boolean;
+    allow_summary?: boolean;
 }
 
 /**
@@ -450,7 +451,12 @@ export interface ModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    createEmbedding?(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]>;
+    createEmbedding?(
+        input: string | string[],
+        model: string,
+        agent: AgentDefinition,
+        opts?: EmbedOpts
+    ): Promise<number[] | number[][]>;
 
     /**
      * Generates images from text prompts
@@ -458,7 +464,7 @@ export interface ModelProvider {
      * @param opts Optional parameters for image generation
      * @returns Promise resolving to generated image data
      */
-    createImage?(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]>;
+    createImage?(prompt: string, model: string, agent: AgentDefinition, opts?: ImageGenerationOpts): Promise<string[]>;
 
     /**
      * Generates speech audio from text (Text-to-Speech)
@@ -470,6 +476,7 @@ export interface ModelProvider {
     createVoice?(
         text: string,
         model: string,
+        agent: AgentDefinition,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer>;
 
@@ -749,12 +756,6 @@ export interface EmbedOpts {
 
     /** Whether to normalize vectors to unit length */
     normalize?: boolean;
-
-    /** Agent information for logging and context */
-    agent?: {
-        agent_id?: string;
-        tags?: string[];
-    };
 }
 
 // ================================================================
@@ -796,11 +797,8 @@ export interface ImageGenerationOpts {
     /** Mask for inpainting (base64 data) - areas to edit should be transparent */
     mask?: string;
 
-    /** Agent information for logging and context */
-    agent?: {
-        agent_id?: string;
-        tags?: string[];
-    };
+    /** Background transparency */
+    background?: 'transparent' | 'opaque' | 'auto';
 }
 
 // ================================================================
@@ -865,12 +863,6 @@ export interface VoiceGenerationOpts {
     /** Additional instructions to alter how the voice sounds */
     affect?: string;
     instructions?: string;
-
-    /** Agent information for logging and context */
-    agent?: {
-        agent_id?: string;
-        tags?: string[];
-    };
 }
 
 export type WorkerFunction = (...args: any[]) => AgentDefinition;
@@ -1033,12 +1025,6 @@ export interface TranscriptionOpts {
 
     /** Noise reduction type (OpenAI) */
     noiseReduction?: 'near_field' | 'far_field' | null;
-
-    /** Agent information for logging and context */
-    agent?: {
-        agent_id?: string;
-        tags?: string[];
-    };
 }
 
 /**

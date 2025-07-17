@@ -158,7 +158,7 @@ export async function* ensembleVoice(
     let result;
     try {
         const providerStartTime = Date.now();
-        result = await provider.createVoice(text, model, streamOptions);
+        result = await provider.createVoice(text, model, agent, streamOptions);
         const providerTime = Date.now() - providerStartTime;
         console.log(
             `[ensembleVoice] Got result from provider in ${providerTime}ms:`,

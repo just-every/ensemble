@@ -1,7 +1,7 @@
 import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
-import { VoiceGenerationOpts } from '../types/types.js';
+import { VoiceGenerationOpts, AgentDefinition } from '../types/types.js';
 
 // ElevenLabs Voice ID mappings for convenience
 export const ELEVENLABS_VOICES = {
@@ -91,6 +91,7 @@ class ElevenLabsProvider extends BaseModelProvider {
     async createVoice(
         text: string,
         model: string,
+        agent: AgentDefinition,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -134,24 +135,14 @@ class ElevenLabsProvider extends BaseModelProvider {
                 (requestBody.voice_settings as any).speed = opts.speed;
             }
 
-            // Log the request
-            const requestParams = {
-                model: modelId,
-                text_length: text.length,
-                voice: voiceId,
-                format: outputFormat,
-                stream: opts?.stream || false,
-                voice_settings: requestBody.voice_settings,
-            };
-
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
+                agent.agent_id || 'default',
                 'elevenlabs',
                 modelId,
-                requestParams,
+                requestBody, // Log the actual request body sent to ElevenLabs
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;
@@ -191,12 +182,11 @@ class ElevenLabsProvider extends BaseModelProvider {
 
             // Handle streaming vs buffer response
             if (opts?.stream && response.body) {
-                // Log the successful response
+                // Log the actual response from ElevenLabs
                 log_llm_response(finalRequestId, {
-                    model: modelId,
-                    character_count: characterCount,
-                    voice: voiceId,
-                    format: outputFormat,
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
                     stream: true,
                 });
                 // Return the response body as a ReadableStream
@@ -205,14 +195,13 @@ class ElevenLabsProvider extends BaseModelProvider {
                 // Return as ArrayBuffer
                 const buffer = await response.arrayBuffer();
 
-                // Log the successful response
+                // Log the actual response from ElevenLabs
                 log_llm_response(finalRequestId, {
-                    model: modelId,
-                    character_count: characterCount,
-                    voice: voiceId,
-                    format: outputFormat,
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
                     stream: false,
-                    audio_size: buffer.byteLength,
+                    content_length: buffer.byteLength,
                 });
 
                 return buffer;

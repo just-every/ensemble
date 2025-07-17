@@ -482,7 +482,12 @@ export class GeminiProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+    async createEmbedding(
+        input: string | string[],
+        model: string,
+        agent: AgentDefinition,
+        opts?: EmbedOpts
+    ): Promise<number[] | number[][]> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
         try {
@@ -523,7 +528,7 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Log the request
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
+                agent.agent_id || 'default',
                 'gemini',
                 actualModelId,
                 {
@@ -532,7 +537,7 @@ export class GeminiProvider extends BaseModelProvider {
                 },
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;
@@ -1118,7 +1123,12 @@ export class GeminiProvider extends BaseModelProvider {
      * @param opts Optional parameters for image generation
      * @returns Promise resolving to generated image data
      */
-    async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
         try {
@@ -1150,13 +1160,13 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Log the request
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
+                agent.agent_id || 'default',
                 'gemini',
                 model,
                 requestParams,
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;
@@ -1234,7 +1244,8 @@ export class GeminiProvider extends BaseModelProvider {
      */
     async createVoice(
         text: string,
-        model: string = 'gemini-2.5-flash-preview-tts',
+        model: string,
+        agent: AgentDefinition,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1297,13 +1308,13 @@ export class GeminiProvider extends BaseModelProvider {
             };
 
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
+                agent.agent_id || 'default',
                 'gemini',
                 model,
                 requestParams,
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;

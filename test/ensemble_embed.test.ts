@@ -72,7 +72,7 @@ describe('ensembleEmbed', () => {
             const agent: AgentDefinition = { agent_id: 'test', model: 'some-embedding-model' };
             const result = await ensembleEmbed('test text', agent, { dimensions: 768 });
 
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'some-embedding-model', {
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'some-embedding-model', agent, {
                 dimensions: 768,
             });
             expect(result).toHaveLength(768);
@@ -110,7 +110,7 @@ describe('ensembleEmbed', () => {
 
             // Verify the original model was used (getModelFromAgent should not be called since model is specified)
             expect(vi.mocked(getModelFromAgent)).not.toHaveBeenCalled();
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', {
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(uniqueText, 'text-embedding-3-large', agent, {
                 dimensions: 768,
             });
             expect(result).toHaveLength(768);
@@ -153,9 +153,14 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed(longText, agent);
 
             // Should have called createEmbedding with an array of chunks
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(expect.any(Array), 'text-embedding-3-small', {
-                dimensions: 1536,
-            });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(
+                expect.any(Array),
+                'text-embedding-3-small',
+                agent,
+                {
+                    dimensions: 1536,
+                }
+            );
 
             // Check that it created 2 chunks
             const callArgs = mockProvider.createEmbedding.mock.calls[0];
@@ -177,9 +182,14 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed(longText, agent, { dimensions: 768 });
 
             // Should have called createEmbedding with an array of chunks
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(expect.any(Array), 'gemini-embedding-exp-03-07', {
-                dimensions: 768,
-            });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(
+                expect.any(Array),
+                'gemini-embedding-exp-03-07',
+                agent,
+                {
+                    dimensions: 768,
+                }
+            );
 
             // Check that it created 2 chunks
             const callArgs = mockProvider.createEmbedding.mock.calls[0];
@@ -199,7 +209,7 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed(shortText, agent);
 
             // Should have called createEmbedding with the text directly
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(shortText, 'text-embedding-3-small', {
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(shortText, 'text-embedding-3-small', agent, {
                 dimensions: 1536,
             });
 
@@ -215,7 +225,7 @@ describe('ensembleEmbed', () => {
             const result = await ensembleEmbed(longText, agent, { dimensions: 768 });
 
             // Should have called createEmbedding with the full text
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(longText, 'some-other-embedding', {
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith(longText, 'some-other-embedding', agent, {
                 dimensions: 768,
             });
 
@@ -231,7 +241,9 @@ describe('ensembleEmbed', () => {
             const agent: AgentDefinition = { agent_id: 'test', model: 'test-model' };
             const result = await ensembleEmbed('test text', agent);
 
-            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', { dimensions: 1536 });
+            expect(mockProvider.createEmbedding).toHaveBeenCalledWith('test text', 'test-model', agent, {
+                dimensions: 1536,
+            });
             expect(result).toEqual(mockEmbedding);
         });
 

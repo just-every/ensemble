@@ -1,17 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ElevenLabsProvider } from '../model_providers/elevenlabs.js';
+import type { AgentDefinition } from '../types/types.js';
 
 // Mock fetch globally
 global.fetch = vi.fn();
 
 describe('ElevenLabsProvider', () => {
     let provider: ElevenLabsProvider;
+    let mockAgent: AgentDefinition;
 
     beforeEach(() => {
         vi.clearAllMocks();
         // Set API key for tests
         process.env.ELEVENLABS_API_KEY = 'test-api-key';
         provider = new ElevenLabsProvider();
+        mockAgent = {
+            agent_id: 'test-agent',
+            name: 'Test Agent',
+            model: 'eleven_multilingual_v2',
+            tags: ['test'],
+        };
     });
 
     describe('supportsModel', () => {
@@ -40,7 +48,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            const result = await provider.createVoice('Hello world', 'eleven_multilingual_v2');
+            const result = await provider.createVoice('Hello world', 'eleven_multilingual_v2', mockAgent);
 
             expect(global.fetch).toHaveBeenCalledWith(
                 expect.stringContaining('/text-to-speech/'),
@@ -71,7 +79,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            const result = await provider.createVoice('Hello world', 'eleven_turbo_v2_5', { stream: true });
+            const result = await provider.createVoice('Hello world', 'eleven_turbo_v2_5', mockAgent, { stream: true });
 
             expect(result).toBeInstanceOf(ReadableStream);
         });
@@ -83,7 +91,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            await provider.createVoice('Test', 'eleven_multilingual_v2', {
+            await provider.createVoice('Test', 'eleven_multilingual_v2', mockAgent, {
                 voice: 'rachel',
                 voice_settings: {
                     stability: 0.8,
@@ -113,7 +121,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            await provider.createVoice('Test', 'eleven_multilingual_v2', {
+            await provider.createVoice('Test', 'eleven_multilingual_v2', mockAgent, {
                 voice: 'adam',
             });
 
@@ -129,7 +137,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            await expect(provider.createVoice('Test', 'eleven_multilingual_v2')).rejects.toThrow(
+            await expect(provider.createVoice('Test', 'eleven_multilingual_v2', mockAgent)).rejects.toThrow(
                 'ElevenLabs API error: 400'
             );
         });
@@ -138,7 +146,7 @@ describe('ElevenLabsProvider', () => {
             delete process.env.ELEVENLABS_API_KEY;
             const providerNoKey = new ElevenLabsProvider();
 
-            await expect(providerNoKey.createVoice('Test', 'eleven_multilingual_v2')).rejects.toThrow(
+            await expect(providerNoKey.createVoice('Test', 'eleven_multilingual_v2', mockAgent)).rejects.toThrow(
                 'ElevenLabs API key is required'
             );
         });
@@ -178,7 +186,7 @@ describe('ElevenLabsProvider', () => {
 
             (global.fetch as any).mockResolvedValueOnce(mockResponse);
 
-            await provider.createVoice('Test', 'eleven_multilingual_v2', {
+            await provider.createVoice('Test', 'eleven_multilingual_v2', mockAgent, {
                 response_format: 'mp3_high',
             });
 

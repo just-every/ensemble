@@ -374,7 +374,12 @@ export class OpenAIProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+    async createEmbedding(
+        input: string | string[],
+        model: string,
+        agent: AgentDefinition,
+        opts?: EmbedOpts
+    ): Promise<number[] | number[][]> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
         try {
@@ -390,18 +395,15 @@ export class OpenAIProvider extends BaseModelProvider {
                 options.dimensions = opts.dimensions;
             }
 
-            // Log the request
+            // Log the actual request being sent to OpenAI
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
+                agent.agent_id || 'default',
                 'openai',
                 model,
-                {
-                    ...options,
-                    input_length: Array.isArray(input) ? input.length : 1,
-                },
+                options, // Log the actual options object sent to OpenAI
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;
@@ -427,13 +429,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 },
             });
 
-            // Log the successful response
-            log_llm_response(finalRequestId, {
-                model,
-                usage: response.usage,
-                dimensions: response.data[0]?.embedding.length,
-                vector_count: response.data.length,
-            });
+            // Log the actual response from OpenAI
+            log_llm_response(finalRequestId, response);
 
             // Extract the embedding vectors - handle single vs. multiple inputs
             if (Array.isArray(input) && input.length > 1) {
@@ -455,7 +452,12 @@ export class OpenAIProvider extends BaseModelProvider {
      * @param opts - Optional parameters for image generation
      * @returns A promise that resolves to
      */
-    async createImage(prompt: string, model?: string, opts?: ImageGenerationOpts): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
         try {
@@ -482,34 +484,12 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // Default background to 'auto'
-            const background: 'transparent' | 'opaque' | 'auto' = 'auto';
+            const background: 'transparent' | 'opaque' | 'auto' = opts?.background || 'auto';
 
             // Get source images if provided
             const source_images = opts?.source_images;
 
-            // Prepare request params for logging
-            const requestParams = {
-                model,
-                prompt,
-                n: number_of_images,
-                quality,
-                size,
-                background,
-                source_images: source_images ? true : false, // Don't log actual image data
-            };
-
-            // Log the request
-            const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
-                'openai',
-                model,
-                requestParams,
-                new Date(),
-                requestId,
-                opts?.agent?.tags
-            );
-            // Use the logged request ID for consistency
-            finalRequestId = loggedRequestId;
+            // We'll log the actual request after we build it
 
             console.log(
                 `[OpenAI] Generating ${number_of_images} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
@@ -578,8 +558,10 @@ export class OpenAIProvider extends BaseModelProvider {
                     prompt,
                     image: imageFiles,
                     n: number_of_images,
+                    background,
                     quality,
                     size,
+                    output_format: 'png',
                 };
 
                 // Add mask if provided
@@ -587,10 +569,22 @@ export class OpenAIProvider extends BaseModelProvider {
                     editParams.mask = maskFile;
                 }
 
+                // Log the actual request being sent to OpenAI
+                const loggedRequestId = log_llm_request(
+                    agent.agent_id || 'default',
+                    'openai',
+                    model,
+                    { ...editParams, imageArray }, // Log the actual edit parameters
+                    new Date(),
+                    requestId,
+                    agent.tags
+                );
+                finalRequestId = loggedRequestId;
+
                 response = await this.client.images.edit(editParams);
             } else {
                 // Use standard image generation
-                response = await this.client.images.generate({
+                const generateParams = {
                     model,
                     prompt,
                     n: number_of_images,
@@ -599,7 +593,21 @@ export class OpenAIProvider extends BaseModelProvider {
                     size,
                     moderation: 'low',
                     output_format: 'png',
-                } as any);
+                } as any;
+
+                // Log the actual request being sent to OpenAI
+                const loggedRequestId = log_llm_request(
+                    agent.agent_id || 'default',
+                    'openai',
+                    model,
+                    generateParams, // Log the actual generate parameters
+                    new Date(),
+                    requestId,
+                    agent.tags
+                );
+                finalRequestId = loggedRequestId;
+
+                response = await this.client.images.generate(generateParams);
             }
 
             // Track usage for cost calculation
@@ -631,14 +639,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 throw new Error('No images returned from OpenAI');
             }
 
-            // Log the successful response
-            log_llm_response(finalRequestId, {
-                model,
-                image_count: imageDataUrls.length,
-                quality,
-                size,
-                cost: response.data.length * this.getImageCost(model, quality),
-            });
+            // Log the actual response from OpenAI
+            log_llm_response(finalRequestId, response);
 
             // Return standardized result
             return imageDataUrls;
@@ -679,6 +681,7 @@ export class OpenAIProvider extends BaseModelProvider {
     async createVoice(
         text: string,
         model: string,
+        agent: AgentDefinition,
         opts?: VoiceGenerationOpts
     ): Promise<ReadableStream<Uint8Array> | ArrayBuffer> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -703,37 +706,31 @@ export class OpenAIProvider extends BaseModelProvider {
                 instructions = `Sound ${opts.affect}${instructions ? ' and ' + instructions : ''}`;
             }
 
-            const requestParams = {
-                model,
-                input_length: text.length,
-                instructions,
-                voice,
-                speed,
-                response_format,
-            };
-
-            // Log the request
-            const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'default',
-                'openai',
-                model,
-                requestParams,
-                new Date(),
-                requestId,
-                opts?.agent?.tags
-            );
-            // Use the logged request ID for consistency
-            finalRequestId = loggedRequestId;
-
-            // Create the speech request
-            const response = await this.client.audio.speech.create({
+            // Build the actual request that will be sent to OpenAI
+            const speechRequest = {
                 model,
                 input: text,
                 instructions,
                 voice,
                 speed,
                 response_format: response_format as any,
-            });
+            };
+
+            // Log the actual request being sent to OpenAI
+            const loggedRequestId = log_llm_request(
+                agent.agent_id || 'default',
+                'openai',
+                model,
+                speechRequest, // Log the actual request object
+                new Date(),
+                requestId,
+                agent.tags
+            );
+            // Use the logged request ID for consistency
+            finalRequestId = loggedRequestId;
+
+            // Create the speech request
+            const response = await this.client.audio.speech.create(speechRequest);
 
             // Track usage for cost calculation
             const characterCount = text.length;
@@ -750,14 +747,12 @@ export class OpenAIProvider extends BaseModelProvider {
                 },
             });
 
-            // Log the successful response
+            // Log the actual response from OpenAI (note: response body is a stream/buffer, so we log metadata)
             log_llm_response(finalRequestId, {
-                model,
-                character_count: characterCount,
-                voice,
-                format: response_format,
-                cost,
-                stream: opts?.stream || false,
+                status: 'success',
+                headers: response.headers,
+                body_type: opts?.stream ? 'ReadableStream' : 'ArrayBuffer',
+                content_type: response.headers?.['content-type'] || 'audio/mpeg',
             });
 
             // Handle streaming vs buffer response

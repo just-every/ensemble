@@ -96,7 +96,12 @@ describe('Voice Generation', () => {
             }
 
             // Check that stream: true was passed
-            expect(mockProvider.createVoice).toHaveBeenCalledWith('Force stream', 'tts-1', { stream: true });
+            expect(mockProvider.createVoice).toHaveBeenCalledWith(
+                'Force stream',
+                'tts-1',
+                { model: 'tts-1' },
+                { stream: true }
+            );
         });
 
         it('should throw error if buffer is returned instead of stream', async () => {
@@ -207,14 +212,19 @@ describe('Voice Generation', () => {
             }
 
             expect(events.length).toBeGreaterThan(0);
-            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith('Test ElevenLabs', 'eleven_multilingual_v2', {
-                voice: 'adam',
-                voice_settings: {
-                    stability: 0.5,
-                    similarity_boost: 0.75,
-                },
-                stream: true,
-            });
+            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
+                'Test ElevenLabs',
+                'eleven_multilingual_v2',
+                { model: 'eleven_multilingual_v2' },
+                {
+                    voice: 'adam',
+                    voice_settings: {
+                        stability: 0.5,
+                        similarity_boost: 0.75,
+                    },
+                    stream: true,
+                }
+            );
         });
 
         it('should handle ElevenLabs streaming', async () => {
@@ -245,11 +255,16 @@ describe('Voice Generation', () => {
             }
 
             expect(events.length).toBeGreaterThan(0);
-            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith('ElevenLabs stream', 'eleven_turbo_v2_5', {
-                voice: 'rachel',
-                response_format: 'mp3_high',
-                stream: true,
-            });
+            expect(elevenLabsProvider.createVoice).toHaveBeenCalledWith(
+                'ElevenLabs stream',
+                'eleven_turbo_v2_5',
+                { model: 'eleven_turbo_v2_5' },
+                {
+                    voice: 'rachel',
+                    response_format: 'mp3_high',
+                    stream: true,
+                }
+            );
         });
     });
 });

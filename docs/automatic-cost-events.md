@@ -37,7 +37,7 @@ setEventHandler((event) => {
 // Make requests - cost events will be emitted automatically
 const stream = ensembleRequest([
     { role: 'user', content: 'Hello!' }
-], { model: 'gpt-3.5-turbo' });
+], { model: 'gpt-4o-mini' });
 
 for await (const event of stream) {
     // Process stream events

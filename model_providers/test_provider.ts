@@ -319,7 +319,12 @@ export class TestProvider extends BaseModelProvider {
      * @param opts Optional parameters for embedding generation
      * @returns Promise resolving to embedding vector(s)
      */
-    async createEmbedding(input: string | string[], model: string, opts?: EmbedOpts): Promise<number[] | number[][]> {
+    async createEmbedding(
+        input: string | string[],
+        model: string,
+        agent: AgentDefinition,
+        opts?: EmbedOpts
+    ): Promise<number[] | number[][]> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
         try {
@@ -331,13 +336,13 @@ export class TestProvider extends BaseModelProvider {
             };
 
             const loggedRequestId = log_llm_request(
-                opts?.agent?.agent_id || 'test',
+                agent.agent_id || 'test',
                 'test',
                 model,
                 requestParams,
                 new Date(),
                 requestId,
-                opts?.agent?.tags
+                agent.tags
             );
             // Use the logged request ID for consistency
             finalRequestId = loggedRequestId;
