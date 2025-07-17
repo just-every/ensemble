@@ -5,7 +5,7 @@
  * across the ensemble system. When paused, requests will wait until resumed.
  */
 
-import { EventEmitter } from 'events';
+import { EventEmitter } from './event_emitter.js';
 
 export interface PauseController {
     /**

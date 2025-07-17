@@ -10,7 +10,7 @@
     "serve": "vite preview --port 3000"
   },
   "dependencies": {
-    "@just-every/demo-ui": "^0.1.1",
+    "@just-every/demo-ui": "file:../../demo-ui",
     "dompurify": "^3.0.9",
     "marked": "^14.1.2",
     "react": "^18.2.0",

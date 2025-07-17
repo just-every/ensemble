@@ -12,6 +12,7 @@ export default defineConfig({
     },
     server: {
         port: 3000,
+        open: true, // Automatically open browser and reuse existing window
     },
     build: {
         outDir: 'dist-react',

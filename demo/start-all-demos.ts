@@ -10,7 +10,7 @@ import { spawn, exec } from 'child_process';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import open from 'open';
+// import open from 'open'; // Removed to prevent opening new windows
 import { promisify } from 'util';
 import net from 'net';
 
@@ -188,10 +188,10 @@ async function startDemoServers() {
     });
     console.log('\nPress Ctrl+C to stop all servers\n');
 
-    // Open the React app in the default browser
-    setTimeout(() => {
-        open(`http://localhost:3000`);
-    }, 1000);
+    // Browser will open automatically via Vite config
+    // setTimeout(() => {
+    //     open(`http://localhost:3000`);
+    // }, 1000);
 
     // Handle cleanup
     process.on('SIGINT', () => {

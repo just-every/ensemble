@@ -427,6 +427,13 @@ async function handleAnalyze(connectionId: string, message: any) {
 
     console.log(`Analyzing embeddings for ${connectionId}`);
 
+    // Send analyze start event
+    ws.send(
+        JSON.stringify({
+            type: 'analyze_start',
+        })
+    );
+
     try {
         // Get embeddings
         const embeddings = ids

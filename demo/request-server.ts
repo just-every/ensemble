@@ -13,9 +13,10 @@ import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { ensembleRequest } from '../dist/index.js';
+import { ensembleRequest, setEnsembleLogger } from '../dist/index.js';
 import type { ToolFunction, AgentDefinition } from '../dist/types.js';
 import { MODEL_REGISTRY, MODEL_CLASSES } from '../dist/data/model_data.js';
+import { enableRequestDemoLogger } from '@just-every/demo-ui';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -234,6 +235,9 @@ wss.on('connection', ws => {
     const connectionId = Math.random().toString(36).substring(7);
     console.log(`New client connected: ${connectionId}`);
 
+    // Set up the logger before any operations
+    const { logger, disconnect } = enableRequestDemoLogger(ws, setEnsembleLogger);
+
     // Store connection info
     activeConnections.set(connectionId, {
         startTime: Date.now(),
@@ -339,6 +343,9 @@ wss.on('connection', ws => {
     // Handle client disconnect
     ws.on('close', () => {
         console.log(`Client disconnected: ${connectionId}`);
+
+        // Disconnect the logger
+        disconnect();
 
         const connInfo = activeConnections.get(connectionId);
         if (connInfo) {
@@ -458,6 +465,23 @@ async function handleChat(connectionId: string, message: any) {
                 messageCount: messages.length,
             })
         );
+
+        // Send the user message as a response_output event to ensure it appears in the conversation
+        const userMessage = messages[messages.length - 1]; // Get the latest user message
+        if (userMessage && userMessage.role === 'user') {
+            ws.send(
+                JSON.stringify({
+                    type: 'response_output',
+                    message: {
+                        id: `user-${Date.now()}`,
+                        type: 'message',
+                        role: 'user',
+                        content: userMessage.content,
+                    },
+                    request_id: connectionId,
+                })
+            );
+        }
 
         // Normal streaming for regular messages
         for await (const event of ensembleRequest(messages, agent)) {

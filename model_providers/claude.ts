@@ -167,7 +167,7 @@ function cleanBase64Data(imageData: string): string {
 }
 
 /**
- * Processes images and adds them to the input array for OpenAI
+ * Processes images and adds them to the input array for Claude
  * Resizes images to max 1024px width and splits into sections if height > 768px
  *
  * @param input - The input array to add images to
@@ -175,13 +175,19 @@ function cleanBase64Data(imageData: string): string {
  * @param source - Description of where the images came from
  * @returns Updated input array with processed images
  */
-async function addImagesToInput(input: any[], images: Record<string, string>): Promise<any[]> {
-    // Add developer messages for each image
-    for (const [, imageData] of Object.entries(images)) {
+async function addImagesToInput(input: any[], images: Record<string, string>, source: string): Promise<any[]> {
+    // Add placeholder text and image for each
+    for (const [image_id, imageData] of Object.entries(images)) {
         // Resize and split the image if needed
         const processedImageData = await resizeAndTruncateForClaude(imageData);
         const mediaType = getImageMediaType(processedImageData);
         const cleanedImageData = cleanBase64Data(processedImageData);
+
+        // Add placeholder text
+        input.push({
+            type: 'text',
+            text: `[image #${image_id}] from the ${source}`,
+        });
 
         // Add image block
         input.push({
@@ -200,6 +206,7 @@ async function addImagesToInput(input: any[], images: Record<string, string>): P
  * Converts a custom ResponseInputItem into Anthropic Claude's message format.
  * Handles text messages, tool use requests (function calls), and tool results (function outputs).
  *
+ * @param model The Claude model identifier (used to decide image handling).
  * @param role The original role associated with the message ('user', 'assistant', 'system').
  * @param content The text content, primarily for non-tool messages.
  * @param msg The detailed message object (ResponseInputItem).
@@ -211,7 +218,7 @@ async function convertToClaudeMessage(
     content: string,
     msg: ResponseInputItem,
     result?: any[]
-): Promise<ClaudeMessage> {
+): Promise<ClaudeMessage | ClaudeMessage[]> {
     if (!msg) return null;
 
     // --- Handle Tool Use (Function Call) ---
@@ -271,7 +278,8 @@ async function convertToClaudeMessage(
             contentBlocks,
             toolResultBlock,
             'content',
-            addImagesToInput
+            addImagesToInput,
+            `function call output of ${msg.name}`
         );
 
         // Anthropic expects role: 'user' for tool_result
@@ -317,21 +325,31 @@ async function convertToClaudeMessage(
             messageRole = 'user';
         }
 
+        // Append images to a content block array
         let contentBlocks = [];
+        const textBlock = { type: 'text', text: content };
         contentBlocks = await appendMessageWithImage(
             model,
             contentBlocks,
-            {
-                type: 'text',
-                text: content,
-            },
+            textBlock,
             'text',
-            addImagesToInput
+            addImagesToInput,
+            messageRole === 'system' ? 'system prompt' : 'message'
         );
-        return {
-            role: messageRole,
-            content: contentBlocks,
-        };
+
+        if (messageRole === 'system') {
+            const textContent = contentToString(contentBlocks.filter(block => block.type === 'text'));
+            const imageContent = contentBlocks.filter(block => block.type === 'image');
+            const systemMsg: ClaudeMessage = { role: 'system', content: textContent };
+            if (imageContent.length > 0) {
+                const imageMsg: ClaudeMessage = { role: 'user', content: imageContent };
+                return [systemMsg, imageMsg];
+            } else {
+                return systemMsg;
+            }
+        } else {
+            return { role: messageRole, content: contentBlocks };
+        }
     }
 }
 
@@ -391,26 +409,29 @@ export class ClaudeProvider extends BaseModelProvider {
 
             const structuredMsg = await convertToClaudeMessage(modelId, role, content, msg, result);
             if (structuredMsg) {
-                // Check for duplicate tool_use IDs before adding
-                if (structuredMsg.role === 'assistant' && Array.isArray(structuredMsg.content)) {
-                    let hasDuplicateToolUse = false;
-                    for (const contentBlock of structuredMsg.content) {
-                        if (contentBlock.type === 'tool_use') {
-                            if (seenToolUseIds.has(contentBlock.id)) {
-                                console.warn(`Skipping duplicate tool_use ID: ${contentBlock.id}`);
-                                hasDuplicateToolUse = true;
-                                break;
-                            } else {
-                                seenToolUseIds.add(contentBlock.id);
+                const msgs = Array.isArray(structuredMsg) ? structuredMsg : [structuredMsg];
+                for (const m of msgs) {
+                    // Check for duplicate tool_use IDs before adding
+                    if (m.role === 'assistant' && Array.isArray(m.content)) {
+                        let hasDuplicateToolUse = false;
+                        for (const contentBlock of m.content) {
+                            if (contentBlock.type === 'tool_use') {
+                                if (seenToolUseIds.has(contentBlock.id)) {
+                                    console.warn(`Skipping duplicate tool_use ID: ${contentBlock.id}`);
+                                    hasDuplicateToolUse = true;
+                                    break;
+                                } else {
+                                    seenToolUseIds.add(contentBlock.id);
+                                }
                             }
                         }
+                        // Only add the message if it doesn't contain duplicate tool_use IDs
+                        if (!hasDuplicateToolUse) {
+                            result.push(m);
+                        }
+                    } else {
+                        result.push(m);
                     }
-                    // Only add the message if it doesn't contain duplicate tool_use IDs
-                    if (!hasDuplicateToolUse) {
-                        result.push(structuredMsg);
-                    }
-                } else {
-                    result.push(structuredMsg);
                 }
             }
             /* ---------- End Claude message build ---------- */
