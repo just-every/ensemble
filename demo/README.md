@@ -18,6 +18,18 @@ Demonstrates the streaming request interface with real-time conversation capabil
 - Token usage and cost tracking
 - Request history and debugging
 
+### 📊 Embed Demo
+Text embedding generation for semantic search and similarity comparisons.
+
+![Embed Demo](screenshots/embed-demo.png)
+
+**Features:**
+- Multiple embedding models
+- Batch text processing
+- Semantic similarity comparison
+- Vector dimension customization
+- Cost tracking
+
 ### 🎤 Voice Demo
 Text-to-speech synthesis using multiple providers (OpenAI, ElevenLabs, Google Gemini).
 
@@ -41,18 +53,6 @@ Real-time speech-to-text transcription with live audio streaming.
 - Audio visualization
 - Multiple transcription models
 - Low-latency processing
-
-### 📊 Embed Demo
-Text embedding generation for semantic search and similarity comparisons.
-
-![Embed Demo](screenshots/embed-demo.png)
-
-**Features:**
-- Multiple embedding models
-- Batch text processing
-- Semantic similarity comparison
-- Vector dimension customization
-- Cost tracking
 
 ## Running the Demos
 
