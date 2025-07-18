@@ -202,7 +202,7 @@ export async function* ensembleLive(
                         const result = await handleToolCall(toolCall, tool, agent);
 
                         // Process the result
-                        const processedResult = await processToolResult(toolCall, result, agent);
+                        const processedResult = await processToolResult(toolCall, result, agent, tool.allow_summary);
 
                         const toolCallResult: ToolCallResult = {
                             toolCall,

@@ -350,7 +350,8 @@ async function injectSummaryTools(agent: AgentDefinition): Promise<void> {
 export async function processToolResult(
     toolCall: ToolCall,
     rawResult: string,
-    agent?: AgentDefinition
+    agent?: AgentDefinition,
+    allowSummary?: boolean
 ): Promise<string> {
     const toolName = toolCall.function.name;
     const config = TOOL_CONFIGS[toolName] || {};
@@ -361,7 +362,7 @@ export async function processToolResult(
     }
 
     // Check if we should skip summarization
-    const skipSummarization = config.skipSummarization || SKIP_SUMMARIZATION_TOOLS.has(toolName);
+    const skipSummarization = config.skipSummarization || SKIP_SUMMARIZATION_TOOLS.has(toolName) || allowSummary === false;
 
     const maxLength = config.maxLength || MAX_RESULT_LENGTH;
 
