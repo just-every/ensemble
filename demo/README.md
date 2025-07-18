@@ -30,17 +30,17 @@ Text-to-speech synthesis using multiple providers (OpenAI, ElevenLabs, Google Ge
 - Speed control and audio quality settings
 - Generation history with playback
 
-### 🎧 Transcribe Demo
-Speech-to-text transcription with support for multiple audio formats and languages.
+### 🎧 Listen Demo
+Real-time speech-to-text transcription with live audio streaming.
 
-![Transcribe Demo](screenshots/transcribe-demo.png)
+![Listen Demo](screenshots/listen-demo.png)
 
 **Features:**
-- Drag & drop audio file upload
+- Live microphone recording
+- Real-time transcription streaming
+- Audio visualization
 - Multiple transcription models
-- Language detection and selection
-- Timestamp generation
-- Real-time transcription progress
+- Low-latency processing
 
 ### 📊 Embed Demo
 Text embedding generation for semantic search and similarity comparisons.
@@ -49,22 +49,10 @@ Text embedding generation for semantic search and similarity comparisons.
 
 **Features:**
 - Multiple embedding models
-- Dimension customization
-- Batch processing
-- Similarity calculations
-- Vector visualization
-
-### 🏷️ Classifier Demo
-Text classification using various models with custom categories.
-
-![Classifier Demo](screenshots/classifier-demo.png)
-
-**Features:**
-- Multi-class classification
-- Confidence scores
-- Custom category definition
-- Batch processing
-- Result visualization
+- Batch text processing
+- Semantic similarity comparison
+- Vector dimension customization
+- Cost tracking
 
 ## Running the Demos
 
