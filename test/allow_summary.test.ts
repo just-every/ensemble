@@ -25,8 +25,8 @@ describe('allowSummary parameter', () => {
             type: 'function',
             function: {
                 name: 'test_no_summary',
-                arguments: JSON.stringify({ text: 'test' })
-            }
+                arguments: JSON.stringify({ text: 'test' }),
+            },
         };
 
         // Process the result
@@ -60,19 +60,23 @@ describe('allowSummary parameter', () => {
             type: 'function',
             function: {
                 name: 'test_with_summary',
-                arguments: JSON.stringify({ text: 'test' })
-            }
+                arguments: JSON.stringify({ text: 'test' }),
+            },
         };
 
         // Mock the summarization to avoid calling the actual LLM
-        const originalCreateSummary = vi.fn().mockResolvedValue('This is a summary of the long output\n\n[Summarized output: 100 → 10 lines, 10000 → 100 chars]');
+        const originalCreateSummary = vi
+            .fn()
+            .mockResolvedValue(
+                'This is a summary of the long output\n\n[Summarized output: 100 → 10 lines, 10000 → 100 chars]'
+            );
 
         // Temporarily replace the createSummary import
-        vi.doMock('../utils/tool_result_processor.js', async (importOriginal) => {
-            const actual = await importOriginal() as any;
+        vi.doMock('../utils/tool_result_processor.js', async importOriginal => {
+            const actual = (await importOriginal()) as any;
             return {
                 ...actual,
-                createSummary: originalCreateSummary
+                createSummary: originalCreateSummary,
             };
         });
 
@@ -111,8 +115,8 @@ describe('allowSummary parameter', () => {
             type: 'function',
             function: {
                 name: 'test_large_no_summary',
-                arguments: JSON.stringify({ text: 'test' })
-            }
+                arguments: JSON.stringify({ text: 'test' }),
+            },
         };
 
         // Process the result

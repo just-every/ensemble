@@ -68,15 +68,23 @@ export default function RequestDemo() {
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     // Settings
-    const [selectedModelClass, setSelectedModelClass] = useState('standard');
+    const [selectedModelClass, setSelectedModelClass] = useState('');
     const [enableTools, setEnableTools] = useState(true);
     const [temperature, setTemperature] = useState(1.0);
     const [availableModelClasses, setAvailableModelClasses] = useState<string[]>([]);
 
     const [isConnected, setIsConnected] = useState(false);
+    const [isReconnecting, setIsReconnecting] = useState(false);
+    const [showConnectionWarning, setShowConnectionWarning] = useState(false);
     const [taskStatus, setTaskStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
     const [, setTaskError] = useState<string | undefined>();
     const wsRef = useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const connectionWarningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const reconnectAttemptsRef = useRef(0);
+    const maxReconnectAttempts = 10;
+    const baseReconnectDelay = 1000; // Start with 1 second
+    const connectionWarningDelay = 3000; // Show warning after 3 seconds
 
     const { state: taskState, processEvent } = useTaskState();
 
@@ -176,13 +184,31 @@ export default function RequestDemo() {
             wsRef.current = null;
         }
 
+        // Show connection warning after delay on first attempt, or immediately after 2 failed attempts
+        if (reconnectAttemptsRef.current >= 2) {
+            setShowConnectionWarning(true);
+        } else if (reconnectAttemptsRef.current === 0 && !connectionWarningTimeoutRef.current) {
+            connectionWarningTimeoutRef.current = setTimeout(() => {
+                setShowConnectionWarning(true);
+            }, connectionWarningDelay);
+        }
+
         try {
             const ws = new WebSocket(REQUEST_WS_URL);
 
             ws.onopen = () => {
                 console.log('WebSocket connected successfully');
                 setIsConnected(true);
+                setIsReconnecting(false);
+                setShowConnectionWarning(false);
                 setTaskError(undefined);
+                reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
+
+                // Clear connection warning timeout
+                if (connectionWarningTimeoutRef.current) {
+                    clearTimeout(connectionWarningTimeoutRef.current);
+                    connectionWarningTimeoutRef.current = null;
+                }
             };
 
             ws.onmessage = event => {
@@ -206,6 +232,22 @@ export default function RequestDemo() {
                 console.log('WebSocket disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
+
+                // Attempt reconnection with exponential backoff
+                if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+                    reconnectAttemptsRef.current++;
+                    const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1), 30000); // Cap at 30 seconds
+                    console.log(
+                        `Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
+                    );
+                    setIsReconnecting(true);
+
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        connectWebSocket();
+                    }, delay);
+                } else {
+                    setIsReconnecting(false);
+                }
             };
 
             wsRef.current = ws;
@@ -214,8 +256,24 @@ export default function RequestDemo() {
             setIsConnected(false);
             setTaskStatus('error');
             setTaskError('Failed to connect to server');
+
+            // Trigger reconnection on connection failure
+            if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+                reconnectAttemptsRef.current++;
+                const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+                console.log(
+                    `Reconnecting after failure in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
+                );
+                setIsReconnecting(true);
+
+                reconnectTimeoutRef.current = setTimeout(() => {
+                    connectWebSocket();
+                }, delay);
+            } else {
+                setIsReconnecting(false);
+            }
         }
-    }, [processEvent, processRequestEvent]);
+    }, [processEvent, processRequestEvent, connectionWarningDelay]);
 
     const sendMessage = useCallback(
         (message: string) => {
@@ -243,7 +301,7 @@ export default function RequestDemo() {
             const request = {
                 type: 'chat',
                 messages: conversationHistory,
-                modelClass: selectedModelClass,
+                modelClass: selectedModelClass || 'standard',
                 toolsEnabled: enableTools,
                 temperature,
             };
@@ -266,6 +324,17 @@ export default function RequestDemo() {
         connectWebSocket();
 
         return () => {
+            // Clear any pending timeouts
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = null;
+            }
+            if (connectionWarningTimeoutRef.current) {
+                clearTimeout(connectionWarningTimeoutRef.current);
+                connectionWarningTimeoutRef.current = null;
+            }
+            // Prevent reconnection on unmount
+            reconnectAttemptsRef.current = maxReconnectAttempts;
             if (wsRef.current) {
                 wsRef.current.close();
                 wsRef.current = null;
@@ -364,6 +433,36 @@ export default function RequestDemo() {
                         }
                     />
 
+                    {/* Connection Status */}
+                    {!isConnected && showConnectionWarning && (
+                        <div
+                            style={{
+                                background: isReconnecting ? 'var(--surface-glass)' : 'rgba(239, 68, 68, 0.1)',
+                                border: `1px solid ${isReconnecting ? 'var(--border-glass)' : 'rgba(239, 68, 68, 0.3)'}`,
+                                borderRadius: '12px',
+                                padding: '12px 16px',
+                                marginBottom: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                fontSize: '14px',
+                                color: isReconnecting ? 'var(--text-secondary)' : 'rgba(239, 68, 68, 0.9)',
+                            }}>
+                            <div
+                                style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: isReconnecting ? 'var(--accent-warning)' : 'var(--accent-error)',
+                                    animation: isReconnecting ? 'pulse 2s infinite' : 'none',
+                                }}
+                            />
+                            {isReconnecting
+                                ? `Reconnecting... (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`
+                                : 'Not connected to server. Make sure the server is running on port 3005.'}
+                        </div>
+                    )}
+
                     {/* Settings Card - moved to top */}
                     <div
                         className="card"
@@ -388,23 +487,34 @@ export default function RequestDemo() {
                                 className="glass-select"
                                 value={selectedModelClass}
                                 onChange={e => setSelectedModelClass(e.target.value)}
+                                disabled={!isConnected}
                                 style={{
                                     fontSize: '14px',
-                                    cursor: 'pointer',
+                                    cursor: isConnected ? 'pointer' : 'not-allowed',
                                     maxWidth: '100%',
+                                    opacity: isConnected ? 1 : 0.7,
                                 }}>
-                                {availableModelClasses.map((cls, index) => {
-                                    // Format the class name: capitalize and replace underscores
-                                    const displayName = String(cls)
-                                        .split('_')
-                                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                        .join(' ');
-                                    return (
-                                        <option key={`${cls}-${index}`} value={cls} style={{ background: '#1a1a2e' }}>
-                                            {displayName}
-                                        </option>
-                                    );
-                                })}
+                                {!isConnected ? (
+                                    <option value="">Loading...</option>
+                                ) : availableModelClasses.length === 0 ? (
+                                    <option value="">No model classes available</option>
+                                ) : (
+                                    availableModelClasses.map((cls, index) => {
+                                        // Format the class name: capitalize and replace underscores
+                                        const displayName = String(cls)
+                                            .split('_')
+                                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                            .join(' ');
+                                        return (
+                                            <option
+                                                key={`${cls}-${index}`}
+                                                value={cls}
+                                                style={{ background: '#1a1a2e' }}>
+                                                {displayName}
+                                            </option>
+                                        );
+                                    })
+                                )}
                             </select>
                         </div>
 
@@ -484,21 +594,29 @@ export default function RequestDemo() {
                                             fontSize: '14px',
                                             color: 'var(--text-secondary)',
                                         }}>
-                                        Temperature: {temperature.toFixed(1)}
+                                        Temperature
                                     </label>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="2"
-                                        step="0.1"
-                                        value={temperature}
-                                        onChange={e => setTemperature(parseFloat(e.target.value))}
-                                        style={{ width: '100%' }}
-                                    />
+                                    <div className="slider-container">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="2"
+                                            step="0.1"
+                                            value={temperature}
+                                            onChange={e => setTemperature(parseFloat(e.target.value))}
+                                        />
+                                        <span className="slider-value">{temperature.toFixed(1)}</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
+                        {/* Show Code Button - moved from header */}
+                        <div style={{ marginTop: '20px' }}>
+                            <div style={{ width: '100%' }}>
+                                <ShowCodeButton onClick={() => setShowCodeModal(true)} />
+                            </div>
+                        </div>
                         {/* Stats Row */}
                         <div
                             style={{
@@ -506,7 +624,6 @@ export default function RequestDemo() {
                                 gap: '16px',
                                 marginTop: '20px',
                                 paddingTop: '20px',
-                                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                             }}>
                             <div style={{ flex: 1, textAlign: 'center' }}>
                                 <div style={{ fontSize: '24px', fontWeight: '700', color: '#4A9EFF' }}>
@@ -526,12 +643,6 @@ export default function RequestDemo() {
                             </div>
                         </div>
 
-                        {/* Show Code Button - moved from header */}
-                        <div style={{ marginTop: '20px' }}>
-                            <div style={{ width: '100%' }}>
-                                <ShowCodeButton onClick={() => setShowCodeModal(true)} />
-                            </div>
-                        </div>
                     </div>
 
                     {/* Examples Card */}
@@ -611,14 +722,13 @@ export default function RequestDemo() {
                         <div
                             style={{
                                 flex: 1,
-                                padding: '0 24px 20px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 position: 'relative',
                                 overflow: 'hidden',
                                 justifyContent: 'space-between',
                             }}>
-                            {showIntro ? (
+                            {showIntro && activeTab === 'conversation' ? (
                                 <>
                                     <div
                                         style={{
@@ -674,26 +784,34 @@ export default function RequestDemo() {
                                     {activeTab === 'requests' && <LLMRequestLog taskState={taskState} />}
                                 </div>
                             )}
-
-                            {/* Input Area at Bottom - only show on conversation tab */}
-                            {activeTab === 'conversation' && (
-                                <div
-                                    style={{
-                                        margin: '0 auto',
-                                        width: '100%',
-                                    }}>
-                                    <ConversationInput
-                                        value={customPrompt}
-                                        onChange={setCustomPrompt}
-                                        onSend={handleRunTask}
-                                        onStop={handleStop}
-                                        isStreaming={taskStatus === 'running'}
-                                        placeholder="Type your message here..."
-                                        disabled={!isConnected}
-                                    />
-                                </div>
-                            )}
                         </div>
+
+                        {/* Input Area at Bottom - only show on conversation tab */}
+                        {activeTab === 'conversation' && (
+                            <div
+                                style={{
+                                    margin: '0 auto',
+                                    padding: '0 20px 10px 20px',
+                                    width: '100%',
+                                }}>
+                                <ConversationInput
+                                    value={customPrompt}
+                                    onChange={setCustomPrompt}
+                                    onSend={handleRunTask}
+                                    onStop={handleStop}
+                                    isStreaming={taskStatus === 'running'}
+                                    placeholder="Type your message here..."
+                                    disabled={!isConnected}
+                                    style={{
+                                        width: '100%',
+                                        resize: 'vertical',
+                                        minHeight: '100px',
+                                        padding: '20px',
+                                        maxHeight: '300px',
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

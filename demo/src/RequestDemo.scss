@@ -4,49 +4,13 @@
     background: var(--surface-hover) !important;
     transform: translateY(-1px);
   }
-  
+
   &.active {
     box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
   }
 }
 
-// Custom slider styles
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--accent-primary);
-    border-radius: 50%;
-    cursor: pointer;
-    margin-top: -5px;
-  }
-  
-  &::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    background: var(--accent-primary);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-  }
-  
-  &::-webkit-slider-track {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-  
-  &::-moz-range-track {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-}
+// Removed custom slider styles - using shared styles from components/style.scss
 
 // Ensure proper dark theme
 .bg-dark {
@@ -71,18 +35,6 @@ input[type="range"] {
   }
 }
 
-// Tool call styling
-.tool-call {
-  margin: 12px 0;
-  padding: 12px;
-  background: var(--surface-glass);
-  border-radius: 8px;
-  border: 1px solid var(--border-glass);
-  
-  &.loading {
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-}
 
 @keyframes pulse {
   0% {
@@ -108,15 +60,15 @@ input[type="range"] {
   &::-webkit-scrollbar {
     width: 8px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background: var(--surface-primary);
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 4px;
-    
+
     &:hover {
       background: var(--border-hover);
     }

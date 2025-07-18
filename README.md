@@ -16,25 +16,11 @@ npm run demo
 This opens a unified demo interface at http://localhost:3000 with all demos:
 
 ### Demo Interface
-![Ensemble Demos Interface](demo/screenshots/demo-interface.png)
+![Ensemble Demos Interface](demo/screenshots/demo-overview.png)
 
-### Available Demos
+Navigate to http://localhost:3000 to access all demos through a unified interface.
 
-#### 💬 Chat Request Demo
-Streaming AI responses with tool calling and multi-model support
-![Chat Request Demo](demo/screenshots/chat-demo.png)
-
-#### 📊 Text Embeddings Demo  
-Generate vector embeddings and perform similarity search
-![Text Embeddings Demo](demo/screenshots/embed-demo.png)
-
-#### 🎤 Voice Generation Demo
-Convert text to natural-sounding speech with multiple providers
-![Voice Generation Demo](demo/screenshots/voice-demo.png)
-
-#### 🎧 Live Transcription Demo
-Real-time speech-to-text with streaming audio processing
-![Transcription Demo](demo/screenshots/transcription-demo.png)
+See the [demo README](demo/README.md) for detailed information about each demo.
 
 ## Features
 
