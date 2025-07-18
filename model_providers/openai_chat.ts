@@ -802,6 +802,11 @@ export class OpenAIChat extends BaseModelProvider {
                     if ('reasoning_content' in delta) {
                         const thinking_content = delta.reasoning_content as string;
                         if (thinking_content) {
+                            // Skip "Thinking... " from grok models
+                            if (model.startsWith('grok-') && thinking_content === 'Thinking... ') {
+                                // Don't yield this delta, just skip it
+                                continue;
+                            }
                             aggregatedThinking += thinking_content;
                             yield {
                                 type: 'message_delta',

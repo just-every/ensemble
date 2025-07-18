@@ -236,7 +236,7 @@ wss.on('connection', ws => {
     console.log(`New client connected: ${connectionId}`);
 
     // Set up the logger before any operations
-    const { logger, disconnect } = enableRequestDemoLogger(ws, setEnsembleLogger);
+    const { disconnect } = enableRequestDemoLogger(ws, setEnsembleLogger);
 
     // Store connection info
     activeConnections.set(connectionId, {

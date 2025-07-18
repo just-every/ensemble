@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { REQUEST_WS_URL } from './config/websocket';
 import {
-    Card,
     ShowCodeButton,
     formatNumber,
     formatCurrency,
@@ -11,7 +10,6 @@ import {
     CodeModal,
     generateRequestCode,
     generateHTMLDemo,
-    ModelSelector,
     Header,
     HeaderTab,
     useTaskState,
@@ -20,6 +18,15 @@ import {
 import './RequestDemo.scss';
 
 type TabType = 'conversation' | 'requests';
+
+interface RequestEvent {
+    type: string;
+    connectionId?: string;
+    models?: unknown;
+    request_id?: string;
+    error?: string;
+    [key: string]: unknown;
+}
 
 // Example prompts
 const examples = {
@@ -75,7 +82,7 @@ export default function RequestDemo() {
 
     // Process WebSocket event
     const processRequestEvent = useCallback(
-        (data: any) => {
+        (data: RequestEvent) => {
             switch (data.type) {
                 case 'connected':
                     console.log('Connected with ID:', data.connectionId);
@@ -89,7 +96,11 @@ export default function RequestDemo() {
                     // }
                     if (data.modelClasses) {
                         const classes = Array.isArray(data.modelClasses)
-                            ? data.modelClasses.map((cls: any) => (typeof cls === 'object' ? cls.id : cls))
+                            ? data.modelClasses.map((cls: unknown) =>
+                                  typeof cls === 'object' && cls !== null && 'id' in cls
+                                      ? (cls as { id: string }).id
+                                      : cls
+                              )
                             : data.modelClasses;
                         setAvailableModelClasses(Array.from(new Set(classes)) as string[]);
                         if (!selectedModelClass && classes.includes('standard')) {
@@ -218,10 +229,10 @@ export default function RequestDemo() {
 
             // Build conversation history
             const conversationHistory = taskState.messages.map(m => {
-                const msg = m.message as any;
+                const msg = m.message as Record<string, unknown>;
                 return {
-                    role: msg.role || (msg.type === 'user' ? 'user' : 'assistant'),
-                    content: msg.content || '',
+                    role: (msg.role as string) || (msg.type === 'user' ? 'user' : 'assistant'),
+                    content: (msg.content as string) || '',
                 };
             });
 
@@ -299,10 +310,10 @@ export default function RequestDemo() {
             code: generateRequestCode({
                 model: selectedModelClass,
                 messages: taskState.messages.map(m => {
-                    const msg = m.message as any;
+                    const msg = m.message as Record<string, unknown>;
                     return {
-                        role: msg.role || (msg.type === 'user' ? 'user' : 'assistant'),
-                        content: msg.content || '',
+                        role: (msg.role as string) || (msg.type === 'user' ? 'user' : 'assistant'),
+                        content: (msg.content as string) || '',
                     };
                 }),
                 temperature,
