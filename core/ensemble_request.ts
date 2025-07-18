@@ -604,7 +604,7 @@ async function processToolCall(toolCall: ToolCall, agent: AgentDefinition): Prom
         const rawResult = await handleToolCall(toolCall, tool, agent);
 
         // Process the result (summarization, truncation, etc.)
-        const processedResult = await processToolResult(toolCall, rawResult, agent, tool.allow_summary);
+        const processedResult = await processToolResult(toolCall, rawResult, agent, tool.allowSummary);
 
         const toolCallResult: ToolCallResult = {
             toolCall,

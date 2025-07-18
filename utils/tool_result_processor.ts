@@ -364,7 +364,8 @@ export async function processToolResult(
     // Check if we should skip summarization
     const skipSummarization = config.skipSummarization || SKIP_SUMMARIZATION_TOOLS.has(toolName) || allowSummary === false;
 
-    const maxLength = config.maxLength || MAX_RESULT_LENGTH;
+    // When allowSummary is false, use a much larger limit (50k chars) to preserve raw content
+    const maxLength = allowSummary === false ? 50000 : (config.maxLength || MAX_RESULT_LENGTH);
 
     // For tools that skip summarization, use intelligent truncation
     if (skipSummarization) {

@@ -3,9 +3,9 @@ import { createToolFunction } from '../utils/create_tool_function.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 import { ToolCall } from '../types/types.js';
 
-describe('allow_summary parameter', () => {
-    it('should not summarize when allow_summary is false', async () => {
-        // Create a tool with allow_summary = false
+describe('allowSummary parameter', () => {
+    it('should not summarize when allowSummary is false', async () => {
+        // Create a tool with allowSummary = false
         const tool = createToolFunction(
             async (text: string) => {
                 return 'x'.repeat(10000); // Long output that would normally be summarized
@@ -14,10 +14,10 @@ describe('allow_summary parameter', () => {
             { text: 'Input text' },
             'Returns a long string',
             'test_no_summary',
-            false // allow_summary = false
+            false // allowSummary = false
         );
 
-        expect(tool.allow_summary).toBe(false);
+        expect(tool.allowSummary).toBe(false);
 
         // Create a mock tool call
         const toolCall: ToolCall = {
@@ -33,14 +33,14 @@ describe('allow_summary parameter', () => {
         const longResult = 'x'.repeat(10000);
         const processed = await processToolResult(toolCall, longResult, undefined, false);
 
-        // Should not be summarized - just truncated
-        expect(processed).toContain('x'.repeat(200)); // Should contain actual content
-        expect(processed).toContain('[Output truncated:'); // Should have truncation message
+        // Should not be summarized - output is under 50k limit so no truncation
+        expect(processed).toBe(longResult); // Should return the full content unchanged
+        expect(processed).not.toContain('[Output truncated:'); // Should NOT be truncated
         expect(processed).not.toContain('[Summarized output'); // Should NOT have summary message
     });
 
-    it('should summarize when allow_summary is true (default)', async () => {
-        // Create a tool with allow_summary = true (default)
+    it('should summarize when allowSummary is true (default)', async () => {
+        // Create a tool with allowSummary = true (default)
         const tool = createToolFunction(
             async (text: string) => {
                 return 'x'.repeat(10000); // Long output that should be summarized
@@ -49,10 +49,10 @@ describe('allow_summary parameter', () => {
             { text: 'Input text' },
             'Returns a long string',
             'test_with_summary'
-            // allow_summary defaults to true
+            // allowSummary defaults to true
         );
 
-        expect(tool.allow_summary).toBe(true);
+        expect(tool.allowSummary).toBe(true);
 
         // Create a mock tool call
         const toolCall: ToolCall = {
@@ -86,9 +86,42 @@ describe('allow_summary parameter', () => {
         expect(processed.length).toBeLessThan(longResult.length);
     });
 
-    it('should respect allow_summary in ensemble_request flow', async () => {
+    it('should respect allowSummary in ensemble_request flow', async () => {
         // This test would require a more complex setup with ensemble_request
         // For now, we've verified the basic functionality
         expect(true).toBe(true);
+    });
+
+    it('should use 50k character limit when allowSummary is false', async () => {
+        // Create a tool with allowSummary = false
+        const tool = createToolFunction(
+            async (text: string) => {
+                return 'x'.repeat(60000); // 60k chars - more than the 50k limit
+            },
+            'Test tool that returns very long output',
+            { text: 'Input text' },
+            'Returns a very long string',
+            'test_large_no_summary',
+            false // allowSummary = false
+        );
+
+        // Create a mock tool call
+        const toolCall: ToolCall = {
+            id: 'test-call-3',
+            type: 'function',
+            function: {
+                name: 'test_large_no_summary',
+                arguments: JSON.stringify({ text: 'test' })
+            }
+        };
+
+        // Process the result
+        const veryLongResult = 'x'.repeat(60000);
+        const processed = await processToolResult(toolCall, veryLongResult, undefined, false);
+
+        // Should be truncated at 50k chars
+        expect(processed).toContain('x'.repeat(1000)); // Should contain actual content
+        expect(processed).toContain('[Output truncated: 60000 → 50000 chars]'); // Should show it was truncated to 50k
+        expect(processed.length).toBeLessThan(55000); // Should be around 50k + truncation message
     });
 });

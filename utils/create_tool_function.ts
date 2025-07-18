@@ -10,7 +10,7 @@ const validToolParameterTypes: ToolParameterType[] = ['string', 'number', 'boole
  * @param paramMap - Optional mapping of function params to API params
  * @param returns - Optional description of what the function returns
  * @param functionName - Optional custom function name (defaults to function.name)
- * @param allow_summary - Whether to allow summary of tool results (defaults to true)
+ * @param allowSummary - Whether to allow summary of tool results (defaults to true)
  * @returns Tool definition object
  *
  * @example
@@ -76,7 +76,7 @@ export function createToolFunction(
     paramMap?: ToolParameterMap,
     returns?: string,
     functionName?: string,
-    allow_summary: boolean = true
+    allowSummary: boolean = true
 ): ToolFunction {
     const funcStr = func.toString();
     const funcName = (functionName || '').replaceAll(' ', '_') || func.name;
@@ -307,6 +307,6 @@ export function createToolFunction(
         },
         ...(injectAgentId && { injectAgentId }),
         ...(injectAbortSignal && { injectAbortSignal }),
-        allow_summary,
+        allowSummary,
     };
 }

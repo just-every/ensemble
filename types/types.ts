@@ -41,7 +41,7 @@ export interface ToolFunction {
     definition: ToolDefinition;
     injectAgentId?: boolean;
     injectAbortSignal?: boolean;
-    allow_summary?: boolean;
+    allowSummary?: boolean;
 }
 
 /**
