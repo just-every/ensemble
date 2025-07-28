@@ -505,32 +505,55 @@ export class OpenAIProvider extends BaseModelProvider {
                 const imageFiles = [];
 
                 // Process each image in the array
-                for (const sourceImg of imageArray) {
+                for (let i = 0; i < imageArray.length; i++) {
+                    const sourceImg = imageArray[i];
                     let imageFile;
+                    let imageData: string;
+                    let metadata: { category?: string; title?: string; id?: string | number } | undefined;
 
-                    // Check if source_image is a URL or base64 string
-                    if (sourceImg.startsWith('http://') || sourceImg.startsWith('https://')) {
+                    // Check if this is an object with metadata
+                    if (typeof sourceImg === 'object' && 'data' in sourceImg) {
+                        imageData = sourceImg.data;
+                        metadata = sourceImg.metadata;
+                    } else {
+                        imageData = sourceImg;
+                    }
+
+                    // Generate filename based on metadata or index
+                    let filename = `image_${i}.png`;
+                    if (metadata) {
+                        const parts = [];
+                        if (metadata.category) parts.push(metadata.category);
+                        if (metadata.title) parts.push(metadata.title.replace(/[^a-zA-Z0-9-_]/g, '_'));
+                        if (metadata.id) parts.push(`id${metadata.id}`);
+                        if (parts.length > 0) {
+                            filename = `${parts.join('_')}.png`;
+                        }
+                    }
+
+                    // Check if image data is a URL or base64 string
+                    if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
                         // Handle URL case - fetch the image
-                        const imageResponse = await fetch(sourceImg);
+                        const imageResponse = await fetch(imageData);
                         const imageBuffer = await imageResponse.arrayBuffer();
 
-                        // Convert to OpenAI file format
-                        imageFile = await toFile(new Uint8Array(imageBuffer), `image_${imageFiles.length}.png`, {
+                        // Convert to OpenAI file format with descriptive filename
+                        imageFile = await toFile(new Uint8Array(imageBuffer), filename, {
                             type: 'image/png',
                         });
                     } else {
                         // Handle base64 string case
                         // Check if it's a data URL and extract the base64 part if needed
-                        let base64Data = sourceImg;
-                        if (sourceImg.startsWith('data:')) {
-                            base64Data = sourceImg.split(',')[1];
+                        let base64Data = imageData;
+                        if (imageData.startsWith('data:')) {
+                            base64Data = imageData.split(',')[1];
                         }
 
                         // Convert base64 to binary
                         const binaryData = Buffer.from(base64Data, 'base64');
 
-                        // Convert to OpenAI file format
-                        imageFile = await toFile(new Uint8Array(binaryData), `image_${imageFiles.length}.png`, {
+                        // Convert to OpenAI file format with descriptive filename
+                        imageFile = await toFile(new Uint8Array(binaryData), filename, {
                             type: 'image/png',
                         });
                     }

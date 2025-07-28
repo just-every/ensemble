@@ -792,13 +792,19 @@ export interface ImageGenerationOpts {
     response_format?: 'url' | 'b64_json';
 
     /** Source images for editing/variations (URLs or base64 data) */
-    source_images?: string | string[];
+    source_images?:
+        | string
+        | string[]
+        | Array<{ data: string; metadata?: { category?: string; title?: string; id?: string | number } }>;
 
     /** Mask for inpainting (base64 data) - areas to edit should be transparent */
     mask?: string;
 
     /** Background transparency */
     background?: 'transparent' | 'opaque' | 'auto';
+
+    /** Control how closely the output matches the input image (OpenAI experimental) */
+    input_fidelity?: 'low' | 'medium' | 'high';
 }
 
 // ================================================================
