@@ -144,6 +144,7 @@ export class Agent implements AgentDefinition {
     cwd?: string; // Working directory for the agent (used by model providers that need a real shell)
     modelScores?: Record<string, number>; // Model-specific scores for weighted selection (0-100)
     disabledModels?: string[]; // Models to exclude from selection
+    tags?: string[]; // Optional tags for categorizing or grouping agents
 
     /** Optional callback for processing tool calls */
     onToolCall?: (toolCall: ToolCall) => Promise<void>;
@@ -178,6 +179,7 @@ export class Agent implements AgentDefinition {
         this.description = definition.description;
         this.instructions = definition.instructions;
         this.tools = definition.tools || [];
+        this.tags = definition.tags || [];
 
         // Ensure agent-specific tools are attached once ID is assigned
         this.model = definition.model;

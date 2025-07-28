@@ -7,7 +7,7 @@ describe('allowSummary parameter', () => {
     it('should not summarize when allowSummary is false', async () => {
         // Create a tool with allowSummary = false
         const tool = createToolFunction(
-            async (text: string) => {
+            async (_text: string) => {
                 return 'x'.repeat(10000); // Long output that would normally be summarized
             },
             'Test tool that returns long output',
@@ -42,7 +42,7 @@ describe('allowSummary parameter', () => {
     it('should summarize when allowSummary is true (default)', async () => {
         // Create a tool with allowSummary = true (default)
         const tool = createToolFunction(
-            async (text: string) => {
+            async (_text: string) => {
                 return 'x'.repeat(10000); // Long output that should be summarized
             },
             'Test tool that returns long output',
@@ -98,8 +98,8 @@ describe('allowSummary parameter', () => {
 
     it('should use 50k character limit when allowSummary is false', async () => {
         // Create a tool with allowSummary = false
-        const tool = createToolFunction(
-            async (text: string) => {
+        const _tool = createToolFunction(
+            async (_text: string) => {
                 return 'x'.repeat(60000); // 60k chars - more than the 50k limit
             },
             'Test tool that returns very long output',

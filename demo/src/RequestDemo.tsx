@@ -642,7 +642,6 @@ export default function RequestDemo() {
                                 </div>
                             </div>
                         </div>
-
                     </div>
 
                     {/* Examples Card */}
