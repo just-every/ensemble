@@ -47,12 +47,16 @@ export async function* ensembleRequest(
     const conversationHistory = agent?.historyThread || messages;
 
     if (agent.instructions) {
-        const firstMsg = conversationHistory[0];
-        const alreadyHasInstructions =
-            firstMsg &&
-            'content' in firstMsg &&
-            typeof firstMsg.content === 'string' &&
-            firstMsg.content.trim() === agent.instructions.trim();
+        // Check if ANY system message in the conversation history contains these exact instructions
+        const alreadyHasInstructions = conversationHistory.some(msg => {
+            return (
+                msg.type === 'message' &&
+                msg.role === 'system' &&
+                'content' in msg &&
+                typeof msg.content === 'string' &&
+                msg.content.trim() === agent.instructions.trim()
+            );
+        });
 
         if (!alreadyHasInstructions) {
             const instructionsMessage: ResponseInputMessage = {
@@ -67,6 +71,7 @@ export async function* ensembleRequest(
                 message: instructionsMessage,
                 request_id: randomUUID(),
             };
+            agent.instructions = undefined; // Clear instructions after adding to history
         }
     }
 

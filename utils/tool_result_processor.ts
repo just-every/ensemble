@@ -73,16 +73,24 @@ const ERROR_FREQUENCY_THRESHOLD = 0.3;
 
 /**
  * Truncate text intelligently, keeping beginning and end
+ * @param simpleMode - If true, just truncate at the end without inserting separator in middle
  */
 function truncate(
     text: string,
     length: number = SUMMARIZE_TRUNCATE_CHARS,
-    separator: string = '\n\n...[truncated for summary]...\n\n'
+    separator: string = '\n\n...[truncated for summary]...\n\n',
+    simpleMode: boolean = false
 ): string {
     text = text.trim();
     if (text.length <= length) {
         return text;
     }
+
+    // In simple mode (for base64 or when allowSummary=false), just truncate at the end
+    if (simpleMode) {
+        return text.substring(0, length);
+    }
+
     // Keep 30% from beginning and 70% from end (end usually has more important info)
     const beginLength = Math.floor(length * 0.3);
     const endLength = length - beginLength - separator.length;
@@ -174,7 +182,7 @@ export async function createSummary(content: string, prompt: string, agent?: Age
     } catch (error) {
         console.error('Error creating summary:', error);
         // Fallback to intelligent truncation
-        const truncated = truncate(content, MAX_RESULT_LENGTH);
+        const truncated = truncate(content, MAX_RESULT_LENGTH, undefined, false);
         return truncated + '\n\n[Summary generation failed, output truncated]';
     }
 }
@@ -301,7 +309,7 @@ async function createExpandableSummary(content: string, prompt: string, agent: A
     } catch (error) {
         console.error('Error creating expandable summary:', error);
         // Fallback to intelligent truncation
-        const truncated = truncate(content, MAX_RESULT_LENGTH);
+        const truncated = truncate(content, MAX_RESULT_LENGTH, undefined, false);
         return truncated + '\n\n[Summary generation failed, output truncated]';
     }
 }
@@ -356,22 +364,27 @@ export async function processToolResult(
     const toolName = toolCall.function.name;
     const config = TOOL_CONFIGS[toolName] || {};
 
-    // Check if result is an image
-    if (rawResult.startsWith('data:image/')) {
+    // Check if result contains an image
+    if (rawResult.includes('data:image/')) {
         return rawResult; // Return images as-is
     }
 
-    // Check if we should skip summarization
-    const skipSummarization =
-        config.skipSummarization || SKIP_SUMMARIZATION_TOOLS.has(toolName) || allowSummary === false;
+    // When allowSummary is explicitly false, return the complete raw result with NO truncation
+    if (allowSummary === false) {
+        return rawResult; // Return complete output, no truncation whatsoever
+    }
 
-    // When allowSummary is false, use a much larger limit (50k chars) to preserve raw content
-    const maxLength = allowSummary === false ? 50000 : config.maxLength || MAX_RESULT_LENGTH;
+    // Check if we should skip summarization
+    const skipSummarization = config.skipSummarization || SKIP_SUMMARIZATION_TOOLS.has(toolName);
+
+    const maxLength = config.maxLength || MAX_RESULT_LENGTH;
 
     // For tools that skip summarization, use intelligent truncation
     if (skipSummarization) {
         if (rawResult.length > maxLength) {
-            const truncatedResult = truncate(rawResult, maxLength);
+            // Check if this contains data URLs that shouldn't be truncated in the middle
+            const useSimpleMode = rawResult.includes('data:image/'); //@todo remove now that we skip images?
+            const truncatedResult = truncate(rawResult, maxLength, undefined, useSimpleMode);
             const truncationMessage =
                 config.truncationMessage || `\n\n[Output truncated: ${rawResult.length} → ${maxLength} chars]`;
             return truncatedResult + truncationMessage;

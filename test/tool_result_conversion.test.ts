@@ -300,4 +300,53 @@ describe('Tool Result Conversion', () => {
 
         expect(result).toBe('{\n  "status": "ok"\n}');
     });
+
+    it('should handle Error objects with proper string representation', async () => {
+        const tool: ToolFunction = {
+            definition: {
+                type: 'function',
+                function: {
+                    name: 'error_tool',
+                    description: 'Returns an Error object',
+                    parameters: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+            },
+            function: vi.fn(async () => new Error('Something went wrong')),
+        };
+
+        const result = await executeToolWithLifecycle(createToolCall('error_tool'), tool, createMockAgent());
+
+        expect(result).toBe('Error: Something went wrong');
+    });
+
+    it('should handle custom Error objects', async () => {
+        class CustomError extends Error {
+            constructor(message: string) {
+                super(message);
+                this.name = 'CustomError';
+            }
+        }
+
+        const tool: ToolFunction = {
+            definition: {
+                type: 'function',
+                function: {
+                    name: 'custom_error_tool',
+                    description: 'Returns a custom Error object',
+                    parameters: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+            },
+            function: vi.fn(async () => new CustomError('Custom error occurred')),
+        };
+
+        const result = await executeToolWithLifecycle(createToolCall('custom_error_tool'), tool, createMockAgent());
+
+        expect(result).toBe('CustomError: Custom error occurred');
+    });
 });

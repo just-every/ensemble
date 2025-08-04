@@ -33,7 +33,7 @@ describe('allowSummary parameter', () => {
         const longResult = 'x'.repeat(10000);
         const processed = await processToolResult(toolCall, longResult, undefined, false);
 
-        // Should not be summarized - output is under 50k limit so no truncation
+        // Should not be summarized or truncated - when allowSummary is false, return complete output
         expect(processed).toBe(longResult); // Should return the full content unchanged
         expect(processed).not.toContain('[Output truncated:'); // Should NOT be truncated
         expect(processed).not.toContain('[Summarized output'); // Should NOT have summary message
@@ -96,11 +96,11 @@ describe('allowSummary parameter', () => {
         expect(true).toBe(true);
     });
 
-    it('should use 50k character limit when allowSummary is false', async () => {
+    it('should NOT truncate at all when allowSummary is false', async () => {
         // Create a tool with allowSummary = false
         const _tool = createToolFunction(
             async (_text: string) => {
-                return 'x'.repeat(60000); // 60k chars - more than the 50k limit
+                return 'x'.repeat(60000); // 60k chars - testing no truncation
             },
             'Test tool that returns very long output',
             { text: 'Input text' },
@@ -123,9 +123,10 @@ describe('allowSummary parameter', () => {
         const veryLongResult = 'x'.repeat(60000);
         const processed = await processToolResult(toolCall, veryLongResult, undefined, false);
 
-        // Should be truncated at 50k chars
-        expect(processed).toContain('x'.repeat(1000)); // Should contain actual content
-        expect(processed).toContain('[Output truncated: 60000 → 50000 chars]'); // Should show it was truncated to 50k
-        expect(processed.length).toBeLessThan(55000); // Should be around 50k + truncation message
+        // Should NOT be truncated at all - the ENTIRE output is preserved
+        expect(processed).toBe(veryLongResult); // Should be the exact same output
+        expect(processed.length).toBe(60000); // Should be exactly 60k chars
+        expect(processed).not.toContain('[Output truncated'); // Should NOT have truncation message
+        expect(processed).not.toContain('[truncated'); // Should NOT have any truncation indicator
     });
 });

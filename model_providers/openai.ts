@@ -486,6 +486,9 @@ export class OpenAIProvider extends BaseModelProvider {
             // Default background to 'auto'
             const background: 'transparent' | 'opaque' | 'auto' = opts?.background || 'auto';
 
+            // Extract input_fidelity if provided
+            const input_fidelity: 'low' | 'medium' | 'high' | undefined = opts?.input_fidelity;
+
             // Get source images if provided
             const source_images = opts?.source_images;
 
@@ -586,6 +589,11 @@ export class OpenAIProvider extends BaseModelProvider {
                     size,
                     output_format: 'png',
                 };
+
+                // Add input_fidelity if provided
+                if (input_fidelity) {
+                    editParams.input_fidelity = input_fidelity;
+                }
 
                 // Add mask if provided
                 if (maskFile) {

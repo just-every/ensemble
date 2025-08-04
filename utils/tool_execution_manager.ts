@@ -33,6 +33,12 @@ function convertResultToString(result: any): string {
         return result.toString();
     }
 
+    // Special handling for Error objects
+    if (result instanceof Error) {
+        // Return the error string representation (e.g., "Error: message")
+        return String(result);
+    }
+
     // For objects and arrays, try JSON.stringify
     if (typeof result === 'object') {
         try {

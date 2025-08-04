@@ -5,6 +5,9 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(grep:*)"
     ],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "/Users/zemaj/www/just-every"
+    ]
   }
 }
