@@ -14,6 +14,42 @@ import {
 } from '../config/tool_execution.js';
 
 /**
+ * Convert a tool result to string intelligently
+ * Handles objects, arrays, and primitive values appropriately
+ */
+function convertResultToString(result: any): string {
+    // Handle null/undefined
+    if (result === null || result === undefined) {
+        return '';
+    }
+
+    // If already a string, return as-is
+    if (typeof result === 'string') {
+        return result;
+    }
+
+    // For numbers and booleans, use toString()
+    if (typeof result === 'number' || typeof result === 'boolean') {
+        return result.toString();
+    }
+
+    // For objects and arrays, try JSON.stringify
+    if (typeof result === 'object') {
+        try {
+            // Pretty print with 2-space indentation for readability
+            return JSON.stringify(result, null, 2);
+        } catch (error) {
+            // If JSON.stringify fails (circular references, etc.), fall back to String()
+            console.warn('Failed to JSON.stringify tool result, falling back to String():', error);
+            return String(result);
+        }
+    }
+
+    // For functions and other types, use String()
+    return String(result);
+}
+
+/**
  * Create a timeout promise
  */
 export function timeoutPromise(ms: number): Promise<'TIMEOUT'> {
@@ -70,13 +106,17 @@ export async function executeToolWithLifecycle(
         // Execute the tool
         const result = await tool.function(...args);
 
-        // Mark as completed
-        await runningToolTracker.completeRunningTool(fnId, String(result), agent);
+        // Convert result to string intelligently
+        const resultString = convertResultToString(result);
 
-        return String(result);
+        // Mark as completed
+        await runningToolTracker.completeRunningTool(fnId, resultString, agent);
+
+        return resultString;
     } catch (error) {
-        // Mark as failed
-        await runningToolTracker.failRunningTool(fnId, String(error), agent);
+        // Mark as failed - use intelligent conversion for error too
+        const errorString = convertResultToString(error);
+        await runningToolTracker.failRunningTool(fnId, errorString, agent);
         throw error;
     }
 }
