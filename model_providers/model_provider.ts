@@ -256,8 +256,30 @@ export async function getModelFromAgent(
         ));
 
     // Resolve any aliases to the actual model ID
-    const modelEntry = findModel(model);
-    return modelEntry?.id || model;
+    // But preserve suffixes (-low, -medium, -high, -max) if they were explicitly provided
+    const suffixes = ['-low', '-medium', '-high', '-max'];
+    let suffix = '';
+    let baseModel = model;
+
+    // Check if model has a suffix
+    for (const s of suffixes) {
+        if (model.endsWith(s)) {
+            suffix = s;
+            baseModel = model.slice(0, -s.length);
+            break;
+        }
+    }
+
+    // Try to find the base model
+    const modelEntry = findModel(baseModel);
+
+    // If we found a model entry and had a suffix, append it back
+    if (modelEntry?.id) {
+        return modelEntry.id + suffix;
+    }
+
+    // Otherwise return the original model
+    return model;
 }
 
 /**
