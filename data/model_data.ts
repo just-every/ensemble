@@ -955,7 +955,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Opus 4
     {
         id: 'claude-opus-4-1-20250805',
-        aliases: ['claude-opus-4', 'claude-4-opus', 'claude-opus-4-20250514'],
+        aliases: ['claude-opus-4', 'claude-opus-4-1', 'claude-4-opus', 'claude-opus-4-20250514'],
         provider: 'anthropic',
         cost: {
             input_per_million: 15.0,
@@ -1784,7 +1784,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Qwen3 235B A22B Thinking
     {
         id: 'qwen3-235b-a22b-thinking-2507',
-        aliases: ['qwen/qwen3-235b-a22b-thinking-2507'],
+        aliases: ['qwen/qwen3-235b-a22b-thinking-2507', 'qwen3'],
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3-235b-a22b-thinking-2507',
         cost: {

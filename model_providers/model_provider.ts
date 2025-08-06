@@ -29,7 +29,7 @@ import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
 import { elevenLabsProvider } from './elevenlabs.js';
-import { MODEL_CLASSES, ModelClassID, ModelProviderID } from '../data/model_data.js';
+import { MODEL_CLASSES, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
 
 // Provider mapping by model prefix
 const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
@@ -245,15 +245,19 @@ export async function getModelFromAgent(
     defaultClass?: ModelClassID,
     excludeModels?: string[]
 ): Promise<string> {
-    return (
+    // Get the model from agent or from class
+    const model =
         agent.model ||
         (await getModelFromClass(
             agent.modelClass || defaultClass,
             excludeModels,
             agent.disabledModels,
             agent.modelScores
-        ))
-    );
+        ));
+
+    // Resolve any aliases to the actual model ID
+    const modelEntry = findModel(model);
+    return modelEntry?.id || model;
 }
 
 /**
