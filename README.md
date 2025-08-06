@@ -79,11 +79,7 @@ const messages = [
 
 // Perform initial request
 for await (const event of ensembleRequest(messages)) {
-    if (event.type === 'message_complete') {
-        // Write response
-        console.log(event.content);
-    }
-    else if (event.type === 'response_output') {
+    if (event.type === 'response_output') {
         // Save out to continue conversation
         messages.push(event.message);
     }

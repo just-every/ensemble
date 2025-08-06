@@ -109,7 +109,7 @@ export const MODEL_CLASSES = {
             'o4-mini-low', // OpenAI
             'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
-            'openai/gpt-oss-120b-max', // OpenAI OSS/OpenRouter
+            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -137,7 +137,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-flash-preview-05-20-max', // Google
             'qwen3-coder', // Qwen/OpenRouter
             'grok-4-medium', // X.AI
-            'openai/gpt-oss-120b-max', // OpenAI OSS/OpenRouter
+            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
