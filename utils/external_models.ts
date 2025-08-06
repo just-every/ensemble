@@ -17,7 +17,7 @@ const modelClassOverrides = new Map<string, Partial<ModelClass>>();
 /**
  * Register an external model with ensemble
  *
- * @param model - The model configuration including id, provider, cost, and features
+ * @param model - The model configuration including id and provider (cost and features are optional)
  * @param provider - The provider instance that handles this model
  *
  * @example
@@ -26,8 +26,15 @@ const modelClassOverrides = new Map<string, Partial<ModelClass>>();
  *
  * const myProvider = new MyCustomProvider();
  *
+ * // Minimal registration - cost and features will use defaults
  * registerExternalModel({
  *   id: 'my-custom-model',
+ *   provider: 'custom'
+ * }, myProvider);
+ *
+ * // Or with explicit cost and features
+ * registerExternalModel({
+ *   id: 'my-custom-model-2',
  *   provider: 'custom',
  *   cost: {
  *     input_per_million: 5,
@@ -44,8 +51,26 @@ const modelClassOverrides = new Map<string, Partial<ModelClass>>();
 export function registerExternalModel(model: ModelEntry, provider: ModelProvider): void {
     const modelId = model.id;
 
-    // Store the model entry
-    externalModels.set(modelId, model);
+    // Apply defaults for cost and features if not provided
+    const modelWithDefaults: ModelEntry = {
+        ...model,
+        cost: model.cost || {
+            input_per_million: 0,
+            output_per_million: 0,
+        },
+        features: model.features || {
+            context_length: 1000000, // Default to 1M context
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            input_modality: ['text', 'image', 'audio', 'video'],
+            output_modality: ['text'],
+            max_output_tokens: 100000,
+        },
+    };
+
+    // Store the model entry with defaults
+    externalModels.set(modelId, modelWithDefaults);
 
     // Store the provider if not already registered
     if (!externalProviders.has(model.provider)) {

@@ -527,7 +527,7 @@ export class MessageHistory {
         const { findModel } = await import('../data/model_data.js');
         const model = findModel(modelId);
 
-        if (!model || !model.features.context_length) {
+        if (!model || !model.features?.context_length) {
             return;
         }
 

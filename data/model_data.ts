@@ -67,6 +67,7 @@ export const MODEL_CLASSES = {
             'grok-3-mini', // X.AI
             'meta-llama/llama-4-scout', // Meta/OpenRouter
             'mistral/ministral-8b', // Mistral/OpenRouter
+            'openai/gpt-oss-20b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -79,10 +80,11 @@ export const MODEL_CLASSES = {
             'o4-mini-high', // OpenAI
             'o3-pro', // OpenAI
             'o3-high', // OpenAI
-            'claude-opus-4-20250514-max', // Anthropic
+            'claude-opus-4-1-20250805-max', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
             'claude-3-7-sonnet-latest-max', // Anthropic
             'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
+            'qwen3-235b-a22b-thinking-2507', // Qwen/OpenRouter
             'grok-4', // X.AI
         ],
         random: true,
@@ -94,6 +96,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'grok-3-mini-fast', // X.AI
             'o3-low', // OpenAI
+            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -106,6 +109,7 @@ export const MODEL_CLASSES = {
             'o4-mini-low', // OpenAI
             'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
+            'openai/gpt-oss-120b-max', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -125,11 +129,15 @@ export const MODEL_CLASSES = {
     // Programming models
     code: {
         models: [
-            'codex-mini-latest', // OpenAI
-            'claude-opus-4-20250514-medium', // Anthropic
+            'claude-opus-4-1-20250805-medium', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
             'o3-high', // OpenAI
-            'gemini-2.5-flash-preview-05-20-medium', // Google
+            'gpt-4.1-max', // OpenAI
+            'gemini-2.5-pro-preview-06-05-medium', // Google
+            'gemini-2.5-flash-preview-05-20-max', // Google
+            'qwen3-coder', // Qwen/OpenRouter
+            'grok-4-medium', // X.AI
+            'openai/gpt-oss-120b-max', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -163,7 +171,7 @@ export const MODEL_CLASSES = {
             'o3-medium', // OpenAI
             'gemini-2.5-flash-preview-05-20-max', // Google
             'gemini-2.5-pro-preview-06-05', // Google
-            'claude-opus-4-20250514-low', // Anthropic
+            'claude-opus-4-1-20250805-low', // Anthropic
             'claude-sonnet-4-20250514-max', // Anthropic
             'grok-4', // X.AI
             //'grok-2-vision', // X.AI
@@ -946,8 +954,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     // Claude Opus 4
     {
-        id: 'claude-opus-4-20250514',
-        aliases: ['claude-opus-4', 'claude-4-opus'],
+        id: 'claude-opus-4-1-20250805',
+        aliases: ['claude-opus-4', 'claude-4-opus', 'claude-opus-4-20250514'],
         provider: 'anthropic',
         cost: {
             input_per_million: 15.0,
@@ -1722,6 +1730,104 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 85, // Higher score for reasoning model
         description: 'DeepSeek-R1 advanced reasoning model with extended output and time-based pricing',
+    },
+
+    // GPT OSS 120B - Open source model via OpenRouter
+    {
+        id: 'gpt-oss-120b',
+        aliases: ['openai/gpt-oss-120b'],
+        provider: 'openrouter',
+        openrouter_id: 'openai/gpt-oss-120b',
+        cost: {
+            input_per_million: 0.1,
+            output_per_million: 0.5,
+        },
+        features: {
+            context_length: 131072,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 100000,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        score: 88,
+        description: 'GPT OSS 120B - MoE model with 5.1B active params, optimized for single H100 GPU',
+    },
+
+    // GPT OSS 20B - Open source model via OpenRouter
+    {
+        id: 'gpt-oss-20b',
+        aliases: ['openai/gpt-oss-20b'],
+        provider: 'openrouter',
+        openrouter_id: 'openai/gpt-oss-20b',
+        cost: {
+            input_per_million: 0.05,
+            output_per_million: 0.2,
+        },
+        features: {
+            context_length: 131072,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 100000,
+        },
+        class: 'standard',
+        score: 82,
+        description: 'GPT OSS 20B - MoE model with 3.6B active params, optimized for consumer hardware',
+    },
+
+    // Qwen3 235B A22B Thinking
+    {
+        id: 'qwen3-235b-a22b-thinking-2507',
+        aliases: ['qwen/qwen3-235b-a22b-thinking-2507'],
+        provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3-235b-a22b-thinking-2507',
+        cost: {
+            input_per_million: 0.078,
+            output_per_million: 0.312,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 81920,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        score: 92,
+        description: 'Qwen3 235B Thinking - MoE model with 22B active params, specialized for complex reasoning',
+    },
+
+    // Qwen3 Coder
+    {
+        id: 'qwen3-coder',
+        aliases: ['qwen/qwen3-coder'],
+        provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3-coder',
+        cost: {
+            input_per_million: 0.2,
+            output_per_million: 0.8,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 100000,
+        },
+        class: 'code',
+        score: 90,
+        description: 'Qwen3 Coder - 480B MoE model with 35B active params, optimized for agentic coding tasks',
     },
 ];
 

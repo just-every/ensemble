@@ -33,6 +33,9 @@ import { MODEL_CLASSES, ModelClassID, ModelProviderID } from '../data/model_data
 
 // Provider mapping by model prefix
 const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
+    // OpenRouter models (must come before OpenAI to take precedence)
+    'gpt-oss-': openRouterProvider, // Open source GPT models via OpenRouter
+
     // OpenAI models
     'gpt-': openaiProvider,
     o1: openaiProvider,
@@ -109,6 +112,11 @@ export function getProviderFromModel(model: string): ModelProviderID {
         if (externalModel) {
             return externalModel.provider;
         }
+    }
+
+    // Special case: gpt-oss models go through OpenRouter
+    if (model.startsWith('gpt-oss-')) {
+        return 'openrouter';
     }
 
     if (

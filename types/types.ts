@@ -627,8 +627,8 @@ export interface ModelEntry {
     id: string; // Model identifier used in API calls
     aliases?: string[]; // Alternative names for the model
     provider: ModelProviderID; // Provider (openai, anthropic, google, xai, deepseek)
-    cost: ModelCost; // Cost information using the updated structure
-    features: ModelFeatures; // Feature information for the model
+    cost?: ModelCost; // Cost information using the updated structure (optional - defaults to zero cost)
+    features?: ModelFeatures; // Feature information for the model (optional - defaults to all features)
     class?: string; // Model class as a string to avoid strict typing issues
     description?: string; // Short description of the model's capabilities
     rate_limit_fallback?: string; // Fallback model ID in case of rate limit errors

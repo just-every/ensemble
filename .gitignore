@@ -36,6 +36,7 @@ coverage/
 *.temp
 
 # Cache directories
+.cache/
 .cache/demo/dist-react/
 
 # Test files for manual testing
