@@ -76,7 +76,7 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat');
             expect(model).not.toBe('grok-3-mini-fast');
             // Should only select from scored models that aren't disabled
-            expect(['gpt-4.1', 'gemini-2.5-flash-preview-05-20-low', 'claude-3-5-haiku-latest']).toContain(model);
+            expect(['gpt-5-mini', 'gemini-2.5-flash-preview-05-20', 'claude-3-5-haiku-latest']).toContain(model);
         }
     });
 
