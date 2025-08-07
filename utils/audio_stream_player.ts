@@ -297,7 +297,7 @@ export class AudioStreamPlayer {
                               ? 'audio/flac'
                               : 'audio/mpeg';
 
-                const blob = new Blob(this.fallbackChunks, { type: mimeType });
+                const blob = new Blob(this.fallbackChunks as BlobPart[], { type: mimeType });
                 const url = URL.createObjectURL(blob);
 
                 this.fallbackAudio = new Audio();

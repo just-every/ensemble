@@ -49,11 +49,10 @@ export const MODEL_CLASSES = {
     // Standard models with good all-around capabilities
     standard: {
         models: [
-            'gpt-4.1', // OpenAI
-            'gemini-2.5-flash-preview-05-20-low', // Google
+            'gpt-5-mini', // OpenAI
+            'gemini-2.5-flash-preview-05-20', // Google
             'claude-3-5-haiku-latest', // Anthropic
-            'grok-3-mini-fast', // X.AI
-            'deepseek-chat', // DeepSeek
+            'grok-3-mini', // X.AI
         ],
         random: true,
     },
@@ -61,11 +60,10 @@ export const MODEL_CLASSES = {
     // Mini/smaller models - faster but less capable
     mini: {
         models: [
-            'gpt-4.1-nano', // OpenAI
-            'claude-3-5-haiku-latest', // Anthropic
+            'gpt-5-nano', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
+            'claude-3-5-haiku-latest', // Anthropic
             'grok-3-mini', // X.AI
-            'meta-llama/llama-4-scout', // Meta/OpenRouter
             'mistral/ministral-8b', // Mistral/OpenRouter
             'openai/gpt-oss-20b', // OpenAI OSS/OpenRouter
         ],
@@ -75,17 +73,12 @@ export const MODEL_CLASSES = {
     // Advanced reasoning models
     reasoning: {
         models: [
+            'gpt-5-max', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
-            'gemini-2.5-flash-preview-05-20-max', // Google
-            'o4-mini-high', // OpenAI
-            'o3-pro', // OpenAI
-            'o3-high', // OpenAI
             'claude-opus-4-1-20250805-max', // Anthropic
-            'claude-sonnet-4-20250514-max', // Anthropic
-            'claude-3-7-sonnet-latest-max', // Anthropic
+            'grok-4', // X.AI
             'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
             'qwen3-235b-a22b-thinking-2507', // Qwen/OpenRouter
-            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -94,7 +87,7 @@ export const MODEL_CLASSES = {
     reasoning_mini: {
         models: [
             'gemini-2.5-flash-preview-05-20-medium', // Google
-            'grok-3-mini-fast', // X.AI
+            'grok-3-mini', // X.AI
             'o3-low', // OpenAI
             'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
@@ -104,12 +97,11 @@ export const MODEL_CLASSES = {
     // Monologue models
     monologue: {
         models: [
+            'gpt-5-chat-latest', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-medium', // Google
-            'o4-mini-low', // OpenAI
             'o3-medium', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
-            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -117,11 +109,12 @@ export const MODEL_CLASSES = {
     // Metacognition models
     metacognition: {
         models: [
+            'gpt-5', // OpenAI
+            'gpt-5-mini', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-high', // Google
-            'o3-high', // OpenAI
             'claude-sonnet-4-20250514-medium', // Anthropic
-            'grok-3-mini-fast', // X.AI
+            'grok-3-mini', // X.AI
         ],
         random: true,
     },
@@ -129,15 +122,14 @@ export const MODEL_CLASSES = {
     // Programming models
     code: {
         models: [
-            'claude-opus-4-1-20250805-medium', // Anthropic
-            'claude-sonnet-4-20250514-max', // Anthropic
+            'gpt-5', // OpenAI
             'o3-high', // OpenAI
-            'gpt-4.1-max', // OpenAI
             'gemini-2.5-pro-preview-06-05-medium', // Google
             'gemini-2.5-flash-preview-05-20-max', // Google
-            'qwen3-coder', // Qwen/OpenRouter
+            'claude-opus-4-1-20250805-medium', // Anthropic
+            'claude-sonnet-4-20250514-max', // Anthropic
             'grok-4-medium', // X.AI
-            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
+            'qwen3-coder', // Qwen/OpenRouter
         ],
         random: true,
     },
@@ -145,8 +137,8 @@ export const MODEL_CLASSES = {
     // Writing models - optimized for conversation and text generation
     writing: {
         models: [
+            'gpt-5-mini', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
-            'gpt-4.1-mini', // OpenAI
         ],
         random: true,
     },
@@ -155,10 +147,8 @@ export const MODEL_CLASSES = {
     // High quality, low cost allows this to be used heavily and reduce token usage for other models
     summary: {
         models: [
-            //'meta-llama/llama-4-scout', // Meta/OpenRouter
+            'gpt-5-mini', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
-            'gpt-4.1-mini', // OpenAI
-            //'mistral/ministral-8b', // Mistral/OpenRouter
         ],
         random: true,
     },
@@ -166,16 +156,10 @@ export const MODEL_CLASSES = {
     // Models with vision capabilities
     vision: {
         models: [
-            //'computer-use-preview',     // OpenAI
-            'o4-mini-medium', // OpenAI
-            'o3-medium', // OpenAI
-            'gemini-2.5-flash-preview-05-20-max', // Google
+            'gpt-5', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'claude-opus-4-1-20250805-low', // Anthropic
-            'claude-sonnet-4-20250514-max', // Anthropic
             'grok-4', // X.AI
-            //'grok-2-vision', // X.AI
-            //'gpt-4.1', // OpenAI
         ],
         random: true,
     },
@@ -183,9 +167,9 @@ export const MODEL_CLASSES = {
     // Mini models with vision capabilities
     vision_mini: {
         models: [
-            'gpt-4.1', // OpenAI
+            'gpt-5-mini', // OpenAI
+            'gpt-5-nano', // OpenAI
             'o3-low', // OpenAI
-            'o4-mini-low', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
             'gemini-2.5-flash-preview-05-20', // Google
             'claude-sonnet-4-20250514-low', // Anthropic
@@ -196,8 +180,8 @@ export const MODEL_CLASSES = {
     // Models with search capabilities
     search: {
         models: [
-            'gpt-4.1', // OpenAI
-            'deepseek-reasoner', // DeepSeek
+            'gpt-5-mini', // OpenAI
+            'o3-deep-research', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
             'perplexity/sonar-deep-research', // Perplexity
         ],
@@ -458,8 +442,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
 
     {
-        id: 'grok-3-fast',
-        aliases: ['grok-3-fast-2025-04-11'],
+        id: 'grok-3',
+        aliases: ['grok-3-2025-04-11'],
         provider: 'xai',
         cost: {
             input_per_million: 5.0,
@@ -510,8 +494,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
 
     {
-        id: 'grok-3-mini-fast',
-        aliases: ['grok-3-mini-fast-2025-04-11'],
+        id: 'grok-3-mini',
+        aliases: ['grok-3-mini-2025-04-11'],
         provider: 'xai',
         cost: {
             input_per_million: 0.6,
@@ -655,6 +639,112 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Latest premium GPT model from OpenAI',
     },
 
+    // GPT-5 models
+    {
+        id: 'gpt-5',
+        aliases: ['gpt-5-2025-08-07'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            cached_input_per_million: 0.13,
+            output_per_million: 10.0,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 95,
+        scores: {
+            monologue: 98,
+            code: 95,
+            reasoning: 92,
+        },
+        description: 'The best model for coding and agentic tasks across domains',
+    },
+    {
+        id: 'gpt-5-mini',
+        aliases: ['gpt-5-mini-2025-08-07'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.25,
+            cached_input_per_million: 0.03,
+            output_per_million: 2.0,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 88,
+        scores: {
+            monologue: 90,
+            code: 87,
+            reasoning: 85,
+        },
+        description: 'A faster, more cost-efficient version of GPT-5 for well-defined tasks',
+    },
+    {
+        id: 'gpt-5-nano',
+        aliases: ['gpt-5-nano-2025-08-07'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.05,
+            cached_input_per_million: 0.01,
+            output_per_million: 0.4,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'mini',
+        score: 78,
+        scores: {
+            monologue: 80,
+            code: 76,
+            reasoning: 75,
+        },
+        description: 'Fastest, most cost-efficient version of GPT-5',
+    },
+    {
+        id: 'gpt-5-chat-latest',
+        aliases: ['gpt-5-chat'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            cached_input_per_million: 0.13,
+            output_per_million: 10.0,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 95,
+        scores: {
+            monologue: 98,
+            code: 95,
+            reasoning: 92,
+        },
+        description: 'GPT-5 model used in ChatGPT',
+    },
+
     // GPT-4o models
     {
         id: 'gpt-4o',
@@ -780,6 +870,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 79, // GPQA Diamond
         },
         description: 'Most powerful reasoning model',
+    },
+    {
+        id: 'o3-deep-research',
+        aliases: ['o3-deep-research-2025-06-26'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 10.0,
+            cached_input_per_million: 2.5,
+            output_per_million: 40.0,
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 90,
+        scores: {
+            monologue: 92,
+            code: 89,
+            reasoning: 88,
+        },
+        description: 'Our most powerful deep research model',
     },
     {
         id: 'o1',
