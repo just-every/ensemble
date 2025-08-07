@@ -36,6 +36,26 @@ import type { WebSocket } from 'ws';
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
 
+/**
+ * Helper function to check if a model requires reasoning support
+ * This includes O-series models (o1, o3, etc.) and GPT models version 5 and above
+ */
+function requiresReasoning(modelName: string): boolean {
+    // O-series models (o1, o3, etc.)
+    if (modelName.startsWith('o')) return true;
+
+    // GPT models version 5 and above
+    if (modelName.startsWith('gpt-')) {
+        const match = modelName.match(/^gpt-(\d+)/);
+        if (match) {
+            const version = parseInt(match[1], 10);
+            return version >= 5;
+        }
+    }
+
+    return false;
+}
+
 // Convert our tool definition to OpenAI's format
 /**
  * Process a JSON schema to make it compatible with OpenAI's requirements
@@ -903,8 +923,8 @@ export class OpenAIProvider extends BaseModelProvider {
                     // Use a complete type assertion to bypass TypeScript's type checking for this object
                     // The OpenAI API expects a structure different from our ResponseInputItem types
 
-                    // Only convert to reasoning if both current model and source model are o-class
-                    if (model.startsWith('o') && message.thinking_id && model === originalModel) {
+                    // Only convert to reasoning if both current model and source model require reasoning
+                    if (requiresReasoning(model) && message.thinking_id && model === originalModel) {
                         //console.log(`[OpenAI] Processing thinking message with ID: ${message.thinking_id}`, message);
                         const match = message.thinking_id.match(/^(rs_[A-Za-z0-9]+)-(\d)$/);
                         if (match) {
@@ -1078,8 +1098,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
             }
 
-            // Default reasoning for o-models if no suffix
-            if (model.startsWith('o') && !hasEffortSuffix) {
+            // Default reasoning for models that require it
+            if (requiresReasoning(model) && !hasEffortSuffix) {
                 requestParams.reasoning = {
                     effort: 'high',
                     summary: 'auto',
