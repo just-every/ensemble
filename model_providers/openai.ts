@@ -1203,6 +1203,17 @@ export class OpenAIProvider extends BaseModelProvider {
                 };
             }
 
+            // Add OpenAI-specific settings
+            if (settings?.verbosity) {
+                // Cast to any to add OpenAI-specific parameter
+                (requestParams as any).verbosity = settings.verbosity;
+            }
+
+            if (settings?.service_tier) {
+                // Cast to any to add OpenAI-specific parameter
+                (requestParams as any).service_tier = settings.service_tier;
+            }
+
             // Add tools if provided
             if (tools && tools.length > 0) {
                 // Convert our tools to OpenAI format

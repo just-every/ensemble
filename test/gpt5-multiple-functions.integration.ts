@@ -9,132 +9,134 @@ import { ensembleRequest } from '../dist/core/ensemble_request.js';
 import { AgentDefinition, ToolFunction } from '../dist/types/types.js';
 
 describe('GPT-5 Multiple Function Calls', () => {
-    it('should handle multiple function calls in a reasoning block', { skip: !process.env.OPENAI_API_KEY }, async () => {
-
-        // Define two simple test functions
-        const tools: ToolFunction[] = [
-            {
-                definition: {
-                    function: {
-                        name: 'get_weather',
-                        description: 'Get the current weather in a location',
-                        parameters: {
-                            type: 'object',
-                            properties: {
-                                location: {
-                                    type: 'string',
-                                    description: 'The city and state, e.g. San Francisco, CA',
+    it(
+        'should handle multiple function calls in a reasoning block',
+        { skip: !process.env.OPENAI_API_KEY },
+        async () => {
+            // Define two simple test functions
+            const tools: ToolFunction[] = [
+                {
+                    definition: {
+                        function: {
+                            name: 'get_weather',
+                            description: 'Get the current weather in a location',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    location: {
+                                        type: 'string',
+                                        description: 'The city and state, e.g. San Francisco, CA',
+                                    },
                                 },
+                                required: ['location'],
                             },
-                            required: ['location'],
                         },
                     },
-                },
-                handler: async (args: any) => {
-                    return {
-                        temperature: 72,
-                        condition: 'sunny',
-                        location: args.location,
-                    };
-                },
-            },
-            {
-                definition: {
-                    function: {
-                        name: 'get_time',
-                        description: 'Get the current time in a timezone',
-                        parameters: {
-                            type: 'object',
-                            properties: {
-                                timezone: {
-                                    type: 'string',
-                                    description: 'The timezone, e.g. America/New_York',
-                                },
-                            },
-                            required: ['timezone'],
-                        },
+                    handler: async (args: any) => {
+                        return {
+                            temperature: 72,
+                            condition: 'sunny',
+                            location: args.location,
+                        };
                     },
                 },
-                handler: async (args: any) => {
-                    const date = new Date();
-                    return {
-                        time: date.toLocaleTimeString('en-US', {
-                            timeZone: args.timezone,
-                            hour12: true,
-                        }),
-                        timezone: args.timezone,
-                    };
+                {
+                    definition: {
+                        function: {
+                            name: 'get_time',
+                            description: 'Get the current time in a timezone',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    timezone: {
+                                        type: 'string',
+                                        description: 'The timezone, e.g. America/New_York',
+                                    },
+                                },
+                                required: ['timezone'],
+                            },
+                        },
+                    },
+                    handler: async (args: any) => {
+                        const date = new Date();
+                        return {
+                            time: date.toLocaleTimeString('en-US', {
+                                timeZone: args.timezone,
+                                hour12: true,
+                            }),
+                            timezone: args.timezone,
+                        };
+                    },
                 },
-            },
-        ];
+            ];
 
-        const agent: AgentDefinition = {
-            agent_id: 'test-gpt5-functions',
-            tools,
-            modelSettings: {
-                temperature: 0.7,
-            },
-        };
+            const agent: AgentDefinition = {
+                agent_id: 'test-gpt5-functions',
+                tools,
+                modelSettings: {
+                    temperature: 0.7,
+                },
+            };
 
-        const messages = [
-            {
-                type: 'message' as const,
-                role: 'user' as const,
-                content:
-                    'Please get the weather in San Francisco, CA and the current time in America/New_York timezone. Then tell me if it would be a good time for a video call between the two locations.',
-            },
-        ];
+            const messages = [
+                {
+                    type: 'message' as const,
+                    role: 'user' as const,
+                    content:
+                        'Please get the weather in San Francisco, CA and the current time in America/New_York timezone. Then tell me if it would be a good time for a video call between the two locations.',
+                },
+            ];
 
-        let hasReceivedToolCalls = false;
-        let toolCallCount = 0;
-        let hasReceivedFinalMessage = false;
-        let reasoningContent = '';
-        const errors: string[] = [];
+            let hasReceivedToolCalls = false;
+            let toolCallCount = 0;
+            let hasReceivedFinalMessage = false;
+            let reasoningContent = '';
+            const errors: string[] = [];
 
-        try {
-            // Use gpt-5-nano for testing (cheapest GPT-5 model)
-            const response = await ensembleRequest(messages, 'gpt-5-nano', agent, undefined, event => {
-                // Track events
-                if (event.type === 'tool_start') {
-                    hasReceivedToolCalls = true;
-                    toolCallCount++;
-                    console.log(`Tool call ${toolCallCount}: ${event.tool_call.function.name}`);
-                } else if (event.type === 'message_delta' && event.thinking_content) {
-                    reasoningContent += event.thinking_content;
-                } else if (event.type === 'message_complete' && event.content && event.content.length > 10) {
-                    hasReceivedFinalMessage = true;
-                    console.log('Final message received:', event.content.substring(0, 100) + '...');
-                } else if (event.type === 'error') {
-                    errors.push(event.error);
-                    console.error('Error during request:', event.error);
+            try {
+                // Use gpt-5-nano for testing (cheapest GPT-5 model)
+                const response = await ensembleRequest(messages, 'gpt-5-nano', agent, undefined, event => {
+                    // Track events
+                    if (event.type === 'tool_start') {
+                        hasReceivedToolCalls = true;
+                        toolCallCount++;
+                        console.log(`Tool call ${toolCallCount}: ${event.tool_call.function.name}`);
+                    } else if (event.type === 'message_delta' && event.thinking_content) {
+                        reasoningContent += event.thinking_content;
+                    } else if (event.type === 'message_complete' && event.content && event.content.length > 10) {
+                        hasReceivedFinalMessage = true;
+                        console.log('Final message received:', event.content.substring(0, 100) + '...');
+                    } else if (event.type === 'error') {
+                        errors.push(event.error);
+                        console.error('Error during request:', event.error);
+                    }
+                });
+
+                // Verify the response
+                expect(errors).toHaveLength(0);
+                expect(hasReceivedToolCalls).toBe(true);
+                expect(toolCallCount).toBe(2); // Should have called both functions
+                expect(hasReceivedFinalMessage).toBe(true);
+                expect(response.content).toBeTruthy();
+                expect(response.content.length).toBeGreaterThan(20);
+
+                // Log reasoning if present
+                if (reasoningContent) {
+                    console.log('Model reasoning:', reasoningContent.substring(0, 200) + '...');
                 }
-            });
 
-            // Verify the response
-            expect(errors).toHaveLength(0);
-            expect(hasReceivedToolCalls).toBe(true);
-            expect(toolCallCount).toBe(2); // Should have called both functions
-            expect(hasReceivedFinalMessage).toBe(true);
-            expect(response.content).toBeTruthy();
-            expect(response.content.length).toBeGreaterThan(20);
-
-            // Log reasoning if present
-            if (reasoningContent) {
-                console.log('Model reasoning:', reasoningContent.substring(0, 200) + '...');
+                console.log('Test passed! GPT-5 successfully handled multiple function calls.');
+            } catch (error) {
+                // Check if it's the specific error we're trying to fix
+                if (error instanceof Error && error.message.includes("required 'reasoning' item")) {
+                    throw new Error('GPT-5 reasoning/function call ordering error still present: ' + error.message);
+                }
+                throw error;
             }
-
-            console.log('Test passed! GPT-5 successfully handled multiple function calls.');
-        } catch (error) {
-            // Check if it's the specific error we're trying to fix
-            if (error instanceof Error && error.message.includes("required 'reasoning' item")) {
-                throw new Error('GPT-5 reasoning/function call ordering error still present: ' + error.message);
-            }
-            throw error;
         }
-    });
+    );
 
     it('should handle function calls with complex message history', { skip: !process.env.OPENAI_API_KEY }, async () => {
-
         // Simple calculator function for testing
         const tools: ToolFunction[] = [
             {

@@ -108,6 +108,10 @@ export interface ModelSettings {
     tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
+
+    // OpenAI-specific settings (will be ignored by other providers)
+    verbosity?: 'low' | 'medium' | 'high'; // Controls response verbosity (OpenAI only)
+    service_tier?: 'auto' | 'default' | 'flex' | 'priority'; // Processing tier for the request (OpenAI only)
 }
 
 /**
