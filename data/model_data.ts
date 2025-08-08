@@ -157,6 +157,7 @@ export const MODEL_CLASSES = {
     vision: {
         models: [
             'gpt-5', // OpenAI
+            'o3-high', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'claude-opus-4-1-20250805-low', // Anthropic
             'grok-4', // X.AI
@@ -167,8 +168,7 @@ export const MODEL_CLASSES = {
     // Mini models with vision capabilities
     vision_mini: {
         models: [
-            'gpt-5-mini', // OpenAI
-            'gpt-5-nano', // OpenAI
+            'gpt-5-mini-medium', // OpenAI
             'o3-low', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
             'gemini-2.5-flash-preview-05-20', // Google

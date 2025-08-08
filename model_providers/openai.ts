@@ -851,6 +851,11 @@ export class OpenAIProvider extends BaseModelProvider {
             // Use 'any' type assertion to avoid TypeScript errors when adding custom structures
             let input: any[] = [];
 
+            // For GPT-5 and reasoning models, we need to group reasoning blocks with their function calls
+            // and move function outputs after all related function calls
+            const pendingFunctionOutputs: any[] = [];
+            let currentReasoningId: string | null = null;
+
             // Process all messages
             for (const messageFull of messages) {
                 let message = { ...messageFull };
@@ -932,6 +937,9 @@ export class OpenAIProvider extends BaseModelProvider {
                             const reasoningId = match[1];
                             const summaryIndex = parseInt(match[2], 10);
 
+                            // Track that we're in a reasoning block
+                            currentReasoningId = reasoningId;
+
                             // Format the summary text content
                             const summaryText =
                                 typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
@@ -993,6 +1001,10 @@ export class OpenAIProvider extends BaseModelProvider {
 
                 // Handle function call messages
                 if (message.type === 'function_call') {
+                    // Check if this function call is associated with current reasoning
+                    const isAssociatedWithReasoning =
+                        currentReasoningId && message.id && message.id.startsWith('fc_') && model === originalModel;
+
                     // Check if id doesn't start with 'fc_', and remove it if so
                     if (message.id && (!message.id.startsWith('fc_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'fc_', remove it
@@ -1009,6 +1021,22 @@ export class OpenAIProvider extends BaseModelProvider {
 
                     // Add the message (potentially without id)
                     input.push(message);
+
+                    // If this is NOT part of a reasoning block, flush any pending outputs
+                    if (!isAssociatedWithReasoning && pendingFunctionOutputs.length > 0) {
+                        for (const output of pendingFunctionOutputs) {
+                            input = await appendMessageWithImage(
+                                model,
+                                input,
+                                output.messageToAdd,
+                                'output',
+                                addImagesToInput,
+                                output.description
+                            );
+                        }
+                        pendingFunctionOutputs.length = 0;
+                        currentReasoningId = null;
+                    }
                     continue;
                 }
 
@@ -1017,20 +1045,45 @@ export class OpenAIProvider extends BaseModelProvider {
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     const { name, id, ...messageToAdd } = message; // Original code removes name
 
-                    input = await appendMessageWithImage(
-                        model,
-                        input,
-                        messageToAdd,
-                        'output',
-                        addImagesToInput,
-                        `function call output of ${message.name}`
-                    );
+                    // If we're in a reasoning block, defer the output
+                    if (currentReasoningId && requiresReasoning(model)) {
+                        pendingFunctionOutputs.push({
+                            messageToAdd,
+                            description: `function call output of ${message.name}`,
+                        });
+                    } else {
+                        // Not in a reasoning block, add immediately
+                        input = await appendMessageWithImage(
+                            model,
+                            input,
+                            messageToAdd,
+                            'output',
+                            addImagesToInput,
+                            `function call output of ${message.name}`
+                        );
+                    }
                     continue;
                 }
 
                 // Handle standard message types (user, assistant, etc.)
                 // Also handle messages without a type property (treat as 'message' type)
                 if ((message.type ?? 'message') === 'message' && 'content' in message) {
+                    // Before adding a regular message, flush any pending function outputs
+                    if (pendingFunctionOutputs.length > 0) {
+                        for (const output of pendingFunctionOutputs) {
+                            input = await appendMessageWithImage(
+                                model,
+                                input,
+                                output.messageToAdd,
+                                'output',
+                                addImagesToInput,
+                                output.description
+                            );
+                        }
+                        pendingFunctionOutputs.length = 0;
+                        currentReasoningId = null;
+                    }
+
                     if ('id' in message && message.id && (!message.id.startsWith('msg_') || model !== originalModel)) {
                         // If id exists and doesn't start with 'msg_', remove it
                         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1046,6 +1099,20 @@ export class OpenAIProvider extends BaseModelProvider {
                         addImagesToInput
                     );
                     continue;
+                }
+            }
+
+            // Flush any remaining pending function outputs at the end
+            if (pendingFunctionOutputs.length > 0) {
+                for (const output of pendingFunctionOutputs) {
+                    input = await appendMessageWithImage(
+                        model,
+                        input,
+                        output.messageToAdd,
+                        'output',
+                        addImagesToInput,
+                        output.description
+                    );
                 }
             }
 
