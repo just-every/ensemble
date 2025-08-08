@@ -39,6 +39,7 @@ const BROWSER_HEIGHT = 1536;
 /**
  * Helper function to check if a model requires reasoning support
  * This includes O-series models (o1, o3, etc.) and GPT models version 5 and above
+ * This fix ensures GPT-5 and future models work correctly with function calls
  */
 function requiresReasoning(modelName: string): boolean {
     // O-series models (o1, o3, etc.)
