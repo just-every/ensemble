@@ -1126,7 +1126,16 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // Format the request according to the Responses API specification
-            let requestParams: ResponseCreateParamsStreaming = {
+            // Extend the official type with OpenAI-specific preview fields that
+            // are not yet in the SDK type definitions (e.g. `verbosity`, `service_tier`).
+            type ResponseCreateParamsStreamingExtended = ResponseCreateParamsStreaming & {
+                // Verbosity control (preview/undocumented in SDK typings)
+                verbosity?: 'low' | 'medium' | 'high';
+                // Service tier selection (allow string to avoid tight coupling)
+                service_tier?: string;
+            };
+
+            let requestParams: ResponseCreateParamsStreamingExtended = {
                 model,
                 stream: true,
                 user: 'magi',
@@ -1206,12 +1215,12 @@ export class OpenAIProvider extends BaseModelProvider {
             // Add OpenAI-specific settings
             if (settings?.verbosity) {
                 // Cast to any to add OpenAI-specific parameter
-                (requestParams as any).verbosity = settings.verbosity;
+                requestParams.verbosity = settings.verbosity;
             }
 
             if (settings?.service_tier) {
                 // Cast to any to add OpenAI-specific parameter
-                (requestParams as any).service_tier = settings.service_tier;
+                requestParams.service_tier = settings.service_tier;
             }
 
             // Add tools if provided
