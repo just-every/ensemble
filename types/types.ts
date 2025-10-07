@@ -273,6 +273,8 @@ export type StreamEventType =
     | 'file_start'
     | 'file_delta'
     | 'file_complete'
+    | 'image_start'
+    | 'image_complete'
     | 'cost_update'
     | 'system_status'
     | 'system_update'
@@ -338,7 +340,7 @@ export interface FileEvent extends StreamEventBase {
     type: 'file_start' | 'file_delta' | 'file_complete';
     message_id: string; // Added message_id for tracking deltas and completes
     mime_type?: string;
-    data_format: 'base64';
+    data_format: 'base64' | 'url';
     data: string;
     order?: number; // Optional order property for message sorting
 }
@@ -569,6 +571,14 @@ export type ModelProviderID =
     | 'deepseek'
     | 'openrouter'
     | 'elevenlabs'
+    | 'luma'
+    | 'ideogram'
+    | 'midjourney'
+    | 'stability'
+    | 'fireworks'
+    | 'fal'
+    | 'runway'
+    | 'bytedance'
     | 'test';
 
 // ================================================================
@@ -663,6 +673,8 @@ export interface ModelUsage {
     isFreeTierUsage?: boolean; // Flag for free tier usage override
     input_modality?: 'text' | 'audio' | 'video' | 'image'; // Modality of input tokens
     output_modality?: 'text' | 'audio' | 'video' | 'image'; // Modality of output tokens
+    /** Optional request correlation id; passed through in cost_update events */
+    request_id?: string;
 }
 
 // Interface for grouping models by class/capability
@@ -809,6 +821,24 @@ export interface ImageGenerationOpts {
 
     /** Control how closely the output matches the input image (OpenAI experimental) */
     input_fidelity?: 'low' | 'medium' | 'high';
+
+    /** When true, return an async stream of ProviderStreamEvent instead of a final array */
+    stream?: boolean;
+
+    // Provider-specific (BytePlus/Bytedance Seedream)
+    /** BytePlus: random seed control (if supported by model) */
+    seed?: number;
+    /** BytePlus: control batch image behavior for Seedream-4.0 */
+    sequential_image_generation?: 'auto' | 'disabled';
+    /** BytePlus: additional config for sequential image generation when set to 'auto' */
+    sequential_image_generation_options?: Record<string, unknown>;
+    /** BytePlus: whether to add AI watermark (default true) */
+    watermark?: boolean;
+    /** BytePlus: guidance scale (not supported by seedream-4.0; included for API compatibility) */
+    guidance_scale?: number;
+
+    /** Internal: correlation id used to tag cost events from providers */
+    request_id?: string;
 }
 
 // ================================================================

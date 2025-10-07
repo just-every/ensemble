@@ -29,6 +29,14 @@ import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
 import { elevenLabsProvider } from './elevenlabs.js';
+import { lumaProvider } from './luma.js';
+import { ideogramProvider } from './ideogram.js';
+import { midjourneyProvider } from './midjourney.js';
+import { fireworksProvider } from './fireworks.js';
+import { stabilityProvider } from './stability.js';
+import { falProvider } from './fal.js';
+import { runwayProvider } from './runway.js';
+import { bytedanceProvider } from './bytedance.js';
 import { MODEL_CLASSES, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
 
 // Provider mapping by model prefix
@@ -54,6 +62,39 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     // Gemini/Google models
     'gemini-': geminiProvider,
     'imagen-': geminiProvider, // Image generation models
+
+    // Luma Photon models
+    'luma-': lumaProvider,
+
+    // Ideogram models
+    'ideogram-': ideogramProvider,
+
+    // Midjourney (via third-party API)
+    'midjourney-': midjourneyProvider,
+
+    // Fireworks (FLUX family)
+    'flux-': fireworksProvider,
+    'fireworks-': fireworksProvider,
+
+    // Stability (Stable Image / SDXL / SD3.5)
+    'stability-': stabilityProvider,
+    'sdxl-': stabilityProvider,
+    sd3: stabilityProvider,
+
+    // Runway Gen-4 Image — official API
+    'runway-': runwayProvider,
+    // Legacy alias removed: 'runwayml-*' models should use 'runway-*' with the official Runway provider
+    'recraft-': falProvider,
+    'fal-': falProvider,
+
+    // ByteDance / BytePlus ModelArk (OpenAI-compatible)
+    'seedream-': bytedanceProvider,
+    'bytedance-': bytedanceProvider,
+    'byteplus-': bytedanceProvider,
+
+    // Adobe Firefly (removed)
+
+    // Replicate removed
 
     // Grok/X.AI models
     'grok-': grokProvider,
@@ -91,6 +132,17 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return !!process.env.ELEVENLABS_API_KEY;
         case 'test':
             return true; // Test provider is always valid
+        case 'stability':
+            return !!process.env.STABILITY_API_KEY;
+        case 'fireworks':
+            return !!process.env.FIREWORKS_API_KEY;
+        case 'fal':
+            return !!process.env.FAL_KEY;
+        case 'bytedance' as any:
+            return !!(process.env.ARK_API_KEY || process.env.BYTEPLUS_API_KEY || process.env.BYTEDANCE_API_KEY);
+        // Replicate removed
+        case 'runway' as any:
+            return !!process.env.RUNWAY_API_KEY && process.env.RUNWAY_API_KEY.startsWith('key_');
         default: {
             // Check if it's an external provider
             const externalProvider = getExternalProvider(provider);
@@ -135,6 +187,29 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'anthropic';
     } else if (model.startsWith('gemini-') || model.startsWith('imagen-')) {
         return 'google';
+    } else if (model.startsWith('firefly-')) {
+        // Firefly integration removed; treat as openrouter fallback
+        return 'openrouter';
+    } else if (model.startsWith('replicate-')) {
+        // Replicate support removed; treat as Runway to surface a clear error if model id invalid
+        return 'runway' as any;
+    } else if (model.startsWith('flux-') || model.startsWith('fireworks-')) {
+        return 'fireworks' as any;
+    } else if (model.startsWith('stability-') || model.startsWith('sdxl-') || model.startsWith('sd3')) {
+        return 'stability' as any;
+    } else if (model.startsWith('runway-')) {
+        return 'runway' as any;
+    } else if (model.startsWith('runwayml-')) {
+        // Legacy mapping removed. Direct users to 'runway-*' models.
+        // Keep as runway to fail later with clearer error if model id is wrong.
+        return 'runway' as any;
+    } else if (model.startsWith('seedream-') || model.startsWith('bytedance-') || model.startsWith('byteplus-')) {
+        return 'bytedance' as any;
+    } else if (
+        model.startsWith('recraft-') ||
+        model.startsWith('fal-')
+    ) {
+        return 'fal' as any;
     } else if (model.startsWith('grok-')) {
         return 'xai';
     } else if (model.startsWith('deepseek-')) {
@@ -438,7 +513,10 @@ export function getModelProvider(model?: string): ModelProvider {
         }
     }
 
-    // Default to openRouter if no specific provider found
+    // Default to FAL if available; else OpenRouter
+    if (isProviderKeyValid('fal' as any)) {
+        return falProvider;
+    }
     if (!isProviderKeyValid(getProviderFromModel('openrouter'))) {
         throw new Error(`No valid provider found for the model ${model}. Please check your API keys.`);
     }

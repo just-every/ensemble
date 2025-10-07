@@ -1,123 +1,130 @@
 {
-    "name": "@just-every/ensemble",
-    "version": "0.2.159",
-    "description": "LLM provider abstraction layer with unified streaming interface",
-    "type": "module",
-    "main": "./dist/cjs/index.cjs",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "files": [
-        "dist",
-        "package.json",
-        "README.md"
-    ],
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/just-every/ensemble.git"
+  "name": "@just-every/ensemble",
+  "version": "0.2.159",
+  "description": "LLM provider abstraction layer with unified streaming interface",
+  "type": "module",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/just-every/ensemble.git"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "openai",
+    "anthropic",
+    "gemini",
+    "deepseek",
+    "grok",
+    "streaming",
+    "model-providers"
+  ],
+  "author": "just-every",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/just-every/ensemble/issues"
+  },
+  "homepage": "https://github.com/just-every/ensemble#readme",
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs && npm run build:fixup",
+    "build:esm": "tsc -p .",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:fixup": "node scripts/fixup-cjs.js",
+    "demo": "npx tsx demo/start-all-demos.ts",
+    "demo:voice": "npm run build && npx tsx demo/voice-server.ts",
+    "demo:transcription": "npx tsx demo/transcription-server.ts",
+    "demo:request": "npx tsx demo/request-server.ts",
+    "demo:embed": "npx tsx demo/embed-server.ts",
+    "clean": "rimraf dist",
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint '**/*.{ts,tsx}'",
+    "lint:fix": "eslint '**/*.{ts,tsx}' --fix",
+    "docs": "typedoc",
+    "demo:live": "npm run build && npx tsx demo/live-server.ts",
+    "demo:listen": "npm run build && npx tsx demo/transcription-server.ts",
+    "smoke:gemini:image": "npm run build && node scripts/smoke_gemini_image.mjs",
+    "smoke:stability:image": "npm run build && node scripts/smoke_stability_image.mjs",
+    "smoke:luma:image": "npm run build && node scripts/smoke_luma_image.mjs",
+    "smoke:ideogram:image": "npm run build && node scripts/smoke_ideogram_image.mjs",
+    "smoke:runway:image": "npm run build && node scripts/smoke_runway_image.mjs",
+    "smoke:mj:image": "npm run build && node scripts/smoke_midjourney_image.mjs",
+    "smoke:images": "npm run smoke:gemini:image && npm run smoke:stability:image && npm run smoke:luma:image && npm run smoke:ideogram:image && npm run smoke:runway:image && npm run smoke:mj:image"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/cjs/index.cjs",
+      "types": "./dist/index.d.ts"
     },
-    "keywords": [
-        "llm",
-        "ai",
-        "openai",
-        "anthropic",
-        "gemini",
-        "deepseek",
-        "grok",
-        "streaming",
-        "model-providers"
-    ],
-    "author": "just-every",
-    "license": "MIT",
-    "bugs": {
-        "url": "https://github.com/just-every/ensemble/issues"
+    "./test": {
+      "import": "./dist/test.js",
+      "require": "./dist/cjs/test.cjs",
+      "types": "./dist/test.d.ts"
     },
-    "homepage": "https://github.com/just-every/ensemble#readme",
-    "scripts": {
-        "build": "npm run build:esm && npm run build:cjs && npm run build:fixup",
-        "build:esm": "tsc -p .",
-        "build:cjs": "tsc -p tsconfig.cjs.json",
-        "build:fixup": "node scripts/fixup-cjs.js",
-        "demo": "npx tsx demo/start-all-demos.ts",
-        "demo:voice": "npm run build && npx tsx demo/voice-server.ts",
-        "demo:transcription": "npx tsx demo/transcription-server.ts",
-        "demo:request": "npx tsx demo/request-server.ts",
-        "demo:embed": "npx tsx demo/embed-server.ts",
-        "clean": "rimraf dist",
-        "prepare": "npm run build",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage",
-        "lint": "eslint '**/*.{ts,tsx}'",
-        "lint:fix": "eslint '**/*.{ts,tsx}' --fix",
-        "docs": "typedoc",
-        "demo:live": "npm run build && npx tsx demo/live-server.ts",
-        "demo:listen": "npm run build && npx tsx demo/transcription-server.ts"
+    "./types": {
+      "import": "./dist/types.js",
+      "require": "./dist/cjs/types.cjs",
+      "types": "./dist/types.d.ts"
     },
-    "exports": {
-        ".": {
-            "import": "./dist/index.js",
-            "require": "./dist/cjs/index.cjs",
-            "types": "./dist/index.d.ts"
-        },
-        "./test": {
-            "import": "./dist/test.js",
-            "require": "./dist/cjs/test.cjs",
-            "types": "./dist/test.d.ts"
-        },
-        "./types": {
-            "import": "./dist/types.js",
-            "require": "./dist/cjs/types.cjs",
-            "types": "./dist/types.d.ts"
-        },
-        "./cost_tracker": {
-            "import": "./dist/cost_tracker.js",
-            "require": "./dist/cjs/cost_tracker.cjs",
-            "types": "./dist/cost_tracker.d.ts"
-        },
-        "./model_providers/*": {
-            "import": "./dist/model_providers/*.js",
-            "require": "./dist/cjs/model_providers/*.cjs",
-            "types": "./dist/model_providers/*.d.ts"
-        },
-        "./utils/*": {
-            "import": "./dist/utils/*.js",
-            "require": "./dist/cjs/utils/*.cjs",
-            "types": "./dist/utils/*.d.ts"
-        },
-        "./utils/audio_stream_player": {
-            "import": "./dist/utils/audio_stream_player.js",
-            "require": "./dist/cjs/utils/audio_stream_player.cjs",
-            "types": "./dist/utils/audio_stream_player.d.ts"
-        }
+    "./cost_tracker": {
+      "import": "./dist/cost_tracker.js",
+      "require": "./dist/cjs/cost_tracker.cjs",
+      "types": "./dist/cost_tracker.d.ts"
     },
-    "dependencies": {
-        "@anthropic-ai/sdk": "^0.58.0",
-        "@google/genai": "^1.11.0",
-        "openai": "^5.10.2",
-        "ws": "^8.18.3"
+    "./model_providers/*": {
+      "import": "./dist/model_providers/*.js",
+      "require": "./dist/cjs/model_providers/*.cjs",
+      "types": "./dist/model_providers/*.d.ts"
     },
-    "devDependencies": {
-        "@eslint/js": "^9.32.0",
-        "@types/node": "^24.1.0",
-        "@types/uuid": "^10.0.0",
-        "@vitest/coverage-v8": "^3.2.4",
-        "dotenv": "^17.2.1",
-        "eslint": "^9.32.0",
-        "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-prettier": "^5.5.3",
-        "express": "^5.1.0",
-        "open": "^10.2.0",
-        "rimraf": "^6.0.1",
-        "typedoc": "^0.28.8",
-        "typescript": "^5.8.3",
-        "typescript-eslint": "^8.38.0",
-        "vitest": "^3.2.4"
+    "./utils/*": {
+      "import": "./dist/utils/*.js",
+      "require": "./dist/cjs/utils/*.cjs",
+      "types": "./dist/utils/*.d.ts"
     },
-    "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "^4.46.1",
-        "sharp": "^0.34.3"
-    },
-    "publishConfig": {
-        "access": "public"
+    "./utils/audio_stream_player": {
+      "import": "./dist/utils/audio_stream_player.js",
+      "require": "./dist/cjs/utils/audio_stream_player.cjs",
+      "types": "./dist/utils/audio_stream_player.d.ts"
     }
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@google/genai": "^1.16.0",
+    "openai": "^5.16.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^24.3.0",
+    "@types/uuid": "^10.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "dotenv": "^17.2.1",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "express": "^5.1.0",
+    "open": "^10.2.0",
+    "rimraf": "^6.0.1",
+    "typedoc": "^0.28.12",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^3.2.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.50.0",
+    "sharp": "^0.34.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

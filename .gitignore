@@ -35,6 +35,10 @@ coverage/
 *.tmp
 *.temp
 
+# Local agent/test artifacts
+.artifacts/
+.code/
+
 # Cache directories
 .cache/
 .cache/demo/dist-react/

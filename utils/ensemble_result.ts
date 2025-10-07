@@ -43,8 +43,8 @@ export interface EnsembleResult {
     /** Files received during the stream */
     files?: Array<{
         mime_type?: string;
-        data: string;
-        data_format: 'base64';
+        data: string; // base64 string or URL when data_format==='url'
+        data_format: 'base64' | 'url';
     }>;
 
     /** Any errors that occurred */

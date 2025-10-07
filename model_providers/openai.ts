@@ -560,17 +560,25 @@ export class OpenAIProvider extends BaseModelProvider {
                         // Handle URL case - fetch the image
                         const imageResponse = await fetch(imageData);
                         const imageBuffer = await imageResponse.arrayBuffer();
+                        const ct = imageResponse.headers.get('content-type') || 'image/png';
 
                         // Convert to OpenAI file format with descriptive filename
                         imageFile = await toFile(new Uint8Array(imageBuffer), filename, {
-                            type: 'image/png',
+                            type: ct,
                         });
                     } else {
                         // Handle base64 string case
                         // Check if it's a data URL and extract the base64 part if needed
                         let base64Data = imageData;
+                        let mime = 'image/png';
                         if (imageData.startsWith('data:')) {
-                            base64Data = imageData.split(',')[1];
+                            const m = /^data:([^;]+);base64,(.+)$/i.exec(imageData);
+                            if (m) {
+                                mime = m[1] || 'image/png';
+                                base64Data = m[2];
+                            } else {
+                                base64Data = imageData.split(',')[1];
+                            }
                         }
 
                         // Convert base64 to binary
@@ -578,7 +586,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
                         // Convert to OpenAI file format with descriptive filename
                         imageFile = await toFile(new Uint8Array(binaryData), filename, {
-                            type: 'image/png',
+                            type: mime,
                         });
                     }
 
@@ -598,8 +606,8 @@ export class OpenAIProvider extends BaseModelProvider {
                     });
                 }
 
-                // Use the first image as the primary image and any additional ones as references
-                // OpenAI API currently uses only the first image for edit but may support multiple in the future
+                // OpenAI Images Edit supports multiple images. Ensure each file has a valid
+                // content-type; otherwise the API may reject specific entries.
                 const editParams: any = {
                     model,
                     prompt,
@@ -608,6 +616,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     background,
                     quality,
                     size,
+                    moderation: 'low',
                     output_format: 'png',
                 };
 
@@ -662,13 +671,16 @@ export class OpenAIProvider extends BaseModelProvider {
                 response = await this.client.images.generate(generateParams);
             }
 
-            // Track usage for cost calculation
+            // Track usage for cost calculation — use provider-derived cost (quality + size)
             if (response.data && response.data.length > 0) {
-                const perImageCost = this.getImageCost(model, quality);
+                const perImageCost = this.getImageCost(model, quality, size);
+                const totalCost = perImageCost * response.data.length;
 
                 costTracker.addUsage({
                     model,
                     image_count: response.data.length,
+                    cost: totalCost, // explicit cost to avoid registry fallback
+                    request_id: opts?.request_id,
                     metadata: {
                         quality,
                         size,
@@ -706,16 +718,15 @@ export class OpenAIProvider extends BaseModelProvider {
     /**
      * Get the cost of generating an image based on model and parameters
      */
-    private getImageCost(model: string, quality: string): number {
+    private getImageCost(model: string, quality: string, size: string): number {
         // GPT Image 1 pricing
         if (model === 'gpt-image-1') {
-            if (quality === 'high') {
-                return 0.08; // $0.080 per image for high quality
-            } else if (quality === 'medium' || quality === 'auto') {
-                return 0.04; // $0.040 per image for medium quality
-            } else if (quality === 'low') {
-                return 0.02; // $0.020 per image for low quality
-            }
+            // Prices vary by quality and output size
+            const isLarge = size === '1536x1024' || size === '1024x1536';
+            if (quality === 'high') return isLarge ? 0.25 : 0.167;
+            if (quality === 'low') return isLarge ? 0.016 : 0.011;
+            // medium/default auto
+            return isLarge ? 0.063 : 0.042;
         }
 
         // Default/unknown pricing

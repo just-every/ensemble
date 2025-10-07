@@ -1133,21 +1133,167 @@ export class GeminiProvider extends BaseModelProvider {
         let finalRequestId = requestId; // Define in outer scope
         try {
             // Extract options with defaults
-            model = model || 'imagen-3.0-generate-002';
+            // Default to Gemini's native image model (preview)
+            model = model || 'gemini-2.5-flash-image-preview';
             const numberOfImages = opts?.n || 1;
 
-            // Map quality to Imagen's aspectRatio if needed
+            // Map size to an aspect ratio where supported (Imagen API only)
             let aspectRatio = '1:1'; // square by default
-            if (opts?.size === 'landscape') {
-                aspectRatio = '16:9';
-            } else if (opts?.size === 'portrait') {
-                aspectRatio = '9:16';
-            }
+            if (opts?.size === 'landscape') aspectRatio = '16:9';
+            else if (opts?.size === 'portrait') aspectRatio = '9:16';
 
             console.log(
                 `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
 
+            // If using the Gemini 2.5 Flash Image (Preview) model, use generateContentStream
+            if (model.includes('gemini-2.5-flash-image-preview')) {
+                // Build a constraints hint to emulate feature parity (aspect ratio, size, style, background)
+                const constraints: string[] = [];
+                // Map size to human-friendly instructions
+                const sizeMap: Record<string, { ar?: string; px?: string }> = {
+                    square: { ar: '1:1', px: '1024x1024' },
+                    landscape: { ar: '16:9' },
+                    portrait: { ar: '9:16' },
+                    '256x256': { ar: '1:1', px: '256x256' },
+                    '512x512': { ar: '1:1', px: '512x512' },
+                    '1024x1024': { ar: '1:1', px: '1024x1024' },
+                    '1536x1024': { ar: '3:2', px: '1536x1024' },
+                    '1024x1536': { ar: '2:3', px: '1024x1536' },
+                    '1792x1024': { ar: '16:9', px: '1792x1024' },
+                    '1024x1792': { ar: '9:16', px: '1024x1792' },
+                };
+                const sm = opts?.size ? sizeMap[String(opts.size)] : undefined;
+                if (sm?.ar) constraints.push(`Aspect ratio: ${sm.ar}.`);
+                if (sm?.px) constraints.push(`Target size: ${sm.px} pixels (approximate).`);
+                if (opts?.style) constraints.push(`Style: ${opts.style}.`);
+                if (opts?.background) constraints.push(`Background: ${opts.background} (use transparency if supported).`);
+
+                const constraintText = constraints.length
+                    ? `\n\nImage constraints (please prioritize):\n- ${constraints.join('\n- ')}`
+                    : '';
+
+                const makeOne = async (): Promise<string[]> => {
+                    const requestParams: GenerateContentParameters = {
+                        model,
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [
+                                    // If source images provided, include them as parts first
+                                    ...(Array.isArray(opts?.source_images)
+                                        ? (opts!.source_images as any[])
+                                              .map((img: any) => typeof img === 'string' ? { _src: img } : img)
+                                              .map((it: any) => {
+                                                  const src: string = it?.data || it?._src || it;
+                                                  if (typeof src !== 'string') return null;
+                                                  if (src.startsWith('data:')) {
+                                                      // data URL
+                                                      const m = /^data:([^;]+);base64,(.+)$/i.exec(src);
+                                                      if (!m) return null;
+                                                      return {
+                                                          inlineData: {
+                                                              mimeType: m[1] || 'image/png',
+                                                              data: m[2],
+                                                          },
+                                                      };
+                                                  }
+                                                  // Assume http(s) URL
+                                                  return {
+                                                      fileData: {
+                                                          mimeType: 'image/*',
+                                                          fileUri: src,
+                                                      },
+                                                  };
+                                              })
+                                              .filter(Boolean)
+                                        : typeof opts?.source_images === 'string'
+                                        ? [
+                                              (() => {
+                                                  const s = String(opts?.source_images);
+                                                  if (s.startsWith('data:')) {
+                                                      const m = /^data:([^;]+);base64,(.+)$/i.exec(s);
+                                                      return m
+                                                          ? { inlineData: { mimeType: m[1] || 'image/png', data: m[2] } }
+                                                          : null;
+                                                  }
+                                                  return { fileData: { mimeType: 'image/*', fileUri: s } };
+                                              })(),
+                                          ].filter(Boolean)
+                                        : []),
+                                    { text: `${prompt}${constraintText}` },
+                                ],
+                            },
+                        ],
+                        config: {
+                            responseModalities: [Modality.IMAGE, Modality.TEXT],
+                        },
+                    };
+
+                    const loggedRequestId = log_llm_request(
+                        agent.agent_id || 'default',
+                        'gemini',
+                        model,
+                        requestParams,
+                        new Date(),
+                        requestId,
+                        agent.tags
+                    );
+                    finalRequestId = loggedRequestId;
+
+                    const response = await this.client.models.generateContentStream(requestParams);
+                    const images: string[] = [];
+
+                    for await (const chunk of response) {
+                        if (!chunk.candidates) continue;
+                        for (const cand of chunk.candidates) {
+                            const parts = cand.content?.parts || [];
+                            for (const part of parts) {
+                                if (part.inlineData?.data) {
+                                    const mime = part.inlineData.mimeType || 'image/png';
+                                    images.push(`data:${mime};base64,${part.inlineData.data}`);
+                                }
+                            }
+                        }
+                    }
+
+                    // Cost tracking per call
+                    if (images.length > 0) {
+                        costTracker.addUsage({
+                            model,
+                            image_count: images.length,
+                            // Pass through request correlation id so streaming consumers receive cost_update
+                            request_id: opts?.request_id,
+                            metadata: { cost_per_image: this.getImageCost(model) },
+                        });
+                    }
+                    return images;
+                };
+
+                const allImages: string[] = [];
+                const calls = Math.max(1, numberOfImages);
+                for (let i = 0; i < calls; i++) {
+                    const imgs = await makeOne();
+                    // Some responses may contain more than one image; respect n by slicing
+                    for (const img of imgs) {
+                        if (allImages.length < numberOfImages) allImages.push(img);
+                    }
+                    if (allImages.length >= numberOfImages) break;
+                }
+
+                if (allImages.length === 0) {
+                    throw new Error('No images returned from Gemini 2.5 Flash Image model');
+                }
+
+                log_llm_response(finalRequestId, {
+                    model,
+                    image_count: allImages.length,
+                    cost: allImages.length * this.getImageCost(model),
+                });
+                return allImages;
+            }
+
+            // Otherwise use the Imagen API
             const requestParams = {
                 model,
                 prompt,
@@ -1174,7 +1320,7 @@ export class GeminiProvider extends BaseModelProvider {
             // Use Gemini/Imagen API for image generation
             const response = await this.client.models.generateImages(requestParams);
 
-            // Process the response
+            // Process the response (Imagen)
             const images: string[] = [];
 
             if (response.generatedImages && response.generatedImages.length > 0) {
@@ -1192,6 +1338,7 @@ export class GeminiProvider extends BaseModelProvider {
                 costTracker.addUsage({
                     model,
                     image_count: images.length,
+                    request_id: opts?.request_id,
                     metadata: {
                         aspect_ratio: aspectRatio,
                         cost_per_image: perImageCost,
@@ -1221,10 +1368,15 @@ export class GeminiProvider extends BaseModelProvider {
     }
 
     /**
-     * Get the cost of generating an image with Imagen
+     * Get the cost of generating an image with Gemini/Imagen
      */
     private getImageCost(model: string): number {
-        // Imagen pricing (as of latest docs)
+        // Pricing (as of latest docs)
+        if (model.includes('gemini-2.5-flash-image-preview')) {
+            // $0.039 per image (1024x1024 ~1290 tokens @ $30 / 1M)
+            return 0.039;
+        }
+        // Imagen pricing
         if (model.includes('imagen-3')) {
             return 0.04; // $0.040 per image for Imagen 3
         } else if (model.includes('imagen-2')) {

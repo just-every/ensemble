@@ -218,6 +218,16 @@ for await (const event of ensembleVoice('Long text...', {
 **Supported Voice Models:**
 - OpenAI: `tts-1`, `tts-1-hd`
 - Google Gemini: `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`
+
+### Image generation
+
+Use OpenAI GPT-Image-1 or Google Gemini 2.5 Flash Image (Preview):
+
+```ts
+import { ensembleImage } from '@just-every/ensemble';
+
+const images = await ensembleImage('A serene lake at dawn', { model: 'gemini-2.5-flash-image-preview' }, { size: 'portrait' });
+```
 - ElevenLabs: `eleven_multilingual_v2`, `eleven_turbo_v2_5`
 
 ## Development
@@ -238,6 +248,32 @@ npm run docs
 # Lint
 npm run lint
 ```
+
+Additional image providers
+
+New providers added
+- Fireworks AI (FLUX family: Kontext/Pro/Schnell) – async APIs with result polling. Docs: Fireworks Image API.
+- Stability AI (Stable Image Ultra/SDXL) – REST v2beta endpoints supporting text-to-image and image-to-image.
+- Runway Gen-4 Image – via FAL.ai.
+- Recraft v3 – via FAL.ai (supports text-to-vector and vector-style outputs).
+
+Environment
+```
+FIREWORKS_API_KEY=your_key
+STABILITY_API_KEY=your_key
+FAL_KEY=your_key
+```
+
+Fallbacks
+- If Fireworks returns 401/403 or is not configured, requests for Flux-family models automatically fall back to FAL.ai equivalents when `FAL_KEY` is set.
+
+- Luma Photon (official): set `LUMA_API_KEY` and use `luma-photon-1` or `luma-photon-flash-1`.
+- Ideogram 3.0 (official): set `IDEOGRAM_API_KEY` and use `ideogram-3.0`.
+- Midjourney v7 (3rd-party): set `MIDJOURNEY_API_KEY` (or `KIE_API_KEY`) and optional `MJ_API_BASE`; use `midjourney-v7`.
+
+Notes
+- Gemini Flash Image does not expose hard size/AR controls; we add soft prompt hints and return the image unchanged.
+- Luma Photon and Ideogram return URLs; we pass them through without altering pixels.
 
 ## Architecture
 

@@ -211,6 +211,13 @@ class CostTracker {
     }
 
     /**
+     * Remove a previously registered onAddUsage callback
+     */
+    offAddUsage(callback: (usage: ModelUsage) => void): void {
+        this.onAddUsageCallbacks = this.onAddUsageCallbacks.filter(cb => cb !== callback);
+    }
+
+    /**
      * Record usage details from a model provider
      *
      * @param usage ModelUsage object containing the cost and usage details

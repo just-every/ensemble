@@ -219,6 +219,37 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
 }
 
 /**
+ * Resize a data URL image to a target width/height using sharp.
+ * Defaults to PNG output to preserve transparency.
+ */
+export async function resizeDataUrl(
+    dataUrl: string,
+    width: number,
+    height: number,
+    opts?: { fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside'; background?: string; format?: 'png' | 'jpeg' }
+): Promise<string> {
+    const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+    if (!match) return dataUrl;
+    const [, mime, b64] = match;
+    const input = Buffer.from(b64, 'base64');
+    const sharp = await getSharp();
+    const image = sharp(input);
+    const fit = opts?.fit || 'cover';
+    const background = opts?.background || (mime.includes('png') ? { r: 0, g: 0, b: 0, alpha: 0 } : '#000');
+
+    let pipeline = image.resize({ width, height, fit, background });
+    const format = opts?.format || (mime.includes('jpeg') ? 'jpeg' : 'png');
+    if (format === 'jpeg') {
+        pipeline = pipeline.jpeg({ quality: 92 });
+    } else {
+        pipeline = pipeline.png();
+    }
+    const out = await pipeline.toBuffer();
+    const outMime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    return `data:${outMime};base64,${out.toString('base64')}`;
+}
+
+/**
  * Resizes and splits an image to meet OpenAI's size requirements:
  * - Maximum width of 1024px
  * - Maximum height of 768px per segment

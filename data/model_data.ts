@@ -206,7 +206,23 @@ export const MODEL_CLASSES = {
     image_generation: {
         models: [
             'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
-            'imagen-3.0-generate-002', // Google Imagen 3
+            'gemini-2.5-flash-image-preview', // Google Gemini image model (Preview)
+            'seedream-4', // ByteDance Seedream 4.0 via BytePlus ModelArk
+            'luma-photon-1', // Luma Photon 1
+            'luma-photon-flash-1', // Luma Photon Flash 1
+            'ideogram-3.0', // Ideogram 3.0
+            'midjourney-v7', // Midjourney V7 (via third-party API)
+            'flux-kontext-pro', // Fireworks: FLUX Kontext Pro
+            'stability-ultra', // Stability: Stable Image Ultra
+            'runway-gen4-image', // Runway official API
+            'runway-gen4-image-turbo', // Runway official API (turbo)
+            'flux-pro-1.1', // Fireworks FLUX Pro 1.1
+            'flux-schnell', // Fireworks FLUX Schnell (fast)
+            'sd3.5-large', // Stability SD3.5 Large
+            'sd3.5-large-turbo', // Stability SD3.5 Large Turbo
+            'sd3.5-medium', // Stability SD3.5 Medium
+            'sd3.5-flash', // Stability SD3.5 Flash (fast)
+            'recraft-v3', // Recraft v3 via FAL
         ],
     },
 
@@ -241,6 +257,112 @@ export const MODEL_CLASSES = {
 
 // Main model registry with all supported models
 export const MODEL_REGISTRY: ModelEntry[] = [
+    // --- ByteDance / BytePlus ModelArk ---
+    {
+        id: 'seedream-4',
+        aliases: ['seedream-4.0', 'bytedance/seedream-4', 'byteplus/seedream-4'],
+        provider: 'bytedance',
+        cost: { per_image: 0.03 }, // $0.03 per image (flat)
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Seedream 4.0 text-to-image via BytePlus ModelArk (OpenAI-compatible Images API).',
+    },
+    // --- Image Providers (New) ---
+    {
+        id: 'flux-kontext-pro',
+        provider: 'fireworks',
+        cost: { per_image: 0.04 }, // Fireworks pricing varies; default placeholder
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'FLUX.1 Kontext Pro via Fireworks (async workflow with polling).',
+    },
+    {
+        id: 'stability-ultra',
+        aliases: ['stability-ultra-1', 'stable-image-ultra'],
+        provider: 'stability',
+        // Stability docs list pricing in credits; "8 credits" per image is not $8.
+        // Convert to dollars for unified cost display. Assuming ~$0.01/credit → ~$0.08 per image.
+        cost: { per_image: 0.08 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Stable Image Ultra (v2beta) – photorealistic, 1MP default.',
+    },
+    {
+        id: 'runway-gen4-image',
+        provider: 'runway',
+        // Pricing: 5 credits (720p) = $0.05, 8 credits (1080p) = $0.08.
+        // Default conservatively to 1080p tier unless overridden.
+        cost: { per_image: 0.08 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Runway Gen‑4 Image via official Runway API.',
+    },
+    {
+        id: 'runway-gen4-image-turbo',
+        provider: 'runway',
+        // Pricing: 2 credits per image, any resolution → $0.02
+        cost: { per_image: 0.02 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Runway Gen‑4 Image Turbo via official Runway API.',
+    },
+    {
+        id: 'flux-pro-1.1',
+        provider: 'fireworks',
+        cost: { per_image: 0.04 },
+        features: { input_modality: ['text'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'FLUX Pro 1.1 (fast, high quality). Uses Fireworks or FAL fallback.',
+    },
+    {
+        id: 'flux-schnell',
+        provider: 'fireworks',
+        cost: { per_image: 0.02 },
+        features: { input_modality: ['text'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'FLUX Schnell (very fast). Uses Fireworks or FAL fallback.',
+    },
+    // Stability SD3.5 family (explicit variants)
+    {
+        id: 'sd3.5-large',
+        provider: 'stability',
+        cost: { per_image: 0.08 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Stability SD3.5 Large.',
+    },
+    {
+        id: 'sd3.5-large-turbo',
+        provider: 'stability',
+        cost: { per_image: 0.10 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Stability SD3.5 Large Turbo.',
+    },
+    {
+        id: 'sd3.5-medium',
+        provider: 'stability',
+        cost: { per_image: 0.05 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Stability SD3.5 Medium.',
+    },
+    {
+        id: 'sd3.5-flash',
+        provider: 'stability',
+        cost: { per_image: 0.02 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Stability SD3.5 Flash (fast).',
+    },
+    {
+        id: 'recraft-v3',
+        provider: 'fal',
+        cost: { per_image: 0.04 }, // $0.04 per image (vector styles 2x)
+        features: { input_modality: ['text'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Recraft V3 via FAL.ai (text‑to‑image / vector styles).',
+    },
     // Embedding models
     {
         id: 'text-embedding-3-small',
@@ -1617,6 +1739,25 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: "OpenAI's DALL-E 2 model, supports image editing and variations",
     },
     {
+        id: 'gemini-2.5-flash-image-preview',
+        aliases: ['models/gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image'],
+        provider: 'google',
+        cost: {
+            // Pricing from Google (Preview): $0.039 per image (up to 1024x1024)
+            per_image: 0.039,
+            // Input priced at $0.30 per 1M tokens for prompts (text/image)
+            input_per_million: 0.3,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image', 'text'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "Gemini 2.5 Flash Image Preview: fast, natively multimodal image generation and editing.",
+    },
+    {
         id: 'imagen-3.0-generate-002',
         aliases: ['imagen-3'],
         provider: 'google',
@@ -1629,6 +1770,74 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: "Google's Imagen 3 model for high-quality image generation",
+    },
+    {
+        id: 'luma-photon-1',
+        provider: 'luma',
+        cost: {
+            // Luma Photon charges by pixels: $0.0073 per million pixels
+            // At 1080p ~2.07MP this is ~ $0.0151 per image.
+            per_image: 0.0151,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description:
+            'Luma Photon 1 text-to-image (official Luma API). Pricing basis: $0.0073 per million pixels; ~1.51¢ per 1080p image.',
+    },
+    {
+        id: 'luma-photon-flash-1',
+        provider: 'luma',
+        cost: {
+            // Luma Photon Flash: $0.0019 per million pixels
+            // At 1080p ~2.07MP this is ~ $0.0039 per image.
+            per_image: 0.0039,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description:
+            'Luma Photon Flash 1 (faster, lower cost). Pricing basis: $0.0019 per million pixels; ~0.39¢ per 1080p image.',
+    },
+    {
+        id: 'ideogram-3.0',
+        aliases: ['ideogram-v3', 'V_3', 'ideogram'],
+        provider: 'ideogram',
+        cost: {
+            // Public reports indicate ~$0.04 per output image for API standard tier
+            // (Turbo tiers can be lower). Adjust if you have a contracted rate.
+            per_image: 0.04,
+        },
+        features: {
+            // NOTE: The edit endpoint currently requires a mask; without a mask
+            // it returns 400. Treat as text-only for smoke tests to avoid
+            // false-negative i2i runs.
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description:
+            'Ideogram 3.0 text-to-image via official Ideogram API. Pricing shown is a typical per-image API rate; confirm with your Ideogram account for exact contracted pricing.',
+    },
+    {
+        id: 'midjourney-v7',
+        aliases: ['midjourney', 'mj-v7', 'mj'],
+        provider: 'midjourney',
+        cost: {
+            // KIE API credit pricing (Fast: ~8 credits per call, about $0.036/call on entry plan), 4 images/call
+            // Approximate per-image: $0.036 / 4 = $0.009
+            per_image: 0.009,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: 'Midjourney v7 text-to-image (via KIE API; requires third-party API key).',
     },
     {
         id: 'imagen-2',
