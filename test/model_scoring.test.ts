@@ -80,6 +80,7 @@ describe('Model Scoring and Disabling', () => {
                 'gpt-5-mini',
                 'gemini-2.5-flash-preview-05-20',
                 'gemini-2.5-flash',
+                'gemini-3-pro-preview',
                 'gemini-3-pro',
                 'claude-haiku-4-5-20250514',
                 'claude-sonnet-4-5-20250514',
