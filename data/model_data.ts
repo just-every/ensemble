@@ -51,8 +51,12 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5-mini', // OpenAI
             'gemini-2.5-flash-preview-05-20', // Google
-            'claude-3-5-haiku-latest', // Anthropic
+            'gemini-2.5-flash', // Google
+            'gemini-3-pro', // Google
+            'claude-sonnet-4-5-20250514', // Anthropic
             'grok-3-mini', // X.AI
+            'grok-4-1-fast-non-reasoning', // X.AI Grok 4.1 Fast
+            'grok-4-fast-non-reasoning', // X.AI Grok 4 Fast
         ],
         random: true,
     },
@@ -62,7 +66,8 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5-nano', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
-            'claude-3-5-haiku-latest', // Anthropic
+            'gemini-2.5-flash-lite', // Google
+            'claude-haiku-4-5-20250514', // Anthropic
             'grok-3-mini', // X.AI
             'mistral/ministral-8b', // Mistral/OpenRouter
             'openai/gpt-oss-20b', // OpenAI OSS/OpenRouter
@@ -74,9 +79,14 @@ export const MODEL_CLASSES = {
     reasoning: {
         models: [
             'gpt-5-max', // OpenAI
+            'gpt-5.1', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
-            'claude-opus-4-1-20250805-max', // Anthropic
+            'gemini-2.5-pro', // Google
+            'gemini-3-pro', // Google
+            'claude-opus-4-1-20250805', // Anthropic
             'grok-4', // X.AI
+            'grok-4-1-fast-reasoning', // X.AI Grok 4.1 Fast
+            'grok-4-fast-reasoning', // X.AI Grok 4 Fast
             'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
             'qwen3-235b-a22b-thinking-2507', // Qwen/OpenRouter
         ],
@@ -87,6 +97,7 @@ export const MODEL_CLASSES = {
     reasoning_mini: {
         models: [
             'gemini-2.5-flash-preview-05-20-medium', // Google
+            'gemini-2.5-flash', // Google
             'grok-3-mini', // X.AI
             'o3-low', // OpenAI
             'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
@@ -101,7 +112,7 @@ export const MODEL_CLASSES = {
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'o3-medium', // OpenAI
-            'claude-sonnet-4-20250514-medium', // Anthropic
+            'claude-sonnet-4-5-20250514', // Anthropic
         ],
         random: true,
     },
@@ -113,7 +124,7 @@ export const MODEL_CLASSES = {
             'gpt-5-mini', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-high', // Google
-            'claude-sonnet-4-20250514-medium', // Anthropic
+            'claude-sonnet-4-5-20250514', // Anthropic
             'grok-3-mini', // X.AI
         ],
         random: true,
@@ -123,12 +134,15 @@ export const MODEL_CLASSES = {
     code: {
         models: [
             'gpt-5', // OpenAI
+            'gpt-5.1-codex', // OpenAI
+            'gpt-5.1-codex-mini', // OpenAI
             'o3-high', // OpenAI
             'gemini-2.5-pro-preview-06-05-medium', // Google
             'gemini-2.5-flash-preview-05-20-max', // Google
-            'claude-opus-4-1-20250805-medium', // Anthropic
-            'claude-sonnet-4-20250514-max', // Anthropic
+            'claude-opus-4-1-20250805', // Anthropic
+            'claude-sonnet-4-5-20250514', // Anthropic
             'grok-4-medium', // X.AI
+            'grok-4-1-fast-reasoning', // X.AI Grok 4.1 Fast
             'qwen3-coder', // Qwen/OpenRouter
         ],
         random: true,
@@ -159,8 +173,9 @@ export const MODEL_CLASSES = {
             'gpt-5', // OpenAI
             'o3-high', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
-            'claude-opus-4-1-20250805-low', // Anthropic
+            'claude-opus-4-1-20250805', // Anthropic
             'grok-4', // X.AI
+            'grok-2-vision', // X.AI Legacy
         ],
         random: true,
     },
@@ -172,7 +187,7 @@ export const MODEL_CLASSES = {
             'o3-low', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
             'gemini-2.5-flash-preview-05-20', // Google
-            'claude-sonnet-4-20250514-low', // Anthropic
+            'claude-sonnet-4-5-20250514', // Anthropic
         ],
         random: true,
     },
@@ -195,9 +210,13 @@ export const MODEL_CLASSES = {
             'gpt-4.1-nano', // OpenAI - 1M context
             'gpt-4.1-mini', // OpenAI - 1M context
             'gemini-2.5-pro-preview-06-05', // Google - 1M context
+            'gemini-2.5-pro', // Google - 1M context
+            'gemini-3-pro', // Google - 1M context
             'gemini-2.5-flash-preview-05-20-medium', // Google - 1M context
             'gemini-2.5-flash-preview-05-20-low', // Google - 1M context
+            'gemini-2.5-flash', // Google - 1M context
             'gemini-2.5-flash-lite-preview-06-17', // Google - 1M context
+            'gemini-2.5-flash-lite', // Google - 1M context
         ],
         random: true,
         description: 'Models with very large context windows (near 1M tokens) for processing long documents',
@@ -207,6 +226,8 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
             'gemini-2.5-flash-image-preview', // Google Gemini image model (Preview)
+            'gemini-2.5-flash-image', // Google Gemini 2.5 Flash Image model
+            'gemini-3-pro-image-preview', // Google Gemini 3 Pro image model (Preview)
             'seedream-4', // ByteDance Seedream 4.0 via BytePlus ModelArk
             'luma-photon-1', // Luma Photon 1
             'luma-photon-flash-1', // Luma Photon Flash 1
@@ -244,6 +265,7 @@ export const MODEL_CLASSES = {
             'eleven_flash_v2_5', // ElevenLabs turbo model for low latency
             'gemini-2.5-flash-preview-tts', // Gemini's flash TTS model
             'gemini-2.5-pro-preview-tts', // Gemini's pro TTS model
+            'gemini-2.5-flash-native-audio-preview', // Gemini's native audio preview model
         ],
         description: 'Text-to-Speech models for voice generation',
     },
@@ -534,9 +556,180 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
 
     //
-    // XAI models
+    // XAI models (Grok)
     //
 
+    // Grok-4.1 Fast models with tiered pricing
+    {
+        id: 'grok-4-1-fast-reasoning',
+        aliases: ['grok-4.1-fast-reasoning'],
+        provider: 'xai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.5,
+            },
+            output_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 1.0,
+            },
+            cached_input_per_million: 0.05,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 88,
+        scores: {
+            monologue: 90,
+            code: 85,
+            reasoning: 88,
+        },
+        description: 'Grok 4.1 Fast with extended reasoning. 2M context, tiered pricing at 128k threshold.',
+    },
+
+    {
+        id: 'grok-4-1-fast-non-reasoning',
+        aliases: ['grok-4.1-fast-non-reasoning'],
+        provider: 'xai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.5,
+            },
+            output_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 1.0,
+            },
+            cached_input_per_million: 0.05,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 85,
+        scores: {
+            monologue: 87,
+            code: 82,
+            reasoning: 80,
+        },
+        description: 'Grok 4.1 Fast without reasoning. 2M context, tiered pricing at 128k threshold.',
+    },
+
+    // Grok-4 Premium model
+    {
+        id: 'grok-4',
+        aliases: ['grok-4-2025-09-01'],
+        provider: 'xai',
+        cost: {
+            input_per_million: 3.0,
+            output_per_million: 15.0,
+            cached_input_per_million: 0.75,
+        },
+        features: {
+            context_length: 256_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 90,
+        scores: {
+            monologue: 92,
+            code: 88,
+            reasoning: 85,
+        },
+        description: 'Grok-4 premium model with 256k context and vision capabilities.',
+    },
+
+    // Grok-4 Fast models (September 2025) with tiered pricing
+    {
+        id: 'grok-4-fast-reasoning',
+        aliases: ['grok-4-fast-reasoning-2025-09-01'],
+        provider: 'xai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.5,
+            },
+            output_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 1.0,
+            },
+            cached_input_per_million: 0.05,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 87,
+        scores: {
+            monologue: 89,
+            code: 84,
+            reasoning: 86,
+        },
+        description: 'Grok-4 Fast with reasoning (Sep 2025). 2M context, tiered pricing at 128k threshold.',
+    },
+
+    {
+        id: 'grok-4-fast-non-reasoning',
+        aliases: ['grok-4-fast-non-reasoning-2025-09-01'],
+        provider: 'xai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.5,
+            },
+            output_per_million: {
+                threshold_tokens: 128_000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 1.0,
+            },
+            cached_input_per_million: 0.05,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 84,
+        scores: {
+            monologue: 86,
+            code: 81,
+            reasoning: 79,
+        },
+        description: 'Grok-4 Fast without reasoning (Sep 2025). 2M context, tiered pricing at 128k threshold.',
+    },
+
+    // Grok-3 models
     {
         id: 'grok-3',
         aliases: ['grok-3-2025-02-11'],
@@ -554,41 +747,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
         },
         class: 'standard',
-        score: 78, // Aggregate (MMLU ≈ 0.80)
-        scores: {
-            monologue: 80, // Humanity’s Last Exam ≈ correlates with MMLU
-            code: 70, // HumanEval – xAI hasn’t published; estimate from AA
-            reasoning: 65, // GPQA Diamond – estimate
-        },
-        description: 'Flagship Grok-3 model for complex reasoning and generation',
-    },
-
-    {
-        id: 'grok-3',
-        aliases: ['grok-3-2025-04-11'],
-        provider: 'xai',
-        cost: {
-            input_per_million: 5.0,
-            output_per_million: 25.0,
-        },
-        features: {
-            context_length: 131_072,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'standard',
         score: 78,
         scores: {
             monologue: 80,
             code: 70,
             reasoning: 65,
         },
-        description: 'Same Grok-3 weights on premium infra for lower latency',
+        description: 'Grok-3 model with 131k context.',
     },
 
+    // Grok-3 Mini models
     {
         id: 'grok-3-mini',
         aliases: ['grok-3-mini-2025-04-11'],
@@ -612,12 +780,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 55,
             reasoning: 50,
         },
-        description: 'Lightweight Grok-3 Mini—budget model for logic tasks',
+        description: 'Grok-3 Mini—budget model with 131k context.',
     },
 
     {
-        id: 'grok-3-mini',
-        aliases: ['grok-3-mini-2025-04-11'],
+        id: 'grok-3-mini-accelerated',
+        aliases: ['grok-3-mini-accelerated-2025-04-11'],
         provider: 'xai',
         cost: {
             input_per_million: 0.6,
@@ -638,31 +806,60 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 55,
             reasoning: 50,
         },
-        description: 'Grok-3 Mini on accelerated hardware for latency-critical use',
+        description: 'Grok-3 Mini on accelerated hardware for lower latency.',
+    },
+
+    // Legacy Grok-2 models (optional, text-only/vision variants)
+    {
+        id: 'grok-2',
+        aliases: ['grok-2-text'],
+        provider: 'xai',
+        cost: {
+            input_per_million: 2.0,
+            output_per_million: 10.0,
+        },
+        features: {
+            context_length: 128_000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 70,
+        scores: {
+            monologue: 72,
+            code: 65,
+            reasoning: 60,
+        },
+        description: 'Legacy Grok-2 text-only model.',
     },
 
     {
-        id: 'grok-4',
-        aliases: ['grok-4-2025-07-09'],
+        id: 'grok-2-vision',
+        aliases: ['grok-2-vision'],
         provider: 'xai',
         cost: {
-            input_per_million: 10.0,
-            output_per_million: 30.0,
+            input_per_million: 2.0,
+            output_per_million: 10.0,
         },
         features: {
-            context_length: 131072,
+            context_length: 128_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
         },
+        class: 'vision',
+        score: 70,
         scores: {
-            monologue: 85,
-            code: 75,
-            reasoning: 70,
+            monologue: 72,
+            code: 65,
+            reasoning: 60,
         },
-        description: 'Most advanced Grok model with vision capabilities and complex reasoning',
+        description: 'Legacy Grok-2 model with vision capabilities.',
     },
 
     //
@@ -865,6 +1062,94 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 92,
         },
         description: 'GPT-5 model used in ChatGPT',
+    },
+
+    // GPT-5.1 models
+    {
+        id: 'gpt-5.1',
+        aliases: ['gpt-5.1-chat-latest'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            output_per_million: 10.0,
+            cached_input_per_million: 0.125,
+        },
+        features: {
+            context_length: 256000,
+            input_modality: ['text', 'image', 'audio', 'video'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 96,
+        description: 'GPT-5.1 flagship multimodal model (Instant/Thinking modes, pricing TBD).',
+    },
+
+    {
+        id: 'gpt-5.1-codex',
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            output_per_million: 10.0,
+            cached_input_per_million: 0.125,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'code',
+        score: 92,
+        description: 'GPT-5.1 Codex — optimized for agentic coding tasks (400k/128k).',
+    },
+
+    {
+        id: 'gpt-5.1-codex-mini',
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.25,
+            output_per_million: 2.0,
+            cached_input_per_million: 0.025,
+        },
+        features: {
+            context_length: 400000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'code',
+        score: 86,
+        description: 'GPT-5.1 Codex Mini — lightweight coding model with 400k context.',
+    },
+
+    {
+        id: 'gpt-5.1-codex-max',
+        provider: 'openai',
+        cost: {
+            input_per_million: 5.0,
+            output_per_million: 15.0,
+        },
+        features: {
+            context_length: 10_000_000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'code',
+        score: 95,
+        description: 'GPT-5.1 Codex Max — multi-million context (IDE-only for now), pricing TBD.',
     },
 
     // GPT-4o models
@@ -1109,62 +1394,148 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Anthropic (Claude) models
     //
 
-    // Claude 3.7 Sonnet
+    // Claude Sonnet 4.5
     {
-        id: 'claude-3-7-sonnet-latest', // Maps to claude-3-7-sonnet-20250219
-        aliases: ['claude-3-7-sonnet'],
+        id: 'claude-sonnet-4-5-20250514',
+        aliases: ['claude-sonnet-4-5', 'claude-sonnet-4.5', 'claude-sonnet-latest'],
         provider: 'anthropic',
         cost: {
             input_per_million: 3.0,
             output_per_million: 15.0,
-            cached_input_per_million: 0.3, // Check Anthropic docs for specifics
+            cached_input_per_million: 0.3, // 10% of input cost
         },
         features: {
-            context_length: 200000, // Confirmed
+            context_length: 200000, // Standard context
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 64000, // Default, higher possible
+            reasoning_output: true,
+            max_output_tokens: 64000,
         },
         class: 'reasoning',
-        score: 85, // Legacy overall score
+        score: 88,
         scores: {
-            monologue: 83, // Humanity's Last Exam
-            code: 77, // HumanEval
-            reasoning: 69, // GPQA Diamond
+            monologue: 86,
+            code: 85,
+            reasoning: 84,
         },
-        description: 'Latest Claude model with strong reasoning capabilities (extended thinking internal)',
+        description: 'Claude Sonnet 4.5 - Latest general-purpose model with strong reasoning and text/image support',
     },
 
-    // Claude 3.5 Haiku
+    // Claude Sonnet 4.5 (September 2025 refresh)
     {
-        id: 'claude-3-5-haiku-latest', // Maps to claude-3-5-haiku-20241022
-        aliases: ['claude-3-5-haiku'],
+        id: 'claude-sonnet-4-5-20250929',
+        aliases: ['claude-sonnet-4-5-sep-2025', 'claude-sonnet-4.5-2025-09-29'],
         provider: 'anthropic',
         cost: {
-            input_per_million: 0.8,
-            output_per_million: 4.0,
-            cached_input_per_million: 0.08, // Check Anthropic docs for specifics
+            input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 3.0,
+                price_above_threshold_per_million: 6.0,
+            },
+            output_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 15.0,
+                price_above_threshold_per_million: 22.5,
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 0.3,
+                price_above_threshold_per_million: 0.6,
+            },
         },
         features: {
-            context_length: 200000, // Confirmed
+            context_length: 200000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 8192, // Confirmed
+            reasoning_output: true,
+            max_output_tokens: 64000,
+        },
+        class: 'reasoning',
+        score: 88,
+        description: 'Claude Sonnet 4.5 (Sep 2025 refresh) with tiered pricing at 200k tokens and vision support.',
+    },
+
+    {
+        id: 'claude-sonnet-4-5-20250514-long-context',
+        aliases: ['claude-sonnet-4-5-long', 'claude-sonnet-4.5-long'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 6.0,
+            output_per_million: 22.5,
+            cached_input_per_million: 0.6, // 10% of input cost
+        },
+        features: {
+            context_length: 1_000_000, // 1M token context
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 64000,
+        },
+        class: 'reasoning',
+        score: 88,
+        description: 'Claude Sonnet 4.5 with 1M token context window - for long-context processing',
+    },
+
+    // Claude Haiku 4.5
+    {
+        id: 'claude-haiku-4-5-20250514',
+        aliases: ['claude-haiku-4-5', 'claude-haiku-4.5', 'claude-haiku-latest'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 1.0,
+            output_per_million: 5.0,
+            cached_input_per_million: 0.1, // 10% of input cost
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 8192,
         },
         class: 'mini',
-        score: 70, // Legacy overall score
+        score: 74,
         scores: {
-            monologue: 66, // Humanity's Last Exam
-            code: 63, // HumanEval
-            reasoning: 55, // GPQA Diamond
+            monologue: 72,
+            code: 71,
+            reasoning: 70,
         },
-        description: 'Fast, cost-effective Claude model',
+        description: 'Claude Haiku 4.5 - Fast, cost-effective model with text and image support',
+    },
+
+    // Claude Haiku 4.5 (October 2025 refresh)
+    {
+        id: 'claude-haiku-4-5-20251001',
+        aliases: ['claude-haiku-4-5-oct-2025', 'claude-haiku-4.5-2025-10-01'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 1.0,
+            output_per_million: 5.0,
+            cached_input_per_million: 0.1,
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 8192,
+        },
+        class: 'mini',
+        score: 74,
+        description: 'Claude Haiku 4.5 (Oct 2025 refresh) fast tier with vision support.',
     },
 
     // Claude CLI (Access Method)
@@ -1190,15 +1561,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Claude accessed via CLI (likely uses latest Sonnet or Haiku model)',
     },
 
-    // Claude Opus 4
+    // Claude Opus 4.1
     {
         id: 'claude-opus-4-1-20250805',
-        aliases: ['claude-opus-4', 'claude-opus-4-1', 'claude-4-opus', 'claude-opus-4-20250514'],
+        aliases: ['claude-opus-4-1', 'claude-opus-4.1', 'claude-4-opus', 'claude-opus'],
         provider: 'anthropic',
         cost: {
             input_per_million: 15.0,
             output_per_million: 75.0,
-            cached_input_per_million: 1.5, // Estimated at 10% of input cost
+            cached_input_per_million: 1.5, // 10% of input cost
         },
         features: {
             context_length: 200000,
@@ -1207,37 +1578,17 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 32000,
             reasoning_output: true,
+            max_output_tokens: 32000,
         },
         class: 'reasoning',
         score: 95, // Highest tier model
-        description: 'Claude Opus 4 - Highest level of intelligence and capability with extended thinking',
-    },
-
-    // Claude Sonnet 4
-    {
-        id: 'claude-sonnet-4-20250514',
-        aliases: ['claude-sonnet-4', 'claude-4-sonnet'],
-        provider: 'anthropic',
-        cost: {
-            input_per_million: 3.0,
-            output_per_million: 15.0,
-            cached_input_per_million: 0.3, // Estimated at 10% of input cost
+        scores: {
+            monologue: 94,
+            code: 94,
+            reasoning: 93,
         },
-        features: {
-            context_length: 200000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-            max_output_tokens: 64000,
-            reasoning_output: true,
-        },
-        class: 'reasoning',
-        score: 90, // High tier model
-        description: 'Claude Sonnet 4 - High intelligence and balanced performance with extended thinking',
+        description: 'Claude Opus 4.1 - Highest intelligence and capability with reasoning support',
     },
 
     //
@@ -1250,17 +1601,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-pro', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-pro-preview-05-06'],
         provider: 'google',
         cost: {
-            // Tiered pricing
-            input_per_million: {
-                threshold_tokens: 200000,
-                price_below_threshold_per_million: 1.25,
-                price_above_threshold_per_million: 2.5,
-            },
-            output_per_million: {
-                threshold_tokens: 200000,
-                price_below_threshold_per_million: 10.0,
-                price_above_threshold_per_million: 15.0,
-            },
+            input_per_million: 1.25,
+            output_per_million: 10.0,
+            cached_input_per_million: 0.13,
         },
         features: {
             context_length: 1048576, // Confirmed
@@ -1280,8 +1623,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-flash', 'gemini-2.5-flash-preview-04-17'],
         provider: 'google',
         cost: {
-            input_per_million: 0.3,
-            output_per_million: 2.5,
+            input_per_million: {
+                text: 1.0,
+                audio: 0.0375,
+            },
+            output_per_million: 0.6,
         },
         features: {
             context_length: 1048576,
@@ -1306,8 +1652,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-flash-lite'],
         provider: 'google',
         cost: {
-            input_per_million: 0.1,
-            output_per_million: 0.4,
+            input_per_million: 0.05,
+            output_per_million: 0.2,
         },
         features: {
             context_length: 1000000,
@@ -1319,13 +1665,64 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             max_output_tokens: 64000,
         },
         class: 'reasoning_mini',
-        score: 75, // Legacy overall score
+        score: 78,
         scores: {
-            monologue: 12, // Humanity's Last Exam
-            code: 63, // HumanEval
-            reasoning: 78, // GPQA Diamond
+            monologue: 14, // Humanity's Last Exam
+            code: 65, // HumanEval
+            reasoning: 75, // GPQA Diamond
         },
-        description: 'Balanced multimodal model with large context, built for Agents.',
+        description: 'Gemini 2.5 Flash Lite - cost-efficient multimodal model with 1M context.',
+    },
+
+    // Gemini 3 Pro (preview)
+    {
+        id: 'gemini-3-pro-preview',
+        aliases: ['gemini-3-pro', 'gemini-3-pro-preview-11-2025'],
+        provider: 'google',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 2.0,
+                price_above_threshold_per_million: 4.0,
+            },
+            output_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 12.0,
+                price_above_threshold_per_million: 18.0,
+            },
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text', 'image', 'audio'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 8192,
+        },
+        class: 'reasoning',
+        score: 90,
+        description:
+            'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
+    },
+
+    // Gemini 3 Pro Image (preview)
+    {
+        id: 'gemini-3-pro-image-preview',
+        aliases: ['gemini-3-pro-image'],
+        provider: 'google',
+        cost: {
+            per_image: 0.134, // AI Studio preview price per image (1024x1024 ref)
+            input_per_million: 2.0,
+            output_per_million: 12.0,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['image', 'text'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description: 'Gemini 3 Pro Image (preview) for text-to-image generation.',
     },
 
     // Gemini 2.0 Flash Lite
@@ -1528,6 +1925,24 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'voice',
         description:
             "Gemini's advanced text-to-speech model with superior voice quality, expression control, and multi-speaker support for creating dynamic conversations.",
+    },
+
+    {
+        id: 'gemini-2.5-flash-native-audio-preview',
+        provider: 'google',
+        cost: {
+            input_per_million: 5.0, // Estimated pricing for native audio
+            output_per_million: 0,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['audio'],
+            streaming: true,
+            context_length: 32000,
+        },
+        class: 'voice',
+        description:
+            "Gemini's native audio preview model providing low-latency text-to-speech with built-in audio processing.",
     },
 
     // Code-specific models (removed claude-code and codex as they're now external)

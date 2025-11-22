@@ -52,7 +52,7 @@ describe('Empty History Thread Handling', () => {
     it('should error with all providers when historyThread is empty', async () => {
         const providers = [
             { model: 'gpt-4.1', provider: 'openai' },
-            { model: 'claude-3-5-haiku-latest', provider: 'anthropic' },
+            { model: 'claude-haiku-4-5-20250514', provider: 'anthropic' },
             { model: 'gemini-2.5-flash-preview-05-20', provider: 'google' },
             { model: 'deepseek-chat', provider: 'deepseek' },
             { model: 'grok-3-mini-fast', provider: 'xai' },

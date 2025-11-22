@@ -18,14 +18,14 @@ describe('Model Scoring and Disabling', () => {
     it('should respect disabled models', async () => {
         const agent: AgentDefinition = {
             modelClass: 'standard',
-            disabledModels: ['gpt-4.1', 'claude-3-5-haiku-latest'],
+            disabledModels: ['gpt-4.1', 'claude-haiku-4-5-20250514'],
         };
 
         // Run multiple times to ensure disabled models are never selected
         for (let i = 0; i < 10; i++) {
             const model = await getModelFromAgent(agent);
             expect(model).not.toBe('gpt-4.1');
-            expect(model).not.toBe('claude-3-5-haiku-latest');
+            expect(model).not.toBe('claude-haiku-4-5-20250514');
         }
     });
 
@@ -65,7 +65,7 @@ describe('Model Scoring and Disabling', () => {
             modelScores: {
                 'gpt-4.1': 80,
                 'gemini-2.5-flash-preview-05-20-low': 20,
-                'claude-3-5-haiku-latest': 50,
+                'claude-haiku-4-5-20250514': 50,
             },
         };
 
@@ -76,7 +76,14 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat');
             expect(model).not.toBe('grok-3-mini-fast');
             // Should only select from scored models that aren't disabled
-            expect(['gpt-5-mini', 'gemini-2.5-flash-preview-05-20', 'claude-3-5-haiku-latest']).toContain(model);
+            expect([
+                'gpt-5-mini',
+                'gemini-2.5-flash-preview-05-20',
+                'gemini-2.5-flash',
+                'gemini-3-pro',
+                'claude-haiku-4-5-20250514',
+                'claude-sonnet-4-5-20250514',
+            ]).toContain(model);
         }
     });
 
@@ -85,7 +92,7 @@ describe('Model Scoring and Disabling', () => {
             modelClass: 'mini',
             disabledModels: [
                 'gpt-4.1-nano',
-                'claude-3-5-haiku-latest',
+                'claude-haiku-4-5-20250514',
                 'gemini-2.0-flash-lite',
                 'grok-3-mini',
                 'meta-llama/llama-4-scout',

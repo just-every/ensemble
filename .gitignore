@@ -38,6 +38,7 @@ coverage/
 # Local agent/test artifacts
 .artifacts/
 .code/
+.claude/
 
 # Cache directories
 .cache/

@@ -63,7 +63,7 @@ describe('canRunAgent', () => {
         it('should validate API key format for Anthropic', async () => {
             process.env.ANTHROPIC_API_KEY = 'sk-ant-valid-key';
 
-            const result = await canRunAgent({ model: 'claude-3-5-sonnet-latest' });
+            const result = await canRunAgent({ model: 'claude-sonnet-4-5-20250514' });
 
             expect(result.canRun).toBe(true);
             expect(result.provider).toBe('anthropic');
@@ -122,7 +122,7 @@ describe('canRunAgent', () => {
         it('should identify missing providers', async () => {
             // Override to have models from different providers
             overrideModelClass('standard', {
-                models: ['gpt-4', 'claude-3-5-sonnet-latest', 'gemini-2.0-flash-latest'],
+                models: ['gpt-4', 'claude-sonnet-4-5-20250514', 'gemini-2.0-flash-latest'],
                 random: false,
             });
 
@@ -171,13 +171,13 @@ describe('canRunAgent', () => {
             process.env.OPENAI_API_KEY = 'sk-test123';
 
             const result = await canRunAgent({
-                model: 'claude-3-5-sonnet-latest',
+                model: 'claude-sonnet-4-5-20250514',
                 modelClass: 'standard',
             });
 
             // Should check the specific model, not the class
             expect(result.canRun).toBe(false); // No Anthropic key
-            expect(result.model).toBe('claude-3-5-sonnet-latest');
+            expect(result.model).toBe('claude-sonnet-4-5-20250514');
             expect(result.provider).toBe('anthropic');
             expect(result.availableModels).toBeUndefined();
         });
@@ -194,7 +194,7 @@ describe('canRunAgent', () => {
         it('should identify single missing provider for model class', async () => {
             // Override to only have Claude models
             overrideModelClass('standard', {
-                models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+                models: ['claude-sonnet-4-5-20250514', 'claude-haiku-4-5-20250514'],
                 random: false,
             });
 

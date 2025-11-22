@@ -466,10 +466,11 @@ export class GeminiProvider extends BaseModelProvider {
             if (!apiKey) {
                 throw new Error('Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.');
             }
+            // Use v1beta to access the latest Gemini 3 preview endpoints
             this._client = new GoogleGenAI({
                 apiKey: apiKey,
                 vertexai: false,
-                httpOptions: { apiVersion: 'v1alpha' },
+                httpOptions: { apiVersion: 'v1beta' },
             });
         }
         return this._client;
@@ -1146,8 +1147,8 @@ export class GeminiProvider extends BaseModelProvider {
                 `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
             );
 
-            // If using the Gemini 2.5 Flash Image (Preview) model, use generateContentStream
-            if (model.includes('gemini-2.5-flash-image-preview')) {
+            // If using Gemini image models that expose image parts via generateContentStream
+            if (model.includes('gemini-2.5-flash-image-preview') || model.includes('gemini-3-pro-image-preview')) {
                 // Build a constraints hint to emulate feature parity (aspect ratio, size, style, background)
                 const constraints: string[] = [];
                 // Map size to human-friendly instructions
@@ -1375,6 +1376,8 @@ export class GeminiProvider extends BaseModelProvider {
         if (model.includes('gemini-2.5-flash-image-preview')) {
             // $0.039 per image (1024x1024 ~1290 tokens @ $30 / 1M)
             return 0.039;
+        } else if (model.includes('gemini-3-pro-image-preview')) {
+            return 0.134; // AI Studio preview per-image reference price
         }
         // Imagen pricing
         if (model.includes('imagen-3')) {
@@ -1664,10 +1667,10 @@ export class GeminiProvider extends BaseModelProvider {
         let isConnected = false;
 
         try {
-            // Initialize AI client with v1alpha
+            // Initialize AI client with v1beta (Live also available on v1beta)
             const ai = new GoogleGenAI({
                 apiKey: this.apiKey,
-                httpOptions: { apiVersion: 'v1alpha' },
+                httpOptions: { apiVersion: 'v1beta' },
             });
 
             // Set up real-time configuration

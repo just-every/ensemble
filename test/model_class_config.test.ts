@@ -35,11 +35,11 @@ describe('Model Class Configuration', () => {
 
         it('should return merged configuration when override exists', () => {
             overrideModelClass('standard', {
-                models: ['gpt-4.1', 'claude-3-5-haiku-latest'],
+                models: ['gpt-4.1', 'claude-haiku-4-5-20250514'],
             });
 
             const config = getModelClass('standard');
-            expect(config?.models).toEqual(['gpt-4.1', 'claude-3-5-haiku-latest']);
+            expect(config?.models).toEqual(['gpt-4.1', 'claude-haiku-4-5-20250514']);
             expect(config?.random).toBe(MODEL_CLASSES.standard.random); // Preserved
         });
     });
@@ -90,10 +90,10 @@ describe('Model Class Configuration', () => {
 
     describe('setModelClassModels', () => {
         it('should set models for a class', () => {
-            setModelClassModels('mini', ['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
+            setModelClassModels('mini', ['gpt-4.1-nano', 'claude-haiku-4-5-20250514']);
 
             const config = getModelClass('mini');
-            expect(config?.models).toEqual(['gpt-4.1-nano', 'claude-3-5-haiku-latest']);
+            expect(config?.models).toEqual(['gpt-4.1-nano', 'claude-haiku-4-5-20250514']);
         });
 
         it('should preserve random setting when not specified', () => {

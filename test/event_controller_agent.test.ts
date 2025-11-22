@@ -52,13 +52,13 @@ describe('EventController with Agent', () => {
             timestamp: new Date().toISOString(),
         };
 
-        await emitEvent(testEvent, testAgent, 'claude-3-5-haiku-latest');
+        await emitEvent(testEvent, testAgent, 'claude-haiku-4-5-20250514');
 
         expect(capturedEvents).toHaveLength(1);
         expect(capturedEvents[0].agent).toBeDefined();
         expect(capturedEvents[0].agent?.agent_id).toBe('test-456');
         expect(capturedEvents[0].agent?.name).toBe('TestAgent2');
-        expect(capturedEvents[0].agent?.model).toBe('claude-3-5-haiku-latest');
+        expect(capturedEvents[0].agent?.model).toBe('claude-haiku-4-5-20250514');
     });
 
     it('should not add agent when not provided', async () => {
