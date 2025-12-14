@@ -34,13 +34,13 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 - 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
 - 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 
-## Model Updates (Nov 2025)
-- OpenAI: GPT-5.1 (base + Codex, Codex-Mini, Codex-Max*), GPT-5/4.1/4o lines retained
+## Model Updates (Dec 2025)
+- OpenAI: Added GPT-5.2 (base + chat-latest + pro) and refreshed GPT-5.1/GPT-5/Codex pricing
 - Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
 - Google: Gemini 3 (Pro/Flash/Ultra) and refreshed Gemini 2.5 pricing incl. image/TTS/native-audio
 - xAI: Grok 4.1 Fast and Grok 4 Fast with tiered pricing; updated Grok 4/3/mini variants
 
-*Codex-Max pricing reflects current published rates and may change when OpenAI finalizes API pricing.
+*Codex-Max pricing reflects current published rates and may change if OpenAI updates pricing.
 
 ## Installation
 
@@ -229,7 +229,7 @@ for await (const event of ensembleVoice('Long text...', {
 
 ### Image generation
 
-Use OpenAI GPT-Image-1 or Google Gemini 2.5 Flash Image (Preview):
+Use OpenAI GPT-Image-1 (or the new cost-efficient GPT-Image-1 Mini) or Google Gemini 2.5 Flash Image (Preview):
 
 ```ts
 import { ensembleImage } from '@just-every/ensemble';

@@ -30,7 +30,6 @@ import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_bu
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
-import type { ReasoningEffort } from 'openai/resources/shared.js';
 import type { WebSocket } from 'ws';
 
 const BROWSER_WIDTH = 1024;
@@ -494,6 +493,11 @@ export class OpenAIProvider extends BaseModelProvider {
                 quality = opts.quality;
             }
 
+            // GPT Image 1 Mini supports low/medium; coerce high to medium to avoid API errors
+            if (model === 'gpt-image-1-mini' && quality === 'high') {
+                quality = 'medium';
+            }
+
             // Map size options
             let size: '1024x1024' | '1536x1024' | '1024x1536' | 'auto' = 'auto';
             if (opts?.size === 'square' || opts?.size === '1024x1024') {
@@ -720,9 +724,18 @@ export class OpenAIProvider extends BaseModelProvider {
      */
     private getImageCost(model: string, quality: string, size: string): number {
         // GPT Image 1 pricing
-        if (model === 'gpt-image-1') {
+        if (model === 'gpt-image-1' || model === 'gpt-image-1-mini') {
             // Prices vary by quality and output size
             const isLarge = size === '1536x1024' || size === '1024x1536';
+
+            // GPT Image 1 Mini pricing (cost-efficient variant)
+            if (model === 'gpt-image-1-mini') {
+                if (quality === 'low') return isLarge ? 0.006 : 0.005;
+                // medium/default (including coerced high/auto)
+                return isLarge ? 0.015 : 0.011;
+            }
+
+            // GPT Image 1 base pricing
             if (quality === 'high') return isLarge ? 0.25 : 0.167;
             if (quality === 'low') return isLarge ? 0.016 : 0.011;
             // medium/default auto
@@ -1153,9 +1166,64 @@ export class OpenAIProvider extends BaseModelProvider {
                 input,
             };
 
+            type OpenAIReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+            const isO3Model = (m: string) => m === 'o3' || m.startsWith('o3-');
+            const isGpt5Family = (m: string) => m.startsWith('gpt-5');
+            const isGpt51Or52 = (m: string) => m.startsWith('gpt-5.1') || m.startsWith('gpt-5.2');
+            const getDefaultReasoningEffort = (m: string): OpenAIReasoningEffort | undefined => {
+                if (m === 'gpt-5.2-pro' || m === 'gpt-5-pro') return 'high';
+                if (m.startsWith('gpt-5.2') || m.startsWith('gpt-5.1')) return 'none';
+                if (m.startsWith('gpt-5')) return 'medium';
+                if (m.startsWith('o')) return 'high';
+                return undefined;
+            };
+
+            // Support configuring reasoning effort via model suffixes.
+            // Note: the OpenAI SDK's ReasoningEffort type may lag docs, so we cast.
+            const REASONING_EFFORT_CONFIGS: OpenAIReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+            let requestedReasoningEffort: OpenAIReasoningEffort | undefined;
+
+            for (const effort of REASONING_EFFORT_CONFIGS) {
+                const suffix = `-${effort}`;
+                if (model.endsWith(suffix)) {
+                    requestedReasoningEffort = effort;
+                    model = model.slice(0, -suffix.length);
+                    requestParams.model = model;
+                    break;
+                }
+            }
+
+            // Apply reasoning defaults.
+            // - GPT-5.1/5.2 default to effort=none (do not send reasoning by default so temperature/top_p can work)
+            // - GPT-5 defaults to effort=medium
+            // - GPT-5 Pro defaults to effort=high
+            // - O-series models default to effort=high
+            const defaultEffort = getDefaultReasoningEffort(model);
+            const effectiveEffort = requestedReasoningEffort ?? defaultEffort;
+
+            if (requestedReasoningEffort) {
+                // Only include reasoning summaries when actually producing reasoning.
+                if (requestedReasoningEffort === 'none') {
+                    requestParams.reasoning = { effort: 'none' as any };
+                } else {
+                    requestParams.reasoning = {
+                        effort: requestedReasoningEffort as any,
+                        summary: 'auto',
+                    };
+                }
+            } else if (requiresReasoning(model)) {
+                if (defaultEffort && defaultEffort !== 'none') {
+                    requestParams.reasoning = {
+                        effort: defaultEffort as any,
+                        summary: 'auto',
+                    };
+                }
+            }
+
             // Add model-specific parameters
             // o3 models don't support temperature and top_p
-            if (!model.startsWith('o3-')) {
+            if (!isO3Model(model)) {
                 if (settings?.temperature !== undefined) {
                     requestParams.temperature = settings.temperature;
                 }
@@ -1165,33 +1233,15 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
             }
 
-            // Define mapping for OpenAI reasoning effort configurations
-            const REASONING_EFFORT_CONFIGS: Array<ReasoningEffort> = ['low', 'medium', 'high'];
-
-            // Check if model has any of the defined suffixes
-            let hasEffortSuffix = false;
-
-            for (const effort of REASONING_EFFORT_CONFIGS) {
-                const suffix = `-${effort}`;
-                if (model.endsWith(suffix)) {
-                    hasEffortSuffix = true;
-                    // Apply the specific reasoning effort and remove the suffix
-                    requestParams.reasoning = {
-                        effort: effort,
-                        summary: 'auto',
-                    };
-                    model = model.slice(0, -suffix.length);
-                    requestParams.model = model; // Update the model in the request
-                    break;
+            // GPT-5 family parameter compatibility (per OpenAI model guide)
+            // - GPT-5.1/5.2 support temperature/top_p only when reasoning effort = none
+            // - Older GPT-5 models do not support these fields at all
+            if (isGpt5Family(model)) {
+                const allowSamplingParams = isGpt51Or52(model) && effectiveEffort === 'none';
+                if (!allowSamplingParams) {
+                    delete requestParams.temperature;
+                    delete requestParams.top_p;
                 }
-            }
-
-            // Default reasoning for models that require it
-            if (requiresReasoning(model) && !hasEffortSuffix) {
-                requestParams.reasoning = {
-                    effort: 'high',
-                    summary: 'auto',
-                };
             }
 
             // Add other settings that work across models

@@ -78,8 +78,9 @@ export const MODEL_CLASSES = {
     // Advanced reasoning models
     reasoning: {
         models: [
-            'gpt-5-max', // OpenAI
+            'gpt-5.2', // OpenAI
             'gpt-5.1', // OpenAI
+            'gpt-5', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-pro', // Google
             'gemini-3-pro', // Google
@@ -108,7 +109,7 @@ export const MODEL_CLASSES = {
     // Monologue models
     monologue: {
         models: [
-            'gpt-5-chat-latest', // OpenAI
+            'gpt-5.2-chat-latest', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-flash-preview-05-20-medium', // Google
             'o3-medium', // OpenAI
@@ -120,6 +121,7 @@ export const MODEL_CLASSES = {
     // Metacognition models
     metacognition: {
         models: [
+            'gpt-5.2', // OpenAI
             'gpt-5', // OpenAI
             'gpt-5-mini', // OpenAI
             'gemini-2.5-pro-preview-06-05', // Google
@@ -136,6 +138,7 @@ export const MODEL_CLASSES = {
             'gpt-5', // OpenAI
             'gpt-5.1-codex', // OpenAI
             'gpt-5.1-codex-mini', // OpenAI
+            'gpt-5.1-codex-max', // OpenAI
             'o3-high', // OpenAI
             'gemini-2.5-pro-preview-06-05-medium', // Google
             'gemini-2.5-flash-preview-05-20-max', // Google
@@ -183,7 +186,7 @@ export const MODEL_CLASSES = {
     // Mini models with vision capabilities
     vision_mini: {
         models: [
-            'gpt-5-mini-medium', // OpenAI
+            'gpt-5-mini', // OpenAI
             'o3-low', // OpenAI
             'gemini-2.5-flash-lite-preview-06-17', // Google
             'gemini-2.5-flash-preview-05-20', // Google
@@ -225,6 +228,7 @@ export const MODEL_CLASSES = {
     image_generation: {
         models: [
             'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
+            'gpt-image-1-mini', // OpenAI GPT-Image-1 Mini (cost-efficient)
             'gemini-2.5-flash-image-preview', // Google Gemini image model (Preview)
             'gemini-2.5-flash-image', // Google Gemini 2.5 Flash Image model
             'gemini-3-pro-image-preview', // Google Gemini 3 Pro image model (Preview)
@@ -958,6 +962,77 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Latest premium GPT model from OpenAI',
     },
 
+    // GPT-5.2 models
+    {
+        id: 'gpt-5.2',
+        aliases: ['gpt-5.2-2025-12-11'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.75,
+            cached_input_per_million: 0.175,
+            output_per_million: 14.0,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 96,
+        scores: {
+            monologue: 97,
+            code: 95,
+            reasoning: 94,
+        },
+        description: 'Frontier flagship model for complex, multi-step tasks (400k/128k).',
+    },
+    {
+        id: 'gpt-5.2-pro',
+        aliases: ['gpt-5.2-pro-2025-12-11'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 21.0,
+            output_per_million: 168.0,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 99,
+        description: 'Highest-accuracy GPT-5.2 variant for the hardest problems (400k/128k).',
+    },
+    {
+        id: 'gpt-5.2-chat-latest',
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.75,
+            cached_input_per_million: 0.175,
+            output_per_million: 14.0,
+        },
+        features: {
+            context_length: 128000,
+            max_output_tokens: 16384,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 94,
+        description: 'ChatGPT-optimized GPT-5.2 chat model (128k/16k).',
+    },
+
     // GPT-5 models
     {
         id: 'gpt-5',
@@ -965,13 +1040,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openai',
         cost: {
             input_per_million: 1.25,
-            cached_input_per_million: 0.13,
+            cached_input_per_million: 0.125,
             output_per_million: 10.0,
         },
         features: {
             context_length: 400000,
-            input_modality: ['text', 'image', 'audio'],
-            output_modality: ['text', 'image', 'audio'],
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
@@ -979,63 +1055,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 95,
         scores: {
-            monologue: 98,
+            monologue: 96,
             code: 95,
             reasoning: 92,
         },
-        description: 'The best model for coding and agentic tasks across domains',
+        description: 'Frontier flagship model for complex, multi-step tasks (400k/128k).',
     },
     {
-        id: 'gpt-5-mini',
-        aliases: ['gpt-5-mini-2025-08-07'],
+        id: 'gpt-5-pro',
+        aliases: ['gpt-5-pro-2025-10-06'],
         provider: 'openai',
         cost: {
-            input_per_million: 0.25,
-            cached_input_per_million: 0.03,
-            output_per_million: 2.0,
+            input_per_million: 15.0,
+            output_per_million: 120.0,
         },
         features: {
             context_length: 400000,
-            input_modality: ['text', 'image', 'audio'],
-            output_modality: ['text', 'image', 'audio'],
+            max_output_tokens: 272000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
         },
-        class: 'standard',
-        score: 88,
-        scores: {
-            monologue: 90,
-            code: 87,
-            reasoning: 85,
-        },
-        description: 'A faster, more cost-efficient version of GPT-5 for well-defined tasks',
-    },
-    {
-        id: 'gpt-5-nano',
-        aliases: ['gpt-5-nano-2025-08-07'],
-        provider: 'openai',
-        cost: {
-            input_per_million: 0.05,
-            cached_input_per_million: 0.01,
-            output_per_million: 0.4,
-        },
-        features: {
-            context_length: 400000,
-            input_modality: ['text', 'image', 'audio'],
-            output_modality: ['text', 'image', 'audio'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'mini',
-        score: 78,
-        scores: {
-            monologue: 80,
-            code: 76,
-            reasoning: 75,
-        },
-        description: 'Fastest, most cost-efficient version of GPT-5',
+        class: 'reasoning',
+        score: 98,
+        description: 'High-accuracy GPT-5 variant for the hardest problems (400k/128k).',
     },
     {
         id: 'gpt-5-chat-latest',
@@ -1043,113 +1088,209 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openai',
         cost: {
             input_per_million: 1.25,
-            cached_input_per_million: 0.13,
+            cached_input_per_million: 0.125,
             output_per_million: 10.0,
         },
         features: {
-            context_length: 400000,
-            input_modality: ['text', 'image', 'audio'],
-            output_modality: ['text', 'image', 'audio'],
+            context_length: 128000,
+            max_output_tokens: 16384,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
         },
-        class: 'reasoning',
-        score: 95,
-        scores: {
-            monologue: 98,
-            code: 95,
-            reasoning: 92,
+        class: 'standard',
+        score: 92,
+        description: 'ChatGPT-optimized GPT-5 chat model (128k/16k).',
+    },
+    {
+        id: 'gpt-5-mini',
+        aliases: ['gpt-5-mini-2025-08-07'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.25,
+            cached_input_per_million: 0.025,
+            output_per_million: 2.0,
         },
-        description: 'GPT-5 model used in ChatGPT',
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 88,
+        scores: {
+            monologue: 88,
+            code: 87,
+            reasoning: 85,
+        },
+        description: 'A faster, more cost-efficient version of GPT-5 (400k/128k).',
+    },
+    {
+        id: 'gpt-5-nano',
+        aliases: ['gpt-5-nano-2025-08-07'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.05,
+            cached_input_per_million: 0.005,
+            output_per_million: 0.4,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'mini',
+        score: 78,
+        scores: {
+            monologue: 78,
+            code: 76,
+            reasoning: 75,
+        },
+        description: 'Fastest, most cost-efficient GPT-5 model (400k/128k).',
     },
 
     // GPT-5.1 models
     {
         id: 'gpt-5.1',
-        aliases: ['gpt-5.1-chat-latest'],
+        aliases: ['gpt-5.1-2025-11-13'],
         provider: 'openai',
         cost: {
             input_per_million: 1.25,
-            output_per_million: 10.0,
             cached_input_per_million: 0.125,
+            output_per_million: 10.0,
         },
         features: {
-            context_length: 256000,
-            input_modality: ['text', 'image', 'audio', 'video'],
-            output_modality: ['text', 'image', 'audio'],
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
         },
         class: 'reasoning',
-        score: 96,
-        description: 'GPT-5.1 flagship multimodal model (Instant/Thinking modes, pricing TBD).',
+        score: 95,
+        description: 'Prior-gen GPT-5.1 flagship model (400k/128k).',
+    },
+    {
+        id: 'gpt-5.1-chat-latest',
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            cached_input_per_million: 0.125,
+            output_per_million: 10.0,
+        },
+        features: {
+            context_length: 128000,
+            max_output_tokens: 16384,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 91,
+        description: 'ChatGPT-optimized GPT-5.1 chat model (128k/16k).',
     },
 
+    // GPT-5 Codex models
+    {
+        id: 'gpt-5-codex',
+        aliases: ['gpt-5-codex-2025-09-15'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.25,
+            cached_input_per_million: 0.125,
+            output_per_million: 10.0,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'code',
+        score: 90,
+        description: 'Prior-gen Codex model for agentic coding (400k/128k).',
+    },
+
+    // GPT-5.1 Codex models
     {
         id: 'gpt-5.1-codex',
         provider: 'openai',
         cost: {
             input_per_million: 1.25,
-            output_per_million: 10.0,
             cached_input_per_million: 0.125,
+            output_per_million: 10.0,
         },
         features: {
             context_length: 400000,
-            input_modality: ['text'],
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 128000,
         },
         class: 'code',
         score: 92,
         description: 'GPT-5.1 Codex — optimized for agentic coding tasks (400k/128k).',
     },
-
     {
         id: 'gpt-5.1-codex-mini',
         provider: 'openai',
         cost: {
             input_per_million: 0.25,
-            output_per_million: 2.0,
             cached_input_per_million: 0.025,
+            output_per_million: 2.0,
         },
         features: {
             context_length: 400000,
-            input_modality: ['text'],
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 128000,
         },
         class: 'code',
         score: 86,
         description: 'GPT-5.1 Codex Mini — lightweight coding model with 400k context.',
     },
-
     {
         id: 'gpt-5.1-codex-max',
         provider: 'openai',
         cost: {
-            input_per_million: 5.0,
-            output_per_million: 15.0,
+            input_per_million: 1.25,
+            cached_input_per_million: 0.125,
+            output_per_million: 10.0,
         },
         features: {
-            context_length: 10_000_000,
-            input_modality: ['text'],
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 128000,
         },
         class: 'code',
         score: 95,
-        description: 'GPT-5.1 Codex Max — multi-million context (IDE-only for now), pricing TBD.',
+        description: 'GPT-5.1 Codex Max — most capable Codex model for coding agents (400k/128k).',
     },
 
     // GPT-4o models
@@ -1795,6 +1936,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'image_generation',
         description:
             "OpenAI's GPT-Image-1 model for text-to-image generation. Supports quality levels (low: $0.011-0.016, medium: $0.042-0.063, high: $0.167-0.25) and sizes (1024x1024, 1024x1536, 1536x1024).",
+    },
+    {
+        id: 'gpt-image-1-mini',
+        provider: 'openai',
+        cost: {
+            per_image: 0.011, // Medium quality, 1024x1024 pricing
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT-Image-1 Mini model. Cost-efficient variant with lower per-image pricing (low: $0.005-0.006, medium: $0.011-0.015) across sizes (1024x1024, 1024x1536, 1536x1024).",
     },
 
     // Voice/TTS models
@@ -2590,8 +2746,8 @@ export function findModel(modelId: string): ModelEntry | undefined {
     const aliasMatch = MODEL_REGISTRY.find(model => model.aliases?.includes(modelId));
     if (aliasMatch) return aliasMatch;
 
-    // If model ends in -low, -medium, -high or -max, remove suffix and try again
-    const suffixes = ['-low', '-medium', '-high', '-max'];
+    // If model ends in a known effort/variant suffix, remove suffix and try again
+    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-max'];
     for (const suffix of suffixes) {
         if (modelId.endsWith(suffix)) {
             const baseName = modelId.slice(0, -suffix.length);

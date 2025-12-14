@@ -1170,6 +1170,22 @@ export class GeminiProvider extends BaseModelProvider {
                 if (opts?.style) constraints.push(`Style: ${opts.style}.`);
                 if (opts?.background) constraints.push(`Background: ${opts.background} (use transparency if supported).`);
 
+                // Preserve user-facing size/quality controls for streaming image models.
+                // The Gemini SDK supports `imageConfig` on GenerateContentConfig.
+                const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
+                if (sm?.ar) imageConfig.aspectRatio = sm.ar;
+
+                const qualityKey = typeof opts?.quality === 'string' ? opts.quality.toLowerCase() : '';
+                const imageSizeMap: Record<string, '1K' | '2K' | '4K'> = {
+                    low: '1K',
+                    standard: '2K',
+                    medium: '2K',
+                    hd: '4K',
+                    high: '4K',
+                };
+                const imageSize = imageSizeMap[qualityKey];
+                if (imageSize) imageConfig.imageSize = imageSize;
+
                 const constraintText = constraints.length
                     ? `\n\nImage constraints (please prioritize):\n- ${constraints.join('\n- ')}`
                     : '';
@@ -1228,6 +1244,7 @@ export class GeminiProvider extends BaseModelProvider {
                         ],
                         config: {
                             responseModalities: [Modality.IMAGE, Modality.TEXT],
+                            ...(Object.keys(imageConfig).length ? { imageConfig } : {}),
                         },
                     };
 
