@@ -3,53 +3,67 @@ import { GeminiProvider } from '../model_providers/gemini.js';
 import type { VoiceGenerationOpts, AgentDefinition } from '../types/types.js';
 
 // Mock the Google GenAI SDK
-vi.mock('@google/genai', () => ({
-    GoogleGenAI: vi.fn().mockImplementation(() => ({
-        models: {
-            generateContent: vi.fn().mockResolvedValue({
-                candidates: [
-                    {
-                        content: {
-                            parts: [
-                                {
-                                    inlineData: {
-                                        mimeType: 'audio/mpeg',
-                                        data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+vi.mock('@google/genai', async () => {
+    const actual = await vi.importActual<any>('@google/genai');
+
+    class GoogleGenAI {
+        public models: {
+            generateContent: ReturnType<typeof vi.fn>;
+            generateContentStream: ReturnType<typeof vi.fn>;
+        };
+
+        constructor() {
+            this.models = {
+                generateContent: vi.fn().mockResolvedValue({
+                    candidates: [
+                        {
+                            content: {
+                                parts: [
+                                    {
+                                        inlineData: {
+                                            mimeType: 'audio/mpeg',
+                                            data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+                                        },
                                     },
-                                },
-                            ],
+                                ],
+                            },
                         },
-                    },
-                ],
-            }),
-            generateContentStream: vi.fn().mockImplementation(() =>
-                Promise.resolve(
-                    (async function* () {
-                        yield {
-                            candidates: [
-                                {
-                                    content: {
-                                        parts: [
-                                            {
-                                                inlineData: {
-                                                    mimeType: 'audio/wav',
-                                                    data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+                    ],
+                }),
+                generateContentStream: vi.fn().mockImplementation(() =>
+                    Promise.resolve(
+                        (async function* () {
+                            yield {
+                                candidates: [
+                                    {
+                                        content: {
+                                            parts: [
+                                                {
+                                                    inlineData: {
+                                                        mimeType: 'audio/wav',
+                                                        data: 'bW9jayBhdWRpbyBkYXRh', // "mock audio data" in base64
+                                                    },
                                                 },
-                                            },
-                                        ],
+                                            ],
+                                        },
                                     },
-                                },
-                            ],
-                        };
-                    })()
-                )
-            ),
+                                ],
+                            };
+                        })()
+                    )
+                ),
+            };
+        }
+    }
+
+    return {
+        ...actual,
+        GoogleGenAI,
+        Modality: actual.Modality ?? {
+            AUDIO: 'AUDIO',
         },
-    })),
-    Modality: {
-        AUDIO: 'AUDIO',
-    },
-}));
+    };
+});
 
 describe('Gemini Voice Generation', () => {
     let provider: GeminiProvider;
