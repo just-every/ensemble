@@ -548,6 +548,7 @@ export type ModelClassID =
     | 'standard'
     | 'mini'
     | 'reasoning'
+    | 'reasoning_high'
     | 'reasoning_mini'
     | 'monologue'
     | 'metacognition'

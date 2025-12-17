@@ -468,7 +468,7 @@ export async function getModelFromClass(
 
     // Last resort: return first model in the class, even if we don't have a valid key
     // The provider will handle the error appropriately
-    let defaultModel = 'gpt-4.1'; // Fallback if we can't get a model from the class
+    let defaultModel = 'gpt-5.2-chat-latest'; // Fallback if we can't get a model from the class
 
     // Check if the model group exists in MODEL_CLASSES before trying to access it
     if (modelGroup in MODEL_CLASSES) {

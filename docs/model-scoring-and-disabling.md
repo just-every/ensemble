@@ -29,9 +29,9 @@ import { AgentDefinition } from '@just-every/ensemble';
 const agent: AgentDefinition = {
     modelClass: 'standard',
     modelScores: {
-        'gpt-4.1': 80,              // High probability
-        'claude-3-5-haiku-latest': 60,   // Medium probability
-        'gemini-2.5-flash-preview-05-20-low': 20,    // Low probability
+        'gpt-5.2-chat-latest': 80,              // High probability
+        'claude-haiku-4-5-20251001': 60,        // Medium probability
+        'gemini-2.5-flash': 20,                 // Low probability
         'deepseek-chat': 0,              // Never selected
         // Other models in the class get default score of 50
     },
@@ -39,7 +39,7 @@ const agent: AgentDefinition = {
 ```
 
 In this example, if only these models are available:
-- GPT-4.1 has 80/(80+60+20) = 50% chance of selection
+- GPT-5.2 has 80/(80+60+20) = 50% chance of selection
 - Claude has 60/(80+60+20) = 37.5% chance
 - Gemini has 20/(80+60+20) = 12.5% chance
 - DeepSeek will never be selected (score of 0)
@@ -54,11 +54,13 @@ The `disabledModels` property provides a simple way to exclude specific models f
 const agent: AgentDefinition = {
     modelClass: 'reasoning',
     disabledModels: [
-        'claude-opus-4-20250514',    // Too expensive
-        'o3-high',                   // Rate limited
+        'claude-opus-4-5-20251101',  // Too expensive
+        'grok-4',                    // Too expensive
     ],
 };
 ```
+
+Tip: if you want only the “maxed-out” reasoning models, use `modelClass: 'reasoning_high'`.
 
 ## Combining Scores and Disabled Models
 
@@ -68,13 +70,13 @@ You can use both features together for fine-grained control:
 const agent: AgentDefinition = {
     modelClass: 'standard',
     modelScores: {
-        'gpt-4.1': 90,                    // Strongly preferred
-        'claude-3-5-haiku-latest': 40,    // Less preferred
-        'gemini-2.5-flash-preview-05-20-low': 10,     // Rarely used
+        'gpt-5.2-chat-latest': 90,             // Strongly preferred
+        'claude-haiku-4-5-20251001': 40,       // Less preferred
+        'gemini-2.5-flash': 10,                // Rarely used
     },
     disabledModels: [
         'deepseek-chat',    // Completely disabled
-        'grok-3-mini-fast', // Completely disabled
+        'grok-4',           // Completely disabled
     ],
 };
 ```
@@ -94,8 +96,8 @@ These features work seamlessly with the existing model class system:
 Prefer faster models for low-latency applications:
 ```typescript
 modelScores: {
-    'gpt-4.1-mini': 90,    // Fast, preferred
-    'gpt-4.1': 10,         // Slower, used rarely
+    'gpt-5-mini': 90,    // Fast, preferred
+    'gpt-5.2': 10,       // Slower, used rarely
 }
 ```
 

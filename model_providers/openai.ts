@@ -482,7 +482,7 @@ export class OpenAIProvider extends BaseModelProvider {
         let finalRequestId = requestId; // Define in outer scope
         try {
             // Extract options with defaults, mapping to the original function parameters
-            model = model || 'gpt-image-1';
+            model = model || 'gpt-image-1.5';
             const number_of_images = opts?.n || 1;
 
             // Map quality options
@@ -491,11 +491,6 @@ export class OpenAIProvider extends BaseModelProvider {
             else if (opts?.quality === 'hd') quality = 'high';
             else if (opts?.quality === 'low' || opts?.quality === 'medium' || opts?.quality === 'high') {
                 quality = opts.quality;
-            }
-
-            // GPT Image 1 Mini supports low/medium; coerce high to medium to avoid API errors
-            if (model === 'gpt-image-1-mini' && quality === 'high') {
-                quality = 'medium';
             }
 
             // Map size options
@@ -723,23 +718,34 @@ export class OpenAIProvider extends BaseModelProvider {
      * Get the cost of generating an image based on model and parameters
      */
     private getImageCost(model: string, quality: string, size: string): number {
-        // GPT Image 1 pricing
-        if (model === 'gpt-image-1' || model === 'gpt-image-1-mini') {
-            // Prices vary by quality and output size
-            const isLarge = size === '1536x1024' || size === '1024x1536';
+        // Prices vary by quality and output size
+        const isLarge = size === '1536x1024' || size === '1024x1536';
 
-            // GPT Image 1 Mini pricing (cost-efficient variant)
-            if (model === 'gpt-image-1-mini') {
-                if (quality === 'low') return isLarge ? 0.006 : 0.005;
-                // medium/default (including coerced high/auto)
-                return isLarge ? 0.015 : 0.011;
-            }
+        // Normalize quality values: treat 'auto' as 'medium'
+        const q = quality === 'auto' ? 'medium' : quality;
 
-            // GPT Image 1 base pricing
-            if (quality === 'high') return isLarge ? 0.25 : 0.167;
-            if (quality === 'low') return isLarge ? 0.016 : 0.011;
-            // medium/default auto
-            return isLarge ? 0.063 : 0.042;
+        // GPT Image 1.5 pricing (OpenAI API Pricing)
+        if (model === 'gpt-image-1.5') {
+            if (q === 'high') return isLarge ? 0.2 : 0.133;
+            if (q === 'low') return isLarge ? 0.013 : 0.009;
+            // medium/default
+            return isLarge ? 0.05 : 0.034;
+        }
+
+        // GPT Image 1 pricing (OpenAI API Pricing)
+        if (model === 'gpt-image-1') {
+            if (q === 'high') return isLarge ? 0.167 : 0.103;
+            if (q === 'low') return isLarge ? 0.011 : 0.007;
+            // medium/default
+            return isLarge ? 0.042 : 0.026;
+        }
+
+        // GPT Image 1 Mini pricing (OpenAI API Pricing)
+        if (model === 'gpt-image-1-mini') {
+            if (q === 'high') return isLarge ? 0.02 : 0.015;
+            if (q === 'low') return isLarge ? 0.006 : 0.005;
+            // medium/default
+            return isLarge ? 0.015 : 0.011;
         }
 
         // Default/unknown pricing

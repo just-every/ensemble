@@ -49,14 +49,11 @@ export const MODEL_CLASSES = {
     // Standard models with good all-around capabilities
     standard: {
         models: [
-            'gpt-5-mini', // OpenAI
-            'gemini-2.5-flash-preview-05-20', // Google
+            // One top pick per provider (prefer stable IDs over dated previews when possible)
+            'gpt-5.2-chat-latest', // OpenAI
             'gemini-2.5-flash', // Google
-            'gemini-3-pro', // Google
-            'claude-sonnet-4-5-20250514', // Anthropic
-            'grok-3-mini', // X.AI
-            'grok-4-1-fast-non-reasoning', // X.AI Grok 4.1 Fast
-            'grok-4-fast-non-reasoning', // X.AI Grok 4 Fast
+            'claude-sonnet-4-5-20250929', // Anthropic
+            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -65,12 +62,9 @@ export const MODEL_CLASSES = {
     mini: {
         models: [
             'gpt-5-nano', // OpenAI
-            'gemini-2.5-flash-lite-preview-06-17', // Google
             'gemini-2.5-flash-lite', // Google
-            'claude-haiku-4-5-20250514', // Anthropic
+            'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
-            'mistral/ministral-8b', // Mistral/OpenRouter
-            'openai/gpt-oss-20b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -78,18 +72,22 @@ export const MODEL_CLASSES = {
     // Advanced reasoning models
     reasoning: {
         models: [
+            // Strong reasoning at reasonable cost
             'gpt-5.2', // OpenAI
-            'gpt-5.1', // OpenAI
-            'gpt-5', // OpenAI
-            'gemini-2.5-pro-preview-06-05', // Google
             'gemini-2.5-pro', // Google
-            'gemini-3-pro', // Google
-            'claude-opus-4-1-20250805', // Anthropic
+            'claude-sonnet-4-5-20250929', // Anthropic
+            'grok-4-1-fast-reasoning', // X.AI
+        ],
+        random: true,
+    },
+
+    // Maxed-out reasoning models (highest tier per provider)
+    reasoning_high: {
+        models: [
+            'gpt-5.2-pro', // OpenAI
+            'gemini-3-pro-preview', // Google
+            'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
-            'grok-4-1-fast-reasoning', // X.AI Grok 4.1 Fast
-            'grok-4-fast-reasoning', // X.AI Grok 4 Fast
-            'mistralai/magistral-medium-2506:thinking', // Mistral/OpenRouter
-            'qwen3-235b-a22b-thinking-2507', // Qwen/OpenRouter
         ],
         random: true,
     },
@@ -97,11 +95,10 @@ export const MODEL_CLASSES = {
     // Fast, cheap reasoning models
     reasoning_mini: {
         models: [
-            'gemini-2.5-flash-preview-05-20-medium', // Google
+            'gpt-5-mini', // OpenAI
             'gemini-2.5-flash', // Google
+            'claude-sonnet-4-5-20250929', // Anthropic
             'grok-3-mini', // X.AI
-            'o3-low', // OpenAI
-            'openai/gpt-oss-120b', // OpenAI OSS/OpenRouter
         ],
         random: true,
     },
@@ -110,10 +107,9 @@ export const MODEL_CLASSES = {
     monologue: {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
-            'gemini-2.5-pro-preview-06-05', // Google
-            'gemini-2.5-flash-preview-05-20-medium', // Google
-            'o3-medium', // OpenAI
-            'claude-sonnet-4-5-20250514', // Anthropic
+            'gemini-3-pro-preview', // Google
+            'claude-sonnet-4-5-20250929', // Anthropic
+            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -122,12 +118,9 @@ export const MODEL_CLASSES = {
     metacognition: {
         models: [
             'gpt-5.2', // OpenAI
-            'gpt-5', // OpenAI
-            'gpt-5-mini', // OpenAI
-            'gemini-2.5-pro-preview-06-05', // Google
-            'gemini-2.5-flash-preview-05-20-high', // Google
-            'claude-sonnet-4-5-20250514', // Anthropic
-            'grok-3-mini', // X.AI
+            'gemini-3-pro-preview', // Google
+            'claude-opus-4-5-20251101', // Anthropic
+            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -135,18 +128,11 @@ export const MODEL_CLASSES = {
     // Programming models
     code: {
         models: [
-            'gpt-5', // OpenAI
-            'gpt-5.1-codex', // OpenAI
-            'gpt-5.1-codex-mini', // OpenAI
             'gpt-5.1-codex-max', // OpenAI
-            'o3-high', // OpenAI
-            'gemini-2.5-pro-preview-06-05-medium', // Google
-            'gemini-2.5-flash-preview-05-20-max', // Google
-            'claude-opus-4-1-20250805', // Anthropic
-            'claude-sonnet-4-5-20250514', // Anthropic
-            'grok-4-medium', // X.AI
-            'grok-4-1-fast-reasoning', // X.AI Grok 4.1 Fast
-            'qwen3-coder', // Qwen/OpenRouter
+            'gemini-3-pro-preview', // Google
+            'claude-opus-4-5-20251101', // Anthropic
+            'grok-4', // X.AI
+            'qwen3-coder', // OpenRouter
         ],
         random: true,
     },
@@ -154,8 +140,10 @@ export const MODEL_CLASSES = {
     // Writing models - optimized for conversation and text generation
     writing: {
         models: [
-            'gpt-5-mini', // OpenAI
-            'gemini-2.5-flash-lite-preview-06-17', // Google
+            'gpt-5.2-chat-latest', // OpenAI
+            'gemini-2.5-flash', // Google
+            'claude-sonnet-4-5-20250929', // Anthropic
+            'grok-4', // X.AI
         ],
         random: true,
     },
@@ -164,8 +152,10 @@ export const MODEL_CLASSES = {
     // High quality, low cost allows this to be used heavily and reduce token usage for other models
     summary: {
         models: [
-            'gpt-5-mini', // OpenAI
-            'gemini-2.5-flash-lite-preview-06-17', // Google
+            'gpt-5-nano', // OpenAI
+            'gemini-2.5-flash-lite', // Google
+            'claude-haiku-4-5-20251001', // Anthropic
+            'grok-3-mini', // X.AI
         ],
         random: true,
     },
@@ -173,12 +163,10 @@ export const MODEL_CLASSES = {
     // Models with vision capabilities
     vision: {
         models: [
-            'gpt-5', // OpenAI
-            'o3-high', // OpenAI
-            'gemini-2.5-pro-preview-06-05', // Google
-            'claude-opus-4-1-20250805', // Anthropic
+            'gpt-5.2', // OpenAI
+            'gemini-3-pro-preview', // Google
+            'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
-            'grok-2-vision', // X.AI Legacy
         ],
         random: true,
     },
@@ -187,10 +175,9 @@ export const MODEL_CLASSES = {
     vision_mini: {
         models: [
             'gpt-5-mini', // OpenAI
-            'o3-low', // OpenAI
-            'gemini-2.5-flash-lite-preview-06-17', // Google
-            'gemini-2.5-flash-preview-05-20', // Google
-            'claude-sonnet-4-5-20250514', // Anthropic
+            'gemini-2.5-flash', // Google
+            'claude-haiku-4-5-20251001', // Anthropic
+            'grok-3-mini', // X.AI
         ],
         random: true,
     },
@@ -198,9 +185,7 @@ export const MODEL_CLASSES = {
     // Models with search capabilities
     search: {
         models: [
-            'gpt-5-mini', // OpenAI
             'o3-deep-research', // OpenAI
-            'gemini-2.5-flash-lite-preview-06-17', // Google
             'perplexity/sonar-deep-research', // Perplexity
         ],
         random: true,
@@ -209,73 +194,52 @@ export const MODEL_CLASSES = {
     // Models with very large context windows (near 1M tokens)
     long: {
         models: [
-            'gpt-4.1', // OpenAI - 1M context
-            'gpt-4.1-nano', // OpenAI - 1M context
-            'gpt-4.1-mini', // OpenAI - 1M context
-            'gemini-2.5-pro-preview-06-05', // Google - 1M context
-            'gemini-2.5-pro', // Google - 1M context
-            'gemini-3-pro', // Google - 1M context
-            'gemini-2.5-flash-preview-05-20-medium', // Google - 1M context
-            'gemini-2.5-flash-preview-05-20-low', // Google - 1M context
-            'gemini-2.5-flash', // Google - 1M context
-            'gemini-2.5-flash-lite-preview-06-17', // Google - 1M context
-            'gemini-2.5-flash-lite', // Google - 1M context
+            'gpt-5.2', // OpenAI
+            'gemini-3-pro-preview', // Google
+            'claude-opus-4-5-20251101', // Anthropic
+            'grok-4', // X.AI
         ],
         random: true,
-        description: 'Models with very large context windows (near 1M tokens) for processing long documents',
+        description: 'Models with very large context windows for processing long documents',
     },
 
     image_generation: {
         models: [
-            'gpt-image-1', // OpenAI GPT-Image-1 (latest, supports editing)
-            'gpt-image-1-mini', // OpenAI GPT-Image-1 Mini (cost-efficient)
-            'gemini-2.5-flash-image-preview', // Google Gemini image model (Preview)
-            'gemini-2.5-flash-image', // Google Gemini 2.5 Flash Image model
-            'gemini-3-pro-image-preview', // Google Gemini 3 Pro image model (Preview)
-            'seedream-4', // ByteDance Seedream 4.0 via BytePlus ModelArk
-            'luma-photon-1', // Luma Photon 1
-            'luma-photon-flash-1', // Luma Photon Flash 1
-            'ideogram-3.0', // Ideogram 3.0
-            'midjourney-v7', // Midjourney V7 (via third-party API)
-            'flux-kontext-pro', // Fireworks: FLUX Kontext Pro
-            'stability-ultra', // Stability: Stable Image Ultra
-            'runway-gen4-image', // Runway official API
-            'runway-gen4-image-turbo', // Runway official API (turbo)
-            'flux-pro-1.1', // Fireworks FLUX Pro 1.1
-            'flux-schnell', // Fireworks FLUX Schnell (fast)
-            'sd3.5-large', // Stability SD3.5 Large
-            'sd3.5-large-turbo', // Stability SD3.5 Large Turbo
-            'sd3.5-medium', // Stability SD3.5 Medium
-            'sd3.5-flash', // Stability SD3.5 Flash (fast)
-            'recraft-v3', // Recraft v3 via FAL
+            // One top pick per image provider
+            'gpt-image-1.5', // OpenAI
+            'gemini-3-pro-image-preview', // Google
+            'seedream-4', // ByteDance
+            'luma-photon-1', // Luma
+            'ideogram-3.0', // Ideogram
+            'midjourney-v7', // Midjourney
+            'flux-kontext-pro', // Fireworks
+            'stability-ultra', // Stability
+            'runway-gen4-image', // Runway
+            'recraft-v3', // FAL
         ],
     },
 
     embedding: {
         models: [
-            'text-embedding-3-small', // OpenAI's standard embedding model (1536d)
-            'gemini-embedding-exp-03-07', // Google's Gemini embedding model (768d) - FREE
+            'text-embedding-3-large', // OpenAI (3072d)
+            'text-embedding-004', // Google (latest stable)
         ],
         description: 'Vector embedding models for semantic search and RAG',
     },
 
     voice: {
         models: [
-            'gpt-4o-mini-tts', // OpenAI's efficient TTS model - default
-            'tts-1', // OpenAI's standard TTS model - optimized for real-time
-            'tts-1-hd', // OpenAI's high-quality TTS model
-            'eleven_multilingual_v2', // ElevenLabs multilingual model
-            'eleven_turbo_v2_5', // ElevenLabs turbo model for low latency
-            'eleven_flash_v2_5', // ElevenLabs turbo model for low latency
-            'gemini-2.5-flash-preview-tts', // Gemini's flash TTS model
-            'gemini-2.5-pro-preview-tts', // Gemini's pro TTS model
-            'gemini-2.5-flash-native-audio-preview', // Gemini's native audio preview model
+            // One top pick per TTS provider
+            'tts-1-hd', // OpenAI
+            'eleven_multilingual_v2', // ElevenLabs
+            'gemini-2.5-pro-preview-tts', // Gemini
         ],
         description: 'Text-to-Speech models for voice generation',
     },
     transcription: {
         models: [
-            'gemini-2.0-flash-live-001', // Gemini Live API for real-time transcription
+            'gpt-4o-transcribe', // OpenAI
+            'gemini-2.5-flash-native-audio-preview-12-2025', // Gemini (replacement for Live)
         ],
         description: 'Speech-to-Text models for audio transcription with real-time streaming',
     },
@@ -440,6 +404,26 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         dim: 768,
         class: 'embedding',
         description: "Google's experimental embedding model optimized for semantic similarity",
+    },
+
+    // Google Embeddings (stable)
+    {
+        id: 'text-embedding-004',
+        provider: 'google',
+        cost: {
+            // Pricing varies by region/product tier; leave unset/zeroed unless we have a confirmed source.
+            input_per_million: 0,
+            output_per_million: 0,
+        },
+        features: {
+            input_modality: ['text'],
+            output_modality: ['embedding'],
+            input_token_limit: 8191,
+        },
+        embedding: true,
+        dim: 768,
+        class: 'embedding',
+        description: "Google's stable text embedding model (text-embedding-004)",
     },
     // Models used via OpenRouter
     // Note: Specific pricing/features via OpenRouter can fluctuate. Validation based on general model info & provider docs.
@@ -1538,7 +1522,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Sonnet 4.5
     {
         id: 'claude-sonnet-4-5-20250514',
-        aliases: ['claude-sonnet-4-5', 'claude-sonnet-4.5', 'claude-sonnet-latest'],
+        aliases: ['claude-sonnet-4.5-2025-05-14', 'claude-sonnet-4-5-may-2025'],
         provider: 'anthropic',
         cost: {
             input_per_million: 3.0,
@@ -1568,7 +1552,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Sonnet 4.5 (September 2025 refresh)
     {
         id: 'claude-sonnet-4-5-20250929',
-        aliases: ['claude-sonnet-4-5-sep-2025', 'claude-sonnet-4.5-2025-09-29'],
+        aliases: [
+            'claude-sonnet-4-5',
+            'claude-sonnet-4.5',
+            'claude-sonnet-latest',
+            'claude-sonnet-4-5-sep-2025',
+            'claude-sonnet-4.5-2025-09-29',
+        ],
         provider: 'anthropic',
         cost: {
             input_per_million: {
@@ -1629,7 +1619,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Haiku 4.5
     {
         id: 'claude-haiku-4-5-20250514',
-        aliases: ['claude-haiku-4-5', 'claude-haiku-4.5', 'claude-haiku-latest'],
+        aliases: ['claude-haiku-4.5-2025-05-14', 'claude-haiku-4-5-may-2025'],
         provider: 'anthropic',
         cost: {
             input_per_million: 1.0,
@@ -1658,7 +1648,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Haiku 4.5 (October 2025 refresh)
     {
         id: 'claude-haiku-4-5-20251001',
-        aliases: ['claude-haiku-4-5-oct-2025', 'claude-haiku-4.5-2025-10-01'],
+        aliases: [
+            'claude-haiku-4-5',
+            'claude-haiku-4.5',
+            'claude-haiku-latest',
+            'claude-haiku-4-5-oct-2025',
+            'claude-haiku-4.5-2025-10-01',
+        ],
         provider: 'anthropic',
         cost: {
             input_per_million: 1.0,
@@ -1705,7 +1701,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Opus 4.1
     {
         id: 'claude-opus-4-1-20250805',
-        aliases: ['claude-opus-4-1', 'claude-opus-4.1', 'claude-4-opus', 'claude-opus'],
+        aliases: ['claude-opus-4-1', 'claude-opus-4.1', 'claude-4-opus'],
         provider: 'anthropic',
         cost: {
             input_per_million: 15.0,
@@ -1730,6 +1726,37 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 93,
         },
         description: 'Claude Opus 4.1 - Highest intelligence and capability with reasoning support',
+    },
+
+    // Claude Opus 4.5 (November 2025)
+    {
+        id: 'claude-opus-4-5-20251101',
+        aliases: [
+            'claude-opus-4-5',
+            'claude-opus-4.5',
+            'claude-opus',
+            'claude-opus-latest',
+            'claude-4.5-opus',
+        ],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 15.0,
+            output_per_million: 75.0,
+            cached_input_per_million: 1.5,
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 32000,
+        },
+        class: 'reasoning',
+        score: 96,
+        description: 'Claude Opus 4.5 - Latest Opus model with strongest reasoning, code, and long-form capabilities.',
     },
 
     //
@@ -1760,8 +1787,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Paid preview of Gemini 2.5 Pro. State-of-the-art multipurpose model.',
     },
     {
-        id: 'gemini-2.5-flash-preview-05-20',
-        aliases: ['gemini-2.5-flash', 'gemini-2.5-flash-preview-04-17'],
+        id: 'gemini-2.5-flash',
+        aliases: ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-preview-04-17'],
         provider: 'google',
         cost: {
             input_per_million: {
@@ -1789,8 +1816,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Balanced multimodal model with large context, built for Agents.',
     },
     {
-        id: 'gemini-2.5-flash-lite-preview-06-17',
-        aliases: ['gemini-2.5-flash-lite'],
+        id: 'gemini-2.5-flash-lite',
+        aliases: ['gemini-2.5-flash-lite-preview-06-17'],
         provider: 'google',
         cost: {
             input_per_million: 0.05,
@@ -1923,10 +1950,37 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     // Image generation models
     {
+        id: 'gpt-image-1.5',
+        aliases: ['gpt-image-1.5-2025-12-16'],
+        provider: 'openai',
+        cost: {
+            // Official pricing varies by quality and output size; see model_providers/openai.ts getImageCost.
+            // Keep a representative per-image price here (medium, 1024x1024) for summaries.
+            per_image: 0.034,
+            // Token pricing (for text/image tokens) as published on OpenAI's model page.
+            input_per_million: {
+                text: 5.0,
+                image: 8.0,
+            },
+            output_per_million: {
+                text: 10.0,
+                image: 32.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image', 'text'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT Image 1.5 model for text-to-image generation and editing. Pricing varies by quality (low/medium/high) and size (1024x1024, 1024x1536, 1536x1024).",
+    },
+    {
         id: 'gpt-image-1',
         provider: 'openai',
         cost: {
-            per_image: 0.042, // Medium quality, 1024x1024 pricing
+            per_image: 0.026, // Medium quality, 1024x1024 pricing
         },
         features: {
             input_modality: ['text', 'image'],
@@ -1935,7 +1989,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description:
-            "OpenAI's GPT-Image-1 model for text-to-image generation. Supports quality levels (low: $0.011-0.016, medium: $0.042-0.063, high: $0.167-0.25) and sizes (1024x1024, 1024x1536, 1536x1024).",
+            "OpenAI's GPT-Image-1 model for text-to-image generation. Supports quality levels (low/medium/high) and sizes (1024x1024, 1024x1536, 1536x1024).",
     },
     {
         id: 'gpt-image-1-mini',
@@ -2085,6 +2139,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'gemini-2.5-flash-native-audio-preview',
+        aliases: ['gemini-2.5-flash-native-audio-preview-12-2025'],
         provider: 'google',
         cost: {
             input_per_million: 5.0, // Estimated pricing for native audio
