@@ -82,6 +82,12 @@ function truncate(
     simpleMode: boolean = false
 ): string {
     text = text.trim();
+
+    // Defensive: callers may pass `undefined` for separator.
+    if (typeof separator !== 'string' || separator.length === 0) {
+        separator = '\n\n...[truncated for summary]...\n\n';
+    }
+
     if (text.length <= length) {
         return text;
     }
@@ -182,7 +188,7 @@ export async function createSummary(content: string, prompt: string, agent?: Age
     } catch (error) {
         console.error('Error creating summary:', error);
         // Fallback to intelligent truncation
-        const truncated = truncate(content, MAX_RESULT_LENGTH, undefined, false);
+        const truncated = truncate(content, MAX_RESULT_LENGTH);
         return truncated + '\n\n[Summary generation failed, output truncated]';
     }
 }
@@ -309,7 +315,7 @@ async function createExpandableSummary(content: string, prompt: string, agent: A
     } catch (error) {
         console.error('Error creating expandable summary:', error);
         // Fallback to intelligent truncation
-        const truncated = truncate(content, MAX_RESULT_LENGTH, undefined, false);
+        const truncated = truncate(content, MAX_RESULT_LENGTH);
         return truncated + '\n\n[Summary generation failed, output truncated]';
     }
 }
