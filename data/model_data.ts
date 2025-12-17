@@ -1842,6 +1842,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 2.5 Flash Lite - cost-efficient multimodal model with 1M context.',
     },
 
+    // Gemini 3 Flash
+    {
+        id: 'gemini-3-flash',
+        aliases: ['gemini-3-flash-preview'],
+        provider: 'google',
+        cost: {
+            input_per_million: 0.1,
+            output_per_million: 0.4,
+            cached_input_per_million: 0.025,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 8192,
+        },
+        class: 'standard',
+        score: 80,
+        description: 'Gemini 3 Flash - fast, cost-efficient multimodal model for agents.',
+    },
+
     // Gemini 3 Pro (preview)
     {
         id: 'gemini-3-pro-preview',
