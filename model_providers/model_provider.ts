@@ -39,8 +39,31 @@ import { runwayProvider } from './runway.js';
 import { bytedanceProvider } from './bytedance.js';
 import { MODEL_CLASSES, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
 
+// Provider lookup by ID for explicit model matches
+const PROVIDER_BY_ID: Record<ModelProviderID, ModelProvider> = {
+    openai: openaiProvider,
+    anthropic: claudeProvider,
+    google: geminiProvider,
+    xai: grokProvider,
+    deepseek: deepSeekProvider,
+    openrouter: openRouterProvider,
+    elevenlabs: elevenLabsProvider,
+    luma: lumaProvider,
+    ideogram: ideogramProvider,
+    midjourney: midjourneyProvider,
+    stability: stabilityProvider,
+    fireworks: fireworksProvider,
+    fal: falProvider,
+    runway: runwayProvider,
+    bytedance: bytedanceProvider,
+    test: testProvider,
+};
+
 // Provider mapping by model prefix
 const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
+    // Explicit model IDs that would otherwise be captured by broader prefixes
+    'text-embedding-004': geminiProvider, // Google Text Embeddings use an OpenAI-like prefix
+
     // OpenRouter models (must come before OpenAI to take precedence)
     'gpt-oss-': openRouterProvider, // Open source GPT models via OpenRouter
 
@@ -130,6 +153,12 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return !!process.env.OPENROUTER_API_KEY;
         case 'elevenlabs':
             return !!process.env.ELEVENLABS_API_KEY;
+        case 'luma':
+            return !!process.env.LUMA_API_KEY;
+        case 'ideogram':
+            return !!process.env.IDEOGRAM_API_KEY;
+        case 'midjourney' as any:
+            return !!(process.env.MIDJOURNEY_API_KEY || process.env.MJ_API_KEY || process.env.KIE_API_KEY);
         case 'test':
             return true; // Test provider is always valid
         case 'stability':
@@ -164,6 +193,12 @@ export function getProviderFromModel(model: string): ModelProviderID {
         if (externalModel) {
             return externalModel.provider;
         }
+    }
+
+    // If the model is registered, trust its provider even if the prefix collides
+    const registeredModel = findModel(model);
+    if (registeredModel) {
+        return registeredModel.provider;
     }
 
     // Special case: gpt-oss models go through OpenRouter
@@ -498,6 +533,22 @@ export function getModelProvider(model?: string): ModelProvider {
                     return externalProvider;
                 }
             }
+        }
+
+        // If we have a registered model entry, return the provider directly
+        const registeredModel = findModel(model);
+        if (registeredModel) {
+            const providerName = registeredModel.provider;
+            const provider = PROVIDER_BY_ID[providerName];
+            if (!provider) {
+                throw new Error(`No provider implementation found for ${providerName}.`);
+            }
+            if (!isProviderKeyValid(providerName)) {
+                throw new Error(
+                    `API key for ${providerName} provider is missing or invalid. Please set ${providerName.toUpperCase()}_API_KEY environment variable.`
+                );
+            }
+            return provider;
         }
 
         for (const [prefix, provider] of Object.entries(MODEL_PROVIDER_MAP)) {

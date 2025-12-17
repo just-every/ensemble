@@ -3,22 +3,36 @@ import { canRunAgent } from '../model_providers/model_provider.js';
 import { overrideModelClass, clearExternalRegistrations } from '../utils/external_models.js';
 
 describe('canRunAgent', () => {
+    const transientKeys = [
+        'OPENAI_API_KEY',
+        'ANTHROPIC_API_KEY',
+        'GOOGLE_API_KEY',
+        'XAI_API_KEY',
+        'DEEPSEEK_API_KEY',
+        'OPENROUTER_API_KEY',
+        'ELEVENLABS_API_KEY',
+        'LUMA_API_KEY',
+        'IDEOGRAM_API_KEY',
+        'MIDJOURNEY_API_KEY',
+        'MJ_API_KEY',
+        'KIE_API_KEY',
+    ];
+
     // Store original env vars
     const originalEnv = { ...process.env };
 
     beforeEach(() => {
-        // Clear all API keys
-        delete process.env.OPENAI_API_KEY;
-        delete process.env.ANTHROPIC_API_KEY;
-        delete process.env.GOOGLE_API_KEY;
-        delete process.env.XAI_API_KEY;
-        delete process.env.DEEPSEEK_API_KEY;
-        delete process.env.OPENROUTER_API_KEY;
-        delete process.env.ELEVENLABS_API_KEY;
+        // Clear all API keys that tests may set
+        for (const key of transientKeys) {
+            delete process.env[key];
+        }
     });
 
     afterEach(() => {
         // Restore original env vars
+        for (const key of transientKeys) {
+            delete process.env[key];
+        }
         Object.assign(process.env, originalEnv);
         // Clear all external registrations including model class overrides
         clearExternalRegistrations();
@@ -76,6 +90,58 @@ describe('canRunAgent', () => {
                 canRun: true,
                 model: 'test-model',
                 provider: 'test',
+            });
+        });
+
+        it('routes Google text embeddings to the Google provider', async () => {
+            process.env.GOOGLE_API_KEY = 'test-google-key';
+
+            const result = await canRunAgent({ model: 'text-embedding-004' });
+
+            expect(result).toMatchObject({
+                canRun: true,
+                model: 'text-embedding-004',
+                provider: 'google',
+                missingProvider: undefined,
+            });
+        });
+
+        it('resolves Luma models when LUMA_API_KEY is set', async () => {
+            process.env.LUMA_API_KEY = 'test-luma-key';
+
+            const result = await canRunAgent({ model: 'luma-photon-1' });
+
+            expect(result).toMatchObject({
+                canRun: true,
+                model: 'luma-photon-1',
+                provider: 'luma',
+                missingProvider: undefined,
+            });
+        });
+
+        it('resolves Ideogram models when IDEOGRAM_API_KEY is set', async () => {
+            process.env.IDEOGRAM_API_KEY = 'test-ideogram-key';
+
+            const result = await canRunAgent({ model: 'ideogram-3.0' });
+
+            expect(result).toMatchObject({
+                canRun: true,
+                model: 'ideogram-3.0',
+                provider: 'ideogram',
+                missingProvider: undefined,
+            });
+        });
+
+        it('resolves Midjourney models when MIDJOURNEY_API_KEY is set', async () => {
+            process.env.MIDJOURNEY_API_KEY = 'test-midjourney-key';
+
+            const result = await canRunAgent({ model: 'midjourney-v7' });
+
+            expect(result).toMatchObject({
+                canRun: true,
+                model: 'midjourney-v7',
+                provider: 'midjourney',
+                missingProvider: undefined,
             });
         });
     });
