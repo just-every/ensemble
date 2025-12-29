@@ -51,7 +51,7 @@ export const MODEL_CLASSES = {
         models: [
             // One top pick per provider (prefer stable IDs over dated previews when possible)
             'gpt-5.2-chat-latest', // OpenAI
-            'gemini-2.5-flash', // Google
+            'gemini-3-flash-preview', // Google
             'claude-sonnet-4-5-20250929', // Anthropic
             'grok-4', // X.AI
         ],
@@ -96,7 +96,7 @@ export const MODEL_CLASSES = {
     reasoning_mini: {
         models: [
             'gpt-5-mini', // OpenAI
-            'gemini-2.5-flash', // Google
+            'gemini-3-flash-preview', // Google
             'claude-sonnet-4-5-20250929', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -141,7 +141,7 @@ export const MODEL_CLASSES = {
     writing: {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
-            'gemini-2.5-flash', // Google
+            'gemini-3-flash-preview', // Google
             'claude-sonnet-4-5-20250929', // Anthropic
             'grok-4', // X.AI
         ],
@@ -175,7 +175,7 @@ export const MODEL_CLASSES = {
     vision_mini: {
         models: [
             'gpt-5-mini', // OpenAI
-            'gemini-2.5-flash', // Google
+            'gemini-3-flash-preview', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -1786,9 +1786,38 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         score: 80, // High score for paid preview version
         description: 'Paid preview of Gemini 2.5 Pro. State-of-the-art multipurpose model.',
     },
+    // Gemini 3 Flash (preview)
+    {
+        id: 'gemini-3-flash-preview',
+        aliases: ['gemini-3-flash'],
+        provider: 'google',
+        cost: {
+            input_per_million: {
+                text: 0.5,
+                image: 0.5,
+                video: 0.5,
+                audio: 1.0,
+            },
+            output_per_million: 3.0,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+        },
+        class: 'standard',
+        description: 'Gemini 3 Flash Preview - fast multimodal model with 1M context window.',
+    },
     {
         id: 'gemini-2.5-flash',
-        aliases: ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-preview-04-17'],
+        aliases: [
+            'gemini-2.5-flash-preview-05-20',
+            'gemini-2.5-flash-preview-04-17',
+        ],
         provider: 'google',
         cost: {
             input_per_million: {
@@ -1842,10 +1871,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 2.5 Flash Lite - cost-efficient multimodal model with 1M context.',
     },
 
-    // Gemini 3 Flash
+    // Gemini 2.0 Flash Experimental
     {
-        id: 'gemini-3-flash',
-        aliases: ['gemini-3-flash-preview'],
+        id: 'gemini-2.0-flash-exp',
+        aliases: ['gemini-2.0-flash-experimental'],
         provider: 'google',
         cost: {
             input_per_million: 0.1,
@@ -1862,8 +1891,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             max_output_tokens: 8192,
         },
         class: 'standard',
-        score: 80,
-        description: 'Gemini 3 Flash - fast, cost-efficient multimodal model for agents.',
+        score: 78,
+        description: 'Gemini 2.0 Flash Experimental (v1beta) - experimental multimodal model.',
     },
 
     // Gemini 3 Pro (preview)
@@ -1882,15 +1911,20 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 price_below_threshold_per_million: 12.0,
                 price_above_threshold_per_million: 18.0,
             },
+            cached_input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+            },
         },
         features: {
-            context_length: 1_000_000,
+            context_length: 1048576,
             input_modality: ['text', 'image', 'video', 'audio'],
-            output_modality: ['text', 'image', 'audio'],
+            output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 8192,
+            max_output_tokens: 65536,
         },
         class: 'reasoning',
         score: 90,

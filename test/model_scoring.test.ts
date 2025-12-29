@@ -10,9 +10,15 @@ vi.mock('../utils/quota_tracker.js', () => ({
 }));
 
 // Mock environment variables for testing
-process.env.OPENAI_API_KEY = 'sk-test';
-process.env.GOOGLE_API_KEY = 'test-key';
-process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+process.env.OPENAI_API_KEY =
+    process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')
+        ? process.env.OPENAI_API_KEY
+        : 'sk-test';
+process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'test-key';
+process.env.ANTHROPIC_API_KEY =
+    process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-')
+        ? process.env.ANTHROPIC_API_KEY
+        : 'sk-ant-test';
 
 describe('Model Scoring and Disabling', () => {
     it('should respect disabled models', async () => {
@@ -34,7 +40,7 @@ describe('Model Scoring and Disabling', () => {
             modelClass: 'standard',
             modelScores: {
                 'gpt-5.2-chat-latest': 90, // Should be selected most often
-                'gemini-2.5-flash': 10, // Should be selected rarely
+                'gemini-3-flash-preview': 10, // Should be selected rarely
             },
         };
 
@@ -50,7 +56,7 @@ describe('Model Scoring and Disabling', () => {
         // With 90:10 weighting, the high-weight model should be selected significantly more often
         // We'll allow some variance but expect at least 70% for the high-weight model
         const gptCount = selectionCounts['gpt-5.2-chat-latest'] || 0;
-        const geminiCount = selectionCounts['gemini-2.5-flash'] || 0;
+        const geminiCount = selectionCounts['gemini-3-flash-preview'] || 0;
 
         // Only check if both models were available
         if (gptCount > 0 && geminiCount > 0) {
@@ -64,7 +70,7 @@ describe('Model Scoring and Disabling', () => {
             disabledModels: ['deepseek-chat', 'grok-4'],
             modelScores: {
                 'gpt-5.2-chat-latest': 80,
-                'gemini-2.5-flash': 20,
+                'gemini-3-flash-preview': 20,
                 'claude-sonnet-4-5-20250929': 50,
             },
         };
@@ -77,7 +83,7 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('grok-4');
             // Should only select from scored models that aren't disabled
             expect([
-                'gemini-2.5-flash',
+                'gemini-3-flash-preview',
                 'gpt-5.2-chat-latest',
                 'claude-sonnet-4-5-20250929',
             ]).toContain(model);
@@ -103,7 +109,7 @@ describe('Model Scoring and Disabling', () => {
     it('should work with getModelFromClass directly', async () => {
         const modelScores = {
             'gpt-5.2-chat-latest': 100,
-            'gemini-2.5-flash': 0, // Zero weight, should never be selected
+            'gemini-3-flash-preview': 0, // Zero weight, should never be selected
         };
 
         // Run multiple times
@@ -113,7 +119,7 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat'); // Should never select disabled
 
             // With a score of 0, the zero-weight model should never be selected when other models have positive weights
-            if (model === 'gemini-2.5-flash') {
+            if (model === 'gemini-3-flash-preview') {
                 zeroWeightSelected = true;
             }
         }

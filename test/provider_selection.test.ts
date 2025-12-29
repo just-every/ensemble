@@ -8,12 +8,24 @@ import { deepSeekProvider } from '../model_providers/deepseek.js';
 import { openRouterProvider } from '../model_providers/openrouter.js';
 
 beforeEach(() => {
-    process.env.OPENAI_API_KEY = 'sk-test';
-    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    process.env.GOOGLE_API_KEY = 'test';
-    process.env.XAI_API_KEY = 'xai-test';
-    process.env.DEEPSEEK_API_KEY = 'sk-test';
-    process.env.OPENROUTER_API_KEY = 'test';
+    process.env.OPENAI_API_KEY =
+        process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')
+            ? process.env.OPENAI_API_KEY
+            : 'sk-test';
+    process.env.ANTHROPIC_API_KEY =
+        process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-')
+            ? process.env.ANTHROPIC_API_KEY
+            : 'sk-ant-test';
+    process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'test';
+    process.env.XAI_API_KEY =
+        process.env.XAI_API_KEY && process.env.XAI_API_KEY.startsWith('xai-')
+            ? process.env.XAI_API_KEY
+            : 'xai-test';
+    process.env.DEEPSEEK_API_KEY =
+        process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.startsWith('sk-')
+            ? process.env.DEEPSEEK_API_KEY
+            : 'sk-test';
+    process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'test';
 });
 
 describe('getModelProvider', () => {

@@ -564,14 +564,14 @@ export function getModelProvider(model?: string): ModelProvider {
         }
     }
 
-    // Default to FAL if available; else OpenRouter
+    // Default to OpenRouter if available; else FAL
+    if (isProviderKeyValid(getProviderFromModel('openrouter'))) {
+        return openRouterProvider;
+    }
     if (isProviderKeyValid('fal' as any)) {
         return falProvider;
     }
-    if (!isProviderKeyValid(getProviderFromModel('openrouter'))) {
-        throw new Error(`No valid provider found for the model ${model}. Please check your API keys.`);
-    }
-    return openRouterProvider;
+    throw new Error(`No valid provider found for the model ${model}. Please check your API keys.`);
 }
 
 /**

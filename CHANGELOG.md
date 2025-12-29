@@ -1,5 +1,10 @@
 # Changelog
 
+## 2025-12-29
+- Promoted Gemini 3 Flash Preview to a first-class model entry and set it as the default Flash choice in model classes.
+- Updated Gemini 3 Pro Preview metadata (cached pricing + output modality) and aligned context/max output tokens with docs.
+- Refreshed tests to use gemini-3-flash-preview where applicable.
+
 ## 2025-12-14
 - Added OpenAI GPT-5.2 lineup (gpt-5.2, gpt-5.2-chat-latest, gpt-5.2-pro) with verified pricing.
 - Fixed OpenAI GPT-5 / GPT-5.1 / Codex pricing and capabilities (context limits, modalities, cached input rates).
