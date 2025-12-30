@@ -270,6 +270,10 @@ function getMimeFromMeta(meta: string): { mime?: string; charset?: string; isBas
     return { mime, charset, isBase64 };
 }
 
+function appendCharset(mime: string, charset?: string): string {
+    return charset ? `${mime};${charset}` : mime;
+}
+
 function looksLikeUrl(input: string): boolean {
     const trimmed = input.trim();
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) return true;
@@ -311,13 +315,13 @@ export function normalizeImageDataUrl(input: {
         const meta = match[1] || '';
         const payload = match[2] || '';
         const { mime, charset, isBase64 } = getMimeFromMeta(meta);
-        const candidateMime = [mime, charset].filter(Boolean).join(';') || input.mime_type;
 
         const normalizedBase64 =
             isBase64 || looksLikeBase64(payload) ? normalizeBase64String(payload) : null;
         if (normalizedBase64) {
             const detected = detectImageType(normalizedBase64);
-            const mimeType = candidateMime || detected || 'image/png';
+            const baseMime = mime || input.mime_type || detected || 'image/png';
+            const mimeType = appendCharset(baseMime, charset);
             return { dataUrl: `data:${mimeType};base64,${normalizedBase64}` };
         }
 
@@ -332,7 +336,8 @@ export function normalizeImageDataUrl(input: {
         })();
         if (decoded) {
             const svgLike = /^<\?xml|<svg/i.test(decoded);
-            const mimeType = candidateMime || (svgLike ? 'image/svg+xml' : 'image/png');
+            const baseMime = mime || input.mime_type || (svgLike ? 'image/svg+xml' : 'image/png');
+            const mimeType = appendCharset(baseMime, charset);
             const base64 = Buffer.from(decoded, 'utf8').toString('base64');
             return { dataUrl: `data:${mimeType};base64,${base64}` };
         }
@@ -347,9 +352,10 @@ export function normalizeImageDataUrl(input: {
             const payload = match[2] || '';
             const normalizedBase64 = normalizeBase64String(payload);
             if (normalizedBase64) {
-                const mimeType = input.mime_type || (meta && !meta.includes('data:') ? meta.replace(/^data:/, '') : '') ||
-                    detectImageType(normalizedBase64) ||
-                    'image/png';
+                const { mime, charset } = getMimeFromMeta(meta);
+                const detected = detectImageType(normalizedBase64);
+                const baseMime = mime || input.mime_type || detected || 'image/png';
+                const mimeType = appendCharset(baseMime, charset);
                 return { dataUrl: `data:${mimeType};base64,${normalizedBase64}` };
             }
         }
