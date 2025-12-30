@@ -875,12 +875,13 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Check if any tools require special handling
             let hasGoogleWebSearch = false;
+            let functionDeclarations: FunctionDeclaration[] = [];
             if (tools && tools.length > 0) {
                 // Check for Google web search tool
                 hasGoogleWebSearch = tools.some(tool => tool.definition.function.name === 'google_web_search');
 
                 // Configure standard function calling tools
-                const functionDeclarations = await convertToGeminiFunctionDeclarations(tools);
+                functionDeclarations = await convertToGeminiFunctionDeclarations(tools);
                 let allowedFunctionNames: string[] = [];
 
                 if (functionDeclarations.length > 0) {
@@ -923,14 +924,17 @@ export class GeminiProvider extends BaseModelProvider {
             // Set up Google Search grounding if needed
             if (hasGoogleWebSearch) {
                 console.log('[Gemini] Enabling Google Search grounding');
-                // Configure the Google Search grounding
-                config.tools = [{ googleSearch: {} }];
-                config.toolConfig = {
-                    functionCallingConfig: {
-                        mode: FunctionCallingConfigMode.ANY,
-                        allowedFunctionNames: ['googleSearch'],
-                    },
-                };
+                // Configure the Google Search grounding. Do not set functionCallingConfig when only using
+                // googleSearch, as it is not a function declaration tool.
+                const toolGroups: NonNullable<GenerateContentConfig['tools']> = [{ googleSearch: {} }];
+                if (functionDeclarations.length > 0) {
+                    toolGroups.push({ functionDeclarations });
+                }
+                config.tools = toolGroups;
+
+                if (functionDeclarations.length === 0) {
+                    delete config.toolConfig;
+                }
             }
 
             const requestParams: GenerateContentParameters = {
