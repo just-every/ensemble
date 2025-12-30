@@ -159,6 +159,15 @@ export interface ResponseContentImage {
     image_url?: string;
 }
 
+export interface ResponseContentImageData {
+    type: 'image';
+    data?: string; // base64 string or data URL
+    url?: string; // http(s) URL
+    file_id?: string;
+    mime_type?: string; // e.g. image/png
+    detail?: 'high' | 'low' | 'auto';
+}
+
 export interface ResponseContentFileInput {
     type: 'input_file';
     file_data?: string;
@@ -169,7 +178,9 @@ export interface ResponseContentFileInput {
 /**
  * ResponseContent
  */
-export type ResponseContent = string | Array<ResponseContentText | ResponseContentImage | ResponseContentFileInput>;
+export type ResponseContent =
+    | string
+    | Array<ResponseContentText | ResponseContentImage | ResponseContentImageData | ResponseContentFileInput>;
 
 /**
  * ResponseInput

@@ -53,7 +53,7 @@ import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { appendMessageWithImage, resizeAndTruncateForGemini } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl, resizeAndTruncateForGemini } from '../utils/image_utils.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
@@ -396,39 +396,101 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
             );
         } else {
             // Regular message
-            let textContent = '';
-            if (typeof msg.content === 'string') {
-                textContent = msg.content;
-            } else if (msg.content && typeof msg.content === 'object' && 'text' in msg.content) {
-                textContent = msg.content.text as string;
-            } else {
-                textContent = JSON.stringify(msg.content);
-            }
-
             const role = msg.role === 'assistant' ? 'model' : 'user';
-            const message: Content = {
-                role,
-                parts: [
-                    {
-                        thought: msg.type === 'thinking',
-                        text: textContent.trim(),
-                    },
-                ],
-            };
 
-            contents = await appendMessageWithImage(
-                model,
-                contents,
-                message,
-                {
-                    read: () => textContent,
-                    write: value => {
-                        message.parts[0].text = value;
-                        return message;
+            // Handle array content with input_text and input_image types
+            if (Array.isArray(msg.content)) {
+                const parts: any[] = [];
+                for (const item of msg.content) {
+                    if (item.type === 'input_text') {
+                        parts.push({
+                            thought: msg.type === 'thinking',
+                            text: item.text || '',
+                        });
+                    } else if (item.type === 'input_image' || item.type === 'image') {
+                        const normalized = normalizeImageDataUrl({
+                            data: 'data' in item ? item.data : undefined,
+                            image_url: 'image_url' in item ? item.image_url : undefined,
+                            url: 'url' in item ? item.url : undefined,
+                            mime_type: 'mime_type' in item ? item.mime_type : undefined,
+                        });
+                        // Convert input_image/image to Gemini's inlineData format
+                        const imageUrl = normalized.dataUrl || normalized.url || ('image_url' in item ? item.image_url : '');
+                        if (imageUrl.startsWith('data:')) {
+                            // Parse data URL: data:image/png;base64,xxx
+                            const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+                            if (match) {
+                                const mimeType = match[1];
+                                const base64Data = match[2];
+                                // Resize image for Gemini if needed
+                                const processedData = await resizeAndTruncateForGemini(imageUrl);
+                                const processedMatch = processedData.match(/^data:([^;]+);base64,(.+)$/);
+                                if (processedMatch) {
+                                    parts.push({
+                                        inlineData: {
+                                            mimeType: processedMatch[1],
+                                            data: processedMatch[2],
+                                        },
+                                    });
+                                } else {
+                                    parts.push({
+                                        inlineData: {
+                                            mimeType: mimeType,
+                                            data: base64Data,
+                                        },
+                                    });
+                                }
+                            }
+                        } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                            // Handle URL-based images
+                            parts.push({
+                                fileData: {
+                                    mimeType: 'image/*',
+                                    fileUri: imageUrl,
+                                },
+                            });
+                        }
+                    }
+                }
+
+                if (parts.length > 0) {
+                    const message: Content = { role, parts };
+                    contents.push(message);
+                }
+            } else {
+                // Handle string content (non-array case)
+                let textContent = '';
+                if (typeof msg.content === 'string') {
+                    textContent = msg.content;
+                } else {
+                    // Fallback for unexpected content types
+                    textContent = JSON.stringify(msg.content);
+                }
+
+                const message: Content = {
+                    role,
+                    parts: [
+                        {
+                            thought: msg.type === 'thinking',
+                            text: textContent.trim(),
+                        },
+                    ],
+                };
+
+                contents = await appendMessageWithImage(
+                    model,
+                    contents,
+                    message,
+                    {
+                        read: () => textContent,
+                        write: value => {
+                            message.parts[0].text = value;
+                            return message;
+                        },
                     },
-                },
-                addImagesToInput
-            );
+                    addImagesToInput
+                );
+            }
         }
     }
 

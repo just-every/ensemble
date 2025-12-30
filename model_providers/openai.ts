@@ -11,6 +11,7 @@ import {
     ProviderStreamEvent,
     ToolCall,
     ResponseInput,
+    ResponseContent,
     AgentDefinition,
     ImageGenerationOpts,
     VoiceGenerationOpts,
@@ -25,7 +26,7 @@ import OpenAI, { toFile } from 'openai';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import { hasEventHandler } from '../utils/event_controller.js';
@@ -354,6 +355,46 @@ async function addImagesToInput(
         }
     }
     return input;
+}
+
+async function convertContentPartsToOpenAI(content: ResponseContent): Promise<ResponseContent> {
+    if (!Array.isArray(content)) return content;
+
+    const parts: ResponseContent = [];
+
+    for (const item of content) {
+        if (item.type === 'input_text') {
+            parts.push(item);
+        } else if (item.type === 'input_image' || item.type === 'image') {
+            const normalized = normalizeImageDataUrl({
+                data: 'data' in item ? item.data : undefined,
+                image_url: 'image_url' in item ? item.image_url : undefined,
+                url: 'url' in item ? item.url : undefined,
+                mime_type: 'mime_type' in item ? item.mime_type : undefined,
+            });
+            const imageUrl = normalized.dataUrl || normalized.url || ('image_url' in item ? item.image_url : '');
+            if (!imageUrl) continue;
+
+            if (imageUrl.startsWith('data:')) {
+                const processedImages = await resizeAndSplitForOpenAI(imageUrl);
+                for (const processedImage of processedImages) {
+                    parts.push({
+                        type: 'input_image',
+                        image_url: processedImage,
+                        detail: item.detail || 'auto',
+                    });
+                }
+            } else {
+                parts.push({
+                    type: 'input_image',
+                    image_url: imageUrl,
+                    detail: item.detail || 'auto',
+                });
+            }
+        }
+    }
+
+    return parts;
 }
 
 /**
@@ -1121,13 +1162,22 @@ export class OpenAIProvider extends BaseModelProvider {
                         message = rest;
                     }
 
-                    input = await appendMessageWithImage(
-                        model,
-                        input,
-                        { ...message, type: 'message' },
-                        'content',
-                        addImagesToInput
-                    );
+                    if (Array.isArray(message.content)) {
+                        const convertedContent = await convertContentPartsToOpenAI(message.content);
+                        input.push({
+                            ...message,
+                            type: 'message',
+                            content: convertedContent,
+                        });
+                    } else {
+                        input = await appendMessageWithImage(
+                            model,
+                            input,
+                            { ...message, type: 'message' },
+                            'content',
+                            addImagesToInput
+                        );
+                    }
                     continue;
                 }
             }

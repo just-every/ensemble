@@ -12,6 +12,7 @@ import {
     ProviderStreamEvent,
     ToolCall,
     ResponseInput,
+    ResponseContent,
     AgentDefinition,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
@@ -21,7 +22,7 @@ import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
-import { appendMessageWithImage, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
 // import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
@@ -221,6 +222,55 @@ export async function addImagesToInput(
     return input;
 }
 
+async function convertContentPartsToOpenAI(
+    content: ResponseContent
+): Promise<OpenAI.Chat.Completions.ChatCompletionContentPart[]> {
+    if (!Array.isArray(content)) return [];
+
+    const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+
+    for (const item of content) {
+        if (item.type === 'input_text') {
+            parts.push({
+                type: 'text',
+                text: item.text || '',
+            });
+        } else if (item.type === 'input_image' || item.type === 'image') {
+            const normalized = normalizeImageDataUrl({
+                data: 'data' in item ? item.data : undefined,
+                image_url: 'image_url' in item ? item.image_url : undefined,
+                url: 'url' in item ? item.url : undefined,
+                mime_type: 'mime_type' in item ? item.mime_type : undefined,
+            });
+            const imageUrl = normalized.dataUrl || normalized.url || ('image_url' in item ? item.image_url : '');
+            if (!imageUrl) continue;
+
+            if (imageUrl.startsWith('data:')) {
+                const processedImages = await resizeAndSplitForOpenAI(imageUrl);
+                for (const processedImage of processedImages) {
+                    parts.push({
+                        type: 'image_url',
+                        image_url: {
+                            url: processedImage,
+                            ...(item.detail ? { detail: item.detail } : {}),
+                        },
+                    });
+                }
+            } else {
+                parts.push({
+                    type: 'image_url',
+                    image_url: {
+                        url: imageUrl,
+                        ...(item.detail ? { detail: item.detail } : {}),
+                    },
+                });
+            }
+        }
+    }
+
+    return parts;
+}
+
 /** Maps internal message history format to OpenAI's format. */
 async function mapMessagesToOpenAI(
     messages: ResponseInput,
@@ -305,6 +355,18 @@ async function mapMessagesToOpenAI(
                 if (!['system', 'user', 'assistant'].includes(message.role)) {
                     message.role = 'user';
                 }
+
+                if (Array.isArray(message.content)) {
+                    const convertedParts = await convertContentPartsToOpenAI(message.content);
+                    if (convertedParts.length > 0) {
+                        result.push({
+                            role: message.role as 'system' | 'user' | 'assistant',
+                            content: convertedParts,
+                        } as OpenAI.Chat.Completions.ChatCompletionMessageParam);
+                        continue;
+                    }
+                }
+
                 result = await appendMessageWithImage(model, result, message, 'content', addImagesToInput);
             }
         }

@@ -26,6 +26,7 @@ import {
     ToolCall,
     ResponseInput,
     ResponseInputItem,
+    ResponseContent,
     AgentDefinition,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
@@ -33,7 +34,7 @@ import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { findModel } from '../data/model_data.js';
-import { appendMessageWithImage, resizeAndTruncateForClaude } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl, resizeAndTruncateForClaude } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 
@@ -68,6 +69,43 @@ function contentToString(content: any) {
         return JSON.stringify(content);
     }
     return '';
+}
+
+async function convertContentPartsToClaude(content: ResponseContent): Promise<any[]> {
+    if (!Array.isArray(content)) return [];
+
+    const blocks: any[] = [];
+    for (const item of content) {
+        if (item.type === 'input_text') {
+            blocks.push({ type: 'text', text: item.text || '' });
+        } else if (item.type === 'input_image' || item.type === 'image') {
+            const normalized = normalizeImageDataUrl({
+                data: 'data' in item ? item.data : undefined,
+                image_url: 'image_url' in item ? item.image_url : undefined,
+                url: 'url' in item ? item.url : undefined,
+                mime_type: 'mime_type' in item ? item.mime_type : undefined,
+            });
+
+            if (!normalized.dataUrl) {
+                if (normalized.url) {
+                    console.warn('Claude image URL inputs are not supported; provide base64 data instead.');
+                }
+                continue;
+            }
+
+            const processedImageData = await resizeAndTruncateForClaude(normalized.dataUrl);
+            blocks.push({
+                type: 'image',
+                source: {
+                    type: 'base64',
+                    media_type: getImageMediaType(processedImageData),
+                    data: cleanBase64Data(processedImageData),
+                },
+            });
+        }
+    }
+
+    return blocks;
 }
 
 /**
@@ -325,17 +363,24 @@ async function convertToClaudeMessage(
             messageRole = 'user';
         }
 
-        // Append images to a content block array
         let contentBlocks = [];
-        const textBlock = { type: 'text', text: content };
-        contentBlocks = await appendMessageWithImage(
-            model,
-            contentBlocks,
-            textBlock,
-            'text',
-            addImagesToInput,
-            messageRole === 'system' ? 'system prompt' : 'message'
-        );
+
+        if ('content' in msg && Array.isArray(msg.content)) {
+            contentBlocks = await convertContentPartsToClaude(msg.content);
+        }
+
+        if (contentBlocks.length === 0) {
+            // Append images to a content block array
+            const textBlock = { type: 'text', text: content };
+            contentBlocks = await appendMessageWithImage(
+                model,
+                contentBlocks,
+                textBlock,
+                'text',
+                addImagesToInput,
+                messageRole === 'system' ? 'system prompt' : 'message'
+            );
+        }
 
         if (messageRole === 'system') {
             const textContent = contentToString(contentBlocks.filter(block => block.type === 'text'));

@@ -6,6 +6,7 @@
 
 import { Buffer } from 'buffer';
 import { v4 as uuidv4 } from 'uuid';
+import { detectImageType, isValidBase64 } from './image_validation.js';
 
 // Lazy-load sharp only when needed
 let sharpModule: any = null;
@@ -216,6 +217,32 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
         image_id: firstImageId,
         images: images,
     };
+}
+
+export function normalizeImageDataUrl(input: {
+    data?: string;
+    image_url?: string;
+    url?: string;
+    mime_type?: string;
+}): { dataUrl?: string; url?: string } {
+    const raw = input.data || input.image_url || input.url;
+    if (!raw) return {};
+
+    if (raw.startsWith('data:')) {
+        return { dataUrl: raw };
+    }
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        return { url: raw };
+    }
+
+    const cleaned = raw.replace(/\s+/g, '');
+    if (!isValidBase64(cleaned)) {
+        return {};
+    }
+
+    const mimeType = input.mime_type || detectImageType(cleaned) || 'image/png';
+    return { dataUrl: `data:${mimeType};base64,${cleaned}` };
 }
 
 /**
