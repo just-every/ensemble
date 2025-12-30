@@ -1,5 +1,8 @@
 # Changelog
 
+## 2025-12-30
+- Documented the new `image` content part and added a full example for image input + JSON output.
+
 ## 2025-12-29
 - Promoted Gemini 3 Flash Preview to a first-class model entry and set it as the default Flash choice in model classes.
 - Updated Gemini 3 Pro Preview metadata (cached pricing + output modality) and aligned context/max output tokens with docs.

@@ -183,6 +183,85 @@ Key configuration options:
 - `maxToolCallRoundsPerTurn` - Limits sequential rounds where each round can have multiple parallel tool calls
 - `modelSettings` - Provider-specific parameters like temperature, max_tokens, etc.
 
+### Multimodal Input (Images)
+
+For multimodal models, pass content as an array of typed parts. In addition to `input_text` and `input_image`, Ensemble now accepts a simpler `image` part that can take base64 data or a URL.
+
+Supported image fields:
+- `type: 'image'`
+- `data`: base64 string **or** full `data:<mime>;base64,...` URL
+- `url`: http(s) URL
+- `file_id`: provider file reference (when supported)
+- `mime_type`: image mime type (recommended when passing raw base64)
+- `detail`: `high` | `low` | `auto` (for providers that support detail hints)
+
+```ts
+import { ensembleRequest } from '@just-every/ensemble';
+
+const messages = [
+  {
+    type: 'message',
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'Describe this image.' },
+      { type: 'image', data: myPngBase64, mime_type: 'image/png' }
+      // or: { type: 'image', url: 'https://example.com/cat.png' }
+    ],
+  },
+];
+
+for await (const event of ensembleRequest(messages, { model: 'gemini-3-flash-preview' })) {
+  if (event.type === 'message_complete' && 'content' in event) {
+    console.log(event.content);
+  }
+}
+```
+
+### Structured JSON Output
+
+Use `modelSettings.json_schema` to request a JSON-only response. The schema is validated by providers that support it.
+
+The example below combines **image input** with **JSON output**:
+
+```ts
+import { ensembleRequest, ensembleResult } from '@just-every/ensemble';
+
+const agent = {
+  model: 'gemini-3-flash-preview',
+  modelSettings: {
+    max_tokens: 256,
+    temperature: 0.2,
+    json_schema: {
+      name: 'image_analysis',
+      type: 'json_schema',
+      schema: {
+        type: 'object',
+        properties: {
+          dominant_color: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['dominant_color', 'confidence'],
+      },
+    },
+  },
+};
+
+const messages = [
+  {
+    type: 'message',
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'Analyze this image and return JSON.' },
+      { type: 'image', data: myPngBase64, mime_type: 'image/png' },
+    ],
+  },
+];
+
+const result = await ensembleResult(ensembleRequest(messages, agent));
+const parsed = JSON.parse(result.message);
+console.log(parsed.dominant_color, parsed.confidence);
+```
+
 ### Advanced Features
 
 - **Parallel Tool Execution** - Tools run concurrently by default within each round
