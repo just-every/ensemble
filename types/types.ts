@@ -161,7 +161,7 @@ export interface ResponseContentImage {
 
 export interface ResponseContentImageData {
     type: 'image';
-    data?: string; // base64 string or data URL
+    data?: string | ArrayBuffer | Uint8Array; // base64 string, data URL, or binary data
     url?: string; // http(s) URL
     file_id?: string;
     mime_type?: string; // e.g. image/png

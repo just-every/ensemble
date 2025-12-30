@@ -219,30 +219,167 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     };
 }
 
+function looksLikeBase64(input: string): boolean {
+    const trimmed = input.trim();
+    if (trimmed.length < 16) return false;
+    return /^[A-Za-z0-9+/_-]+={0,2}$/.test(trimmed);
+}
+
+function normalizeBase64String(input: string): string | null {
+    const cleaned = input.replace(/\s+/g, '');
+    if (!cleaned) return '';
+
+    const normalized = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+    const mod = normalized.length % 4;
+    if (mod === 1) return null;
+    const padded = normalized + (mod === 0 ? '' : '='.repeat(4 - mod));
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(padded)) return null;
+
+    try {
+        atob(padded);
+    } catch {
+        return null;
+    }
+
+    return isValidBase64(padded) ? padded : null;
+}
+
+function looksLikeHex(input: string): boolean {
+    const trimmed = input.trim();
+    if (trimmed.length < 32 || trimmed.length % 2 !== 0) return false;
+    return /^[0-9a-fA-F]+$/.test(trimmed);
+}
+
+function normalizeHexToBase64(input: string): string | null {
+    if (!looksLikeHex(input)) return null;
+    try {
+        return Buffer.from(input.trim(), 'hex').toString('base64');
+    } catch {
+        return null;
+    }
+}
+
+function getMimeFromMeta(meta: string): { mime?: string; charset?: string; isBase64: boolean } {
+    const parts = meta
+        .split(';')
+        .map(part => part.trim())
+        .filter(Boolean);
+    const isBase64 = parts.some(part => part.toLowerCase() === 'base64');
+    const charset = parts.find(part => part.toLowerCase().startsWith('charset='));
+    const mime = parts.find(part => !part.toLowerCase().startsWith('charset=') && part.toLowerCase() !== 'base64');
+    return { mime, charset, isBase64 };
+}
+
+function looksLikeUrl(input: string): boolean {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) return true;
+    if (trimmed.startsWith('//')) return true;
+    if (trimmed.includes(' ') || trimmed.includes('\n')) return false;
+    if (/^[^\s]+\.[^\s]+\//.test(trimmed)) return true;
+    if (/^[^\s]+\.[^\s]+$/.test(trimmed)) return true;
+    return false;
+}
+
+function normalizeBinaryInput(input: ArrayBuffer | Uint8Array): string {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+    return Buffer.from(bytes).toString('base64');
+}
+
 export function normalizeImageDataUrl(input: {
-    data?: string;
+    data?: string | ArrayBuffer | Uint8Array;
     image_url?: string;
     url?: string;
     mime_type?: string;
 }): { dataUrl?: string; url?: string } {
-    const raw = input.data || input.image_url || input.url;
+    const raw = input.data ?? input.image_url ?? input.url;
     if (!raw) return {};
 
-    if (raw.startsWith('data:')) {
-        return { dataUrl: raw };
+    if (raw instanceof Uint8Array || raw instanceof ArrayBuffer) {
+        const base64 = normalizeBinaryInput(raw);
+        const mimeType = input.mime_type || detectImageType(base64) || 'image/png';
+        return { dataUrl: `data:${mimeType};base64,${base64}` };
     }
 
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
-        return { url: raw };
-    }
+    if (typeof raw !== 'string') return {};
+    const trimmed = raw.trim();
+    if (!trimmed) return {};
 
-    const cleaned = raw.replace(/\s+/g, '');
-    if (!isValidBase64(cleaned)) {
+    if (trimmed.startsWith('data:')) {
+        const match = trimmed.match(/^data:([^,]*?),(.*)$/s);
+        if (!match) return { dataUrl: trimmed };
+
+        const meta = match[1] || '';
+        const payload = match[2] || '';
+        const { mime, charset, isBase64 } = getMimeFromMeta(meta);
+        const candidateMime = [mime, charset].filter(Boolean).join(';') || input.mime_type;
+
+        const normalizedBase64 =
+            isBase64 || looksLikeBase64(payload) ? normalizeBase64String(payload) : null;
+        if (normalizedBase64) {
+            const detected = detectImageType(normalizedBase64);
+            const mimeType = candidateMime || detected || 'image/png';
+            return { dataUrl: `data:${mimeType};base64,${normalizedBase64}` };
+        }
+
+        // Non-base64 payloads (e.g., SVG XML) - encode as UTF-8
+        const rawPayload = payload.trim();
+        const decoded = (() => {
+            try {
+                return decodeURIComponent(rawPayload);
+            } catch {
+                return rawPayload;
+            }
+        })();
+        if (decoded) {
+            const svgLike = /^<\?xml|<svg/i.test(decoded);
+            const mimeType = candidateMime || (svgLike ? 'image/svg+xml' : 'image/png');
+            const base64 = Buffer.from(decoded, 'utf8').toString('base64');
+            return { dataUrl: `data:${mimeType};base64,${base64}` };
+        }
+
         return {};
     }
 
-    const mimeType = input.mime_type || detectImageType(cleaned) || 'image/png';
-    return { dataUrl: `data:${mimeType};base64,${cleaned}` };
+    if (trimmed.includes(';base64,')) {
+        const match = trimmed.match(/^([^,]*?);base64,(.*)$/s);
+        if (match) {
+            const meta = match[1] || '';
+            const payload = match[2] || '';
+            const normalizedBase64 = normalizeBase64String(payload);
+            if (normalizedBase64) {
+                const mimeType = input.mime_type || (meta && !meta.includes('data:') ? meta.replace(/^data:/, '') : '') ||
+                    detectImageType(normalizedBase64) ||
+                    'image/png';
+                return { dataUrl: `data:${mimeType};base64,${normalizedBase64}` };
+            }
+        }
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) {
+        return { url: trimmed };
+    }
+
+    if (trimmed.startsWith('//')) {
+        return { url: `https:${trimmed}` };
+    }
+
+    const base64Candidate = normalizeBase64String(trimmed);
+    if (base64Candidate) {
+        const mimeType = input.mime_type || detectImageType(base64Candidate) || 'image/png';
+        return { dataUrl: `data:${mimeType};base64,${base64Candidate}` };
+    }
+
+    const hexCandidate = normalizeHexToBase64(trimmed);
+    if (hexCandidate) {
+        const mimeType = input.mime_type || detectImageType(hexCandidate) || 'image/png';
+        return { dataUrl: `data:${mimeType};base64,${hexCandidate}` };
+    }
+
+    if (looksLikeUrl(trimmed)) {
+        return { url: trimmed.startsWith('http') ? trimmed : `https://${trimmed.replace(/^\/\//, '')}` };
+    }
+
+    return {};
 }
 
 /**
