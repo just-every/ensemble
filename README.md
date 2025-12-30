@@ -229,7 +229,6 @@ import { ensembleRequest, ensembleResult } from '@just-every/ensemble';
 const agent = {
   model: 'gemini-3-flash-preview',
   modelSettings: {
-    max_tokens: 256,
     temperature: 0.2,
     json_schema: {
       name: 'image_analysis',
