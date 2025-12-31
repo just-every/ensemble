@@ -1204,6 +1204,14 @@ export class GeminiProvider extends BaseModelProvider {
             model = model || 'gemini-2.5-flash-image-preview';
             const numberOfImages = opts?.n || 1;
 
+            const { getToolsFromAgent } = await import('../utils/agent.js');
+            const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
+            const hasGoogleWebSearch = tools?.some(tool => tool.definition.function.name === 'google_web_search');
+            const hasOtherTools = tools?.some(tool => tool.definition.function.name !== 'google_web_search');
+            if (hasOtherTools) {
+                console.warn('[Gemini] Image generation ignores function tools; only google_web_search is supported.');
+            }
+
             // Map size to an aspect ratio where supported (Imagen API only)
             let aspectRatio = '1:1'; // square by default
             if (opts?.size === 'landscape') aspectRatio = '16:9';
@@ -1311,6 +1319,7 @@ export class GeminiProvider extends BaseModelProvider {
                         config: {
                             responseModalities: [Modality.IMAGE, Modality.TEXT],
                             ...(Object.keys(imageConfig).length ? { imageConfig } : {}),
+                            ...(hasGoogleWebSearch ? { tools: [{ googleSearch: {} }] } : {}),
                         },
                     };
 
