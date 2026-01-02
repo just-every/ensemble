@@ -807,6 +807,8 @@ export interface ImageGenerationOpts {
         | '1024x1536'
         | '1792x1024'
         | '1024x1792'
+        | '1696x2528'
+        | '2048x2048'
         | '512x512'
         | '256x256';
 
