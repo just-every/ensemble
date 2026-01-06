@@ -1938,12 +1938,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-3-pro-image'],
         provider: 'google',
         cost: {
-            per_image: 0.134, // AI Studio preview price per image (1024x1024 ref)
+            per_image: 0.134, // AI Studio preview price per image (1K/2K); 4K is $0.24
             input_per_million: 2.0,
             output_per_million: 12.0,
         },
         features: {
-            input_modality: ['text'],
+            input_modality: ['text', 'image'],
             output_modality: ['image', 'text'],
             streaming: false,
         },

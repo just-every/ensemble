@@ -191,8 +191,18 @@ class CostTracker {
         }
 
         // Handle Per-Image Cost Calculation
-        if (image_count > 0 && model.cost?.per_image) {
-            usage.cost += image_count * model.cost.per_image;
+        const perImageOverride =
+            usage.metadata && typeof (usage.metadata as Record<string, unknown>).cost_per_image === 'number'
+                ? (usage.metadata as Record<string, unknown>).cost_per_image
+                : undefined;
+        const perImageCost =
+            typeof perImageOverride === 'number'
+                ? perImageOverride
+                : typeof model.cost?.per_image === 'number'
+                  ? model.cost.per_image
+                  : undefined;
+        if (image_count > 0 && typeof perImageCost === 'number') {
+            usage.cost += image_count * perImageCost;
         }
 
         // Ensure cost is not negative

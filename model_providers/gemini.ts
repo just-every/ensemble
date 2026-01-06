@@ -276,6 +276,36 @@ export function getImageMimeType(imageData: string): string {
 }
 
 /**
+ * Best-effort MIME inference for URL-based images.
+ */
+function inferImageMimeTypeFromUrl(src: string): string {
+    try {
+        const url = new URL(src);
+        const path = url.pathname.toLowerCase();
+        if (path.endsWith('.png')) return 'image/png';
+        if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
+        if (path.endsWith('.webp')) return 'image/webp';
+        if (path.endsWith('.gif')) return 'image/gif';
+        if (path.endsWith('.bmp')) return 'image/bmp';
+        if (path.endsWith('.tif') || path.endsWith('.tiff')) return 'image/tiff';
+        if (path.endsWith('.svg')) return 'image/svg+xml';
+    } catch {
+        // Ignore URL parsing errors and fall back to heuristic below.
+    }
+
+    const lower = src.toLowerCase();
+    if (lower.includes('.png')) return 'image/png';
+    if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg';
+    if (lower.includes('.webp')) return 'image/webp';
+    if (lower.includes('.gif')) return 'image/gif';
+    if (lower.includes('.bmp')) return 'image/bmp';
+    if (lower.includes('.tif') || lower.includes('.tiff')) return 'image/tiff';
+    if (lower.includes('.svg')) return 'image/svg+xml';
+
+    return 'image/jpeg';
+}
+
+/**
  * Helper function to clean base64 data by removing the prefix
  */
 export function cleanBase64Data(imageData: string): string {
@@ -445,7 +475,7 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                             // Handle URL-based images
                             parts.push({
                                 fileData: {
-                                    mimeType: 'image/*',
+                                    mimeType: inferImageMimeTypeFromUrl(imageUrl),
                                     fileUri: imageUrl,
                                 },
                             });
@@ -1259,6 +1289,7 @@ export class GeminiProvider extends BaseModelProvider {
                 };
                 const imageSize = imageSizeMap[qualityKey];
                 if (imageSize) imageConfig.imageSize = imageSize;
+                const perImageCost = this.getImageCost(model, imageSize);
 
                 const constraintText = constraints.length
                     ? `\n\nImage constraints (please prioritize):\n- ${constraints.join('\n- ')}`
@@ -1292,7 +1323,7 @@ export class GeminiProvider extends BaseModelProvider {
                                                   // Assume http(s) URL
                                                   return {
                                                       fileData: {
-                                                          mimeType: 'image/*',
+                                                          mimeType: inferImageMimeTypeFromUrl(src),
                                                           fileUri: src,
                                                       },
                                                   };
@@ -1308,7 +1339,12 @@ export class GeminiProvider extends BaseModelProvider {
                                                           ? { inlineData: { mimeType: m[1] || 'image/png', data: m[2] } }
                                                           : null;
                                                   }
-                                                  return { fileData: { mimeType: 'image/*', fileUri: s } };
+                                                  return {
+                                                      fileData: {
+                                                          mimeType: inferImageMimeTypeFromUrl(s),
+                                                          fileUri: s,
+                                                      },
+                                                  };
                                               })(),
                                           ].filter(Boolean)
                                         : []),
@@ -1336,8 +1372,12 @@ export class GeminiProvider extends BaseModelProvider {
 
                     const response = await this.client.models.generateContentStream(requestParams);
                     const images: string[] = [];
+                    let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
 
                     for await (const chunk of response) {
+                        if (chunk.usageMetadata) {
+                            usageMetadata = chunk.usageMetadata;
+                        }
                         if (!chunk.candidates) continue;
                         for (const cand of chunk.candidates) {
                             const parts = cand.content?.parts || [];
@@ -1352,13 +1392,51 @@ export class GeminiProvider extends BaseModelProvider {
 
                     // Cost tracking per call
                     if (images.length > 0) {
-                        costTracker.addUsage({
-                            model,
-                            image_count: images.length,
-                            // Pass through request correlation id so streaming consumers receive cost_update
-                            request_id: opts?.request_id,
-                            metadata: { cost_per_image: this.getImageCost(model) },
-                        });
+                        const baseMetadata = {
+                            cost_per_image: perImageCost,
+                            ...(imageSize ? { image_size: imageSize } : {}),
+                        };
+                        if (usageMetadata) {
+                            const promptTokensRaw = usageMetadata.promptTokenCount || 0;
+                            const toolTokens = usageMetadata.toolUsePromptTokenCount || 0;
+                            const thoughtTokens = usageMetadata.thoughtsTokenCount || 0;
+                            const candidateTokens = usageMetadata.candidatesTokenCount || 0;
+                            const totalTokens = usageMetadata.totalTokenCount || 0;
+                            let promptTokens = promptTokensRaw;
+
+                            if (promptTokens === 0 && totalTokens > 0) {
+                                const derivedPrompt = totalTokens - candidateTokens - toolTokens - thoughtTokens;
+                                if (derivedPrompt > 0) {
+                                    promptTokens = derivedPrompt;
+                                }
+                            }
+
+                            const inputTokens = promptTokens + toolTokens;
+                            const outputTokens = candidateTokens + thoughtTokens;
+                            costTracker.addUsage({
+                                model,
+                                image_count: images.length,
+                                input_tokens: inputTokens,
+                                output_tokens: outputTokens,
+                                cached_tokens: usageMetadata.cachedContentTokenCount || 0,
+                                // Pass through request correlation id so streaming consumers receive cost_update
+                                request_id: opts?.request_id,
+                                metadata: {
+                                    ...baseMetadata,
+                                    total_tokens: totalTokens,
+                                    reasoning_tokens: thoughtTokens,
+                                    tool_tokens: toolTokens,
+                                },
+                            });
+                        } else {
+                            costTracker.addUsage({
+                                model,
+                                image_count: images.length,
+                                // Pass through request correlation id so streaming consumers receive cost_update
+                                request_id: opts?.request_id,
+                                metadata: baseMetadata,
+                            });
+                        }
                     }
                     return images;
                 };
@@ -1381,7 +1459,7 @@ export class GeminiProvider extends BaseModelProvider {
                 log_llm_response(finalRequestId, {
                     model,
                     image_count: allImages.length,
-                    cost: allImages.length * this.getImageCost(model),
+                    cost: allImages.length * perImageCost,
                 });
                 return allImages;
             }
@@ -1431,6 +1509,7 @@ export class GeminiProvider extends BaseModelProvider {
                 costTracker.addUsage({
                     model,
                     image_count: images.length,
+                    cost: images.length * perImageCost,
                     request_id: opts?.request_id,
                     metadata: {
                         aspect_ratio: aspectRatio,
@@ -1444,11 +1523,12 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             // Log the successful response
+            const perImageCost = this.getImageCost(model);
             log_llm_response(finalRequestId, {
                 model,
                 image_count: images.length,
                 aspect_ratio: aspectRatio,
-                cost: images.length * this.getImageCost(model),
+                cost: images.length * perImageCost,
             });
 
             // Return standardized result
@@ -1463,13 +1543,15 @@ export class GeminiProvider extends BaseModelProvider {
     /**
      * Get the cost of generating an image with Gemini/Imagen
      */
-    private getImageCost(model: string): number {
+    private getImageCost(model: string, imageSize?: '1K' | '2K' | '4K'): number {
         // Pricing (as of latest docs)
         if (model.includes('gemini-2.5-flash-image-preview')) {
             // $0.039 per image (1024x1024 ~1290 tokens @ $30 / 1M)
             return 0.039;
         } else if (model.includes('gemini-3-pro-image-preview')) {
-            return 0.134; // AI Studio preview per-image reference price
+            // Gemini 3 Pro Image (preview): 1K/2K = $0.134, 4K = $0.24 (standard generation)
+            if (imageSize === '4K') return 0.24;
+            return 0.134;
         }
         // Imagen pricing
         if (model.includes('imagen-3')) {
