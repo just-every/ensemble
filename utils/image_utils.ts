@@ -32,8 +32,8 @@ export const OPENAI_MAX_WIDTH = 1024;
 export const OPENAI_MAX_HEIGHT = 768;
 export const CLAUDE_MAX_WIDTH = 1024;
 export const CLAUDE_MAX_HEIGHT = 1120;
-export const GEMINI_MAX_WIDTH = 1024;
-export const GEMINI_MAX_HEIGHT = 1536;
+export const GEMINI_MAX_WIDTH = 2048;
+export const GEMINI_MAX_HEIGHT = 2528;
 
 import { ExtractBase64ImageResult } from '../types/types.js';
 import { convertImageToTextIfNeeded } from './image_to_text.js';
