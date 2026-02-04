@@ -1467,7 +1467,7 @@ export class GeminiProvider extends BaseModelProvider {
                 }
 
                 if (allImages.length === 0) {
-                    throw new Error('No images returned from Gemini 2.5 Flash Image model');
+                    throw new Error(`No images returned from ${model} model`);
                 }
 
                 log_llm_response(finalRequestId, {
