@@ -228,9 +228,9 @@ async function resolveAsyncEnums(params: any): Promise<any> {
 async function convertToGeminiFunctionDeclarations(tools: ToolFunction[]): Promise<FunctionDeclaration[]> {
     const declarations = await Promise.all(
         tools.map(async tool => {
-            // Special handling for Google web search
-            if (tool.definition.function.name === 'google_web_search') {
-                // Return null for this special tool - we'll handle it separately in the config
+            // Special handling for native tools (not function declarations)
+            if (tool.definition.function.name === 'google_web_search' || tool.definition.function.name === 'code_execution') {
+                // Return null for these special tools - we'll handle them separately in the config
                 return null;
             }
 
@@ -905,10 +905,12 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Check if any tools require special handling
             let hasGoogleWebSearch = false;
+            let hasCodeExecutionTool = false;
             let functionDeclarations: FunctionDeclaration[] = [];
             if (tools && tools.length > 0) {
                 // Check for Google web search tool
                 hasGoogleWebSearch = tools.some(tool => tool.definition.function.name === 'google_web_search');
+                hasCodeExecutionTool = tools.some(tool => tool.definition.function.name === 'code_execution');
 
                 // Configure standard function calling tools
                 functionDeclarations = await convertToGeminiFunctionDeclarations(tools);
@@ -946,22 +948,32 @@ export class GeminiProvider extends BaseModelProvider {
                             }
                         }
                     }
-                } else if (!hasGoogleWebSearch) {
+                } else if (!hasGoogleWebSearch && !hasCodeExecutionTool) {
                     console.warn('Tools were provided but resulted in empty declarations after conversion.');
                 }
             }
 
-            // Set up Google Search grounding if needed
-            if (hasGoogleWebSearch) {
-                console.log('[Gemini] Enabling Google Search grounding');
-                // Configure the Google Search grounding. Do not set functionCallingConfig when only using
-                // googleSearch, as it is not a function declaration tool.
-                const toolGroups: NonNullable<GenerateContentConfig['tools']> = [{ googleSearch: {} }];
+            // Set up native tool groups and function declarations
+            if (hasGoogleWebSearch || hasCodeExecutionTool || functionDeclarations.length > 0) {
+                const toolGroups: NonNullable<GenerateContentConfig['tools']> = [];
+
+                if (hasGoogleWebSearch) {
+                    console.log('[Gemini] Enabling Google Search grounding');
+                    toolGroups.push({ googleSearch: {} });
+                }
+
+                if (hasCodeExecutionTool) {
+                    console.log('[Gemini] Enabling code execution');
+                    toolGroups.push({ codeExecution: {} });
+                }
+
                 if (functionDeclarations.length > 0) {
                     toolGroups.push({ functionDeclarations });
                 }
+
                 config.tools = toolGroups;
 
+                // Do not set functionCallingConfig when only using googleSearch or codeExecution.
                 if (functionDeclarations.length === 0) {
                     delete config.toolConfig;
                 }

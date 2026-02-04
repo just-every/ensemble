@@ -5,6 +5,7 @@ This guide covers the advanced tool execution features in Ensemble, including ti
 ## Table of Contents
 - [Overview](#overview)
 - [Basic Tool Execution](#basic-tool-execution)
+- [Provider Native Tools](#provider-native-tools)
 - [Advanced Features](#advanced-features)
   - [Timeout Handling](#timeout-handling)
   - [Sequential Execution](#sequential-execution)
@@ -58,6 +59,40 @@ const agent = {
 for await (const event of ensembleRequest(messages, agent)) {
     // Handle events
 }
+```
+
+## Provider Native Tools
+
+Some providers expose native tools that are not function declarations. Ensemble maps special tool names to those
+native capabilities. For Gemini:
+
+- `google_web_search` enables Google Search grounding.
+- `code_execution` enables Gemini's native code execution.
+
+Define these tools like normal functions, but their handlers are not called by Gemini. They only control request
+configuration.
+
+```typescript
+const agent = {
+    model: 'gemini-3-flash-preview',
+    tools: [
+        {
+            definition: {
+                type: 'function',
+                function: {
+                    name: 'code_execution',
+                    description: 'Enable Gemini native code execution',
+                    parameters: {
+                        type: 'object',
+                        properties: {},
+                        required: [],
+                    },
+                },
+            },
+            function: async () => '',
+        },
+    ],
+};
 ```
 
 ## Advanced Features
