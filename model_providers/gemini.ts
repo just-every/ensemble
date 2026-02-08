@@ -1265,28 +1265,22 @@ export class GeminiProvider extends BaseModelProvider {
 
             // If using Gemini image models that expose image parts via generateContentStream
             if (model.includes('gemini-2.5-flash-image-preview') || model.includes('gemini-3-pro-image-preview')) {
-                // Build a constraints hint to emulate feature parity (aspect ratio, size, style, background)
-                const constraints: string[] = [];
-                // Map size to human-friendly instructions
-                const sizeMap: Record<string, { ar?: string; px?: string }> = {
-                    square: { ar: '1:1', px: '1024x1024' },
+                // Use imageConfig for aspect ratio / size; do not inject size/aspect instructions into the prompt.
+                const sizeMap: Record<string, { ar?: string }> = {
+                    square: { ar: '1:1' },
                     landscape: { ar: '16:9' },
                     portrait: { ar: '9:16' },
-                    '256x256': { ar: '1:1', px: '256x256' },
-                    '512x512': { ar: '1:1', px: '512x512' },
-                    '1024x1024': { ar: '1:1', px: '1024x1024' },
-                    '1536x1024': { ar: '3:2', px: '1536x1024' },
-                    '1024x1536': { ar: '2:3', px: '1024x1536' },
-                    '1696x2528': { ar: '2:3', px: '1696x2528' },
-                    '2048x2048': { ar: '1:1', px: '2048x2048' },
-                    '1792x1024': { ar: '16:9', px: '1792x1024' },
-                    '1024x1792': { ar: '9:16', px: '1024x1792' },
+                    '256x256': { ar: '1:1' },
+                    '512x512': { ar: '1:1' },
+                    '1024x1024': { ar: '1:1' },
+                    '1536x1024': { ar: '3:2' },
+                    '1024x1536': { ar: '2:3' },
+                    '1696x2528': { ar: '2:3' },
+                    '2048x2048': { ar: '1:1' },
+                    '1792x1024': { ar: '16:9' },
+                    '1024x1792': { ar: '9:16' },
                 };
                 const sm = opts?.size ? sizeMap[String(opts.size)] : undefined;
-                if (sm?.ar) constraints.push(`Aspect ratio: ${sm.ar}.`);
-                if (sm?.px) constraints.push(`Target size: ${sm.px} pixels (approximate).`);
-                if (opts?.style) constraints.push(`Style: ${opts.style}.`);
-                if (opts?.background) constraints.push(`Background: ${opts.background} (use transparency if supported).`);
 
                 // Preserve user-facing size/quality controls for streaming image models.
                 // The Gemini SDK supports `imageConfig` on GenerateContentConfig.
@@ -1304,10 +1298,6 @@ export class GeminiProvider extends BaseModelProvider {
                 const imageSize = imageSizeMap[qualityKey];
                 if (imageSize) imageConfig.imageSize = imageSize;
                 const perImageCost = this.getImageCost(model, imageSize);
-
-                const constraintText = constraints.length
-                    ? `\n\nImage constraints (please prioritize):\n- ${constraints.join('\n- ')}`
-                    : '';
 
                 const makeOne = async (): Promise<string[]> => {
                     const requestParams: GenerateContentParameters = {
@@ -1362,7 +1352,7 @@ export class GeminiProvider extends BaseModelProvider {
                                               })(),
                                           ].filter(Boolean)
                                         : []),
-                                    { text: `${prompt}${constraintText}` },
+                                    { text: prompt },
                                 ],
                             },
                         ],
