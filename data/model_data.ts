@@ -85,7 +85,7 @@ export const MODEL_CLASSES = {
     reasoning_high: {
         models: [
             'gpt-5.2-pro', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -107,7 +107,7 @@ export const MODEL_CLASSES = {
     monologue: {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-sonnet-4-5-20250929', // Anthropic
             'grok-4', // X.AI
         ],
@@ -118,7 +118,7 @@ export const MODEL_CLASSES = {
     metacognition: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -129,7 +129,7 @@ export const MODEL_CLASSES = {
     code: {
         models: [
             'gpt-5.1-codex-max', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
             'qwen3-coder', // OpenRouter
@@ -164,7 +164,7 @@ export const MODEL_CLASSES = {
     vision: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -195,7 +195,7 @@ export const MODEL_CLASSES = {
     long: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3-pro-preview', // Google
+            'gemini-3.1-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -1895,10 +1895,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 2.0 Flash Experimental (v1beta) - experimental multimodal model.',
     },
 
-    // Gemini 3 Pro (preview)
+    // Gemini 3.1 Pro (preview)
     {
-        id: 'gemini-3-pro-preview',
-        aliases: ['gemini-3-pro', 'gemini-3-pro-preview-11-2025'],
+        id: 'gemini-3.1-pro-preview',
+        aliases: [
+            'gemini-3.1-pro-preview-customtools',
+            'gemini-3.1-pro',
+            'gemini-3-pro-preview',
+            'gemini-3-pro',
+            'gemini-3-pro-preview-11-2025',
+        ],
         provider: 'google',
         cost: {
             input_per_million: {
@@ -1929,7 +1935,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 90,
         description:
-            'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
+            'Gemini 3.1 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
     },
 
     // Gemini 3 Pro Image (preview)
@@ -2440,6 +2446,33 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'image_generation',
         description:
             "Gemini 2.5 Flash Image Preview: fast, natively multimodal image generation and editing.",
+    },
+    {
+        id: 'gemini-3.1-flash-image-preview',
+        aliases: ['models/gemini-3.1-flash-image-preview', 'gemini-3.1-flash-image'],
+        provider: 'google',
+        cost: {
+            // Preview pricing from Google AI Studio. Image output is priced per token;
+            // representative defaults are captured in per_image and refined in provider-level overrides
+            // (0.5K=$0.045, 1K=$0.067, 2K=$0.101, 4K=$0.151).
+            per_image: 0.067, // 1K output equivalent
+            input_per_million: {
+                text: 0.25,
+                image: 0.25,
+            },
+            output_per_million: {
+                text: 1.5, // Includes thinking tokens
+                image: 60.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image', 'text'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            'Gemini 3.1 Flash Image Preview: fast multimodal image generation for high-throughput, interactive workflows.',
     },
     {
         id: 'imagen-3.0-generate-002',

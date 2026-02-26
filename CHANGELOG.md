@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-02-27
+- Added Gemini 3.1 Pro Preview support (`gemini-3.1-pro-preview`) with alias support for `gemini-3.1-pro-preview-customtools`.
+- Preserved backward compatibility by mapping legacy Gemini 3 Pro Preview IDs to Gemini 3.1 Pro Preview.
+- Added Gemini 3.1 Flash Image Preview support (`gemini-3.1-flash-image-preview`) with token and per-image pricing metadata.
+- Updated Gemini image provider logic to route `gemini-3.1-flash-image-preview` through streaming image generation and size-aware per-image pricing.
+- Added 0.5K image-tier support for Gemini 3.1 Flash Image pricing (e.g., explicit `512x512` requests and `low` quality mapping).
+- Added 0.5K aspect-ratio-aware resizing for Gemini 3.1 Flash Image outputs (512px short side with requested AR).
+- Added Gemini 3.1 Flash Image aspect-ratio keys (`1:4`, `1:8`, `4:1`, `8:1`, `21:9`, etc.) and table-based 0.5K output dimensions.
+- Verified Gemini 3.1 Flash Image pricing tiers in provider logic/tests: 0.5K=$0.045, 1K=$0.067, 2K=$0.101, 4K=$0.151.
+- Added Gemini 3 Pro Image explicit table-resolution support (1K/2K/4K presets map to correct aspect ratio, tier, and pricing).
+- Added Gemini image grounding controls (`grounding.web_search` / `grounding.image_search`) with `searchTypes` support for Gemini 3.1 Flash Image.
+- Added Gemini image thinking controls (`thinking.level`, `thinking.include_thoughts`) and image metadata callback support (`on_metadata`) exposing grounding metadata, citations, thoughts, and thought signatures.
+
 ## 2025-12-30
 - Documented the new `image` content part and added a full example for image input + JSON output.
 

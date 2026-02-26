@@ -34,6 +34,9 @@ import {
     ResponseInput,
     AgentDefinition,
     ImageGenerationOpts,
+    ImageGenerationMetadata,
+    ImageGroundingChunk,
+    ImageThoughtPart,
     VoiceGenerationOpts,
     type MessageEvent,
     TranscriptionOpts,
@@ -53,7 +56,12 @@ import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { appendMessageWithImage, normalizeImageDataUrl, resizeAndTruncateForGemini } from '../utils/image_utils.js';
+import {
+    appendMessageWithImage,
+    normalizeImageDataUrl,
+    resizeAndTruncateForGemini,
+    resizeDataUrl,
+} from '../utils/image_utils.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
@@ -322,6 +330,66 @@ function formatGroundingChunks(chunks: any[]): string {
         .join('\n');
 }
 
+function normalizeGroundingChunk(chunk: any): ImageGroundingChunk | null {
+    if (!chunk || typeof chunk !== 'object') return null;
+
+    const webUri = chunk?.web?.uri;
+    const webTitle = chunk?.web?.title;
+    const imageUri = chunk?.image?.imageUri || chunk?.image?.image_uri || chunk?.image_uri;
+    const imageLandingUri = chunk?.image?.uri || chunk?.uri;
+
+    const uri = webUri || imageLandingUri;
+    if (!uri && !imageUri) return null;
+
+    return {
+        ...(uri ? { uri } : {}),
+        ...(imageUri ? { image_uri: imageUri } : {}),
+        ...(webTitle ? { title: webTitle } : {}),
+    };
+}
+
+function dedupeGroundingChunks(chunks: ImageGroundingChunk[]): ImageGroundingChunk[] {
+    const seen = new Set<string>();
+    const out: ImageGroundingChunk[] = [];
+
+    for (const chunk of chunks) {
+        const key = `${chunk.uri || ''}|${chunk.image_uri || ''}|${chunk.title || ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(chunk);
+    }
+
+    return out;
+}
+
+function mergeImageMetadata(target: ImageGenerationMetadata, source: ImageGenerationMetadata): ImageGenerationMetadata {
+    const next: ImageGenerationMetadata = {
+        ...target,
+        model: source.model || target.model,
+    };
+
+    if (source.grounding) {
+        const t = target.grounding || {};
+        const s = source.grounding;
+        next.grounding = {
+            ...t,
+            ...s,
+            imageSearchQueries: Array.from(new Set([...(t.imageSearchQueries || []), ...(s.imageSearchQueries || [])])),
+            webSearchQueries: Array.from(new Set([...(t.webSearchQueries || []), ...(s.webSearchQueries || [])])),
+            groundingChunks: dedupeGroundingChunks([...(t.groundingChunks || []), ...(s.groundingChunks || [])]),
+            groundingSupports: [...(t.groundingSupports || []), ...(s.groundingSupports || [])],
+        };
+    }
+
+    next.thought_signatures = Array.from(
+        new Set([...(target.thought_signatures || []), ...(source.thought_signatures || [])])
+    );
+    next.thoughts = [...(target.thoughts || []), ...(source.thoughts || [])];
+    next.citations = dedupeGroundingChunks([...(target.citations || []), ...(source.citations || [])]);
+
+    return next;
+}
+
 /**
  * Processes images and adds them to the input array for OpenAI
  * Resizes images to max 1024px width and splits into sections if height > 768px
@@ -533,6 +601,59 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-medium': 2048,
     '-high': 12288,
     '-max': 24576,
+};
+
+const GEMINI_31_FLASH_IMAGE_05K_DIMENSIONS: Record<string, { width: number; height: number }> = {
+    '1:1': { width: 512, height: 512 },
+    '1:4': { width: 256, height: 1024 },
+    '1:8': { width: 192, height: 1536 },
+    '2:3': { width: 424, height: 632 },
+    '3:2': { width: 632, height: 424 },
+    '3:4': { width: 448, height: 600 },
+    '4:1': { width: 1024, height: 256 },
+    '4:3': { width: 600, height: 448 },
+    '4:5': { width: 464, height: 576 },
+    '5:4': { width: 576, height: 464 },
+    '8:1': { width: 1536, height: 192 },
+    '9:16': { width: 384, height: 688 },
+    '16:9': { width: 688, height: 384 },
+    '21:9': { width: 792, height: 168 },
+};
+
+const GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS: Record<string, { ar: string; imageSize: '1K' | '2K' | '4K' }> = {
+    // 1K
+    '1024x1024': { ar: '1:1', imageSize: '1K' },
+    '848x1264': { ar: '2:3', imageSize: '1K' },
+    '1264x848': { ar: '3:2', imageSize: '1K' },
+    '896x1200': { ar: '3:4', imageSize: '1K' },
+    '1200x896': { ar: '4:3', imageSize: '1K' },
+    '928x1152': { ar: '4:5', imageSize: '1K' },
+    '1152x928': { ar: '5:4', imageSize: '1K' },
+    '768x1376': { ar: '9:16', imageSize: '1K' },
+    '1376x768': { ar: '16:9', imageSize: '1K' },
+    '1584x672': { ar: '21:9', imageSize: '1K' },
+    // 2K
+    '2048x2048': { ar: '1:1', imageSize: '2K' },
+    '1696x2528': { ar: '2:3', imageSize: '2K' },
+    '2528x1696': { ar: '3:2', imageSize: '2K' },
+    '1792x2400': { ar: '3:4', imageSize: '2K' },
+    '2400x1792': { ar: '4:3', imageSize: '2K' },
+    '1856x2304': { ar: '4:5', imageSize: '2K' },
+    '2304x1856': { ar: '5:4', imageSize: '2K' },
+    '1536x2752': { ar: '9:16', imageSize: '2K' },
+    '2752x1536': { ar: '16:9', imageSize: '2K' },
+    '3168x1344': { ar: '21:9', imageSize: '2K' },
+    // 4K
+    '4096x4096': { ar: '1:1', imageSize: '4K' },
+    '3392x5056': { ar: '2:3', imageSize: '4K' },
+    '5056x3392': { ar: '3:2', imageSize: '4K' },
+    '3584x4800': { ar: '3:4', imageSize: '4K' },
+    '4800x3584': { ar: '4:3', imageSize: '4K' },
+    '3712x4608': { ar: '4:5', imageSize: '4K' },
+    '4608x3712': { ar: '5:4', imageSize: '4K' },
+    '3072x5504': { ar: '9:16', imageSize: '4K' },
+    '5504x3072': { ar: '16:9', imageSize: '4K' },
+    '6336x2688': { ar: '21:9', imageSize: '4K' },
 };
 
 /**
@@ -1254,6 +1375,27 @@ export class GeminiProvider extends BaseModelProvider {
                 console.warn('[Gemini] Image generation ignores function tools; only google_web_search is supported.');
             }
 
+            const explicitWebGrounding = opts?.grounding?.web_search;
+            const explicitImageGrounding = opts?.grounding?.image_search;
+            const enableWebGrounding = explicitWebGrounding ?? hasGoogleWebSearch ?? false;
+
+            const isGemini31FlashImageModel = model.includes('gemini-3.1-flash-image-preview');
+            const enableImageGrounding = explicitImageGrounding === true && isGemini31FlashImageModel;
+            if (explicitImageGrounding && !isGemini31FlashImageModel) {
+                console.warn(
+                    '[Gemini] Image Search grounding is only available for gemini-3.1-flash-image-preview. Ignoring image_search=true.'
+                );
+            }
+
+            const includeThoughts = opts?.thinking?.include_thoughts === true;
+            const requestedThinkingLevel = opts?.thinking?.level;
+            const thinkingLevel = requestedThinkingLevel === 'high' ? 'High' : requestedThinkingLevel ? 'Minimal' : undefined;
+            if (requestedThinkingLevel && !isGemini31FlashImageModel) {
+                console.warn(
+                    '[Gemini] thinking.level is currently supported for gemini-3.1-flash-image-preview only. Ignoring thinking level.'
+                );
+            }
+
             // Map size to an aspect ratio where supported (Imagen API only)
             let aspectRatio = '1:1'; // square by default
             if (opts?.size === 'landscape') aspectRatio = '16:9';
@@ -1264,9 +1406,29 @@ export class GeminiProvider extends BaseModelProvider {
             );
 
             // If using Gemini image models that expose image parts via generateContentStream
-            if (model.includes('gemini-2.5-flash-image-preview') || model.includes('gemini-3-pro-image-preview')) {
+            if (
+                model.includes('gemini-2.5-flash-image-preview') ||
+                model.includes('gemini-3.1-flash-image-preview') ||
+                model.includes('gemini-3-pro-image-preview')
+            ) {
+                let aggregateMetadata: ImageGenerationMetadata = { model };
+
                 // Use imageConfig for aspect ratio / size; do not inject size/aspect instructions into the prompt.
                 const sizeMap: Record<string, { ar?: string }> = {
+                    '1:1': { ar: '1:1' },
+                    '1:4': { ar: '1:4' },
+                    '1:8': { ar: '1:8' },
+                    '2:3': { ar: '2:3' },
+                    '3:2': { ar: '3:2' },
+                    '3:4': { ar: '3:4' },
+                    '4:1': { ar: '4:1' },
+                    '4:3': { ar: '4:3' },
+                    '4:5': { ar: '4:5' },
+                    '5:4': { ar: '5:4' },
+                    '8:1': { ar: '8:1' },
+                    '9:16': { ar: '9:16' },
+                    '16:9': { ar: '16:9' },
+                    '21:9': { ar: '21:9' },
                     square: { ar: '1:1' },
                     landscape: { ar: '16:9' },
                     portrait: { ar: '9:16' },
@@ -1281,25 +1443,105 @@ export class GeminiProvider extends BaseModelProvider {
                     '1024x1792': { ar: '9:16' },
                 };
                 const sm = opts?.size ? sizeMap[String(opts.size)] : undefined;
+                const gemini3ProDimensionPreset = model.includes('gemini-3-pro-image-preview')
+                    ? GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS[String(opts?.size)]
+                    : undefined;
 
                 // Preserve user-facing size/quality controls for streaming image models.
                 // The Gemini SDK supports `imageConfig` on GenerateContentConfig.
                 const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
                 if (sm?.ar) imageConfig.aspectRatio = sm.ar;
+                if (gemini3ProDimensionPreset?.ar) imageConfig.aspectRatio = gemini3ProDimensionPreset.ar;
 
                 const qualityKey = typeof opts?.quality === 'string' ? opts.quality.toLowerCase() : '';
-                const imageSizeMap: Record<string, '1K' | '2K' | '4K'> = {
-                    low: '1K',
-                    standard: '2K',
-                    medium: '2K',
-                    hd: '4K',
-                    high: '4K',
-                };
-                const imageSize = imageSizeMap[qualityKey];
-                if (imageSize) imageConfig.imageSize = imageSize;
+                type GeminiImageSize = '0.5K' | '1K' | '2K' | '4K';
+
+                // Gemini 3.1 Flash Image supports 0.5K billing/output tier; older image models do not.
+                const imageSizeMap: Record<string, GeminiImageSize> = isGemini31FlashImageModel
+                    ? {
+                          low: '0.5K',
+                          standard: '1K',
+                          medium: '2K',
+                          hd: '4K',
+                          high: '4K',
+                      }
+                    : {
+                          low: '1K',
+                          standard: '2K',
+                          medium: '2K',
+                          hd: '4K',
+                          high: '4K',
+                      };
+
+                let imageSize: GeminiImageSize | undefined = imageSizeMap[qualityKey];
+
+                if (gemini3ProDimensionPreset?.imageSize) {
+                    imageSize = gemini3ProDimensionPreset.imageSize;
+                }
+
+                // Explicit 512x512 requests map to the 0.5K tier on Gemini 3.1 Flash Image.
+                if (isGemini31FlashImageModel && opts?.size === '512x512') {
+                    imageSize = '0.5K';
+                }
+
+                // Public docs currently list only 1K/2K/4K for `imageConfig.imageSize`.
+                // Keep 0.5K as an internal billing/selection tier and avoid sending unknown values.
+                const requestImageSize = imageSize === '0.5K' ? undefined : imageSize;
+                if (requestImageSize) imageConfig.imageSize = requestImageSize;
+
+                const thinkingConfig: Record<string, unknown> = {};
+                if (opts?.thinking && 'include_thoughts' in opts.thinking) {
+                    thinkingConfig.includeThoughts = includeThoughts;
+                }
+                if (thinkingLevel && isGemini31FlashImageModel) {
+                    thinkingConfig.thinkingLevel = thinkingLevel;
+                }
+
+                const searchTypes: Record<string, Record<string, never>> = {};
+                if (enableWebGrounding) searchTypes.webSearch = {};
+                if (enableImageGrounding) searchTypes.imageSearch = {};
+                const googleSearchTool =
+                    Object.keys(searchTypes).length > 0
+                        ? {
+                              googleSearch: {
+                                  searchTypes,
+                              } as any,
+                          }
+                        : undefined;
+
+                // For 0.5K, use a 512px short side and preserve requested aspect ratio.
+                const halfKTargetDimensions = (() => {
+                    if (!isGemini31FlashImageModel || imageSize !== '0.5K') return undefined;
+                    const ar = imageConfig.aspectRatio || '1:1';
+
+                    const exactDimensions = GEMINI_31_FLASH_IMAGE_05K_DIMENSIONS[ar];
+                    if (exactDimensions) return exactDimensions;
+
+                    const match = /^(\d+):(\d+)$/.exec(ar);
+                    if (!match) return { width: 512, height: 512 };
+
+                    const wRatio = Number(match[1]);
+                    const hRatio = Number(match[2]);
+                    if (!Number.isFinite(wRatio) || !Number.isFinite(hRatio) || wRatio <= 0 || hRatio <= 0) {
+                        return { width: 512, height: 512 };
+                    }
+
+                    if (wRatio >= hRatio) {
+                        return {
+                            width: Math.max(1, Math.round((wRatio / hRatio) * 512)),
+                            height: 512,
+                        };
+                    }
+
+                    return {
+                        width: 512,
+                        height: Math.max(1, Math.round((hRatio / wRatio) * 512)),
+                    };
+                })();
+
                 const perImageCost = this.getImageCost(model, imageSize);
 
-                const makeOne = async (): Promise<string[]> => {
+                const makeOne = async (): Promise<{ images: string[]; metadata: ImageGenerationMetadata }> => {
                     const requestParams: GenerateContentParameters = {
                         model,
                         contents: [
@@ -1359,7 +1601,8 @@ export class GeminiProvider extends BaseModelProvider {
                         config: {
                             responseModalities: [Modality.IMAGE, Modality.TEXT],
                             ...(Object.keys(imageConfig).length ? { imageConfig } : {}),
-                            ...(hasGoogleWebSearch ? { tools: [{ googleSearch: {} }] } : {}),
+                            ...(googleSearchTool ? { tools: [googleSearchTool] as any } : {}),
+                            ...(Object.keys(thinkingConfig).length ? { thinkingConfig: thinkingConfig as any } : {}),
                         },
                     };
 
@@ -1376,6 +1619,7 @@ export class GeminiProvider extends BaseModelProvider {
 
                     const response = await this.client.models.generateContentStream(requestParams);
                     const images: string[] = [];
+                    let metadata: ImageGenerationMetadata = { model };
                     let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
 
                     for await (const chunk of response) {
@@ -1384,11 +1628,91 @@ export class GeminiProvider extends BaseModelProvider {
                         }
                         if (!chunk.candidates) continue;
                         for (const cand of chunk.candidates) {
+                            const groundingMetadata = (cand as any).groundingMetadata;
+                            if (groundingMetadata) {
+                                const chunks = Array.isArray(groundingMetadata.groundingChunks)
+                                    ? groundingMetadata.groundingChunks
+                                          .map((c: any) => normalizeGroundingChunk(c))
+                                          .filter((c: ImageGroundingChunk | null): c is ImageGroundingChunk => !!c)
+                                    : [];
+
+                                const searchEntryPoint = groundingMetadata.searchEntryPoint;
+                                const imageSearchQueries = Array.isArray(groundingMetadata.imageSearchQueries)
+                                    ? groundingMetadata.imageSearchQueries
+                                          .map((q: any) => (typeof q === 'string' ? q : q?.query || q?.text))
+                                          .filter((q: any): q is string => typeof q === 'string' && q.length > 0)
+                                    : [];
+                                const webSearchQueries = Array.isArray(groundingMetadata.webSearchQueries)
+                                    ? groundingMetadata.webSearchQueries
+                                          .map((q: any) => (typeof q === 'string' ? q : q?.query || q?.text))
+                                          .filter((q: any): q is string => typeof q === 'string' && q.length > 0)
+                                    : [];
+
+                                metadata = mergeImageMetadata(metadata, {
+                                    model,
+                                    grounding: {
+                                        ...(imageSearchQueries.length ? { imageSearchQueries } : {}),
+                                        ...(webSearchQueries.length ? { webSearchQueries } : {}),
+                                        ...(chunks.length ? { groundingChunks: chunks } : {}),
+                                        ...(Array.isArray(groundingMetadata.groundingSupports)
+                                            ? { groundingSupports: groundingMetadata.groundingSupports }
+                                            : {}),
+                                        ...(searchEntryPoint ? { searchEntryPoint } : {}),
+                                    },
+                                    citations: chunks.filter(c => !!c.uri),
+                                });
+                            }
+
                             const parts = cand.content?.parts || [];
                             for (const part of parts) {
+                                const thoughtSignature = (part as any).thoughtSignature || (part as any).thought_signature;
+                                if (thoughtSignature) {
+                                    metadata = mergeImageMetadata(metadata, {
+                                        model,
+                                        thought_signatures: [thoughtSignature],
+                                    });
+                                }
+
+                                if (part.thought) {
+                                    if (includeThoughts) {
+                                        const thoughtPart: ImageThoughtPart = {
+                                            thought: true,
+                                            type: part.inlineData?.data ? 'image' : 'text',
+                                            ...(part.text ? { text: part.text } : {}),
+                                            ...(part.inlineData?.mimeType ? { mime_type: part.inlineData.mimeType } : {}),
+                                            ...(part.inlineData?.data ? { data: part.inlineData.data } : {}),
+                                            ...(thoughtSignature ? { thought_signature: thoughtSignature } : {}),
+                                        };
+                                        metadata = mergeImageMetadata(metadata, {
+                                            model,
+                                            thoughts: [thoughtPart],
+                                        });
+                                    }
+                                    continue;
+                                }
+
                                 if (part.inlineData?.data) {
                                     const mime = part.inlineData.mimeType || 'image/png';
-                                    images.push(`data:${mime};base64,${part.inlineData.data}`);
+                                    let imageData = `data:${mime};base64,${part.inlineData.data}`;
+
+                                    // Enforce 0.5K output when requested for Gemini 3.1 Flash Image.
+                                    if (halfKTargetDimensions) {
+                                        try {
+                                            imageData = await resizeDataUrl(
+                                                imageData,
+                                                halfKTargetDimensions.width,
+                                                halfKTargetDimensions.height,
+                                                {
+                                                    fit: 'cover',
+                                                }
+                                            );
+                                        } catch (resizeError) {
+                                            console.warn('[Gemini] Failed to resize image to 0.5K, returning original image.');
+                                            console.warn(truncateLargeValues(resizeError));
+                                        }
+                                    }
+
+                                    images.push(imageData);
                                 }
                             }
                         }
@@ -1442,18 +1766,29 @@ export class GeminiProvider extends BaseModelProvider {
                             });
                         }
                     }
-                    return images;
+                    return { images, metadata };
                 };
 
                 const allImages: string[] = [];
                 const calls = Math.max(1, numberOfImages);
                 for (let i = 0; i < calls; i++) {
-                    const imgs = await makeOne();
+                    const { images: imgs, metadata } = await makeOne();
+                    aggregateMetadata = mergeImageMetadata(aggregateMetadata, metadata);
                     // Some responses may contain more than one image; respect n by slicing
                     for (const img of imgs) {
                         if (allImages.length < numberOfImages) allImages.push(img);
                     }
                     if (allImages.length >= numberOfImages) break;
+                }
+
+                if (aggregateMetadata.grounding?.groundingChunks) {
+                    aggregateMetadata.citations = dedupeGroundingChunks(
+                        aggregateMetadata.grounding.groundingChunks.filter(c => !!c.uri)
+                    );
+                }
+
+                if (opts?.on_metadata) {
+                    opts.on_metadata(aggregateMetadata);
                 }
 
                 if (allImages.length === 0) {
@@ -1547,9 +1882,16 @@ export class GeminiProvider extends BaseModelProvider {
     /**
      * Get the cost of generating an image with Gemini/Imagen
      */
-    private getImageCost(model: string, imageSize?: '1K' | '2K' | '4K'): number {
+    private getImageCost(model: string, imageSize?: '0.5K' | '1K' | '2K' | '4K'): number {
         // Pricing (as of latest docs)
-        if (model.includes('gemini-2.5-flash-image-preview')) {
+        if (model.includes('gemini-3.1-flash-image-preview')) {
+            // Gemini 3.1 Flash Image Preview token-equivalent image pricing.
+            // Tokens per image: 0.5K=747, 1K=1120, 2K=1680, 4K=2520 @ $60 / 1M image tokens.
+            if (imageSize === '4K') return 0.151;
+            if (imageSize === '2K') return 0.101;
+            if (imageSize === '0.5K') return 0.045;
+            return 0.067; // 1K (default)
+        } else if (model.includes('gemini-2.5-flash-image-preview')) {
             // $0.039 per image (1024x1024 ~1290 tokens @ $30 / 1M)
             return 0.039;
         } else if (model.includes('gemini-3-pro-image-preview')) {

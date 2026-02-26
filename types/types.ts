@@ -810,7 +810,22 @@ export interface ImageGenerationOpts {
         | '1696x2528'
         | '2048x2048'
         | '512x512'
-        | '256x256';
+        | '256x256'
+        | '1:1'
+        | '1:4'
+        | '1:8'
+        | '2:3'
+        | '3:2'
+        | '3:4'
+        | '4:1'
+        | '4:3'
+        | '4:5'
+        | '5:4'
+        | '8:1'
+        | '9:16'
+        | '16:9'
+        | '21:9'
+        | `${number}x${number}`;
 
     /** Quality of the generated image */
     quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high';
@@ -853,6 +868,73 @@ export interface ImageGenerationOpts {
 
     /** Internal: correlation id used to tag cost events from providers */
     request_id?: string;
+
+    /** Google grounding controls for Gemini image models */
+    grounding?: {
+        /** Enable Google web search grounding */
+        web_search?: boolean;
+        /** Enable Google image search grounding (Gemini 3.1 Flash Image only) */
+        image_search?: boolean;
+    };
+
+    /** Thinking controls for Gemini image models */
+    thinking?: {
+        /** Thinking level (Gemini 3.1 Flash Image supports minimal/high) */
+        level?: 'minimal' | 'high';
+        /** Return model thoughts in response metadata */
+        include_thoughts?: boolean;
+    };
+
+    /**
+     * Callback to receive provider metadata (grounding, thoughts, signatures, citations)
+     * for image generation requests.
+     */
+    on_metadata?: (metadata: ImageGenerationMetadata) => void;
+}
+
+/**
+ * Grounding chunk attribution for generated image responses
+ */
+export interface ImageGroundingChunk {
+    uri?: string;
+    image_uri?: string;
+    title?: string;
+}
+
+/**
+ * Grounding metadata surfaced by Gemini image generation
+ */
+export interface ImageGroundingMetadata {
+    imageSearchQueries?: string[];
+    webSearchQueries?: string[];
+    groundingChunks?: ImageGroundingChunk[];
+    groundingSupports?: unknown[];
+    searchEntryPoint?: {
+        renderedContent?: string;
+    };
+}
+
+/**
+ * Thought part surfaced by Gemini image generation
+ */
+export interface ImageThoughtPart {
+    thought: true;
+    type: 'text' | 'image';
+    text?: string;
+    mime_type?: string;
+    data?: string;
+    thought_signature?: string;
+}
+
+/**
+ * Supplemental metadata for image generation calls
+ */
+export interface ImageGenerationMetadata {
+    model?: string;
+    grounding?: ImageGroundingMetadata;
+    thoughts?: ImageThoughtPart[];
+    thought_signatures?: string[];
+    citations?: ImageGroundingChunk[];
 }
 
 // ================================================================

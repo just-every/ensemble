@@ -307,12 +307,34 @@ for await (const event of ensembleVoice('Long text...', {
 
 ### Image generation
 
-Use OpenAI GPT-Image-1 (or the new cost-efficient GPT-Image-1 Mini) or Google Gemini 2.5 Flash Image (Preview):
+Use OpenAI GPT-Image-1 (or the new cost-efficient GPT-Image-1 Mini) or Google Gemini image models:
 
 ```ts
 import { ensembleImage } from '@just-every/ensemble';
 
 const images = await ensembleImage('A serene lake at dawn', { model: 'gemini-2.5-flash-image-preview' }, { size: 'portrait' });
+
+// Gemini 3.1 Flash Image: grounded generation + thinking controls + metadata callback
+const grounded = await ensembleImage(
+  'A detailed painting of a Timareta butterfly resting on a flower',
+  { model: 'gemini-3.1-flash-image-preview' },
+  {
+    size: '16:9',
+    quality: 'high', // 4K
+    grounding: {
+      web_search: true,
+      image_search: true,
+    },
+    thinking: {
+      level: 'high',
+      include_thoughts: true,
+    },
+    on_metadata: metadata => {
+      // metadata.citations includes containing-page URLs for attribution compliance
+      console.log(metadata.citations);
+    },
+  }
+);
 ```
 - ElevenLabs: `eleven_multilingual_v2`, `eleven_turbo_v2_5`
 
@@ -358,7 +380,8 @@ Fallbacks
 - Midjourney v7 (3rd-party): set `MIDJOURNEY_API_KEY` (or `KIE_API_KEY`) and optional `MJ_API_BASE`; use `midjourney-v7`.
 
 Notes
-- Gemini Flash Image does not expose hard size/AR controls; we add soft prompt hints and return the image unchanged.
+- Gemini 3.1 Flash Image supports 0.5K/1K/2K/4K tiers, explicit aspect ratios, Google Image Search grounding, and thinking controls.
+- Gemini 3 Pro Image supports explicit 1K/2K/4K resolution presets mapped to official aspect-ratio tables.
 - Luma Photon and Ideogram return URLs; we pass them through without altering pixels.
 
 ## Architecture
