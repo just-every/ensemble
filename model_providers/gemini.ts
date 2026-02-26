@@ -1387,12 +1387,27 @@ export class GeminiProvider extends BaseModelProvider {
                 );
             }
 
-            const includeThoughts = opts?.thinking?.include_thoughts === true;
-            const requestedThinkingLevel = opts?.thinking?.level;
+            const thinkingOptions = opts?.thinking;
+            const hasThinkingOptionsObject =
+                thinkingOptions !== null &&
+                typeof thinkingOptions === 'object' &&
+                !Array.isArray(thinkingOptions);
+
+            const includeThoughts =
+                hasThinkingOptionsObject && (thinkingOptions as { include_thoughts?: unknown }).include_thoughts === true;
+            const requestedThinkingLevel = hasThinkingOptionsObject
+                ? (thinkingOptions as { level?: unknown }).level
+                : undefined;
             const thinkingLevel = requestedThinkingLevel === 'high' ? 'High' : requestedThinkingLevel ? 'Minimal' : undefined;
             if (requestedThinkingLevel && !isGemini31FlashImageModel) {
                 console.warn(
                     '[Gemini] thinking.level is currently supported for gemini-3.1-flash-image-preview only. Ignoring thinking level.'
+                );
+            }
+
+            if (hasThinkingOptionsObject && 'include_thoughts' in thinkingOptions && !isGemini31FlashImageModel) {
+                console.warn(
+                    '[Gemini] thinking.include_thoughts is currently supported for gemini-3.1-flash-image-preview only. Ignoring include_thoughts.'
                 );
             }
 
@@ -1490,7 +1505,7 @@ export class GeminiProvider extends BaseModelProvider {
                 if (requestImageSize) imageConfig.imageSize = requestImageSize;
 
                 const thinkingConfig: Record<string, unknown> = {};
-                if (opts?.thinking && 'include_thoughts' in opts.thinking) {
+                if (hasThinkingOptionsObject && 'include_thoughts' in thinkingOptions && isGemini31FlashImageModel) {
                     thinkingConfig.includeThoughts = includeThoughts;
                 }
                 if (thinkingLevel && isGemini31FlashImageModel) {

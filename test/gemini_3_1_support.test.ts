@@ -374,6 +374,58 @@ describe('Gemini 3.1 model support', () => {
         expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
     });
 
+    it('omits thinkingConfig for unsupported image models', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        await provider.createImage(
+            'A portrait of an astronaut',
+            'gemini-2.5-flash-image-preview',
+            { agent_id: 'test-gemini-2.5-thinking-ignored' } as any,
+            {
+                n: 1,
+                thinking: {
+                    include_thoughts: true,
+                    level: 'high',
+                },
+            }
+        );
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.config?.thinkingConfig).toBeUndefined();
+    });
+
+    it('ignores malformed thinking values for unsupported image models', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        await expect(
+            provider.createImage(
+                'A robot holding a lantern',
+                'gemini-2.5-flash-image-preview',
+                { agent_id: 'test-gemini-2.5-thinking-malformed' } as any,
+                {
+                    n: 1,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    thinking: 'not-an-object' as any,
+                }
+            )
+        ).resolves.toBeInstanceOf(Array);
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.config?.thinkingConfig).toBeUndefined();
+    });
+
     it('returns grounding/thought metadata via on_metadata and excludes thought images from outputs', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(makeGeminiGroundedThoughtImageStream());
