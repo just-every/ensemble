@@ -55,6 +55,14 @@ async function getSharp() {
     return sharpModule;
 }
 
+async function getSharpOrNull() {
+    try {
+        return await getSharp();
+    } catch {
+        return null;
+    }
+}
+
 // Constants for image processing
 export const MAX_IMAGE_HEIGHT = 2000;
 export const DEFAULT_QUALITY = 80;
@@ -431,8 +439,11 @@ export async function resizeDataUrl(
     const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
     if (!match) return dataUrl;
     const [, mime, b64] = match;
+    const sharp = await getSharpOrNull();
+    if (!sharp) {
+        return dataUrl;
+    }
     const input = Buffer.from(b64, 'base64');
-    const sharp = await getSharp();
     const image = sharp(input);
     const fit = opts?.fit || 'cover';
     const background = opts?.background || (mime.includes('png') ? { r: 0, g: 0, b: 0, alpha: 0 } : '#000');
@@ -461,56 +472,66 @@ export async function resizeAndSplitForOpenAI(imageData: string): Promise<string
     const MAX_WIDTH = 1024;
     const MAX_HEIGHT = 768;
 
-    // Strip the data-URL prefix and grab format
-    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
-    const imageFormat = imageData.match(/data:image\/(\w+);/)?.[1] || 'png';
-
-    // Convert to a Buffer
-    const imageBuffer = Buffer.from(base64Image, 'base64');
-
-    // Quick-exit if already small enough
-    const sharp = await getSharp();
-    const { width: origW = 0, height: origH = 0 } = await sharp(imageBuffer).metadata();
-    if (origW <= MAX_WIDTH && origH <= MAX_HEIGHT) {
+    const sharp = await getSharpOrNull();
+    if (!sharp) {
+        // Cloudflare Workers and some edge runtimes can't load native sharp.
+        // OpenAI accepts image data URLs directly, so pass through unchanged.
         return [imageData];
     }
 
-    // 1) Resize *with* flatten so no transparency becomes grey
-    const newWidth = Math.min(origW, MAX_WIDTH);
-    const resizedBuffer = await sharp(imageBuffer)
-        .resize({ width: newWidth })
-        .flatten({ background: '#fff' }) // white background
-        .toFormat(imageFormat as any)
-        .toBuffer();
+    try {
+        // Strip the data-URL prefix and grab format
+        const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
+        const imageFormat = imageData.match(/data:image\/(\w+);/)?.[1] || 'png';
 
-    // 2) Read the real resized height
-    const { height: resizedH = 0 } = await sharp(resizedBuffer).metadata();
+        // Convert to a Buffer
+        const imageBuffer = Buffer.from(base64Image, 'base64');
 
-    const result: string[] = [];
-
-    // 3) If still too tall, slice it
-    if (resizedH > MAX_HEIGHT) {
-        const segments = Math.ceil(resizedH / MAX_HEIGHT);
-        for (let i = 0; i < segments; i++) {
-            const top = i * MAX_HEIGHT;
-            const height = Math.min(MAX_HEIGHT, resizedH - top);
-            if (height <= 0) continue;
-
-            const segmentBuf = await sharp(resizedBuffer)
-                .extract({ left: 0, top, width: newWidth, height })
-                .toFormat(imageFormat as any)
-                .toBuffer();
-
-            const segmentDataUrl = `data:image/${imageFormat};base64,${segmentBuf.toString('base64')}`;
-            result.push(segmentDataUrl);
+        // Quick-exit if already small enough
+        const { width: origW = 0, height: origH = 0 } = await sharp(imageBuffer).metadata();
+        if (origW <= MAX_WIDTH && origH <= MAX_HEIGHT) {
+            return [imageData];
         }
-    } else {
-        // single slice fits
-        const singleUrl = `data:image/${imageFormat};base64,${resizedBuffer.toString('base64')}`;
-        result.push(singleUrl);
-    }
 
-    return result;
+        // 1) Resize *with* flatten so no transparency becomes grey
+        const newWidth = Math.min(origW, MAX_WIDTH);
+        const resizedBuffer = await sharp(imageBuffer)
+            .resize({ width: newWidth })
+            .flatten({ background: '#fff' }) // white background
+            .toFormat(imageFormat as any)
+            .toBuffer();
+
+        // 2) Read the real resized height
+        const { height: resizedH = 0 } = await sharp(resizedBuffer).metadata();
+
+        const result: string[] = [];
+
+        // 3) If still too tall, slice it
+        if (resizedH > MAX_HEIGHT) {
+            const segments = Math.ceil(resizedH / MAX_HEIGHT);
+            for (let i = 0; i < segments; i++) {
+                const top = i * MAX_HEIGHT;
+                const height = Math.min(MAX_HEIGHT, resizedH - top);
+                if (height <= 0) continue;
+
+                const segmentBuf = await sharp(resizedBuffer)
+                    .extract({ left: 0, top, width: newWidth, height })
+                    .toFormat(imageFormat as any)
+                    .toBuffer();
+
+                const segmentDataUrl = `data:image/${imageFormat};base64,${segmentBuf.toString('base64')}`;
+                result.push(segmentDataUrl);
+            }
+        } else {
+            // single slice fits
+            const singleUrl = `data:image/${imageFormat};base64,${resizedBuffer.toString('base64')}`;
+            result.push(singleUrl);
+        }
+
+        return result;
+    } catch {
+        return [imageData];
+    }
 }
 
 // Utility to strip and re-prefix data-URLs
@@ -521,7 +542,10 @@ function stripDataUrl(dataUrl: string) {
 }
 
 async function processAndTruncate(imageBuffer: Buffer, format: string, maxW: number, maxH: number): Promise<Buffer> {
-    const sharp = await getSharp();
+    const sharp = await getSharpOrNull();
+    if (!sharp) {
+        return imageBuffer;
+    }
     // 1) Auto-orient, resize to max width, flatten transparency
     const resized = await sharp(imageBuffer)
         .rotate()
@@ -552,7 +576,10 @@ export async function resizeAndTruncateForClaude(imageData: string): Promise<str
     const buf = Buffer.from(base64, 'base64');
 
     // early-exit if already fits
-    const sharp = await getSharp();
+    const sharp = await getSharpOrNull();
+    if (!sharp) {
+        return imageData;
+    }
     const meta = await sharp(buf).metadata();
     if (meta.width! <= CLAUDE_MAX_WIDTH && meta.height! <= CLAUDE_MAX_HEIGHT) {
         return imageData;
@@ -570,7 +597,10 @@ export async function resizeAndTruncateForGemini(imageData: string): Promise<str
     const buf = Buffer.from(base64, 'base64');
 
     // early-exit if already fits
-    const sharp = await getSharp();
+    const sharp = await getSharpOrNull();
+    if (!sharp) {
+        return imageData;
+    }
     const meta = await sharp(buf).metadata();
     if (meta.width! <= GEMINI_MAX_WIDTH && meta.height! <= GEMINI_MAX_HEIGHT) {
         return imageData;
