@@ -11,11 +11,41 @@ import { detectImageType, isValidBase64 } from './image_validation.js';
 // Lazy-load sharp only when needed
 let sharpModule: any = null;
 
+function resolveSharpModule(candidate: unknown): ((input?: unknown) => any) | null {
+    if (typeof candidate === 'function') {
+        return candidate as (input?: unknown) => any;
+    }
+    if (!candidate || typeof candidate !== 'object') {
+        return null;
+    }
+
+    const moduleObj = candidate as Record<string, unknown>;
+    if (typeof moduleObj.default === 'function') {
+        return moduleObj.default as (input?: unknown) => any;
+    }
+
+    if (moduleObj.default && typeof moduleObj.default === 'object') {
+        const nested = moduleObj.default as Record<string, unknown>;
+        if (typeof nested.default === 'function') {
+            return nested.default as (input?: unknown) => any;
+        }
+    }
+
+    if (typeof moduleObj.sharp === 'function') {
+        return moduleObj.sharp as (input?: unknown) => any;
+    }
+
+    return null;
+}
+
 async function getSharp() {
     if (!sharpModule) {
         try {
             const module = await import('sharp');
-            sharpModule = module.default || module;
+            sharpModule = resolveSharpModule(module);
+            if (!sharpModule) {
+                throw new Error('Sharp module loaded but export shape was not callable');
+            }
         } catch {
             throw new Error(
                 'Sharp is required for image processing but not installed. Please install it with: npm install sharp'
