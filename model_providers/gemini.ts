@@ -1614,7 +1614,9 @@ export class GeminiProvider extends BaseModelProvider {
                             },
                         ],
                         config: {
-                            responseModalities: [Modality.IMAGE, Modality.TEXT],
+                            // Image generation should request image-only responses to avoid
+                            // unnecessary text output tokens.
+                            responseModalities: [Modality.IMAGE],
                             ...(Object.keys(imageConfig).length ? { imageConfig } : {}),
                             ...(googleSearchTool ? { tools: [googleSearchTool] as any } : {}),
                             ...(Object.keys(thinkingConfig).length ? { thinkingConfig: thinkingConfig as any } : {}),

@@ -166,6 +166,7 @@ describe('Gemini 3.1 model support', () => {
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
 
         expect(usageArg?.metadata?.cost_per_image).toBe(0.045);
+        expect(requestArg?.config?.responseModalities).toEqual(['IMAGE']);
         // Keep 0.5K internal; only send documented imageSize values to Gemini.
         expect(requestArg?.config?.imageConfig?.imageSize).toBeUndefined();
 
