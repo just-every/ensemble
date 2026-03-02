@@ -136,6 +136,61 @@ export async function appendMessageWithImage(
     return input;
 }
 
+const CONTEXTUAL_IMAGE_ID_LOOKBACK = 600;
+
+function normalizeContextualImageId(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.replace(/[^A-Za-z0-9._:-]+/g, '');
+    if (!normalized) return null;
+    return normalized.slice(0, 128);
+}
+
+function findContextualImageId(content: string, matchOffset: number): string | null {
+    const windowStart = Math.max(0, matchOffset - CONTEXTUAL_IMAGE_ID_LOOKBACK);
+    const lookbehind = content.slice(windowStart, matchOffset);
+    const idRegex = /"(?:artifact_id|artifactId|id)"\s*:\s*"([^"\\]{1,200})"/g;
+    let match: RegExpExecArray | null = null;
+    let candidate: string | null = null;
+    while ((match = idRegex.exec(lookbehind)) !== null) {
+        const normalized = normalizeContextualImageId(match[1] || '');
+        if (normalized) {
+            candidate = normalized;
+        }
+    }
+    return candidate;
+}
+
+function resolveImagePlaceholderId(
+    content: string,
+    matchOffset: number,
+    images: Record<string, string>,
+    imageDataUrl: string
+): string {
+    const contextualId = findContextualImageId(content, matchOffset);
+    if (contextualId) {
+        const existing = images[contextualId];
+        if (!existing || existing === imageDataUrl) {
+            return contextualId;
+        }
+        let suffix = 2;
+        while (true) {
+            const candidate = `${contextualId}_${suffix}`;
+            const existingCandidate = images[candidate];
+            if (!existingCandidate || existingCandidate === imageDataUrl) {
+                return candidate;
+            }
+            suffix += 1;
+        }
+    }
+
+    let generated = uuidv4();
+    while (images[generated] && images[generated] !== imageDataUrl) {
+        generated = uuidv4();
+    }
+    return generated;
+}
+
 /**
  * Extract base64 images from a string, preserving non-image content
  * Replaces images with placeholder text [image <id>] and returns mapping
@@ -167,9 +222,7 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     const images: Record<string, string> = {};
 
     // Replace all images with placeholders and collect them in the images map
-    const replaceContent = content.replace(imgRegex, match => {
-        const id = uuidv4();
-
+    const replaceContent = content.replace(imgRegex, (match, _mime, matchOffset: number) => {
         // Extract the mime type
         const mimeMatch = match.match(/data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,/);
         const mime = mimeMatch ? mimeMatch[1] : '';
@@ -236,7 +289,14 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
         // Store the complete data URI with cleaned base64
         // Ensure we always have the "image/" prefix for consistency
         const prefix = mime.includes('/') ? 'data:' : 'data:image/';
-        images[id] = `${prefix}${mime};base64,${goodBase64}`;
+        const imageDataUrl = `${prefix}${mime};base64,${goodBase64}`;
+        const id = resolveImagePlaceholderId(
+            content,
+            typeof matchOffset === 'number' ? matchOffset : 0,
+            images,
+            imageDataUrl
+        );
+        images[id] = imageDataUrl;
         return `[image #${id}]`;
     });
 
