@@ -425,9 +425,73 @@ async function addImagesToInput(input: Content[], images: Record<string, string>
     return input;
 }
 
+function normalizeThoughtSignature(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
+function extractThoughtSignatureFromMessage(msg: unknown): string | null {
+    if (!msg || typeof msg !== 'object') {
+        return null;
+    }
+
+    const direct = normalizeThoughtSignature((msg as { thought_signature?: unknown }).thought_signature);
+    if (direct) {
+        return direct;
+    }
+
+    const candidate = msg as { type?: unknown; signature?: unknown };
+    if (candidate.type !== 'thinking') {
+        return null;
+    }
+
+    if (typeof candidate.signature === 'string') {
+        return normalizeThoughtSignature(candidate.signature);
+    }
+
+    if (!Array.isArray(candidate.signature)) {
+        return null;
+    }
+
+    for (const part of candidate.signature) {
+        if (typeof part === 'string') {
+            const parsed = normalizeThoughtSignature(part);
+            if (parsed) {
+                return parsed;
+            }
+            continue;
+        }
+
+        if (part && typeof part === 'object' && 'text' in part) {
+            const parsed = normalizeThoughtSignature((part as { text?: unknown }).text);
+            if (parsed) {
+                return parsed;
+            }
+        }
+    }
+
+    return null;
+}
+
 // Convert message history to Gemini's content format
 async function convertToGeminiContents(model: string, messages: ResponseInput): Promise<Content[]> {
     let contents: Content[] = [];
+    let pendingFunctionCallParts: Array<Record<string, unknown>> = [];
+
+    const flushPendingFunctionCalls = (): void => {
+        if (pendingFunctionCallParts.length === 0) {
+            return;
+        }
+
+        contents.push({
+            role: 'model',
+            parts: pendingFunctionCallParts as any,
+        });
+        pendingFunctionCallParts = [];
+    };
 
     for (const msg of messages) {
         if (msg.type === 'function_call') {
@@ -448,18 +512,16 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                 };
             }
 
-            contents.push({
-                role: 'model',
-                parts: [
-                    {
-                        functionCall: {
-                            name: msg.name,
-                            args,
-                        },
-                    },
-                ],
+            const thoughtSignature = extractThoughtSignatureFromMessage(msg);
+            pendingFunctionCallParts.push({
+                functionCall: {
+                    name: msg.name,
+                    args,
+                },
+                ...(thoughtSignature ? { thoughtSignature } : {}),
             });
         } else if (msg.type === 'function_call_output') {
+            flushPendingFunctionCalls();
             let textOutput = '';
             if (typeof msg.output === 'string') {
                 textOutput = msg.output;
@@ -493,8 +555,10 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                 addImagesToInput
             );
         } else {
+            flushPendingFunctionCalls();
             // Regular message
             const role = msg.role === 'assistant' ? 'model' : 'user';
+            const thoughtSignature = msg.type === 'thinking' ? extractThoughtSignatureFromMessage(msg) : null;
 
             // Handle array content with input_text and input_image types
             if (Array.isArray(msg.content)) {
@@ -551,6 +615,13 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                     }
                 }
 
+                if (thoughtSignature && parts.length > 0) {
+                    parts[parts.length - 1] = {
+                        ...parts[parts.length - 1],
+                        thoughtSignature,
+                    };
+                }
+
                 if (parts.length > 0) {
                     const message: Content = { role, parts };
                     contents.push(message);
@@ -571,6 +642,7 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                         {
                             thought: msg.type === 'thinking',
                             text: textContent.trim(),
+                            ...(thoughtSignature ? { thoughtSignature } : {}),
                         },
                     ],
                 };
@@ -591,6 +663,8 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
             }
         }
     }
+
+    flushPendingFunctionCalls();
 
     return contents;
 }
@@ -908,6 +982,7 @@ export class GeminiProvider extends BaseModelProvider {
         let messageId = uuidv4();
         let contentBuffer = '';
         let thoughtBuffer = '';
+        let latestThoughtSignature: string | null = null;
         let eventOrder = 0;
         // Track shown grounding URLs to avoid duplicates
         const shownGrounding = new Set<string>();
@@ -1150,13 +1225,31 @@ export class GeminiProvider extends BaseModelProvider {
 
                 // Handle function calls (if present)
                 if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+                    const functionCallPartSignatures: Array<string | null> = [];
+                    for (const candidate of chunk.candidates || []) {
+                        const parts = candidate?.content?.parts || [];
+                        for (const part of parts) {
+                            if ((part as any)?.functionCall) {
+                                functionCallPartSignatures.push(
+                                    normalizeThoughtSignature((part as any).thoughtSignature || (part as any).thought_signature)
+                                );
+                            }
+                        }
+                    }
+
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
+                            const thoughtSignature =
+                                normalizeThoughtSignature((fc as any).thoughtSignature || (fc as any).thought_signature) ||
+                                functionCallPartSignatures.shift() ||
+                                null;
+
                             yield withRequestId({
                                 type: 'tool_start',
                                 tool_call: {
                                     id: fc.id || `call_${uuidv4()}`,
                                     type: 'function',
+                                    ...(thoughtSignature ? { thought_signature: thoughtSignature } : {}),
                                     function: {
                                         name: fc.name,
                                         arguments: JSON.stringify(fc.args || {}),
@@ -1170,6 +1263,13 @@ export class GeminiProvider extends BaseModelProvider {
                 for (const candidate of chunk.candidates) {
                     if (candidate.content?.parts) {
                         for (const part of candidate.content.parts) {
+                            const thoughtSignature = normalizeThoughtSignature(
+                                (part as any).thoughtSignature || (part as any).thought_signature
+                            );
+                            if (thoughtSignature) {
+                                latestThoughtSignature = thoughtSignature;
+                            }
+
                             let text = '';
                             if (part.text) {
                                 text += part.text;
@@ -1299,6 +1399,7 @@ export class GeminiProvider extends BaseModelProvider {
                     type: 'message_complete',
                     content: contentBuffer,
                     thinking_content: thoughtBuffer,
+                    ...(latestThoughtSignature ? { thinking_signature: latestThoughtSignature } : {}),
                     message_id: messageId,
                 });
             }
@@ -1339,6 +1440,7 @@ export class GeminiProvider extends BaseModelProvider {
                     type: 'message_complete',
                     content: contentBuffer,
                     thinking_content: thoughtBuffer,
+                    ...(latestThoughtSignature ? { thinking_signature: latestThoughtSignature } : {}),
                     message_id: messageId,
                 });
             }

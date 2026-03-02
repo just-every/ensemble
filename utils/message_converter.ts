@@ -60,6 +60,7 @@ export function convertToFunctionCall(
         call_id: toolCall.call_id || toolCall.id,
         name: toolCall.function.name,
         arguments: toolCall.function.arguments,
+        ...(toolCall.thought_signature ? { thought_signature: toolCall.thought_signature } : {}),
         model,
         status,
         timestamp: Date.now(),

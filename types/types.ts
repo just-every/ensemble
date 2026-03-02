@@ -121,6 +121,7 @@ export interface ToolCall {
     id: string;
     type: 'function';
     call_id?: string;
+    thought_signature?: string;
     function: {
         name: string;
         arguments: string;
@@ -242,6 +243,7 @@ export interface ResponseInputFunctionCall extends ResponseBaseMessage {
     call_id: string;
     name: string;
     arguments: string;
+    thought_signature?: string;
     id?: string;
     status?: 'in_progress' | 'completed' | 'incomplete';
 }
