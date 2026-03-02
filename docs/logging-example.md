@@ -31,6 +31,7 @@ The trace logger emits:
 Each event includes:
 
 - `turn_id`: Shared by all events in the same top-level turn
+- `agent_id`: Included on every trace event when the agent has `agent_id`
 - `request_id`: Shared by all events in the same model request round
 - `sequence`: Monotonic sequence per turn
 - `timestamp`: ISO timestamp
@@ -126,6 +127,7 @@ async function main() {
                 sequence: event.sequence,
                 type: event.type,
                 turn_id: event.turn_id,
+                agent_id: event.agent_id,
                 request_id: event.request_id,
                 tool_call_id: event.tool_call_id,
                 data: event.data,

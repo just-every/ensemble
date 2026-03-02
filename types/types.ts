@@ -763,6 +763,7 @@ export type EnsembleTraceEventType =
 export interface EnsembleTraceEvent {
     type: EnsembleTraceEventType;
     turn_id: string;
+    agent_id?: string;
     request_id?: string;
     tool_call_id?: string;
     sequence: number;

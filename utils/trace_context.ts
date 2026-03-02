@@ -21,10 +21,18 @@ export class TraceContext {
         this.turnId = turnId || randomUUID();
     }
 
+    private getEventAgentId(): { agent_id?: string } {
+        if (this.agent.agent_id === undefined) {
+            return {};
+        }
+        return { agent_id: this.agent.agent_id };
+    }
+
     async emitTurnStart(data?: Record<string, unknown>): Promise<void> {
         await emitTraceEvent({
             type: 'turn_start',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             data: {
                 operation: this.operation,
                 agent_id: this.agent.agent_id,
@@ -43,6 +51,7 @@ export class TraceContext {
         await emitTraceEvent({
             type: 'request_start',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             request_id: requestId,
             data: {
                 request_number: this.requestCount,
@@ -57,6 +66,7 @@ export class TraceContext {
         await emitTraceEvent({
             type: 'tool_start',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             request_id: requestId,
             tool_call_id: toolCallId,
             data,
@@ -67,6 +77,7 @@ export class TraceContext {
         await emitTraceEvent({
             type: 'tool_done',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             request_id: requestId,
             tool_call_id: toolCallId,
             data,
@@ -78,6 +89,7 @@ export class TraceContext {
         await emitTraceEvent({
             type: 'request_end',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             request_id: requestId,
             data: {
                 request_number: requestNumber,
@@ -90,6 +102,7 @@ export class TraceContext {
         await emitTraceEvent({
             type: 'turn_end',
             turn_id: this.turnId,
+            ...this.getEventAgentId(),
             data: {
                 status,
                 reason,

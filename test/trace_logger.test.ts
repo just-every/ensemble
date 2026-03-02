@@ -76,6 +76,9 @@ describe('Trace Logger', () => {
         // All events should be tied to a single turn.
         const turnIds = new Set(traceEvents.map(event => event.turn_id));
         expect(turnIds.size).toBe(1);
+
+        // Agent id should be present on all trace events.
+        expect(traceEvents.every(event => event.agent_id === 'trace-agent')).toBe(true);
     });
 
     it('should emit tool lifecycle events and request follow-up status', async () => {
@@ -145,5 +148,6 @@ describe('Trace Logger', () => {
         // Tool events should be associated with the first request.
         expect(toolStarts[0].request_id).toBe(requestStarts[0].request_id);
         expect(toolDones[0].request_id).toBe(requestStarts[0].request_id);
+        expect(traceEvents.every(event => event.agent_id === 'trace-agent')).toBe(true);
     });
 });

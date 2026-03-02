@@ -47,6 +47,7 @@ describe('Trace Logger - Other Requests', () => {
         const types = traceEvents.map(event => event.type);
         expect(types).toEqual(['turn_start', 'request_start', 'request_end', 'turn_end']);
         expect(traceEvents.find(event => event.type === 'request_end')?.data?.status).toBe('completed');
+        expect(traceEvents.every(event => event.agent_id === 'embed-agent')).toBe(true);
     });
 
     it('should emit trace lifecycle for ensembleListen', async () => {
@@ -73,6 +74,7 @@ describe('Trace Logger - Other Requests', () => {
         expect(types).toEqual(['turn_start', 'request_start', 'request_end', 'turn_end']);
         expect(traceEvents.find(event => event.type === 'request_end')?.data?.status).toBe('completed');
         expect(traceEvents.find(event => event.type === 'request_end')?.data?.final_response).toBe('hello');
+        expect(traceEvents.every(event => event.agent_id === 'listen-agent')).toBe(true);
     });
 
     it('should emit trace lifecycle for ensembleVoice', async () => {
@@ -102,6 +104,7 @@ describe('Trace Logger - Other Requests', () => {
         const types = traceEvents.map(event => event.type);
         expect(types).toEqual(['turn_start', 'request_start', 'request_end', 'turn_end']);
         expect(traceEvents.find(event => event.type === 'request_end')?.data?.status).toBe('completed');
+        expect(traceEvents.every(event => event.agent_id === 'voice-agent')).toBe(true);
     });
 
     it('should emit trace lifecycle for ensembleLive', async () => {
@@ -139,5 +142,6 @@ describe('Trace Logger - Other Requests', () => {
         const types = traceEvents.map(event => event.type);
         expect(types).toEqual(['turn_start', 'request_start', 'request_end', 'turn_end']);
         expect(traceEvents.find(event => event.type === 'request_end')?.data?.status).toBe('completed');
+        expect(traceEvents.every(event => event.agent_id === 'live-agent')).toBe(true);
     });
 });

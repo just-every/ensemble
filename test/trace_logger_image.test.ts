@@ -52,6 +52,7 @@ describe('Trace Logger - Image', () => {
         const turnEnd = traceEvents.find(event => event.type === 'turn_end');
         expect(turnEnd?.data?.status).toBe('completed');
         expect(turnEnd?.data?.request_count).toBe(1);
+        expect(traceEvents.every(event => event.agent_id === 'image-agent')).toBe(true);
     });
 
     it('should use the same request_id for stream image trace events', async () => {
@@ -81,5 +82,6 @@ describe('Trace Logger - Image', () => {
         expect(requestStart?.request_id).toBe('image-request-1');
         expect(requestEnd?.request_id).toBe('image-request-1');
         expect(requestEnd?.data?.status).toBe('completed');
+        expect(traceEvents.every(event => event.agent_id === 'image-agent')).toBe(true);
     });
 });
