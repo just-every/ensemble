@@ -752,6 +752,28 @@ export interface EnsembleLogger {
     log_llm_error(requestId: string | undefined, errorData: unknown, timestamp?: Date): void;
 }
 
+export type EnsembleTraceEventType =
+    | 'turn_start'
+    | 'request_start'
+    | 'tool_start'
+    | 'tool_done'
+    | 'request_end'
+    | 'turn_end';
+
+export interface EnsembleTraceEvent {
+    type: EnsembleTraceEventType;
+    turn_id: string;
+    request_id?: string;
+    tool_call_id?: string;
+    sequence: number;
+    timestamp: string;
+    data?: Record<string, unknown>;
+}
+
+export interface EnsembleTraceLogger {
+    log_trace_event(event: EnsembleTraceEvent): void | Promise<void>;
+}
+
 // ================================================================
 // Image Processing Types
 // ================================================================

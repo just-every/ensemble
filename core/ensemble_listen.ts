@@ -5,6 +5,8 @@ import type {
     TranscriptionEvent,
 } from '../types/types.js';
 import { getModelFromAgent, getModelProvider, type ModelProvider } from '../model_providers/model_provider.js';
+import { createTraceContext } from '../utils/trace_context.js';
+import { randomUUID } from 'crypto';
 
 // Re-export for convenience
 export type { TranscriptionOpts, TranscriptionAudioSource, TranscriptionEvent };
@@ -82,6 +84,15 @@ export async function* ensembleListen(
     agent: AgentDefinition,
     options: TranscriptionOpts = {}
 ): AsyncGenerator<TranscriptionEvent> {
+    const trace = createTraceContext(agent, 'transcription');
+    const requestId = randomUUID();
+    let requestStarted = false;
+    let turnStatus: 'completed' | 'error' = 'completed';
+    let requestStatus = 'completed';
+    let requestError: string | undefined;
+    let transcriptionDuration: number | undefined;
+    let finalTranscript: string | undefined;
+
     // Force streaming
     const streamOptions = { ...options, stream: true };
 
@@ -92,117 +103,185 @@ export async function* ensembleListen(
         encoding: 'pcm' as const,
     };
 
-    // Emit initial event
-    const startEvent: TranscriptionEvent = {
-        type: 'transcription_start',
-        timestamp: new Date().toISOString(),
-        format: audioFormat.encoding || 'pcm',
-        audioFormat: audioFormat,
-    };
-    yield startEvent;
+    const audioSourceType =
+        audioSource instanceof ReadableStream
+            ? 'readable_stream'
+            : audioSource instanceof ArrayBuffer
+              ? 'array_buffer'
+              : audioSource instanceof Uint8Array
+                ? 'uint8array'
+                : typeof audioSource === 'function'
+                  ? 'factory'
+                  : typeof audioSource === 'object' && audioSource !== null && Symbol.asyncIterator in audioSource
+                    ? 'async_iterable'
+                    : typeof audioSource;
 
-    // Determine which model to use
-    const model = await getModelFromAgent(agent, 'transcription');
+    await trace.emitTurnStart({
+        audio_source_type: audioSourceType,
+        options: streamOptions,
+    });
 
-    // Get the provider for this model
-    let provider: ModelProvider;
     try {
-        provider = getModelProvider(model);
-    } catch (error) {
-        const errorEvent: TranscriptionEvent = {
-            type: 'error',
+        // Determine which model to use
+        const model = await getModelFromAgent(agent, 'transcription');
+        await trace.emitRequestStart(requestId, {
+            agent_id: agent.agent_id,
+            model,
+            payload: {
+                audio_source_type: audioSourceType,
+                options: streamOptions,
+            },
+        });
+        requestStarted = true;
+
+        // Emit initial event
+        const startEvent: TranscriptionEvent = {
+            type: 'transcription_start',
             timestamp: new Date().toISOString(),
-            error: `Failed to initialize provider for model ${model}: ${
+            format: audioFormat.encoding || 'pcm',
+            audioFormat: audioFormat,
+        };
+        yield startEvent;
+
+        // Get the provider for this model
+        let provider: ModelProvider;
+        try {
+            provider = getModelProvider(model);
+        } catch (error) {
+            requestStatus = 'error';
+            turnStatus = 'error';
+            requestError = `Failed to initialize provider for model ${model}: ${
                 error instanceof Error ? error.message : 'Unknown error'
-            }`,
-        };
-        yield errorEvent;
-        return;
-    }
+            }`;
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: requestError,
+            };
+            yield errorEvent;
+            return;
+        }
 
-    if (!provider.createTranscription) {
-        const errorEvent: TranscriptionEvent = {
-            type: 'error',
-            timestamp: new Date().toISOString(),
-            error: `Provider for model ${model} does not support transcription`,
-        };
-        yield errorEvent;
-        return;
-    }
+        if (!provider.createTranscription) {
+            requestStatus = 'error';
+            turnStatus = 'error';
+            requestError = `Provider for model ${model} does not support transcription`;
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: requestError,
+            };
+            yield errorEvent;
+            return;
+        }
 
-    // Normalize audio source to ReadableStream
-    let audioStream: ReadableStream<Uint8Array>;
-    try {
-        audioStream = normalizeAudioSource(audioSource);
-    } catch (error) {
-        const errorEvent: TranscriptionEvent = {
-            type: 'error',
-            timestamp: new Date().toISOString(),
-            error: `Failed to normalize audio source: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        };
-        yield errorEvent;
-        return;
-    }
+        // Normalize audio source to ReadableStream
+        let audioStream: ReadableStream<Uint8Array>;
+        try {
+            audioStream = normalizeAudioSource(audioSource);
+        } catch (error) {
+            requestStatus = 'error';
+            turnStatus = 'error';
+            requestError = `Failed to normalize audio source: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: requestError,
+            };
+            yield errorEvent;
+            return;
+        }
 
-    // Start transcription
-    const startTime = Date.now();
-    let fullTranscript = '';
-    let currentTurnText = '';
-    const allTurns: string[] = [];
+        // Start transcription
+        const startTime = Date.now();
+        let fullTranscript = '';
+        let currentTurnText = '';
+        const allTurns: string[] = [];
 
-    try {
-        // Pass audio stream and options to provider
-        const transcriptionGenerator = provider.createTranscription(audioStream, agent, model, streamOptions);
+        try {
+            // Pass audio stream and options to provider
+            const transcriptionGenerator = provider.createTranscription(audioStream, agent, model, streamOptions);
 
-        for await (const event of transcriptionGenerator) {
-            // Track full transcript for complete event
-            if (event.type === 'transcription_turn_delta' && event.delta) {
-                fullTranscript += event.delta;
-                currentTurnText += event.delta;
-            }
-
-            // Handle turn complete
-            if (event.type === 'transcription_turn_complete') {
-                // Add text to the turn event
-                const turnEvent: TranscriptionEvent = {
-                    ...event,
-                    text: currentTurnText,
-                };
-                yield turnEvent;
-
-                // Save turn and reset for next turn
-                if (currentTurnText.trim()) {
-                    allTurns.push(currentTurnText.trim());
+            for await (const event of transcriptionGenerator) {
+                // Track full transcript for complete event
+                if (event.type === 'transcription_turn_delta' && event.delta) {
+                    fullTranscript += event.delta;
+                    currentTurnText += event.delta;
                 }
-                currentTurnText = '';
-            } else {
-                // Pass through all other events
-                yield event;
+
+                // Handle turn complete
+                if (event.type === 'transcription_turn_complete') {
+                    // Add text to the turn event
+                    const turnEvent: TranscriptionEvent = {
+                        ...event,
+                        text: currentTurnText,
+                    };
+                    yield turnEvent;
+
+                    // Save turn and reset for next turn
+                    if (currentTurnText.trim()) {
+                        allTurns.push(currentTurnText.trim());
+                    }
+                    currentTurnText = '';
+                } else {
+                    // Pass through all other events
+                    yield event;
+                }
             }
-        }
 
-        // If there's remaining text not in a turn, add it as a final turn
-        if (currentTurnText.trim()) {
-            allTurns.push(currentTurnText.trim());
-        }
+            // If there's remaining text not in a turn, add it as a final turn
+            if (currentTurnText.trim()) {
+                allTurns.push(currentTurnText.trim());
+            }
 
-        // Emit complete event with all turns joined
-        const duration = (Date.now() - startTime) / 1000;
-        const completeEvent: TranscriptionEvent = {
-            type: 'transcription_complete',
-            timestamp: new Date().toISOString(),
-            text: allTurns.length > 0 ? allTurns.join('\n') : fullTranscript,
-            duration: duration,
-        };
-        yield completeEvent;
+            // Emit complete event with all turns joined
+            const duration = (Date.now() - startTime) / 1000;
+            const transcript = allTurns.length > 0 ? allTurns.join('\n') : fullTranscript;
+            transcriptionDuration = duration;
+            finalTranscript = transcript;
+            const completeEvent: TranscriptionEvent = {
+                type: 'transcription_complete',
+                timestamp: new Date().toISOString(),
+                text: transcript,
+                duration: duration,
+            };
+            yield completeEvent;
+        } catch (error) {
+            requestStatus = 'error';
+            turnStatus = 'error';
+            requestError = error instanceof Error ? error.message : 'Transcription failed';
+            console.error('[ensembleListen] Error during transcription:', error);
+            const errorEvent: TranscriptionEvent = {
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                error: requestError,
+            };
+            yield errorEvent;
+        }
     } catch (error) {
-        console.error('[ensembleListen] Error during transcription:', error);
+        requestStatus = 'error';
+        turnStatus = 'error';
+        requestError = error instanceof Error ? error.message : String(error);
         const errorEvent: TranscriptionEvent = {
             type: 'error',
             timestamp: new Date().toISOString(),
-            error: error instanceof Error ? error.message : 'Transcription failed',
+            error: requestError,
         };
         yield errorEvent;
+        throw error;
+    } finally {
+        if (requestStarted) {
+            await trace.emitRequestEnd(requestId, {
+                status: requestStatus,
+                error: requestError,
+                duration: transcriptionDuration,
+                final_response: finalTranscript,
+            });
+        }
+        await trace.emitTurnEnd(turnStatus, turnStatus === 'completed' ? 'completed' : 'exception', {
+            error: requestError,
+            final_response: finalTranscript,
+        });
     }
 }
 

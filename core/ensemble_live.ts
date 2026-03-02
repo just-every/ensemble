@@ -21,6 +21,8 @@ import { MessageHistory } from '../utils/message_history.js';
 import { handleToolCall } from '../utils/tool_execution_manager.js';
 import { processToolResult } from '../utils/tool_result_processor.js';
 import { emitEvent } from '../utils/event_controller.js';
+import { createTraceContext } from '../utils/trace_context.js';
+import { randomUUID } from 'crypto';
 
 /**
  * Creates a live interactive session with real-time audio/text capabilities
@@ -50,6 +52,8 @@ export async function* ensembleLive(
     options?: LiveOptions
 ): AsyncGenerator<LiveEvent> {
     const startTime = Date.now();
+    const trace = createTraceContext(agent, 'live_session');
+    const requestId = randomUUID();
     let session: LiveSession | null = null;
     let messageHistory: MessageHistory | null = null;
     let totalToolCalls = 0;
@@ -57,6 +61,18 @@ export async function* ensembleLive(
     let isSessionActive = true;
     let totalCost = 0;
     let totalTokens = 0;
+    let requestStarted = false;
+    let turnStatus: 'completed' | 'error' = 'completed';
+    let turnEndReason = 'completed';
+    let requestStatus = 'completed';
+    let requestError: string | undefined;
+    let resolvedModel: string | undefined;
+    let resolvedProviderId: string | undefined;
+
+    await trace.emitTurnStart({
+        config,
+        options,
+    });
 
     try {
         // Determine the model to use
@@ -64,17 +80,31 @@ export async function* ensembleLive(
         if (!model) {
             throw new Error('No model specified in agent configuration');
         }
+        resolvedModel = model;
 
         // Get the provider for this model
         const provider = getModelProvider(model);
         if (!provider) {
             throw new Error(`No provider found for model: ${model}`);
         }
+        resolvedProviderId = provider.provider_id;
 
         // Check if provider supports Live API
         if (!provider.createLiveSession) {
             throw new Error(`Provider ${provider.provider_id} does not support Live API`);
         }
+
+        await trace.emitRequestStart(requestId, {
+            agent_id: agent.agent_id,
+            provider: provider.provider_id,
+            model,
+            payload: {
+                config,
+                options,
+                history_count: options?.messageHistory?.length ?? 0,
+            },
+        });
+        requestStarted = true;
 
         // Initialize message history if provided
         if (options?.messageHistory) {
@@ -156,10 +186,14 @@ export async function* ensembleLive(
                     options?.maxToolCallRoundsPerTurn ?? agent.maxToolCallRoundsPerTurn ?? Infinity;
 
                 if (totalToolCalls >= maxToolCalls) {
+                    turnStatus = 'error';
+                    turnEndReason = 'max_tool_calls_exceeded';
+                    requestStatus = 'error';
+                    requestError = `Maximum tool calls (${maxToolCalls}) exceeded`;
                     const errorEvent: LiveErrorEvent = {
                         type: 'error',
                         timestamp: new Date().toISOString(),
-                        error: `Maximum tool calls (${maxToolCalls}) exceeded`,
+                        error: requestError,
                         code: 'MAX_TOOL_CALLS_EXCEEDED',
                         recoverable: false,
                     };
@@ -181,6 +215,12 @@ export async function* ensembleLive(
 
                 // Execute tool calls
                 for (const toolCall of toolCallEvent.toolCalls) {
+                    await trace.emitToolStart(requestId, toolCall.id, {
+                        tool_name: toolCall.function.name,
+                        call_id: toolCall.call_id || toolCall.id,
+                        arguments: toolCall.function.arguments,
+                    });
+
                     // Emit tool start event
                     const toolStartEvent: LiveToolStartEvent = {
                         type: 'tool_start',
@@ -215,6 +255,12 @@ export async function* ensembleLive(
                         totalToolCalls++;
                         currentTurnToolCalls++;
 
+                        await trace.emitToolDone(requestId, toolCall.id, {
+                            tool_name: toolCall.function.name,
+                            call_id: toolCallResult.call_id,
+                            output: toolCallResult.output,
+                        });
+
                         // Emit tool result event
                         const toolResultEvent: LiveToolResultEvent = {
                             type: 'tool_result',
@@ -237,6 +283,12 @@ export async function* ensembleLive(
                         };
 
                         toolResults.push(toolCallResult);
+
+                        await trace.emitToolDone(requestId, toolCall.id, {
+                            tool_name: toolCall.function.name,
+                            call_id: toolCallResult.call_id,
+                            error: errorMessage,
+                        });
 
                         // Emit error event
                         const errorEvent: LiveErrorEvent = {
@@ -309,6 +361,10 @@ export async function* ensembleLive(
     } catch (error) {
         // Emit error event
         const errorMessage = error instanceof Error ? error.message : String(error);
+        turnStatus = 'error';
+        turnEndReason = 'exception';
+        requestStatus = 'error';
+        requestError = errorMessage;
         const errorEvent: LiveErrorEvent = {
             type: 'error',
             timestamp: new Date().toISOString(),
@@ -329,10 +385,34 @@ export async function* ensembleLive(
 
         // Emit end event
         const duration = Date.now() - startTime;
+        if (requestStarted) {
+            await trace.emitRequestEnd(requestId, {
+                status: requestStatus,
+                error: requestError,
+                duration_ms: duration,
+                total_tokens: totalTokens,
+                total_cost: totalCost > 0 ? totalCost : undefined,
+                total_tool_calls: totalToolCalls,
+                session_id: session?.sessionId,
+                model: resolvedModel,
+                provider: resolvedProviderId,
+            });
+        }
+        await trace.emitTurnEnd(turnStatus, turnEndReason, {
+            error: requestError,
+            duration_ms: duration,
+            total_tokens: totalTokens,
+            total_cost: totalCost > 0 ? totalCost : undefined,
+            total_tool_calls: totalToolCalls,
+            session_id: session?.sessionId,
+            model: resolvedModel,
+            provider: resolvedProviderId,
+        });
+
         const endEvent: LiveEndEvent = {
             type: 'live_end',
             timestamp: new Date().toISOString(),
-            reason: isSessionActive ? 'completed' : 'error',
+            reason: turnStatus === 'completed' ? 'completed' : 'error',
             duration,
             totalTokens,
             totalCost: totalCost > 0 ? totalCost : undefined,
@@ -375,6 +455,16 @@ export async function* ensembleLiveAudio(
         enableProactivity?: boolean;
     }
 ): AsyncGenerator<LiveEvent> {
+    const trace = createTraceContext(agent, 'live_audio_session');
+    const requestId = randomUUID();
+    let requestStarted = false;
+    let turnStatus: 'completed' | 'error' = 'completed';
+    let turnEndReason = 'completed';
+    let requestStatus = 'completed';
+    let requestError: string | undefined;
+    let totalCost = 0;
+    let totalTokens = 0;
+    const startTime = Date.now();
     const config: LiveConfig = {
         responseModalities: ['AUDIO'],
         speechConfig: options?.voice
@@ -399,59 +489,82 @@ export async function* ensembleLiveAudio(
         };
     }
 
-    // We need direct access to the session, so we'll handle the live session creation manually
-    const model = await getModelFromAgent(agent);
-    console.log('[ensembleLiveAudio] Using model:', model);
-    if (!model) {
-        throw new Error('No model specified in agent configuration');
-    }
+    await trace.emitTurnStart({
+        config,
+        options,
+        audio_source_type: 'async_iterable',
+    });
 
-    const provider = getModelProvider(model);
-    console.log('[ensembleLiveAudio] Provider:', provider?.provider_id);
-    if (!provider || !provider.createLiveSession) {
-        throw new Error(`Provider does not support Live API for model: ${model}`);
-    }
-
-    // Create the live session directly
-    console.log('[ensembleLiveAudio] Creating live session...');
-    const session = await provider.createLiveSession(config, agent, model, options);
-    console.log('[ensembleLiveAudio] Session created:', session.sessionId);
-
-    // Start audio processing task
+    let session: LiveSession | null = null;
+    let model: string | undefined;
+    let providerId: string | undefined;
     let audioChunkCount = 0;
     let totalAudioBytes = 0;
-    const audioProcessingTask = (async () => {
-        try {
-            console.log('[ensembleLiveAudio] Starting audio processing task...');
-            for await (const chunk of audioSource) {
-                if (!session.isActive()) {
-                    console.log('[ensembleLiveAudio] Session inactive, stopping audio processing');
-                    break;
-                }
+    let audioProcessingTask: Promise<void> | null = null;
 
-                audioChunkCount++;
-                totalAudioBytes += chunk.length;
-
-                // Convert to base64
-                const base64Data = Buffer.from(chunk).toString('base64');
-                console.log(
-                    `[ensembleLiveAudio] Sending audio chunk ${audioChunkCount}, size: ${chunk.length} bytes, total: ${totalAudioBytes} bytes`
-                );
-                await session.sendAudio({
-                    data: base64Data,
-                    mimeType: 'audio/pcm;rate=16000',
-                });
-            }
-            console.log(
-                `[ensembleLiveAudio] Audio processing completed. Total chunks: ${audioChunkCount}, Total bytes: ${totalAudioBytes}`
-            );
-        } catch (error) {
-            console.error('[ensembleLiveAudio] Error processing audio:', error);
-        }
-    })();
-
-    // Process events from the session
     try {
+        // We need direct access to the session, so we'll handle the live session creation manually
+        model = await getModelFromAgent(agent);
+        console.log('[ensembleLiveAudio] Using model:', model);
+        if (!model) {
+            throw new Error('No model specified in agent configuration');
+        }
+
+        const provider = getModelProvider(model);
+        providerId = provider?.provider_id;
+        console.log('[ensembleLiveAudio] Provider:', provider?.provider_id);
+        if (!provider || !provider.createLiveSession) {
+            throw new Error(`Provider does not support Live API for model: ${model}`);
+        }
+
+        await trace.emitRequestStart(requestId, {
+            agent_id: agent.agent_id,
+            provider: provider.provider_id,
+            model,
+            payload: {
+                config,
+                options,
+                audio_source_type: 'async_iterable',
+            },
+        });
+        requestStarted = true;
+
+        // Create the live session directly
+        console.log('[ensembleLiveAudio] Creating live session...');
+        session = await provider.createLiveSession(config, agent, model, options);
+        console.log('[ensembleLiveAudio] Session created:', session.sessionId);
+
+        // Start audio processing task
+        audioProcessingTask = (async () => {
+            try {
+                console.log('[ensembleLiveAudio] Starting audio processing task...');
+                for await (const chunk of audioSource) {
+                    if (!session || !session.isActive()) {
+                        console.log('[ensembleLiveAudio] Session inactive, stopping audio processing');
+                        break;
+                    }
+
+                    audioChunkCount++;
+                    totalAudioBytes += chunk.length;
+
+                    // Convert to base64
+                    const base64Data = Buffer.from(chunk).toString('base64');
+                    console.log(
+                        `[ensembleLiveAudio] Sending audio chunk ${audioChunkCount}, size: ${chunk.length} bytes, total: ${totalAudioBytes} bytes`
+                    );
+                    await session.sendAudio({
+                        data: base64Data,
+                        mimeType: 'audio/pcm;rate=16000',
+                    });
+                }
+                console.log(
+                    `[ensembleLiveAudio] Audio processing completed. Total chunks: ${audioChunkCount}, Total bytes: ${totalAudioBytes}`
+                );
+            } catch (error) {
+                console.error('[ensembleLiveAudio] Error processing audio:', error);
+            }
+        })();
+
         // Emit start event
         yield {
             type: 'live_start',
@@ -466,23 +579,68 @@ export async function* ensembleLiveAudio(
         for await (const event of session.getEventStream()) {
             eventCount++;
             console.log(`[ensembleLiveAudio] Event ${eventCount}:`, event.type);
+
+            if (event.type === 'cost_update') {
+                const costEvent = event as LiveCostUpdateEvent;
+                if (costEvent.usage.totalCost) {
+                    totalCost += costEvent.usage.totalCost;
+                }
+                if (costEvent.usage.totalTokens) {
+                    totalTokens += costEvent.usage.totalTokens;
+                }
+            }
+
             yield event;
         }
         console.log(`[ensembleLiveAudio] Event processing completed. Total events: ${eventCount}`);
+    } catch (error) {
+        turnStatus = 'error';
+        turnEndReason = 'exception';
+        requestStatus = 'error';
+        requestError = error instanceof Error ? error.message : String(error);
+        throw error;
     } finally {
-        // Ensure audio processing is stopped
-        await audioProcessingTask;
+        if (audioProcessingTask) {
+            await audioProcessingTask;
+        }
 
         // Close session if still active
-        if (session.isActive()) {
+        if (session && session.isActive()) {
             await session.close();
         }
+
+        const duration = Date.now() - startTime;
+        if (requestStarted) {
+            await trace.emitRequestEnd(requestId, {
+                status: requestStatus,
+                error: requestError,
+                duration_ms: duration,
+                total_tokens: totalTokens,
+                total_cost: totalCost > 0 ? totalCost : undefined,
+                audio_chunks_sent: audioChunkCount,
+                audio_bytes_sent: totalAudioBytes,
+                session_id: session?.sessionId,
+                model,
+                provider: providerId,
+            });
+        }
+        await trace.emitTurnEnd(turnStatus, turnEndReason, {
+            error: requestError,
+            duration_ms: duration,
+            total_tokens: totalTokens,
+            total_cost: totalCost > 0 ? totalCost : undefined,
+            audio_chunks_sent: audioChunkCount,
+            audio_bytes_sent: totalAudioBytes,
+            session_id: session?.sessionId,
+            model,
+            provider: providerId,
+        });
 
         // Emit end event
         yield {
             type: 'live_end',
             timestamp: new Date().toISOString(),
-            reason: 'completed',
+            reason: turnStatus === 'completed' ? 'completed' : 'error',
         } as LiveEndEvent;
     }
 }
@@ -513,6 +671,12 @@ export async function ensembleLiveText(
     // Find session from events
     const eventQueue: LiveEvent[] = [];
     let eventPromiseResolve: ((value: IteratorResult<LiveEvent>) => void) | null = null;
+
+    // Prime the live generator so provider session setup starts before returning controls.
+    const firstEvent = await sessionGenerator.next();
+    if (!firstEvent.done && firstEvent.value) {
+        eventQueue.push(firstEvent.value);
+    }
 
     // Process events in background
     (async () => {

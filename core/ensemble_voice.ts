@@ -1,6 +1,8 @@
 import type { AgentDefinition, VoiceGenerationOpts } from '../types/types.js';
 import { getModelFromAgent, getModelProvider, type ModelProvider } from '../model_providers/model_provider.js';
 import { findModel } from '../data/model_data.js';
+import { createTraceContext } from '../utils/trace_context.js';
+import { randomUUID } from 'crypto';
 
 // Re-export for convenience
 export type { VoiceGenerationOpts };
@@ -52,6 +54,12 @@ export async function* ensembleVoice(
     const model = await getModelFromAgent(agent, 'voice');
     const isGemini = model.startsWith('gemini');
     const isElevenLabs = model.startsWith('eleven_');
+    const trace = createTraceContext(agent, 'voice_generation');
+    const requestId = randomUUID();
+    let requestStarted = false;
+    let turnStatus: 'completed' | 'error' = 'completed';
+    let requestStatus = 'completed';
+    let requestError: string | undefined;
 
     // Start timing
     const startTime = Date.now();
@@ -62,6 +70,22 @@ export async function* ensembleVoice(
     const modelInfo = findModel(model);
     const isOpenAI = modelInfo?.provider === 'openai';
     const isWav = format === 'wav';
+
+    await trace.emitTurnStart({
+        input_text: text,
+        options: streamOptions,
+        model,
+    });
+    await trace.emitRequestStart(requestId, {
+        agent_id: agent.agent_id,
+        provider: modelInfo?.provider,
+        model,
+        payload: {
+            text,
+            options: streamOptions,
+        },
+    });
+    requestStarted = true;
 
     // Determine effective format after any conversions
     const effectiveFormat = isGemini || (isElevenLabs && isPCM) ? 'wav' : format;
@@ -140,214 +164,233 @@ export async function* ensembleVoice(
             : {}),
     };
 
-    // Get the provider for this model
-    let provider: ModelProvider;
     try {
-        provider = getModelProvider(model);
-    } catch (error) {
-        throw new Error(
-            `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-    }
-
-    if (!provider.createVoice) {
-        throw new Error(`Provider for model ${model} does not support voice generation`);
-    }
-
-    // Get the audio stream
-    let result;
-    try {
-        const providerStartTime = Date.now();
-        result = await provider.createVoice(text, model, agent, streamOptions);
-        const providerTime = Date.now() - providerStartTime;
-        console.log(
-            `[ensembleVoice] Got result from provider in ${providerTime}ms:`,
-            typeof result,
-            result instanceof ReadableStream ? 'ReadableStream' : 'ArrayBuffer'
-        );
-    } catch (error) {
-        console.error('[ensembleVoice] Error calling provider.createVoice:', error);
-        throw error;
-    }
-
-    if (!(result instanceof ReadableStream)) {
-        throw new Error('Expected streaming response but got buffer');
-    }
-
-    const reader = result.getReader();
-    const CHUNK_SIZE = 8192; // 8KB chunks
-    let buffer = new Uint8Array(0);
-    let chunkIndex = 0;
-
-    // For Gemini, ElevenLabs PCM, or OpenAI WAV, we need to handle WAV streaming
-    const needsWavHandling = isGemini || (isElevenLabs && isPCM) || (isOpenAI && isWav);
-
-    if (needsWavHandling) {
-        const provider = isGemini ? 'Gemini' : isOpenAI ? 'OpenAI' : 'ElevenLabs';
-
-        // Determine sample rate upfront
-        let sampleRate: number;
-        if (isGemini || isOpenAI) {
-            sampleRate = 24000; // Both Gemini and OpenAI TTS use 24kHz
-        } else {
-            // ElevenLabs - extract sample rate from format string
-            if (format === 'pcm_16000') sampleRate = 16000;
-            else if (format === 'pcm_22050') sampleRate = 22050;
-            else if (format === 'pcm_44100') sampleRate = 44100;
-            else sampleRate = 24000; // Default for generic 'pcm'
+        // Get the provider for this model
+        let provider: ModelProvider;
+        try {
+            provider = getModelProvider(model);
+        } catch (error) {
+            throw new Error(
+                `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
         }
-        console.log(`[ensembleVoice] ${provider}: Will stream with sample rate ${sampleRate}Hz`);
 
-        // For Gemini, we know it returns all data at once, so use larger chunks
-        const providerChunkSize = isGemini ? 32768 : CHUNK_SIZE; // 32KB for Gemini, 8KB for others
+        if (!provider.createVoice) {
+            throw new Error(`Provider for model ${model} does not support voice generation`);
+        }
 
-        let isFirstChunk = true;
-        let hasWavHeader = false;
-        let headerBuffer = new Uint8Array(0);
+        // Get the audio stream
+        let result;
+        try {
+            const providerStartTime = Date.now();
+            result = await provider.createVoice(text, model, agent, streamOptions);
+            const providerTime = Date.now() - providerStartTime;
+            console.log(
+                `[ensembleVoice] Got result from provider in ${providerTime}ms:`,
+                typeof result,
+                result instanceof ReadableStream ? 'ReadableStream' : 'ArrayBuffer'
+            );
+        } catch (error) {
+            console.error('[ensembleVoice] Error calling provider.createVoice:', error);
+            throw error;
+        }
 
-        while (true) {
-            const { done, value } = await reader.read();
+        if (!(result instanceof ReadableStream)) {
+            throw new Error('Expected streaming response but got buffer');
+        }
 
-            if (value) {
-                if (!firstByteTime) {
-                    firstByteTime = Date.now();
-                }
+        const reader = result.getReader();
+        const CHUNK_SIZE = 8192; // 8KB chunks
+        let buffer = new Uint8Array(0);
+        let chunkIndex = 0;
 
-                // Append to buffer
-                const newBuffer = new Uint8Array(buffer.length + value.length);
-                newBuffer.set(buffer);
-                newBuffer.set(value, buffer.length);
-                buffer = newBuffer;
+        // For Gemini, ElevenLabs PCM, or OpenAI WAV, we need to handle WAV streaming
+        const needsWavHandling = isGemini || (isElevenLabs && isPCM) || (isOpenAI && isWav);
+
+        if (needsWavHandling) {
+            const provider = isGemini ? 'Gemini' : isOpenAI ? 'OpenAI' : 'ElevenLabs';
+
+            // Determine sample rate upfront
+            let sampleRate: number;
+            if (isGemini || isOpenAI) {
+                sampleRate = 24000; // Both Gemini and OpenAI TTS use 24kHz
+            } else {
+                // ElevenLabs - extract sample rate from format string
+                if (format === 'pcm_16000') sampleRate = 16000;
+                else if (format === 'pcm_22050') sampleRate = 22050;
+                else if (format === 'pcm_44100') sampleRate = 44100;
+                else sampleRate = 24000; // Default for generic 'pcm'
             }
+            console.log(`[ensembleVoice] ${provider}: Will stream with sample rate ${sampleRate}Hz`);
 
-            // Check for WAV header on first chunk
-            if (isFirstChunk && buffer.length >= 4) {
-                const header = new TextDecoder().decode(buffer.slice(0, 4));
-                hasWavHeader = header === 'RIFF';
-                isFirstChunk = false;
+            // For Gemini, we know it returns all data at once, so use larger chunks
+            const providerChunkSize = isGemini ? 32768 : CHUNK_SIZE; // 32KB for Gemini, 8KB for others
 
-                // If no WAV header, prepare to add one
-                if (!hasWavHeader) {
-                    // Create WAV header with placeholder size (we'll use a large value)
-                    const dataSize = 0x7ffffffe; // Maximum possible size for streaming
-                    const wavHeader = new ArrayBuffer(44);
-                    const view = new DataView(wavHeader);
+            let isFirstChunk = true;
+            let hasWavHeader = false;
+            let headerBuffer = new Uint8Array(0);
 
-                    // Helper to write string
-                    const setString = (offset: number, str: string) => {
-                        for (let i = 0; i < str.length; i++) {
-                            view.setUint8(offset + i, str.charCodeAt(i));
-                        }
-                    };
+            while (true) {
+                const { done, value } = await reader.read();
 
-                    // Write WAV header
-                    setString(0, 'RIFF');
-                    view.setUint32(4, dataSize + 36, true); // File size - 8
-                    setString(8, 'WAVE');
-                    setString(12, 'fmt ');
-                    view.setUint32(16, 16, true); // fmt chunk size
-                    view.setUint16(20, 1, true); // PCM format
-                    view.setUint16(22, 1, true); // Mono
-                    view.setUint32(24, sampleRate, true);
-                    view.setUint32(28, sampleRate * 2, true); // Byte rate
-                    view.setUint16(32, 2, true); // Block align
-                    view.setUint16(34, 16, true); // Bits per sample
-                    setString(36, 'data');
-                    view.setUint32(40, dataSize, true); // Data size
+                if (value) {
+                    if (!firstByteTime) {
+                        firstByteTime = Date.now();
+                    }
 
-                    // Prepend header to buffer
-                    headerBuffer = new Uint8Array(wavHeader);
-                    const newBuffer = new Uint8Array(headerBuffer.length + buffer.length);
-                    newBuffer.set(headerBuffer);
-                    newBuffer.set(buffer, headerBuffer.length);
+                    // Append to buffer
+                    const newBuffer = new Uint8Array(buffer.length + value.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(value, buffer.length);
                     buffer = newBuffer;
                 }
-            }
 
-            // Process buffer in chunks
-            while (buffer.length >= providerChunkSize || (done && buffer.length > 0)) {
-                const chunkSize = Math.min(providerChunkSize, buffer.length);
-                const chunk = buffer.slice(0, chunkSize);
-                buffer = buffer.slice(chunkSize);
+                // Check for WAV header on first chunk
+                if (isFirstChunk && buffer.length >= 4) {
+                    const header = new TextDecoder().decode(buffer.slice(0, 4));
+                    hasWavHeader = header === 'RIFF';
+                    isFirstChunk = false;
 
-                const base64Chunk = Buffer.from(chunk).toString('base64');
-                const isFinalChunk = done && buffer.length === 0;
+                    // If no WAV header, prepare to add one
+                    if (!hasWavHeader) {
+                        // Create WAV header with placeholder size (we'll use a large value)
+                        const dataSize = 0x7ffffffe; // Maximum possible size for streaming
+                        const wavHeader = new ArrayBuffer(44);
+                        const view = new DataView(wavHeader);
 
-                yield {
-                    type: 'audio_stream',
-                    chunkIndex: chunkIndex++,
-                    isFinalChunk: isFinalChunk,
-                    data: base64Chunk,
-                    timestamp: new Date().toISOString(),
-                };
+                        // Helper to write string
+                        const setString = (offset: number, str: string) => {
+                            for (let i = 0; i < str.length; i++) {
+                                view.setUint8(offset + i, str.charCodeAt(i));
+                            }
+                        };
 
-                if (isFinalChunk) break;
-            }
+                        // Write WAV header
+                        setString(0, 'RIFF');
+                        view.setUint32(4, dataSize + 36, true); // File size - 8
+                        setString(8, 'WAVE');
+                        setString(12, 'fmt ');
+                        view.setUint32(16, 16, true); // fmt chunk size
+                        view.setUint16(20, 1, true); // PCM format
+                        view.setUint16(22, 1, true); // Mono
+                        view.setUint32(24, sampleRate, true);
+                        view.setUint32(28, sampleRate * 2, true); // Byte rate
+                        view.setUint16(32, 2, true); // Block align
+                        view.setUint16(34, 16, true); // Bits per sample
+                        setString(36, 'data');
+                        view.setUint32(40, dataSize, true); // Data size
 
-            if (done) break;
-        }
-    } else {
-        // For other providers, stream as before
-        while (true) {
-            const { done, value } = await reader.read();
-
-            if (value) {
-                if (!firstByteTime) {
-                    firstByteTime = Date.now();
+                        // Prepend header to buffer
+                        headerBuffer = new Uint8Array(wavHeader);
+                        const newBuffer = new Uint8Array(headerBuffer.length + buffer.length);
+                        newBuffer.set(headerBuffer);
+                        newBuffer.set(buffer, headerBuffer.length);
+                        buffer = newBuffer;
+                    }
                 }
 
-                // Append to buffer
-                const newBuffer = new Uint8Array(buffer.length + value.length);
-                newBuffer.set(buffer);
-                newBuffer.set(value, buffer.length);
-                buffer = newBuffer;
+                // Process buffer in chunks
+                while (buffer.length >= providerChunkSize || (done && buffer.length > 0)) {
+                    const chunkSize = Math.min(providerChunkSize, buffer.length);
+                    const chunk = buffer.slice(0, chunkSize);
+                    buffer = buffer.slice(chunkSize);
+
+                    const base64Chunk = Buffer.from(chunk).toString('base64');
+                    const isFinalChunk = done && buffer.length === 0;
+
+                    yield {
+                        type: 'audio_stream',
+                        chunkIndex: chunkIndex++,
+                        isFinalChunk: isFinalChunk,
+                        data: base64Chunk,
+                        timestamp: new Date().toISOString(),
+                    };
+
+                    if (isFinalChunk) break;
+                }
+
+                if (done) break;
             }
+        } else {
+            // For other providers, stream as before
+            while (true) {
+                const { done, value } = await reader.read();
 
-            // Process buffer in chunks or on completion
-            while (buffer.length >= CHUNK_SIZE || (done && buffer.length > 0)) {
-                const chunkSize = Math.min(CHUNK_SIZE, buffer.length);
-                const chunk = buffer.slice(0, chunkSize);
-                buffer = buffer.slice(chunkSize);
+                if (value) {
+                    if (!firstByteTime) {
+                        firstByteTime = Date.now();
+                    }
 
-                // Convert to base64
-                const base64Chunk = Buffer.from(chunk).toString('base64');
-                const isFinalChunk = done && buffer.length === 0;
+                    // Append to buffer
+                    const newBuffer = new Uint8Array(buffer.length + value.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(value, buffer.length);
+                    buffer = newBuffer;
+                }
 
-                const audioEvent = {
-                    type: 'audio_stream',
-                    chunkIndex: chunkIndex++,
-                    isFinalChunk: isFinalChunk,
-                    data: base64Chunk,
-                    timestamp: new Date().toISOString(),
-                };
-                yield audioEvent;
+                // Process buffer in chunks or on completion
+                while (buffer.length >= CHUNK_SIZE || (done && buffer.length > 0)) {
+                    const chunkSize = Math.min(CHUNK_SIZE, buffer.length);
+                    const chunk = buffer.slice(0, chunkSize);
+                    buffer = buffer.slice(chunkSize);
 
-                if (isFinalChunk) break;
+                    // Convert to base64
+                    const base64Chunk = Buffer.from(chunk).toString('base64');
+                    const isFinalChunk = done && buffer.length === 0;
+
+                    const audioEvent = {
+                        type: 'audio_stream',
+                        chunkIndex: chunkIndex++,
+                        isFinalChunk: isFinalChunk,
+                        data: base64Chunk,
+                        timestamp: new Date().toISOString(),
+                    };
+                    yield audioEvent;
+
+                    if (isFinalChunk) break;
+                }
+
+                if (done) break;
             }
-
-            if (done) break;
         }
-    }
 
-    // Log total time
-    const totalTime = Date.now() - startTime;
-    console.log(`[ensembleVoice] ${model}: Total generation time: ${totalTime}ms`);
+        // Log total time
+        const totalTime = Date.now() - startTime;
+        console.log(`[ensembleVoice] ${model}: Total generation time: ${totalTime}ms`);
 
-    // Also emit cost event
-    try {
-        const costTrackerModule = await import('../utils/cost_tracker.js');
-        const costTracker = costTrackerModule.costTracker;
-        const usage = (costTracker as any).entries || [];
+        // Also emit cost event
+        try {
+            const costTrackerModule = await import('../utils/cost_tracker.js');
+            const costTracker = costTrackerModule.costTracker;
+            const usage = (costTracker as any).entries || [];
 
-        if (usage.length > 0) {
-            const latestUsage = usage[usage.length - 1];
-            yield {
-                type: 'cost_update',
-                usage: latestUsage,
-            };
+            if (usage.length > 0) {
+                const latestUsage = usage[usage.length - 1];
+                yield {
+                    type: 'cost_update',
+                    usage: latestUsage,
+                };
+            }
+        } catch (error) {
+            // Cost tracking is optional
+            console.debug('Cost tracking not available:', error);
         }
     } catch (error) {
-        // Cost tracking is optional
-        console.debug('Cost tracking not available:', error);
+        turnStatus = 'error';
+        requestStatus = 'error';
+        requestError = error instanceof Error ? error.message : String(error);
+        throw error;
+    } finally {
+        if (requestStarted) {
+            await trace.emitRequestEnd(requestId, {
+                status: requestStatus,
+                error: requestError,
+                first_byte_ms: firstByteTime ? firstByteTime - startTime : undefined,
+                total_time_ms: Date.now() - startTime,
+            });
+        }
+        await trace.emitTurnEnd(turnStatus, turnStatus === 'completed' ? 'completed' : 'exception', {
+            error: requestError,
+        });
     }
 }

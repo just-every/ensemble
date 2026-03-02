@@ -1,331 +1,170 @@
-# Logging Example
+# Trace Logging Example
 
-This example demonstrates how to implement a custom logger for @just-every/ensemble that captures all LLM requests and responses in a JSON array format.
+This guide shows the new trace logging API for `@just-every/ensemble` using:
+
+- `turn_*` events for the overall user turn
+- `request_*` events for each model request round within that turn
+- `tool_start` / `tool_done` events tied to the request that triggered the tool call
+
+Unlike raw stream logging, this trace API intentionally emits only high-signal lifecycle events, not every thinking or delta event.
+
+Trace logging is currently wired into:
+
+- `ensembleRequest` (chat/tool-call turns)
+- `ensembleImage` (image generation turns)
+- `ensembleEmbed` (embedding requests)
+- `ensembleListen` (transcription requests)
+- `ensembleVoice` (voice generation requests)
+- `ensembleLive` / `ensembleLiveAudio` (live session requests)
+
+## Event Model
+
+The trace logger emits:
+
+1. `turn_start`
+2. `request_start` (includes request payload)
+3. `tool_start` / `tool_done` (zero or more)
+4. `request_end`
+5. Repeat `request_start ... request_end` for additional request rounds
+6. `turn_end`
+
+Each event includes:
+
+- `turn_id`: Shared by all events in the same top-level turn
+- `request_id`: Shared by all events in the same model request round
+- `sequence`: Monotonic sequence per turn
+- `timestamp`: ISO timestamp
+- `data`: Event-specific metadata
 
 ## Complete Example
 
 ```typescript
 import {
-    EnsembleLogger,
-    setEnsembleLogger,
     ensembleRequest,
+    setEnsembleTraceLogger,
+    EnsembleTraceLogger,
+    EnsembleTraceEvent,
     AgentDefinition,
+    ResponseInput,
 } from '@just-every/ensemble';
 
-// Define types for our log entries
-interface LogEntry {
-    id: string;
-    type: 'request' | 'response' | 'error';
-    timestamp: Date;
-    agentId?: string;
-    provider?: string;
-    model?: string;
-    data: unknown;
+// Minimal DB adapter so this example stays framework-agnostic.
+interface TraceDB {
+    insert(event: EnsembleTraceEvent): Promise<void>;
 }
 
-interface RequestResponsePair {
-    requestId: string;
-    request?: LogEntry;
-    response?: LogEntry;
-    error?: LogEntry;
-    duration?: number;
-}
+class InMemoryTraceDB implements TraceDB {
+    private events: EnsembleTraceEvent[] = [];
 
-// Implement a JSON Array Logger
-export class JSONArrayLogger implements EnsembleLogger {
-    private logs: RequestResponsePair[] = [];
-    private pendingRequests: Map<string, RequestResponsePair> = new Map();
-
-    log_llm_request(
-        agentId: string,
-        providerName: string,
-        model: string,
-        requestData: unknown,
-        timestamp?: Date
-    ): string {
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const logEntry: LogEntry = {
-            id: requestId,
-            type: 'request',
-            timestamp: timestamp || new Date(),
-            agentId,
-            provider: providerName,
-            model,
-            data: requestData,
-        };
-
-        const pair: RequestResponsePair = {
-            requestId,
-            request: logEntry,
-        };
-
-        this.pendingRequests.set(requestId, pair);
-        
-        console.log(`[Logger] Request ${requestId} - ${model} via ${providerName}`);
-        
-        return requestId;
+    async insert(event: EnsembleTraceEvent): Promise<void> {
+        this.events.push(event);
     }
 
-    log_llm_response(
-        requestId: string | undefined,
-        responseData: unknown,
-        timestamp?: Date
-    ): void {
-        if (!requestId) {
-            console.warn('[Logger] Response logged without request ID');
-            return;
-        }
-
-        const pair = this.pendingRequests.get(requestId);
-        if (pair) {
-            const responseEntry: LogEntry = {
-                id: `res_${requestId}`,
-                type: 'response',
-                timestamp: timestamp || new Date(),
-                data: responseData,
-            };
-
-            pair.response = responseEntry;
-            
-            // Calculate duration if we have both request and response
-            if (pair.request) {
-                pair.duration = responseEntry.timestamp.getTime() - pair.request.timestamp.getTime();
-            }
-
-            // Move from pending to completed logs
-            this.logs.push(pair);
-            this.pendingRequests.delete(requestId);
-            
-            console.log(`[Logger] Response ${requestId} - Duration: ${pair.duration}ms`);
-        }
-    }
-
-    log_llm_error(
-        requestId: string | undefined,
-        errorData: unknown,
-        timestamp?: Date
-    ): void {
-        if (!requestId) {
-            console.warn('[Logger] Error logged without request ID');
-            return;
-        }
-
-        const pair = this.pendingRequests.get(requestId) || { requestId };
-        
-        const errorEntry: LogEntry = {
-            id: `err_${requestId}`,
-            type: 'error',
-            timestamp: timestamp || new Date(),
-            data: errorData,
-        };
-
-        pair.error = errorEntry;
-        
-        // Move from pending to completed logs (even if we don't have the request)
-        this.logs.push(pair);
-        this.pendingRequests.delete(requestId);
-        
-        console.log(`[Logger] Error ${requestId}:`, errorData);
-    }
-
-    // Helper methods to access the logs
-    getAllLogs(): RequestResponsePair[] {
-        return [...this.logs];
-    }
-
-    getLogsByModel(model: string): RequestResponsePair[] {
-        return this.logs.filter(pair => pair.request?.model === model);
-    }
-
-    getLogsByProvider(provider: string): RequestResponsePair[] {
-        return this.logs.filter(pair => pair.request?.provider === provider);
-    }
-
-    getErrorLogs(): RequestResponsePair[] {
-        return this.logs.filter(pair => pair.error !== undefined);
-    }
-
-    exportAsJSON(): string {
-        return JSON.stringify(this.logs, null, 2);
-    }
-
-    exportSummary(): object {
-        const summary = {
-            totalRequests: this.logs.length,
-            pendingRequests: this.pendingRequests.size,
-            errors: this.logs.filter(p => p.error).length,
-            averageDuration: 0,
-            byModel: {} as Record<string, number>,
-            byProvider: {} as Record<string, number>,
-        };
-
-        let totalDuration = 0;
-        let durationCount = 0;
-
-        for (const pair of this.logs) {
-            if (pair.duration) {
-                totalDuration += pair.duration;
-                durationCount++;
-            }
-
-            if (pair.request?.model) {
-                summary.byModel[pair.request.model] = (summary.byModel[pair.request.model] || 0) + 1;
-            }
-
-            if (pair.request?.provider) {
-                summary.byProvider[pair.request.provider] = (summary.byProvider[pair.request.provider] || 0) + 1;
-            }
-        }
-
-        summary.averageDuration = durationCount > 0 ? totalDuration / durationCount : 0;
-
-        return summary;
-    }
-
-    clearLogs(): void {
-        this.logs = [];
-        this.pendingRequests.clear();
+    getAll(): EnsembleTraceEvent[] {
+        return [...this.events];
     }
 }
 
-// Usage Example
+class DatabaseTraceLogger implements EnsembleTraceLogger {
+    constructor(private db: TraceDB) {}
+
+    async log_trace_event(event: EnsembleTraceEvent): Promise<void> {
+        // Store exactly what ensemble emits.
+        await this.db.insert(event);
+    }
+}
+
 async function main() {
-    // Create and set the logger
-    const logger = new JSONArrayLogger();
-    setEnsembleLogger(logger);
+    const traceDB = new InMemoryTraceDB();
+    const traceLogger = new DatabaseTraceLogger(traceDB);
 
-    // Define some example messages
-    const messages = [
-        { role: 'user' as const, content: 'What is the weather like today?' },
+    // Register trace logger (pass null to clear existing loggers)
+    setEnsembleTraceLogger(traceLogger);
+
+    const messages: ResponseInput = [
+        { type: 'message', role: 'user', content: 'Find weather in Brisbane and summarize it.' },
     ];
 
-    // Make some requests with different models
-    const agents: AgentDefinition[] = [
-        { modelClass: 'mini' },
-        { model: 'gpt-4o-mini' },
-        { model: 'claude-3-5-haiku-latest' },
-    ];
+    const agent: AgentDefinition = {
+        agent_id: 'weather-agent',
+        model: 'gpt-4o-mini',
+        tools: [
+            {
+                definition: {
+                    type: 'function',
+                    function: {
+                        name: 'get_weather',
+                        description: 'Get weather for a location',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                location: { type: 'string', description: 'City name' },
+                            },
+                            required: ['location'],
+                        },
+                    },
+                },
+                function: async (location: string) => {
+                    return `Weather for ${location}: 24C and sunny`;
+                },
+            },
+        ],
+    };
 
-    console.log('Starting LLM requests...\n');
-
-    // Execute requests
-    for (const agent of agents) {
-        try {
-            console.log(`Making request with agent:`, agent);
-            
-            for await (const event of ensembleRequest(messages, agent)) {
-                if (event.type === 'message_complete') {
-                    console.log(`Response: ${event.content}\n`);
-                }
-            }
-        } catch (error) {
-            console.error(`Error with agent ${JSON.stringify(agent)}:`, error);
+    // Run request normally. Trace events are logged automatically.
+    for await (const event of ensembleRequest(messages, agent)) {
+        if (event.type === 'message_complete' && event.content) {
+            console.log('Assistant:', event.content);
         }
     }
 
-    // Display the collected logs
-    console.log('\n=== LOG SUMMARY ===');
-    console.log(JSON.stringify(logger.exportSummary(), null, 2));
-
-    console.log('\n=== ALL LOGS (JSON) ===');
-    console.log(logger.exportAsJSON());
-
-    // Example: Get logs for a specific model
-    const gptLogs = logger.getLogsByModel('gpt-4o-mini');
-    console.log(`\n=== GPT-4O-MINI LOGS (${gptLogs.length} requests) ===`);
-    console.log(JSON.stringify(gptLogs, null, 2));
-
-    // Example: Get error logs
-    const errorLogs = logger.getErrorLogs();
-    if (errorLogs.length > 0) {
-        console.log(`\n=== ERROR LOGS (${errorLogs.length} errors) ===`);
-        console.log(JSON.stringify(errorLogs, null, 2));
+    // Inspect logged trace events
+    console.log('\n=== TRACE EVENTS ===');
+    for (const event of traceDB.getAll()) {
+        console.log(
+            JSON.stringify({
+                sequence: event.sequence,
+                type: event.type,
+                turn_id: event.turn_id,
+                request_id: event.request_id,
+                tool_call_id: event.tool_call_id,
+                data: event.data,
+            })
+        );
     }
 }
 
-// Run the example
 if (import.meta.url === `file://${process.argv[1]}`) {
     main().catch(console.error);
 }
 ```
 
-## Key Features
+## What `request_start` Contains
 
-1. **Request ID Generation**: Each request gets a unique ID for tracking
-2. **Request-Response Pairing**: Automatically matches responses to their requests
-3. **Duration Tracking**: Calculates how long each request took
-4. **Error Handling**: Captures and logs errors with their request context
-5. **Export Options**: Export as JSON or get summaries
-6. **Filtering**: Filter logs by model, provider, or error status
+`request_start` includes the payload that will be used for that request round. Payload shape depends on operation:
 
-## Output Example
+- Chat: `messages`, `model_settings`, `tool_names`
+- Image: `prompt`, image `options`
+- Embed: `text`, embed `options`
+- Voice: `text`, voice `options`
+- Listen: source metadata + transcription `options`
+- Live: live `config` + request `options`
 
-When you run this logger, you'll get output like:
+This makes it straightforward for clients to persist the exact request context before tool calls and final output events arrive.
 
-```json
-{
-  "totalRequests": 3,
-  "pendingRequests": 0,
-  "errors": 0,
-  "averageDuration": 523.5,
-  "byModel": {
-    "gpt-4o-mini": 1,
-    "claude-3-5-haiku-latest": 1,
-    "gemini-2.0-flash-thinking-exp-1219": 1
-  },
-  "byProvider": {
-    "openai": 1,
-    "anthropic": 1,
-    "google": 1
-  }
-}
-```
-
-And detailed logs like:
+## Example Event Sequence
 
 ```json
-[
-  {
-    "requestId": "req_1234567890_abc123",
-    "request": {
-      "id": "req_1234567890_abc123",
-      "type": "request",
-      "timestamp": "2024-01-15T10:30:00.000Z",
-      "agentId": "agent_123",
-      "provider": "openai",
-      "model": "gpt-4o-mini",
-      "data": {
-        "messages": [
-          {
-            "role": "user",
-            "content": "What is the weather like today?"
-          }
-        ],
-        "temperature": 0.7
-      }
-    },
-    "response": {
-      "id": "res_req_1234567890_abc123",
-      "type": "response",
-      "timestamp": "2024-01-15T10:30:00.523Z",
-      "data": {
-        "content": "I don't have access to real-time weather data...",
-        "usage": {
-          "promptTokens": 15,
-          "completionTokens": 45,
-          "totalTokens": 60
-        }
-      }
-    },
-    "duration": 523
-  }
-]
+{ "sequence": 1, "type": "turn_start", "turn_id": "turn_abc", "data": { "agent_id": "weather-agent" } }
+{ "sequence": 2, "type": "request_start", "turn_id": "turn_abc", "request_id": "req_1", "data": { "payload": { "messages": [ ... ] } } }
+{ "sequence": 3, "type": "tool_start", "turn_id": "turn_abc", "request_id": "req_1", "tool_call_id": "call_1", "data": { "tool_name": "get_weather" } }
+{ "sequence": 4, "type": "tool_done", "turn_id": "turn_abc", "request_id": "req_1", "tool_call_id": "call_1", "data": { "output": "Weather for Brisbane: 24C and sunny" } }
+{ "sequence": 5, "type": "request_end", "turn_id": "turn_abc", "request_id": "req_1", "data": { "status": "waiting_for_followup_request" } }
+{ "sequence": 6, "type": "request_start", "turn_id": "turn_abc", "request_id": "req_2", "data": { "payload": { "messages": [ ... ] } } }
+{ "sequence": 7, "type": "request_end", "turn_id": "turn_abc", "request_id": "req_2", "data": { "status": "completed", "final_response": "Brisbane is 24C and sunny..." } }
+{ "sequence": 8, "type": "turn_end", "turn_id": "turn_abc", "data": { "status": "completed", "request_count": 2 } }
 ```
 
-## Integration Tips
+## Legacy LLM Logger
 
-1. **Persistence**: You can easily extend this logger to save logs to a file or database
-2. **Filtering**: Add more sophisticated filtering based on your needs
-3. **Analytics**: Use the collected data for performance monitoring and cost analysis
-4. **Debugging**: The structured logs make it easy to debug issues with specific requests
-5. **Compliance**: Can be extended to handle data retention policies or PII redaction
+`setEnsembleLogger` still works for provider-level request/response/error logging. Use `setEnsembleTraceLogger` when you want turn/request/tool lifecycle logging with stable IDs and request payload snapshots.

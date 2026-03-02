@@ -430,11 +430,9 @@ describe('ensembleLive unit tests', () => {
         // Should have emitted end event
         const endEvent = events.find(e => e.type === 'live_end');
         expect(endEvent).toBeDefined();
-        // Note: The reason is always 'error' due to how isSessionActive is set to false before the check
-        // This appears to be a bug in the implementation, but we'll test the current behavior
         expect(endEvent).toMatchObject({
             type: 'live_end',
-            reason: 'error', // Current implementation always sets this to 'error'
+            reason: 'completed',
         });
 
         // Should have emitted agent done event

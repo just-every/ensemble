@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
+import { createTraceContext } from '../utils/trace_context.js';
 
 /**
  * Generate images from text prompts
@@ -28,11 +29,53 @@ export function ensembleImage(
     agent: AgentDefinition,
     options: ImageGenerationOpts = {}
 ): Promise<string[]> | AsyncGenerator<ProviderStreamEvent> {
-    const run = async (): Promise<string[]> => {
-        const model = await getModelFromAgent(agent, 'image_generation');
-        const provider = getModelProvider(model);
-        if (!provider.createImage) throw new Error(`Provider for model ${model} does not support image generation`);
-        return provider.createImage(prompt, model, agent, options);
+    const run = async (requestId?: string): Promise<string[]> => {
+        const trace = createTraceContext(agent, 'image_generation');
+        const tracedRequestId = requestId || options.request_id || randomUUID();
+        const requestOptions: ImageGenerationOpts = { ...options, request_id: tracedRequestId };
+        let requestStarted = false;
+
+        await trace.emitTurnStart({
+            prompt,
+            options: requestOptions,
+        });
+
+        try {
+            const model = await getModelFromAgent(agent, 'image_generation');
+            const provider = getModelProvider(model);
+            if (!provider.createImage) throw new Error(`Provider for model ${model} does not support image generation`);
+
+            await trace.emitRequestStart(tracedRequestId, {
+                agent_id: agent.agent_id,
+                provider: provider.provider_id,
+                model,
+                payload: {
+                    prompt,
+                    options: requestOptions,
+                },
+            });
+            requestStarted = true;
+
+            const images = await provider.createImage(prompt, model, agent, requestOptions);
+            await trace.emitRequestEnd(tracedRequestId, {
+                status: 'completed',
+                image_count: images.length,
+            });
+            await trace.emitTurnEnd('completed', 'completed');
+            return images;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (requestStarted) {
+                await trace.emitRequestEnd(tracedRequestId, {
+                    status: 'error',
+                    error: errorMessage,
+                });
+            }
+            await trace.emitTurnEnd('error', 'exception', {
+                error: errorMessage,
+            });
+            throw error;
+        }
     };
 
     if (!options.stream) {
@@ -42,8 +85,6 @@ export function ensembleImage(
     // Streaming mode
     const self = async function* (): AsyncGenerator<ProviderStreamEvent> {
         const request_id = options.request_id || randomUUID();
-        // Ensure providers receive the correlation id
-        options = { ...options, request_id };
         const { costTracker } = await import('../utils/cost_tracker.js');
 
         // Emit start
@@ -64,7 +105,7 @@ export function ensembleImage(
         costTracker.onAddUsage(handler);
 
         try {
-            const images = await run();
+            const images = await run(request_id);
             // flush any cost updates that may have arrived before first file
             while (iterator.queue.length) yield iterator.queue.shift() as ProviderStreamEvent;
             // Emit each file as it becomes available (we have them all at once here)

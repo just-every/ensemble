@@ -22,6 +22,7 @@ import { verifyOutput, setEnsembleRequestFunction } from '../utils/verification.
 import { setEnsembleRequestFunction as setImageToTextFunction } from '../utils/image_to_text.js';
 import { waitWhilePaused } from '../utils/pause_controller.js';
 import { emitEvent } from '../utils/event_controller.js';
+import { createTraceContext, TraceContext } from '../utils/trace_context.js';
 import {
     convertToThinkingMessage,
     convertToOutputMessage,
@@ -82,24 +83,36 @@ export async function* ensembleRequest(
         compactionThreshold: 0.7, // Compact when reaching 70% of context
     });
 
+    const trace = createTraceContext(agent, 'chat');
+    let totalToolCalls = 0;
+    let toolCallRounds = 0;
+    let errorRounds = 0;
+    let turnStatus: 'completed' | 'error' = 'completed';
+    let turnEndReason = 'completed';
+    let turnError: string | undefined;
+    const maxToolCalls = agent?.maxToolCalls ?? 200;
+    const maxRounds = agent?.maxToolCallRoundsPerTurn ?? Infinity;
+    let hasToolCalls = false;
+    let hasError = false;
+    let lastMessageContent = '';
+    const modelHistory: string[] = [];
+
+    await trace.emitTurnStart({
+        input_messages: conversationHistory,
+    });
+
     try {
-        // Track tool calls and rounds
-        let totalToolCalls = 0;
-        let toolCallRounds = 0;
-        let errorRounds = 0;
-        const maxToolCalls = agent?.maxToolCalls ?? 200;
-        const maxRounds = agent?.maxToolCallRoundsPerTurn ?? Infinity;
-
-        // Execute rounds while we have tool calls and haven't hit limits
-        let hasToolCalls = false;
-        let hasError = false;
-        let lastMessageContent = '';
-        const modelHistory: string[] = [];
-
         // Always execute at least one round to get initial response
         do {
             hasToolCalls = false;
             hasError = false;
+            let currentRoundRequestId: string | undefined;
+            const currentRoundMessages: string[] = [];
+            const currentRoundErrors: string[] = [];
+            let currentRoundToolCalls = 0;
+            let currentRoundRequestDuration: number | undefined;
+            let currentRoundDurationWithTools: number | undefined;
+            let currentRoundRequestCost: number | undefined;
 
             const model = await getModelFromAgent(
                 agent,
@@ -109,17 +122,23 @@ export async function* ensembleRequest(
             modelHistory.push(model);
 
             // Execute one round
-            const stream = executeRound(model, agent, history, totalToolCalls, maxToolCalls);
+            const stream = executeRound(model, agent, history, totalToolCalls, maxToolCalls, trace);
 
             // Yield all events from this round
             for await (const event of stream) {
                 yield event;
 
                 switch (event.type) {
+                    case 'agent_start': {
+                        currentRoundRequestId = event.request_id;
+                        break;
+                    }
+
                     case 'message_complete': {
                         const messageEvent = event as MessageEventBase;
                         if (messageEvent.content) {
                             lastMessageContent = messageEvent.content;
+                            currentRoundMessages.push(messageEvent.content);
                         }
                         break;
                     }
@@ -128,6 +147,14 @@ export async function* ensembleRequest(
                         const toolEvent = event as ToolEvent;
                         if (toolEvent.tool_call) {
                             const toolName = toolEvent.tool_call.function.name;
+                            currentRoundToolCalls += 1;
+
+                            await trace.emitToolStart(event.request_id, toolEvent.tool_call.id, {
+                                tool_name: toolName,
+                                arguments: toolEvent.tool_call.function.arguments,
+                                arguments_formatted: toolEvent.tool_call.function.arguments_formatted,
+                            });
+
                             // Don't count special tools as regular tool calls that need another round
                             if (toolName !== 'task_complete' && toolName !== 'task_fatal_error') {
                                 hasToolCalls = true;
@@ -137,8 +164,33 @@ export async function* ensembleRequest(
                         break;
                     }
 
+                    case 'tool_done': {
+                        const toolEvent = event as ToolEvent;
+                        if (toolEvent.tool_call) {
+                            await trace.emitToolDone(event.request_id, toolEvent.tool_call.id, {
+                                tool_name: toolEvent.tool_call.function.name,
+                                call_id: toolEvent.result?.call_id,
+                                output: toolEvent.result?.output,
+                                error: toolEvent.result?.error,
+                            });
+                        }
+                        break;
+                    }
+
+                    case 'agent_done': {
+                        const agentDoneEvent = event as any;
+                        currentRoundRequestDuration = agentDoneEvent.request_duration;
+                        currentRoundDurationWithTools = agentDoneEvent.duration_with_tools;
+                        currentRoundRequestCost = agentDoneEvent.request_cost;
+                        break;
+                    }
+
                     case 'error': {
                         hasError = true;
+                        const errorEvent = event as any;
+                        if (errorEvent.error) {
+                            currentRoundErrors.push(String(errorEvent.error));
+                        }
                         break;
                     }
                 }
@@ -155,6 +207,30 @@ export async function* ensembleRequest(
             if (hasError) {
                 ++errorRounds;
             }
+
+            const willRetryForError = hasError && errorRounds < MAX_ERROR_ATTEMPTS;
+            const willContinueForTools = hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls;
+            const willContinue = willRetryForError || willContinueForTools;
+
+            let requestStatus = 'completed';
+            if (hasError) {
+                requestStatus = willContinue ? 'error_retrying' : 'error';
+            } else if (hasToolCalls) {
+                requestStatus = willContinue ? 'waiting_for_followup_request' : 'tool_limit_reached';
+            }
+
+            if (currentRoundRequestId) {
+                await trace.emitRequestEnd(currentRoundRequestId, {
+                    status: requestStatus,
+                    will_continue: willContinue,
+                    tool_calls: currentRoundToolCalls,
+                    final_response: currentRoundMessages.length > 0 ? currentRoundMessages.join('\n') : undefined,
+                    errors: currentRoundErrors.length > 0 ? currentRoundErrors : undefined,
+                    request_duration_ms: currentRoundRequestDuration,
+                    duration_with_tools_ms: currentRoundDurationWithTools,
+                    request_cost: currentRoundRequestCost,
+                });
+            }
         } while (
             (hasError && errorRounds < MAX_ERROR_ATTEMPTS) ||
             (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls)
@@ -163,8 +239,13 @@ export async function* ensembleRequest(
         // If we hit limits, add a notification
         if (hasToolCalls && toolCallRounds >= maxRounds) {
             console.log('[ensembleRequest] Tool call rounds limit reached');
+            turnEndReason = 'max_tool_call_rounds_reached';
         } else if (hasToolCalls && totalToolCalls >= maxToolCalls) {
             console.log('[ensembleRequest] Total tool calls limit reached');
+            turnEndReason = 'max_tool_calls_reached';
+        } else if (hasError && errorRounds >= MAX_ERROR_ATTEMPTS) {
+            turnStatus = 'error';
+            turnEndReason = 'max_error_attempts_reached';
         }
 
         // Perform verification if configured
@@ -185,6 +266,9 @@ export async function* ensembleRequest(
     } catch (err) {
         // Use unified error handler
         const error = err as any;
+        turnStatus = 'error';
+        turnEndReason = 'exception';
+        turnError = error.message || 'Unknown error';
         yield {
             type: 'error',
             error: error.message || 'Unknown error',
@@ -194,6 +278,13 @@ export async function* ensembleRequest(
             timestamp: new Date().toISOString(),
         } as ProviderStreamEvent;
     } finally {
+        await trace.emitTurnEnd(turnStatus, turnEndReason, {
+            error: turnError,
+            tool_call_rounds: toolCallRounds,
+            total_tool_calls: totalToolCalls,
+            error_rounds: errorRounds,
+        });
+
         // Emit stream end
         yield {
             type: 'stream_end',
@@ -210,7 +301,8 @@ async function* executeRound(
     agent: AgentDefinition,
     history: MessageHistory,
     currentToolCalls: number,
-    maxToolCalls: number
+    maxToolCalls: number,
+    trace: TraceContext
 ): AsyncGenerator<ProviderStreamEvent> {
     // Generate request ID and track timing
     const requestId = randomUUID();
@@ -254,6 +346,17 @@ async function* executeRound(
 
     // Create provider and agent with fresh settings
     const provider = getModelProvider(model);
+
+    await trace.emitRequestStart(requestId, {
+        agent_id: agent.agent_id,
+        provider: provider.provider_id,
+        model,
+        payload: {
+            messages,
+            model_settings: agent.modelSettings,
+            tool_names: agent.tools?.map(tool => tool.definition.function.name) || [],
+        },
+    });
 
     // Stream the response with retry support if available
     const stream =
