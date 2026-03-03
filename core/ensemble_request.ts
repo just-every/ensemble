@@ -32,6 +32,17 @@ import {
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
+const DEFAULT_TERMINAL_TOOL_NAMES = new Set(['task_complete', 'task_fatal_error']);
+
+const getTerminalToolNames = (agent: AgentDefinition): Set<string> => {
+    const toolNames = new Set(DEFAULT_TERMINAL_TOOL_NAMES);
+    for (const name of agent.terminalToolNames ?? []) {
+        if (typeof name === 'string' && name.trim().length > 0) {
+            toolNames.add(name);
+        }
+    }
+    return toolNames;
+};
 
 // Set the ensemble request function in verification and image-to-text modules to avoid circular dependency
 setEnsembleRequestFunction(ensembleRequest);
@@ -106,6 +117,7 @@ export async function* ensembleRequest(
         do {
             hasToolCalls = false;
             hasError = false;
+            let terminalToolSucceededThisRound = false;
             let currentRoundRequestId: string | undefined;
             const currentRoundMessages: string[] = [];
             const currentRoundErrors: string[] = [];
@@ -113,6 +125,7 @@ export async function* ensembleRequest(
             let currentRoundRequestDuration: number | undefined;
             let currentRoundDurationWithTools: number | undefined;
             let currentRoundRequestCost: number | undefined;
+            const terminalToolNames = getTerminalToolNames(agent);
 
             const model = await getModelFromAgent(
                 agent,
@@ -155,8 +168,8 @@ export async function* ensembleRequest(
                                 arguments_formatted: toolEvent.tool_call.function.arguments_formatted,
                             });
 
-                            // Don't count special tools as regular tool calls that need another round
-                            if (toolName !== 'task_complete' && toolName !== 'task_fatal_error') {
+                            // Don't count terminal tools as regular tool calls that need another round
+                            if (!terminalToolNames.has(toolName)) {
                                 hasToolCalls = true;
                             }
                         }
@@ -167,8 +180,13 @@ export async function* ensembleRequest(
                     case 'tool_done': {
                         const toolEvent = event as ToolEvent;
                         if (toolEvent.tool_call) {
+                            const toolName = toolEvent.tool_call.function.name;
+                            if (terminalToolNames.has(toolName) && !toolEvent.result?.error) {
+                                terminalToolSucceededThisRound = true;
+                            }
+
                             await trace.emitToolDone(event.request_id, toolEvent.tool_call.id, {
-                                tool_name: toolEvent.tool_call.function.name,
+                                tool_name: toolName,
                                 call_id: toolEvent.result?.call_id,
                                 output: toolEvent.result?.output,
                                 error: toolEvent.result?.error,
@@ -194,6 +212,12 @@ export async function* ensembleRequest(
                         break;
                     }
                 }
+            }
+
+            // A successful terminal tool call ends this turn immediately.
+            if (terminalToolSucceededThisRound) {
+                hasToolCalls = false;
+                hasError = false;
             }
 
             if (hasToolCalls) {
@@ -534,10 +558,11 @@ async function* executeRound(
 
     // Complete then process any tool calls
     const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
+    const terminalToolNames = getTerminalToolNames(agent);
 
     for (const toolResult of toolResults) {
         const toolName = toolResult.toolCall.function.name;
-        const isSpecialTool = toolName === 'task_complete' || toolName === 'task_fatal_error';
+        const isTerminalTool = terminalToolNames.has(toolName);
 
         // Get the formatted arguments if we stored them
         const formattedArgs = toolCallFormattedArgs.get(toolResult.toolCall.id);
@@ -567,8 +592,8 @@ async function* executeRound(
         // Emit tool done event through global event controller
         await emitEvent(toolDoneEvent, agent, model);
 
-        // For special tools, don't add the output to history or send back to LLM
-        if (!isSpecialTool) {
+        // For terminal tools, don't add output to history or send it back to the model.
+        if (!isTerminalTool) {
             const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
 
             history.add(functionOutput);

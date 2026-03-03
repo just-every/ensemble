@@ -1060,6 +1060,7 @@ export interface AgentDefinition {
     intelligence?: 'low' | 'standard' | 'high'; // Used to select the model
     maxToolCalls?: number; // Maximum total number of tool calls allowed (default: 200)
     maxToolCallRoundsPerTurn?: number; // Maximum number of sequential tool call rounds per turn. Each round can have multiple parallel tool calls. Default: Infinity (no limit)
+    terminalToolNames?: string[]; // Tool names that should end the turn immediately after a successful tool_done (defaults include task_complete and task_fatal_error)
     verifier?: AgentDefinition;
     maxVerificationAttempts?: number;
     args?: any;

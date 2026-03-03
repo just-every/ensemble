@@ -179,4 +179,82 @@ describe('Special Tools (task_complete and task_fatal_error)', () => {
         const functionOutputs = responseOutputs.filter(e => e.message?.type === 'function_call_output');
         expect(functionOutputs).toHaveLength(0);
     });
+
+    it('should honor agent-configured terminal tools', async () => {
+        const messages: ResponseInput = [{ type: 'message', role: 'user', content: 'Test finalize', id: '1' }];
+
+        let regularToolCalled = false;
+        let finalizeCalled = false;
+
+        const agent: AgentDefinition = {
+            model: 'test-model',
+            terminalToolNames: ['finalize_draft_output'],
+            tools: [
+                {
+                    definition: {
+                        type: 'function' as const,
+                        function: {
+                            name: 'finalize_draft_output',
+                            description: 'Finalize this draft',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    prompt: { type: 'string' },
+                                },
+                                required: ['prompt'],
+                            },
+                        },
+                    },
+                    function: vi.fn(async () => {
+                        finalizeCalled = true;
+                        // If another round occurs, this would be called.
+                        testProviderConfig.toolName = 'regular_tool';
+                        testProviderConfig.toolArguments = { input: 'test' };
+                        return 'Finalized';
+                    }),
+                },
+                {
+                    definition: {
+                        type: 'function' as const,
+                        function: {
+                            name: 'regular_tool',
+                            description: 'A regular tool',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    input: { type: 'string' },
+                                },
+                                required: ['input'],
+                            },
+                        },
+                    },
+                    function: vi.fn(async () => {
+                        regularToolCalled = true;
+                        return 'Regular tool output';
+                    }),
+                },
+            ],
+            maxToolCallRoundsPerTurn: 10,
+        };
+
+        testProviderConfig.simulateToolCall = true;
+        testProviderConfig.toolName = 'finalize_draft_output';
+        testProviderConfig.toolArguments = { prompt: 'done' };
+
+        const events: ProviderStreamEvent[] = [];
+        for await (const event of ensembleRequest(messages, agent)) {
+            events.push(event);
+        }
+
+        expect(finalizeCalled).toBe(true);
+        expect(regularToolCalled).toBe(false);
+
+        const toolDoneEvents = events.filter(e => e.type === 'tool_done');
+        expect(toolDoneEvents).toHaveLength(1);
+        expect(toolDoneEvents[0].tool_call?.function.name).toBe('finalize_draft_output');
+
+        const responseOutputs = events.filter(e => e.type === 'response_output');
+        const functionOutputs = responseOutputs.filter(e => e.message?.type === 'function_call_output');
+        expect(functionOutputs).toHaveLength(0);
+    });
 });
