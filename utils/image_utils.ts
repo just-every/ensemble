@@ -136,9 +136,7 @@ export async function appendMessageWithImage(
     return input;
 }
 
-const CONTEXTUAL_IMAGE_ID_LOOKBACK = 600;
-
-function normalizeContextualImageId(value: string): string | null {
+function normalizeExplicitImageId(value: string): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
     const normalized = trimmed.replace(/[^A-Za-z0-9._:-]+/g, '');
@@ -146,36 +144,20 @@ function normalizeContextualImageId(value: string): string | null {
     return normalized.slice(0, 128);
 }
 
-function findContextualImageId(content: string, matchOffset: number): string | null {
-    const windowStart = Math.max(0, matchOffset - CONTEXTUAL_IMAGE_ID_LOOKBACK);
-    const lookbehind = content.slice(windowStart, matchOffset);
-    const idRegex = /"(?:artifact_id|artifactId|id)"\s*:\s*"([^"\\]{1,200})"/g;
-    let match: RegExpExecArray | null = null;
-    let candidate: string | null = null;
-    while ((match = idRegex.exec(lookbehind)) !== null) {
-        const normalized = normalizeContextualImageId(match[1] || '');
-        if (normalized) {
-            candidate = normalized;
-        }
-    }
-    return candidate;
-}
-
 function resolveImagePlaceholderId(
-    content: string,
-    matchOffset: number,
+    explicitIdRaw: string | null,
     images: Record<string, string>,
     imageDataUrl: string
 ): string {
-    const contextualId = findContextualImageId(content, matchOffset);
-    if (contextualId) {
-        const existing = images[contextualId];
+    const explicitId = explicitIdRaw ? normalizeExplicitImageId(explicitIdRaw) : null;
+    if (explicitId) {
+        const existing = images[explicitId];
         if (!existing || existing === imageDataUrl) {
-            return contextualId;
+            return explicitId;
         }
         let suffix = 2;
         while (true) {
-            const candidate = `${contextualId}_${suffix}`;
+            const candidate = `${explicitId}_${suffix}`;
             const existingCandidate = images[candidate];
             if (!existingCandidate || existingCandidate === imageDataUrl) {
                 return candidate;
@@ -216,13 +198,16 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     // Find all image data using regex
     // This pattern matches data URIs for images with proper base64 termination
     // Supports both "data:image/png;base64," and "data:png;base64," formats
-    const imgRegex = /data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,[A-Za-z0-9+/\s]*={0,2}/g;
+    // Optional explicit id prefix format:
+    //   [image #<id>]data:image/png;base64,...
+    // When present, <id> is used directly. We do not infer ids heuristically.
+    const imgRegex = /(?:\[image\s*#([A-Za-z0-9._:-]{1,128})\]\s*)?data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,[A-Za-z0-9+/\s]*={0,2}/gi;
 
     // Replace all instances and build a map of image_id -> image_data
     const images: Record<string, string> = {};
 
     // Replace all images with placeholders and collect them in the images map
-    const replaceContent = content.replace(imgRegex, (match, _mime, matchOffset: number) => {
+    const replaceContent = content.replace(imgRegex, (match, explicitIdRaw, _mime) => {
         // Extract the mime type
         const mimeMatch = match.match(/data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,/);
         const mime = mimeMatch ? mimeMatch[1] : '';
@@ -291,8 +276,7 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
         const prefix = mime.includes('/') ? 'data:' : 'data:image/';
         const imageDataUrl = `${prefix}${mime};base64,${goodBase64}`;
         const id = resolveImagePlaceholderId(
-            content,
-            typeof matchOffset === 'number' ? matchOffset : 0,
+            typeof explicitIdRaw === 'string' ? explicitIdRaw : null,
             images,
             imageDataUrl
         );
