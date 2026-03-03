@@ -1467,7 +1467,10 @@ export class GeminiProvider extends BaseModelProvider {
             // Extract options with defaults
             // Default to Gemini's native image model (preview)
             model = model || 'gemini-2.5-flash-image-preview';
-            const numberOfImages = opts?.n || 1;
+            const numberOfImages = opts?.n ?? 1;
+            if (!Number.isInteger(numberOfImages) || numberOfImages < 1) {
+                throw new Error('[Gemini] ImageGenerationOpts.n must be a positive integer.');
+            }
 
             const { getToolsFromAgent } = await import('../utils/agent.js');
             const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
@@ -1737,9 +1740,24 @@ export class GeminiProvider extends BaseModelProvider {
                     finalRequestId = loggedRequestId;
 
                     const response = await this.client.models.generateContentStream(requestParams);
+                    const wantsSingleImage = numberOfImages === 1;
                     const images: string[] = [];
+                    let firstImage: string | null = null;
                     let metadata: ImageGenerationMetadata = { model };
                     let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
+
+                    const closeResponseStream = async (): Promise<void> => {
+                        const responseWithReturn = response as AsyncGenerator<GenerateContentResponse> & {
+                            return?: () => Promise<unknown>;
+                        };
+                        if (typeof responseWithReturn.return === 'function') {
+                            try {
+                                await responseWithReturn.return();
+                            } catch {
+                                // Ignore close errors. We already have the image payload we need.
+                            }
+                        }
+                    };
 
                     for await (const chunk of response) {
                         if (chunk.usageMetadata) {
@@ -1831,14 +1849,30 @@ export class GeminiProvider extends BaseModelProvider {
                                         }
                                     }
 
+                                    if (wantsSingleImage) {
+                                        firstImage = imageData;
+                                        await closeResponseStream();
+                                        break;
+                                    }
+
                                     images.push(imageData);
                                 }
                             }
+
+                            if (wantsSingleImage && firstImage) {
+                                break;
+                            }
+                        }
+
+                        if (wantsSingleImage && firstImage) {
+                            break;
                         }
                     }
 
+                    const finalImages = wantsSingleImage && firstImage ? [firstImage] : images;
+
                     // Cost tracking per call
-                    if (images.length > 0) {
+                    if (finalImages.length > 0) {
                         const baseMetadata = {
                             cost_per_image: perImageCost,
                             ...(imageSize ? { image_size: imageSize } : {}),
@@ -1862,7 +1896,7 @@ export class GeminiProvider extends BaseModelProvider {
                             const outputTokens = candidateTokens + thoughtTokens;
                             costTracker.addUsage({
                                 model,
-                                image_count: images.length,
+                                image_count: finalImages.length,
                                 input_tokens: inputTokens,
                                 output_tokens: outputTokens,
                                 cached_tokens: usageMetadata.cachedContentTokenCount || 0,
@@ -1878,14 +1912,14 @@ export class GeminiProvider extends BaseModelProvider {
                         } else {
                             costTracker.addUsage({
                                 model,
-                                image_count: images.length,
+                                image_count: finalImages.length,
                                 // Pass through request correlation id so streaming consumers receive cost_update
                                 request_id: opts?.request_id,
                                 metadata: baseMetadata,
                             });
                         }
                     }
-                    return { images, metadata };
+                    return { images: finalImages, metadata };
                 };
 
                 const allImages: string[] = [];
