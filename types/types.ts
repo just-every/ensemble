@@ -107,6 +107,8 @@ export interface ModelSettings {
     text?: { format: string };
     tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel
+    tool_timeout_ms?: number; // Per-tool timeout override used by tool execution manager
+    tool_timeout_behavior?: 'background' | 'error'; // Timeout handling mode for long-running tools
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
 
     // OpenAI-specific settings (will be ignored by other providers)

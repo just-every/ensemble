@@ -13,6 +13,9 @@ import {
     STATUS_TRACKING_TOOLS,
 } from '../config/tool_execution.js';
 
+const MIN_TOOL_TIMEOUT_MS = 1000;
+const MAX_TOOL_TIMEOUT_MS = 900000;
+
 /**
  * Convert a tool result to string intelligently
  * Handles objects, arrays, and primitive values appropriately
@@ -71,6 +74,27 @@ export function agentHasStatusTracking(agent: AgentDefinition): boolean {
     if (!agent.tools) return false;
 
     return agent.tools.some(tool => STATUS_TRACKING_TOOLS.has(tool.definition.function.name));
+}
+
+function resolveConfiguredToolTimeoutMs(agent: AgentDefinition): number | null {
+    const raw = (agent.modelSettings as any)?.tool_timeout_ms;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return null;
+    }
+    return Math.max(MIN_TOOL_TIMEOUT_MS, Math.min(MAX_TOOL_TIMEOUT_MS, Math.floor(parsed)));
+}
+
+function resolveToolTimeoutBehavior(
+    agent: AgentDefinition,
+    hasStatusTracking: boolean
+): 'background' | 'error' {
+    const raw = String((agent.modelSettings as any)?.tool_timeout_behavior || '')
+        .trim()
+        .toLowerCase();
+    if (raw === 'background') return 'background';
+    if (raw === 'error') return 'error';
+    return hasStatusTracking ? 'background' : 'error';
 }
 
 /**
@@ -162,7 +186,10 @@ export async function handleToolCall(toolCall: ToolCall, tool: ToolFunction, age
     // Determine if we should apply timeout
     const hasStatusTools = agentHasStatusTracking(agent);
     const excludedFromTimeout = EXCLUDED_FROM_TIMEOUT_FUNCTIONS.has(toolName);
-    const shouldTimeout = !excludedFromTimeout && hasStatusTools && !sequential;
+    const configuredTimeoutMs = resolveConfiguredToolTimeoutMs(agent);
+    const timeoutBehavior = resolveToolTimeoutBehavior(agent, hasStatusTools);
+    const timeoutMs = configuredTimeoutMs ?? FUNCTION_TIMEOUT_MS;
+    const shouldTimeout = !excludedFromTimeout && !sequential && (hasStatusTools || configuredTimeoutMs !== null);
 
     // Create the execute function
     const execute = sequential ? () => runSequential(agent.agent_id || 'unknown', executeFunction) : executeFunction;
@@ -172,16 +199,24 @@ export async function handleToolCall(toolCall: ToolCall, tool: ToolFunction, age
     }
 
     // Race against timeout
-    const result = await Promise.race([
-        execute().catch(error => {
-            throw error;
-        }),
-        timeoutPromise(FUNCTION_TIMEOUT_MS),
-    ]);
+    const executionPromise = execute();
+    // Avoid unhandled rejections when timeout wins the race.
+    executionPromise.catch(() => {});
+
+    const result = await Promise.race([executionPromise, timeoutPromise(timeoutMs)]);
 
     if (result === 'TIMEOUT') {
         runningToolTracker.markTimedOut(fnId);
-        return `Tool ${toolName} is running in the background (RunningTool: ${fnId}).`;
+        if (typeof (runningToolTracker as any).abortRunningTool === 'function') {
+            runningToolTracker.abortRunningTool(fnId);
+        }
+        const timeoutMessage = `Tool ${toolName} timed out after ${timeoutMs}ms`;
+        if (timeoutBehavior === 'background') {
+            return `Tool ${toolName} is running in the background (RunningTool: ${fnId}).`;
+        }
+
+        await runningToolTracker.failRunningTool(fnId, timeoutMessage, agent);
+        throw new Error(timeoutMessage);
     }
 
     return result;

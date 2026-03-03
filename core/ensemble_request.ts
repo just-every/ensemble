@@ -138,80 +138,93 @@ export async function* ensembleRequest(
             const stream = executeRound(model, agent, history, totalToolCalls, maxToolCalls, trace);
 
             // Yield all events from this round
-            for await (const event of stream) {
-                yield event;
+            try {
+                for await (const event of stream) {
+                    yield event;
 
-                switch (event.type) {
-                    case 'agent_start': {
-                        currentRoundRequestId = event.request_id;
-                        break;
-                    }
-
-                    case 'message_complete': {
-                        const messageEvent = event as MessageEventBase;
-                        if (messageEvent.content) {
-                            lastMessageContent = messageEvent.content;
-                            currentRoundMessages.push(messageEvent.content);
+                    switch (event.type) {
+                        case 'agent_start': {
+                            currentRoundRequestId = event.request_id;
+                            break;
                         }
-                        break;
-                    }
 
-                    case 'tool_start': {
-                        const toolEvent = event as ToolEvent;
-                        if (toolEvent.tool_call) {
-                            const toolName = toolEvent.tool_call.function.name;
-                            currentRoundToolCalls += 1;
-
-                            await trace.emitToolStart(event.request_id, toolEvent.tool_call.id, {
-                                tool_name: toolName,
-                                arguments: toolEvent.tool_call.function.arguments,
-                                arguments_formatted: toolEvent.tool_call.function.arguments_formatted,
-                            });
-
-                            // Don't count terminal tools as regular tool calls that need another round
-                            if (!terminalToolNames.has(toolName)) {
-                                hasToolCalls = true;
+                        case 'message_complete': {
+                            const messageEvent = event as MessageEventBase;
+                            if (messageEvent.content) {
+                                lastMessageContent = messageEvent.content;
+                                currentRoundMessages.push(messageEvent.content);
                             }
+                            break;
                         }
-                        ++totalToolCalls;
-                        break;
-                    }
 
-                    case 'tool_done': {
-                        const toolEvent = event as ToolEvent;
-                        if (toolEvent.tool_call) {
-                            const toolName = toolEvent.tool_call.function.name;
-                            if (terminalToolNames.has(toolName) && !toolEvent.result?.error) {
-                                terminalToolSucceededThisRound = true;
+                        case 'tool_start': {
+                            const toolEvent = event as ToolEvent;
+                            if (toolEvent.tool_call) {
+                                const toolName = toolEvent.tool_call.function.name;
+                                currentRoundToolCalls += 1;
+
+                                await trace.emitToolStart(event.request_id, toolEvent.tool_call.id, {
+                                    tool_name: toolName,
+                                    arguments: toolEvent.tool_call.function.arguments,
+                                    arguments_formatted: toolEvent.tool_call.function.arguments_formatted,
+                                });
+
+                                // Don't count terminal tools as regular tool calls that need another round
+                                if (!terminalToolNames.has(toolName)) {
+                                    hasToolCalls = true;
+                                }
                             }
-
-                            await trace.emitToolDone(event.request_id, toolEvent.tool_call.id, {
-                                tool_name: toolName,
-                                call_id: toolEvent.result?.call_id,
-                                output: toolEvent.result?.output,
-                                error: toolEvent.result?.error,
-                            });
+                            ++totalToolCalls;
+                            break;
                         }
-                        break;
-                    }
 
-                    case 'agent_done': {
-                        const agentDoneEvent = event as any;
-                        currentRoundRequestDuration = agentDoneEvent.request_duration;
-                        currentRoundDurationWithTools = agentDoneEvent.duration_with_tools;
-                        currentRoundRequestCost = agentDoneEvent.request_cost;
-                        break;
-                    }
+                        case 'tool_done': {
+                            const toolEvent = event as ToolEvent;
+                            if (toolEvent.tool_call) {
+                                const toolName = toolEvent.tool_call.function.name;
+                                if (terminalToolNames.has(toolName) && !toolEvent.result?.error) {
+                                    terminalToolSucceededThisRound = true;
+                                }
 
-                    case 'error': {
-                        hasError = true;
-                        const errorEvent = event as any;
-                        if (errorEvent.error) {
-                            currentRoundErrors.push(String(errorEvent.error));
+                                await trace.emitToolDone(event.request_id, toolEvent.tool_call.id, {
+                                    tool_name: toolName,
+                                    call_id: toolEvent.result?.call_id,
+                                    output: toolEvent.result?.output,
+                                    error: toolEvent.result?.error,
+                                });
+                            }
+                            break;
                         }
-                        break;
+
+                        case 'agent_done': {
+                            const agentDoneEvent = event as any;
+                            currentRoundRequestDuration = agentDoneEvent.request_duration;
+                            currentRoundDurationWithTools = agentDoneEvent.duration_with_tools;
+                            currentRoundRequestCost = agentDoneEvent.request_cost;
+                            break;
+                        }
+
+                        case 'error': {
+                            hasError = true;
+                            const errorEvent = event as any;
+                            if (errorEvent.error) {
+                                currentRoundErrors.push(String(errorEvent.error));
+                            }
+                            break;
+                        }
                     }
                 }
+            } catch (roundError) {
+                hasError = true;
+                const errorMessage = roundError instanceof Error ? roundError.message : String(roundError);
+                currentRoundErrors.push(errorMessage);
+                yield {
+                    type: 'error',
+                    request_id: currentRoundRequestId,
+                    error: errorMessage,
+                    recoverable: true,
+                    timestamp: new Date().toISOString(),
+                } as ProviderStreamEvent;
             }
 
             // A successful terminal tool call ends this turn immediately.
