@@ -11,7 +11,7 @@ function makeSingleChunkStream(chunk: Record<string, unknown>) {
 }
 
 describe('Gemini thought signatures for function calls', () => {
-    it('replays tool-call thought signatures and preserves parallel function call grouping in history', async () => {
+    it('replays tool-call thought signatures across grouped parallel function calls in history', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(
             makeSingleChunkStream({
@@ -91,10 +91,10 @@ describe('Gemini thought signatures for function calls', () => {
         const toolParts = functionCallMessages[0].parts.filter((part: any) => part.functionCall);
         expect(toolParts).toHaveLength(2);
         expect(toolParts[0].thoughtSignature).toBe('sig-tool-step-1');
-        expect(toolParts[1].thoughtSignature).toBeUndefined();
+        expect(toolParts[1].thoughtSignature).toBe('sig-tool-step-1');
     });
 
-    it('emits tool_start and message_complete events with thought signatures from Gemini chunks', async () => {
+    it('propagates chunk thought signatures across parallel tool_start events', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(
             makeSingleChunkStream({
@@ -174,7 +174,7 @@ describe('Gemini thought signatures for function calls', () => {
         const toolStartEvents = events.filter(event => event.type === 'tool_start');
         expect(toolStartEvents).toHaveLength(2);
         expect(toolStartEvents[0].tool_call.thought_signature).toBe('sig-tool-step');
-        expect(toolStartEvents[1].tool_call.thought_signature).toBeUndefined();
+        expect(toolStartEvents[1].tool_call.thought_signature).toBe('sig-tool-step');
 
         const messageComplete = events.find(event => event.type === 'message_complete');
         expect(messageComplete).toBeTruthy();

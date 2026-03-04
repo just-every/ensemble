@@ -480,6 +480,8 @@ function extractThoughtSignatureFromMessage(msg: unknown): string | null {
 async function convertToGeminiContents(model: string, messages: ResponseInput): Promise<Content[]> {
     let contents: Content[] = [];
     let pendingFunctionCallParts: Array<Record<string, unknown>> = [];
+    let latestThoughtSignature: string | null = null;
+    let pendingFunctionCallSignature: string | null = null;
 
     const flushPendingFunctionCalls = (): void => {
         if (pendingFunctionCallParts.length === 0) {
@@ -491,6 +493,7 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
             parts: pendingFunctionCallParts as any,
         });
         pendingFunctionCallParts = [];
+        pendingFunctionCallSignature = null;
     };
 
     for (const msg of messages) {
@@ -512,7 +515,15 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                 };
             }
 
-            const thoughtSignature = extractThoughtSignatureFromMessage(msg);
+            const explicitThoughtSignature = extractThoughtSignatureFromMessage(msg);
+            const thoughtSignature =
+                explicitThoughtSignature || pendingFunctionCallSignature || latestThoughtSignature;
+            if (explicitThoughtSignature) {
+                pendingFunctionCallSignature = explicitThoughtSignature;
+                latestThoughtSignature = explicitThoughtSignature;
+            } else if (thoughtSignature && !pendingFunctionCallSignature) {
+                pendingFunctionCallSignature = thoughtSignature;
+            }
             pendingFunctionCallParts.push({
                 functionCall: {
                     name: msg.name,
@@ -559,6 +570,9 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
             // Regular message
             const role = msg.role === 'assistant' ? 'model' : 'user';
             const thoughtSignature = msg.type === 'thinking' ? extractThoughtSignatureFromMessage(msg) : null;
+            if (thoughtSignature) {
+                latestThoughtSignature = thoughtSignature;
+            }
 
             // Handle array content with input_text and input_image types
             if (Array.isArray(msg.content)) {
@@ -1226,23 +1240,33 @@ export class GeminiProvider extends BaseModelProvider {
                 // Handle function calls (if present)
                 if (chunk.functionCalls && chunk.functionCalls.length > 0) {
                     const functionCallPartSignatures: Array<string | null> = [];
+                    const discoveredFunctionSignatures: string[] = [];
                     for (const candidate of chunk.candidates || []) {
                         const parts = candidate?.content?.parts || [];
                         for (const part of parts) {
                             if ((part as any)?.functionCall) {
-                                functionCallPartSignatures.push(
-                                    normalizeThoughtSignature((part as any).thoughtSignature || (part as any).thought_signature)
+                                const normalizedPartSignature = normalizeThoughtSignature(
+                                    (part as any).thoughtSignature || (part as any).thought_signature
                                 );
+                                functionCallPartSignatures.push(normalizedPartSignature);
+                                if (normalizedPartSignature) {
+                                    discoveredFunctionSignatures.push(normalizedPartSignature);
+                                }
                             }
                         }
                     }
+                    const sharedFunctionCallSignature =
+                        discoveredFunctionSignatures.at(-1) || latestThoughtSignature || null;
 
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
                             const thoughtSignature =
                                 normalizeThoughtSignature((fc as any).thoughtSignature || (fc as any).thought_signature) ||
                                 functionCallPartSignatures.shift() ||
-                                null;
+                                sharedFunctionCallSignature;
+                            if (thoughtSignature) {
+                                latestThoughtSignature = thoughtSignature;
+                            }
 
                             yield withRequestId({
                                 type: 'tool_start',
