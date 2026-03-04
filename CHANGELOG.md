@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-03
+- Temporarily switched Gemini Pro preview canonical mapping back to `gemini-3-pro-preview`.
+- Kept compatibility aliases so `gemini-3.1-pro-preview`, `gemini-3.1-pro-preview-customtools`, and `gemini-3.1-pro` resolve to `gemini-3-pro-preview`.
+- Updated model class defaults that previously pointed at `gemini-3.1-pro-preview` to use `gemini-3-pro-preview`.
+
 ## 2026-02-27
 - Added Gemini 3.1 Pro Preview support (`gemini-3.1-pro-preview`) with alias support for `gemini-3.1-pro-preview-customtools`.
 - Preserved backward compatibility by mapping legacy Gemini 3 Pro Preview IDs to Gemini 3.1 Pro Preview.

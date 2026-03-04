@@ -85,7 +85,7 @@ export const MODEL_CLASSES = {
     reasoning_high: {
         models: [
             'gpt-5.2-pro', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -107,7 +107,7 @@ export const MODEL_CLASSES = {
     monologue: {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-sonnet-4-5-20250929', // Anthropic
             'grok-4', // X.AI
         ],
@@ -118,7 +118,7 @@ export const MODEL_CLASSES = {
     metacognition: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -129,7 +129,7 @@ export const MODEL_CLASSES = {
     code: {
         models: [
             'gpt-5.1-codex-max', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
             'qwen3-coder', // OpenRouter
@@ -164,7 +164,7 @@ export const MODEL_CLASSES = {
     vision: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -195,7 +195,7 @@ export const MODEL_CLASSES = {
     long: {
         models: [
             'gpt-5.2', // OpenAI
-            'gemini-3.1-pro-preview', // Google
+            'gemini-3-pro-preview', // Google
             'claude-opus-4-5-20251101', // Anthropic
             'grok-4', // X.AI
         ],
@@ -1895,13 +1895,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 2.0 Flash Experimental (v1beta) - experimental multimodal model.',
     },
 
-    // Gemini 3.1 Pro (preview)
+    // Gemini 3 Pro (preview)
     {
-        id: 'gemini-3.1-pro-preview',
+        id: 'gemini-3-pro-preview',
         aliases: [
+            'gemini-3.1-pro-preview',
             'gemini-3.1-pro-preview-customtools',
             'gemini-3.1-pro',
-            'gemini-3-pro-preview',
             'gemini-3-pro',
             'gemini-3-pro-preview-11-2025',
         ],
@@ -1935,7 +1935,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 90,
         description:
-            'Gemini 3.1 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
+            'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
     },
 
     // Gemini 3 Pro Image (preview)

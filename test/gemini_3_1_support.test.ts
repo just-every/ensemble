@@ -112,27 +112,29 @@ function getPngDimensions(dataUrl: string): { width: number; height: number } {
     };
 }
 
-describe('Gemini 3.1 model support', () => {
-    it('registers Gemini 3.1 Pro Preview and customtools alias', () => {
-        const canonical = findModel('gemini-3.1-pro-preview');
+describe('Gemini 3.x model support', () => {
+    it('registers Gemini 3 Pro Preview and 3.1 compatibility aliases', () => {
+        const canonical = findModel('gemini-3-pro-preview');
+        const fallbackAlias = findModel('gemini-3.1-pro-preview');
         const customToolsAlias = findModel('gemini-3.1-pro-preview-customtools');
 
-        expect(canonical?.id).toBe('gemini-3.1-pro-preview');
-        expect(customToolsAlias?.id).toBe('gemini-3.1-pro-preview');
+        expect(canonical?.id).toBe('gemini-3-pro-preview');
+        expect(fallbackAlias?.id).toBe('gemini-3-pro-preview');
+        expect(customToolsAlias?.id).toBe('gemini-3-pro-preview');
     });
 
-    it('keeps backward compatibility for Gemini 3 Pro Preview aliases', () => {
-        const legacyAlias = findModel('gemini-3-pro-preview');
-        expect(legacyAlias?.id).toBe('gemini-3.1-pro-preview');
+    it('keeps backward compatibility for Gemini 3.1 Pro aliases', () => {
+        const legacyAlias = findModel('gemini-3.1-pro');
+        expect(legacyAlias?.id).toBe('gemini-3-pro-preview');
     });
 
-    it('normalizes agent model aliases to the Gemini 3.1 Pro Preview canonical ID', async () => {
+    it('normalizes agent model aliases to the Gemini 3 Pro Preview canonical ID', async () => {
         const resolved = await getModelFromAgent({
             agent_id: 'test-gemini-3-1-alias',
             model: 'gemini-3.1-pro-preview-customtools',
         } as any);
 
-        expect(resolved).toBe('gemini-3.1-pro-preview');
+        expect(resolved).toBe('gemini-3-pro-preview');
     });
 
     it('registers Gemini 3.1 Flash Image Preview pricing metadata', () => {
