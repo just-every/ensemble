@@ -1813,6 +1813,31 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 3 Flash Preview - fast multimodal model with 1M context window.',
     },
     {
+        id: 'gemini-3.1-flash-lite-preview',
+        provider: 'google',
+        cost: {
+            input_per_million: {
+                text: 0.25,
+                image: 0.25,
+                video: 0.25,
+                audio: 0.5,
+            },
+            output_per_million: 1.5,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+        },
+        class: 'reasoning_mini',
+        score: 82,
+        description: 'Gemini 3.1 Flash Lite Preview - cost-efficient multimodal model with 1M context window.',
+    },
+    {
         id: 'gemini-2.5-flash',
         aliases: [
             'gemini-2.5-flash-preview-05-20',
