@@ -216,8 +216,8 @@ describe('Gemini 3.x model support', () => {
         );
 
         const dims = getPngDimensions(images[0]);
-        expect(dims.width).toBe(688);
-        expect(dims.height).toBe(384);
+        expect(dims.width).toBe(632);
+        expect(dims.height).toBe(424);
     });
 
     it('supports narrow portrait ratios from the Gemini 3.1 Flash Image table', async () => {

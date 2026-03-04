@@ -1542,8 +1542,8 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Map size to an aspect ratio where supported (Imagen API only)
             let aspectRatio = '1:1'; // square by default
-            if (opts?.size === 'landscape') aspectRatio = '16:9';
-            else if (opts?.size === 'portrait') aspectRatio = '9:16';
+            if (opts?.size === 'landscape') aspectRatio = '3:2';
+            else if (opts?.size === 'portrait') aspectRatio = '2:3';
 
             console.log(
                 `[Gemini] Generating ${numberOfImages} image(s) with model ${model}, prompt: "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"`
@@ -1574,8 +1574,8 @@ export class GeminiProvider extends BaseModelProvider {
                     '16:9': { ar: '16:9' },
                     '21:9': { ar: '21:9' },
                     square: { ar: '1:1' },
-                    landscape: { ar: '16:9' },
-                    portrait: { ar: '9:16' },
+                    landscape: { ar: '3:2' },
+                    portrait: { ar: '2:3' },
                     '256x256': { ar: '1:1' },
                     '512x512': { ar: '1:1' },
                     '1024x1024': { ar: '1:1' },
