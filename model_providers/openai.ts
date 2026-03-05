@@ -1226,10 +1226,11 @@ export class OpenAIProvider extends BaseModelProvider {
 
             const isO3Model = (m: string) => m === 'o3' || m.startsWith('o3-');
             const isGpt5Family = (m: string) => m.startsWith('gpt-5');
-            const isGpt51Or52 = (m: string) => m.startsWith('gpt-5.1') || m.startsWith('gpt-5.2');
+            const isGpt514Or52 = (m: string) =>
+                m.startsWith('gpt-5.1') || m.startsWith('gpt-5.2') || m.startsWith('gpt-5.4');
             const getDefaultReasoningEffort = (m: string): OpenAIReasoningEffort | undefined => {
-                if (m === 'gpt-5.2-pro' || m === 'gpt-5-pro') return 'high';
-                if (m.startsWith('gpt-5.2') || m.startsWith('gpt-5.1')) return 'none';
+                if (m === 'gpt-5.4-pro' || m === 'gpt-5.2-pro' || m === 'gpt-5-pro') return 'high';
+                if (m.startsWith('gpt-5.4') || m.startsWith('gpt-5.2') || m.startsWith('gpt-5.1')) return 'none';
                 if (m.startsWith('gpt-5')) return 'medium';
                 if (m.startsWith('o')) return 'high';
                 return undefined;
@@ -1251,7 +1252,7 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // Apply reasoning defaults.
-            // - GPT-5.1/5.2 default to effort=none (do not send reasoning by default so temperature/top_p can work)
+            // - GPT-5.1/5.2/5.4 default to effort=none (do not send reasoning by default so temperature/top_p can work)
             // - GPT-5 defaults to effort=medium
             // - GPT-5 Pro defaults to effort=high
             // - O-series models default to effort=high
@@ -1290,10 +1291,10 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // GPT-5 family parameter compatibility (per OpenAI model guide)
-            // - GPT-5.1/5.2 support temperature/top_p only when reasoning effort = none
+            // - GPT-5.1/5.2/5.4 support temperature/top_p only when reasoning effort = none
             // - Older GPT-5 models do not support these fields at all
             if (isGpt5Family(model)) {
-                const allowSamplingParams = isGpt51Or52(model) && effectiveEffort === 'none';
+                const allowSamplingParams = isGpt514Or52(model) && effectiveEffort === 'none';
                 if (!allowSamplingParams) {
                     delete requestParams.temperature;
                     delete requestParams.top_p;

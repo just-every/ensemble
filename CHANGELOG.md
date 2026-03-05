@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-06
+- Added first-class OpenAI support for `gpt-5.4` and `gpt-5.4-pro`, including canonical dated aliases, pricing, and capability metadata.
+- Updated reasoning-heavy OpenAI model classes to prefer GPT-5.4 / GPT-5.4 Pro.
+- Taught the OpenAI provider to apply GPT-5.4 reasoning defaults correctly and to keep sampling params when `gpt-5.4` runs with its default `reasoning.effort=none` behavior.
+
 ## 2026-03-03
 - Temporarily switched Gemini Pro preview canonical mapping back to `gemini-3-pro-preview`.
 - Kept compatibility aliases so `gemini-3.1-pro-preview`, `gemini-3.1-pro-preview-customtools`, and `gemini-3.1-pro` resolve to `gemini-3-pro-preview`.
