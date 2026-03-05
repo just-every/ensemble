@@ -408,6 +408,7 @@ async function* executeRound(
 
     // Buffer for events emitted during tool execution
     const toolEventBuffer: ProviderStreamEvent[] = [];
+    let sawToolCallThisRound = false;
 
     // Add tool event buffers
     agent.onToolEvent = async (event: ProviderStreamEvent) => {
@@ -493,6 +494,16 @@ async function* executeRound(
 
             case 'message_complete': {
                 const messageEvent = event as MessageEventBase;
+
+                // Some providers emit assistant prefill/summary text in the same turn as tool_use.
+                // Persisting that assistant message after tool results can violate provider ordering
+                // constraints on follow-up requests (e.g. Claude requires next request to end on user
+                // tool_result after tool_use). Once a tool call has started in this round, ignore
+                // subsequent assistant message_complete payloads for history construction.
+                if (sawToolCallThisRound) {
+                    break;
+                }
+
                 if (
                     messageEvent.thinking_content ||
                     (!messageEvent.content && messageEvent.message_id) // Note that some providers require empty thinking nodes to be included in the conversation history
@@ -532,6 +543,7 @@ async function* executeRound(
                 if (!toolEvent.tool_call) {
                     break;
                 }
+                sawToolCallThisRound = true;
 
                 // Check if we'll exceed the limit
                 const remainingCalls = maxToolCalls - currentToolCalls;
