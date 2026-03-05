@@ -52,7 +52,7 @@ export const MODEL_CLASSES = {
             // One top pick per provider (prefer stable IDs over dated previews when possible)
             'gpt-5.2-chat-latest', // OpenAI
             'gemini-3-flash-preview', // Google
-            'claude-sonnet-4-5-20250929', // Anthropic
+            'claude-sonnet-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -75,7 +75,7 @@ export const MODEL_CLASSES = {
             // Strong reasoning at reasonable cost
             'gpt-5.2', // OpenAI
             'gemini-2.5-pro', // Google
-            'claude-sonnet-4-5-20250929', // Anthropic
+            'claude-sonnet-4-6', // Anthropic
             'grok-4-1-fast-reasoning', // X.AI
         ],
         random: true,
@@ -86,7 +86,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2-pro', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-opus-4-5-20251101', // Anthropic
+            'claude-opus-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -97,7 +97,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5-mini', // OpenAI
             'gemini-3-flash-preview', // Google
-            'claude-sonnet-4-5-20250929', // Anthropic
+            'claude-sonnet-4-6', // Anthropic
             'grok-3-mini', // X.AI
         ],
         random: true,
@@ -108,7 +108,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-sonnet-4-5-20250929', // Anthropic
+            'claude-sonnet-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -119,7 +119,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-opus-4-5-20251101', // Anthropic
+            'claude-opus-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -128,9 +128,9 @@ export const MODEL_CLASSES = {
     // Programming models
     code: {
         models: [
-            'gpt-5.1-codex-max', // OpenAI
+            'gpt-5.3-codex', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-opus-4-5-20251101', // Anthropic
+            'claude-opus-4-6', // Anthropic
             'grok-4', // X.AI
             'qwen3-coder', // OpenRouter
         ],
@@ -142,7 +142,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2-chat-latest', // OpenAI
             'gemini-3-flash-preview', // Google
-            'claude-sonnet-4-5-20250929', // Anthropic
+            'claude-sonnet-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -165,7 +165,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-opus-4-5-20251101', // Anthropic
+            'claude-opus-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -196,7 +196,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.2', // OpenAI
             'gemini-3-pro-preview', // Google
-            'claude-opus-4-5-20251101', // Anthropic
+            'claude-opus-4-6', // Anthropic
             'grok-4', // X.AI
         ],
         random: true,
@@ -1277,6 +1277,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'GPT-5.1 Codex Max — most capable Codex model for coding agents (400k/128k).',
     },
 
+    // GPT-5.3 Codex
+    {
+        id: 'gpt-5.3-codex',
+        provider: 'openai',
+        cost: {
+            input_per_million: 1.75,
+            cached_input_per_million: 0.175,
+            output_per_million: 14.0,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            reasoning_output: true,
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'code',
+        score: 97,
+        description: 'GPT-5.3 Codex — latest top-tier coding model with image input and strong agentic coding performance.',
+    },
+
     // GPT-4o models
     {
         id: 'gpt-4o',
@@ -1555,7 +1579,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: [
             'claude-sonnet-4-5',
             'claude-sonnet-4.5',
-            'claude-sonnet-latest',
             'claude-sonnet-4-5-sep-2025',
             'claude-sonnet-4.5-2025-09-29',
         ],
@@ -1578,7 +1601,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             },
         },
         features: {
-            context_length: 200000,
+            context_length: 1_000_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -1590,6 +1613,31 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 88,
         description: 'Claude Sonnet 4.5 (Sep 2025 refresh) with tiered pricing at 200k tokens and vision support.',
+    },
+
+    // Claude Sonnet 4.6
+    {
+        id: 'claude-sonnet-4-6',
+        aliases: ['claude-sonnet-4-6', 'claude-sonnet-4.6', 'claude-sonnet-latest'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 3.0,
+            output_per_million: 15.0,
+            cached_input_per_million: 0.3, // 10% of input cost
+        },
+        features: {
+            context_length: 200000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 64000,
+        },
+        class: 'reasoning',
+        score: 94,
+        description: 'Claude Sonnet 4.6 with updated reasoning and multimodal capabilities.',
     },
 
     {
@@ -1734,8 +1782,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: [
             'claude-opus-4-5',
             'claude-opus-4.5',
-            'claude-opus',
-            'claude-opus-latest',
             'claude-4.5-opus',
         ],
         provider: 'anthropic',
@@ -1757,6 +1803,36 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 96,
         description: 'Claude Opus 4.5 - Latest Opus model with strongest reasoning, code, and long-form capabilities.',
+    },
+
+    // Claude Opus 4.6
+    {
+        id: 'claude-opus-4-6',
+        aliases: ['claude-opus-4-6', 'claude-opus-4.6', 'claude-opus', 'claude-opus-latest', 'claude-4.6-opus'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 5.0,
+            output_per_million: 25.0,
+            cached_input_per_million: 0.5, // 10% of input cost
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'reasoning',
+        score: 97,
+        scores: {
+            monologue: 95,
+            code: 96,
+            reasoning: 96,
+        },
+        description: 'Claude Opus 4.6 - Latest Opus model with strongest reasoning, code, and long-form capabilities.',
     },
 
     //
@@ -2895,6 +2971,52 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'code',
         score: 90,
         description: 'Qwen3 Coder - 480B MoE model with 35B active params, optimized for agentic coding tasks',
+    },
+
+    // GLM-5 (via OpenRouter)
+    {
+        id: 'z-ai/glm-5',
+        aliases: ['glm-5'],
+        provider: 'openrouter',
+        cost: {
+            input_per_million: 0.8,
+            output_per_million: 2.56,
+            cached_input_per_million: 0.16,
+        },
+        features: {
+            context_length: 202752,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 83,
+        description: 'GLM-5 via OpenRouter. Large context text model from Z-AI for general-purpose reasoning tasks.',
+    },
+
+    // Kimi K2.5 (via OpenRouter)
+    {
+        id: 'moonshotai/kimi-k2.5',
+        aliases: ['kimi-k2.5', 'kimi-k2-5'],
+        provider: 'openrouter',
+        cost: {
+            input_per_million: 0.45,
+            output_per_million: 2.2,
+            cached_input_per_million: 0.225,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 86,
+        description: 'MoonshotAI Kimi K2.5 via OpenRouter. Long-context text model with strong reasoning performance.',
     },
 ];
 
