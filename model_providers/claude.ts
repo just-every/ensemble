@@ -717,6 +717,9 @@ export class ClaudeProvider extends BaseModelProvider {
             // Determine if thinking is enabled
             const thinkingEnabled = thinking !== undefined && thinking.type === 'enabled';
 
+            // Anthropic requires temperature=1 whenever thinking is enabled.
+            const requestTemperature = thinkingEnabled ? 1 : settings?.temperature;
+
             // Preprocess *and* convert messages for Claude in one pass
             const claudeMessages = await this.prepareClaudeMessages(messages, model, thinkingEnabled);
 
@@ -741,7 +744,7 @@ export class ClaudeProvider extends BaseModelProvider {
                 stream: true,
                 max_tokens,
                 ...(thinking ? { thinking } : {}),
-                ...(settings?.temperature !== undefined ? { temperature: settings.temperature } : {}),
+                ...(requestTemperature !== undefined ? { temperature: requestTemperature } : {}),
             };
 
             // Add tools if provided, using the corrected conversion function
