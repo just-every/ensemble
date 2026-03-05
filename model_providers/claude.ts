@@ -482,157 +482,50 @@ export class ClaudeProvider extends BaseModelProvider {
             /* ---------- End Claude message build ---------- */
         }
 
-        // If thinking is enabled, ensure proper message formatting
+        // If thinking is enabled, normalize assistant blocks so any thinking content is
+        // attached to the next assistant message that includes non-thinking content.
+        // This prevents invalid requests where an assistant message ends with only a
+        // `thinking` block.
         if (thinkingEnabled && result.length > 0) {
-            // Track converted tool IDs to handle orphaned tool_results
-            const convertedToolIds = new Set<string>();
+            const normalized: ClaudeMessage[] = [];
+            let pendingThinkingBlocks: Array<Record<string, unknown>> = [];
+            const isThinkingBlock = (block: any): boolean =>
+                block?.type === 'thinking' || block?.type === 'redacted_thinking';
 
-            // First pass: Convert all assistant messages with tool_use but no thinking block
-            for (let i = 0; i < result.length; i++) {
-                const msg = result[i];
-                if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-                    // Check if message contains tool_use blocks
-                    const hasToolUse = msg.content.some(block => block.type === 'tool_use');
-
-                    if (hasToolUse) {
-                        // Check if message starts with a thinking block
-                        const hasThinkingBlock =
-                            msg.content.length > 0 &&
-                            (msg.content[0].type === 'thinking' || msg.content[0].type === 'redacted_thinking');
-
-                        // If it has tool_use but no thinking block at the start, convert to user message
-                        if (!hasThinkingBlock) {
-                            // Extract tool calls and collect IDs
-                            const toolUseBlocks = msg.content.filter(block => block.type === 'tool_use');
-
-                            // Collect tool IDs that we're converting
-                            toolUseBlocks.forEach(block => {
-                                if (block.id) {
-                                    convertedToolIds.add(block.id);
-                                }
-                            });
-
-                            // Convert to text description
-                            const toolCalls = toolUseBlocks
-                                .map(block => {
-                                    const args =
-                                        typeof block.input === 'string' ? block.input : JSON.stringify(block.input);
-                                    return `Called tool '${block.name}' with arguments: ${args}`;
-                                })
-                                .join('\n');
-
-                            // Convert the message to a user message with tool call description
-                            msg.role = 'user';
-                            msg.content = [
-                                {
-                                    type: 'text',
-                                    text: `[Previous assistant action]\n${toolCalls}`,
-                                },
-                            ];
-                        }
-                    }
+            for (const msg of result) {
+                if (msg.role !== 'assistant' || !Array.isArray(msg.content)) {
+                    pendingThinkingBlocks = [];
+                    normalized.push(msg);
+                    continue;
                 }
+
+                const thinkingBlocks = msg.content
+                    .filter(isThinkingBlock)
+                    .map(block => ({ ...block }));
+                const nonThinkingBlocks = msg.content.filter(block => !isThinkingBlock(block));
+
+                if (nonThinkingBlocks.length === 0) {
+                    if (thinkingBlocks.length > 0) {
+                        pendingThinkingBlocks = [...pendingThinkingBlocks, ...thinkingBlocks];
+                    }
+                    continue;
+                }
+
+                const mergedThinkingBlocks =
+                    pendingThinkingBlocks.length > 0 || thinkingBlocks.length > 0
+                        ? [...pendingThinkingBlocks, ...thinkingBlocks]
+                        : [];
+                pendingThinkingBlocks = [];
+
+                msg.content =
+                    mergedThinkingBlocks.length > 0
+                        ? [...mergedThinkingBlocks, ...nonThinkingBlocks]
+                        : nonThinkingBlocks;
+                normalized.push(msg);
             }
 
-            // Second pass: Find tool IDs in already-converted text messages
-            for (let i = 0; i < result.length; i++) {
-                const msg = result[i];
-                if (msg.role === 'user' && Array.isArray(msg.content)) {
-                    for (const block of msg.content) {
-                        if (block.type === 'text' && typeof block.text === 'string') {
-                            // Look for tool_use JSON in text that may have been converted already
-                            const toolUseMatches = block.text.matchAll(/"id"\s*:\s*"(call_[^"]+)"/g);
-                            for (const match of toolUseMatches) {
-                                if (match[1]) {
-                                    convertedToolIds.add(match[1]);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Third pass: Handle orphaned tool_result messages
-            for (let i = 0; i < result.length; i++) {
-                const msg = result[i];
-                if (msg.role === 'user' && Array.isArray(msg.content)) {
-                    // Check each content block for tool_result
-                    const convertedBlocks = [];
-                    let hasConvertedToolResult = false;
-
-                    for (const block of msg.content) {
-                        if (block.type === 'tool_result' && convertedToolIds.has(block.tool_use_id)) {
-                            // Convert orphaned tool_result to text
-                            hasConvertedToolResult = true;
-                            convertedBlocks.push({
-                                type: 'text',
-                                text: `[Tool Result for ${block.tool_use_id}]\n${block.content || '(empty result)'}`,
-                            });
-                        } else {
-                            convertedBlocks.push(block);
-                        }
-                    }
-
-                    if (hasConvertedToolResult) {
-                        msg.content = convertedBlocks;
-                    }
-                }
-            }
-
-            // Then handle consecutive assistant messages
-            for (let i = 1; i < result.length; i++) {
-                const prevMsg = result[i - 1];
-                const currentMsg = result[i];
-
-                // Check for consecutive assistant messages
-                if (prevMsg.role === 'assistant' && currentMsg.role === 'assistant') {
-                    // Check if current assistant message starts with a thinking block
-                    let hasThinkingBlock = false;
-
-                    if (Array.isArray(currentMsg.content)) {
-                        hasThinkingBlock =
-                            currentMsg.content.length > 0 &&
-                            (currentMsg.content[0].type === 'thinking' ||
-                                currentMsg.content[0].type === 'redacted_thinking');
-                    }
-
-                    // If no thinking block, convert to user message
-                    if (!hasThinkingBlock) {
-                        const contentStr = contentToString(currentMsg.content);
-                        currentMsg.role = 'user';
-                        currentMsg.content = [
-                            {
-                                type: 'text',
-                                text: `Previous thoughts:\n\n${contentStr}`,
-                            },
-                        ];
-                    }
-                }
-            }
-
-            // Final pass: Handle ANY remaining assistant messages without thinking blocks
-            // This catches assistant messages that aren't consecutive and don't have tool_use
-            for (let i = 0; i < result.length; i++) {
-                const msg = result[i];
-                if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-                    // Check if message starts with a thinking block
-                    const hasThinkingBlock =
-                        msg.content.length > 0 &&
-                        (msg.content[0].type === 'thinking' || msg.content[0].type === 'redacted_thinking');
-
-                    // If no thinking block and only contains text content, convert to user message
-                    if (!hasThinkingBlock && msg.content.every(block => block.type === 'text')) {
-                        const contentStr = contentToString(msg.content);
-                        msg.role = 'user';
-                        msg.content = [
-                            {
-                                type: 'text',
-                                text: `[Previous assistant response]\n${contentStr}`,
-                            },
-                        ];
-                    }
-                }
-            }
+            result.length = 0;
+            result.push(...normalized);
         }
 
         return result;
