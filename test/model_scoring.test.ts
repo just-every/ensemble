@@ -24,14 +24,14 @@ describe('Model Scoring and Disabling', () => {
     it('should respect disabled models', async () => {
         const agent: AgentDefinition = {
             modelClass: 'standard',
-            disabledModels: ['gpt-5.2-chat-latest', 'claude-sonnet-4-5-20250929'],
+            disabledModels: ['gpt-5.2-chat-latest', 'claude-sonnet-4-6'],
         };
 
         // Run multiple times to ensure disabled models are never selected
         for (let i = 0; i < 10; i++) {
             const model = await getModelFromAgent(agent);
             expect(model).not.toBe('gpt-5.2-chat-latest');
-            expect(model).not.toBe('claude-sonnet-4-5-20250929');
+            expect(model).not.toBe('claude-sonnet-4-6');
         }
     });
 
@@ -71,7 +71,7 @@ describe('Model Scoring and Disabling', () => {
             modelScores: {
                 'gpt-5.2-chat-latest': 80,
                 'gemini-3-flash-preview': 20,
-                'claude-sonnet-4-5-20250929': 50,
+                'claude-sonnet-4-6': 50,
             },
         };
 
@@ -85,7 +85,7 @@ describe('Model Scoring and Disabling', () => {
             expect([
                 'gemini-3-flash-preview',
                 'gpt-5.2-chat-latest',
-                'claude-sonnet-4-5-20250929',
+                'claude-sonnet-4-6',
             ]).toContain(model);
         }
     });
