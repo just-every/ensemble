@@ -523,6 +523,34 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             'Qwen-Max, based on Qwen2.5, provides the best inference performance among Qwen models, especially for complex multi-step tasks.',
     },
     {
+        id: 'qwen/qwen3.5-397b-a17b',
+        aliases: ['qwen3.5-397b-a17b'],
+        provider: 'openrouter',
+        cost: {
+            input_per_million: 0.39,
+            output_per_million: 2.34,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 81920,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        score: 92,
+        scores: {
+            monologue: 90,
+            code: 86,
+            reasoning: 88,
+        },
+        description:
+            'Qwen3.5-397B-A17B is a vision-language 397B MoE model with a native 262k-context window, multimodal input support, and strong reasoning.',
+    },
+    {
         id: 'mistral/ministral-8b',
         provider: 'openrouter',
         cost: {
