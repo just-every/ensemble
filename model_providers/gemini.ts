@@ -1052,7 +1052,7 @@ export class GeminiProvider extends BaseModelProvider {
             };
 
             // Add thinking configuration if suffix was detected
-            if (thinkingBudget) {
+            if (thinkingBudget !== null) {
                 // thinkingBudget exists in runtime API but not in TypeScript definitions
                 (config as any).thinkingConfig.thinkingBudget = thinkingBudget;
             }
@@ -1210,9 +1210,21 @@ export class GeminiProvider extends BaseModelProvider {
             const { waitWhilePaused } = await import('../utils/pause_controller.js');
             await waitWhilePaused(100, agent.abortSignal);
 
-            // --- Start streaming with retry logic ---
-            const getStreamFn = () => this.client.models.generateContentStream(requestParams);
-            const response = this.retryStreamOnIncompleteJson(getStreamFn);
+            const hasImageInput = contents.some(content =>
+                (content.parts || []).some(part => Boolean((part as any)?.inlineData || (part as any)?.fileData))
+            );
+            const useNonStreamingJsonResponse =
+                Boolean(settings?.json_schema) &&
+                hasImageInput &&
+                !hasGoogleWebSearch &&
+                !hasCodeExecutionTool &&
+                functionDeclarations.length === 0;
+
+            const response = useNonStreamingJsonResponse
+                ? (async function* (provider: GeminiProvider) {
+                      yield (await (provider.client.models as any).generateContent(requestParams)) as GenerateContentResponse;
+                  })(this)
+                : this.retryStreamOnIncompleteJson(() => this.client.models.generateContentStream(requestParams));
 
             let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
 

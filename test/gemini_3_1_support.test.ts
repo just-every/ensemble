@@ -94,6 +94,14 @@ function makeGeminiGroundedThoughtImageStream() {
     };
 }
 
+function makeSingleChunkStream(chunk: Record<string, unknown>) {
+    return {
+        async *[Symbol.asyncIterator]() {
+            yield chunk;
+        },
+    };
+}
+
 function getPngDimensions(dataUrl: string): { width: number; height: number } {
     const match = /^data:image\/png;base64,(.+)$/i.exec(dataUrl);
     if (!match) {
@@ -135,6 +143,72 @@ describe('Gemini 3.x model support', () => {
         } as any);
 
         expect(resolved).toBe('gemini-3-pro-preview');
+    });
+
+    it('preserves Gemini effort suffixes for provider-level thinking mapping', async () => {
+        const resolved = await getModelFromAgent({
+            agent_id: 'test-gemini-3-1-lite-invalid-high',
+            model: 'gemini-3.1-flash-lite-preview-high',
+        } as any);
+
+        expect(resolved).toBe('gemini-3.1-flash-lite-preview-high');
+    });
+
+    it('keeps registered suffixed variants intact', async () => {
+        const resolved = await getModelFromAgent({
+            agent_id: 'test-o4-mini-high',
+            model: 'o4-mini-high',
+        } as any);
+
+        expect(resolved).toBe('o4-mini-high');
+    });
+
+    it('forwards thinkingBudget=0 for Gemini -low text requests', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const stream = provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-3.1-flash-lite-preview-low',
+            { agent_id: 'test-gemini-low-thinking-budget' } as any,
+            'req-low-thinking'
+        );
+
+        for await (const _event of stream) {
+            // Drain stream.
+        }
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
+        expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
+        expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
     });
 
     it('registers Gemini 3.1 Flash Image Preview pricing metadata', () => {

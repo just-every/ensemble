@@ -383,7 +383,9 @@ export async function getModelFromAgent(
     // Try to find the base model
     const modelEntry = findModel(baseModel);
 
-    // If we found a model entry and had a suffix, append it back
+    // If we found a model entry and had a suffix, append it back.
+    // Provider implementations may interpret suffixes like -low/-high as
+    // provider-specific reasoning or thinking controls.
     if (modelEntry?.id) {
         return modelEntry.id + suffix;
     }
