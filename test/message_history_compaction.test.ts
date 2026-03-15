@@ -240,6 +240,38 @@ describe('MessageHistory Automatic Compaction', () => {
         expect(pinnedMessage).toBeDefined();
     });
 
+    it('should not count embedded image payloads in function_call_output as plain text', async () => {
+        const history = new MessageHistory([], {
+            modelId: 'test-model-small-context',
+            compactionThreshold: 0.7,
+        });
+
+        const imagePayload = 'A'.repeat(12000);
+        await history.add({
+            type: 'function_call_output',
+            call_id: 'call_image',
+            name: 'review_render',
+            output: JSON.stringify({
+                ok: true,
+                source_images: [
+                    {
+                        data: `data:image/png;base64,${imagePayload}`,
+                        metadata: { category: 'polish-overlay', id: 'overlay_1' },
+                    },
+                ],
+            }),
+        });
+
+        await history.add({
+            type: 'message',
+            role: 'user',
+            content: 'follow up',
+        });
+
+        const internal = history as unknown as { estimatedTokens: number };
+        expect(internal.estimatedTokens).toBeLessThan(400);
+    });
+
     it('should maintain micro-log during conversation', async () => {
         const history = new MessageHistory([], {
             modelId: 'test-model-small-context',

@@ -481,6 +481,25 @@ export class MessageHistory {
      * Estimate token count for a message
      * Simple estimation: ~4 characters per token
      */
+    private estimateFunctionOutputChars(output: string): number {
+        if (!output) return 0;
+        let normalized = output;
+
+        // Do not count embedded image payloads inside serialized tool results as plain text.
+        normalized = normalized.replace(
+            /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/g,
+            '[image]'
+        );
+
+        // Also collapse common raw-base64 image fields if they appear without a data URL prefix.
+        normalized = normalized.replace(
+            /"data"\s*:\s*"([A-Za-z0-9+/=\s]{512,})"/g,
+            '"data":"[image]"'
+        );
+
+        return normalized.length;
+    }
+
     private estimateMessageTokens(msg: ResponseInputItem): number {
         let charCount = 0;
 
@@ -498,7 +517,7 @@ export class MessageHistory {
         } else if (msg.type === 'function_call') {
             charCount += msg.name.length + msg.arguments.length;
         } else if (msg.type === 'function_call_output') {
-            charCount += msg.output.length;
+            charCount += this.estimateFunctionOutputChars(msg.output);
         }
 
         // Rough estimation: 4 characters per token
