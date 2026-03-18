@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-03-18
+- Added first-class OpenAI support for `gpt-5.4-mini` and `gpt-5.4-nano`, including current dated aliases, pricing, and capability metadata.
+- Refreshed existing `gpt-5.4` / `gpt-5.4-pro` snapshot aliases and pricing to match current OpenAI docs.
+- Updated mini-capability OpenAI model classes to prefer `gpt-5.4-mini` / `gpt-5.4-nano` where appropriate.
 - Restored `gemini-3.1-pro-preview` as the canonical Gemini Pro preview model id.
 - Kept `gemini-3-pro-preview` and related legacy names as backward-compatible aliases.
 - Updated Gemini model class defaults back to `gemini-3.1-pro-preview`.

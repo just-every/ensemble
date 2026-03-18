@@ -94,7 +94,7 @@ describe('Model Scoring and Disabling', () => {
         const agent: AgentDefinition = {
             modelClass: 'mini',
             disabledModels: [
-                'gpt-5-nano',
+                'gpt-5.4-nano',
                 'claude-haiku-4-5-20251001',
                 'gemini-2.5-flash-lite',
                 'grok-3-mini',

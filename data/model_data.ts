@@ -61,7 +61,7 @@ export const MODEL_CLASSES = {
     // Mini/smaller models - faster but less capable
     mini: {
         models: [
-            'gpt-5-nano', // OpenAI
+            'gpt-5.4-nano', // OpenAI
             'gemini-2.5-flash-lite', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
@@ -95,7 +95,7 @@ export const MODEL_CLASSES = {
     // Fast, cheap reasoning models
     reasoning_mini: {
         models: [
-            'gpt-5-mini', // OpenAI
+            'gpt-5.4-mini', // OpenAI
             'gemini-3-flash-preview', // Google
             'claude-sonnet-4-6', // Anthropic
             'grok-3-mini', // X.AI
@@ -174,7 +174,7 @@ export const MODEL_CLASSES = {
     // Mini models with vision capabilities
     vision_mini: {
         models: [
-            'gpt-5-mini', // OpenAI
+            'gpt-5.4-mini', // OpenAI
             'gemini-3-flash-preview', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
@@ -977,12 +977,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // GPT-5.4 models
     {
         id: 'gpt-5.4',
-        aliases: ['gpt-5.4-2026-02-27'],
+        aliases: ['gpt-5.4-2026-03-05'],
         provider: 'openai',
         cost: {
-            input_per_million: 2.0,
-            cached_input_per_million: 0.5,
-            output_per_million: 16.0,
+            input_per_million: 2.5,
+            cached_input_per_million: 0.25,
+            output_per_million: 15.0,
         },
         features: {
             context_length: 1050000,
@@ -1004,11 +1004,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
     {
         id: 'gpt-5.4-pro',
-        aliases: ['gpt-5.4-pro-2026-02-27'],
+        aliases: ['gpt-5.4-pro-2026-03-05'],
         provider: 'openai',
         cost: {
-            input_per_million: 24.0,
-            output_per_million: 192.0,
+            input_per_million: 30.0,
+            output_per_million: 180.0,
         },
         features: {
             context_length: 1050000,
@@ -1022,6 +1022,60 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         score: 100,
         description: 'Highest-accuracy GPT-5.4 variant for the hardest problems (1.05M/128k).',
+    },
+    {
+        id: 'gpt-5.4-mini',
+        aliases: ['gpt-5.4-mini-2026-03-17'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.75,
+            cached_input_per_million: 0.075,
+            output_per_million: 4.5,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 91,
+        scores: {
+            monologue: 92,
+            code: 93,
+            reasoning: 89,
+        },
+        description: 'A faster, more efficient GPT-5.4 model for coding, computer use, and subagents (400k/128k).',
+    },
+    {
+        id: 'gpt-5.4-nano',
+        aliases: ['gpt-5.4-nano-2026-03-17'],
+        provider: 'openai',
+        cost: {
+            input_per_million: 0.2,
+            cached_input_per_million: 0.02,
+            output_per_million: 1.25,
+        },
+        features: {
+            context_length: 400000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'mini',
+        score: 82,
+        scores: {
+            monologue: 82,
+            code: 81,
+            reasoning: 79,
+        },
+        description: 'A cheap, high-volume GPT-5.4-class model for extraction, ranking, and subagents (400k/128k).',
     },
 
     // GPT-5.2 models
