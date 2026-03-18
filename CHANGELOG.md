@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-18
+- Restored `gemini-3.1-pro-preview` as the canonical Gemini Pro preview model id.
+- Kept `gemini-3-pro-preview` and related legacy names as backward-compatible aliases.
+- Updated Gemini model class defaults back to `gemini-3.1-pro-preview`.
+
 ## 2026-03-06
 - Added first-class OpenAI support for `gpt-5.4` and `gpt-5.4-pro`, including canonical dated aliases, pricing, and capability metadata.
 - Updated reasoning-heavy OpenAI model classes to prefer GPT-5.4 / GPT-5.4 Pro.
