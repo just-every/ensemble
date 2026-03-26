@@ -104,6 +104,8 @@ export interface ModelSettings {
     max_tokens?: number;
     stop_sequence?: string;
     seed?: number;
+    /** Generic thinking budget in provider-specific units (provider implementations interpret this). */
+    thinking_budget?: number;
     text?: { format: string };
     tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel

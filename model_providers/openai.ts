@@ -1223,6 +1223,23 @@ export class OpenAIProvider extends BaseModelProvider {
             };
 
             type OpenAIReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+            const parseThinkingBudget = (value: unknown): number | null => {
+                if (typeof value !== 'number' || !Number.isFinite(value)) {
+                    return null;
+                }
+                return Math.max(0, Math.floor(value));
+            };
+            const mapThinkingBudgetToReasoningEffort = (budget: number): OpenAIReasoningEffort | undefined => {
+                if (!Number.isFinite(budget) || budget < 0) {
+                    return undefined;
+                }
+                if (budget === 0) return 'none';
+                if (budget <= 2048) return 'minimal';
+                if (budget <= 8192) return 'low';
+                if (budget <= 16384) return 'medium';
+                if (budget <= 32768) return 'high';
+                return 'xhigh';
+            };
 
             const isO3Model = (m: string) => m === 'o3' || m.startsWith('o3-');
             const isGpt5Family = (m: string) => m.startsWith('gpt-5');
@@ -1249,6 +1266,13 @@ export class OpenAIProvider extends BaseModelProvider {
                     requestParams.model = model;
                     break;
                 }
+            }
+
+            const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
+            const thinkingBudgetEffort =
+                thinkingBudgetFromSettings !== null ? mapThinkingBudgetToReasoningEffort(thinkingBudgetFromSettings) : undefined;
+            if (thinkingBudgetEffort !== undefined) {
+                requestedReasoningEffort = thinkingBudgetEffort;
             }
 
             // Apply reasoning defaults.

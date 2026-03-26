@@ -211,6 +211,58 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
     });
 
+    it('maps modelSettings.thinking_budget to Gemini thinking budget', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const stream = provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-3.1-flash-lite-preview',
+            {
+                agent_id: 'test-gemini-thinking-budget-settings',
+                modelSettings: {
+                    thinking_budget: 0,
+                },
+            } as any,
+            'req-thinking-budget-settings'
+        );
+
+        for await (const _event of stream) {
+            // Drain stream.
+        }
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
+        expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
+    });
+
     it('registers Gemini 3.1 Flash Image Preview pricing metadata', () => {
         const imageModel = findModel('gemini-3.1-flash-image-preview');
 

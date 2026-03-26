@@ -691,6 +691,13 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-max': 24576,
 };
 
+function parseThinkingBudget(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return null;
+    }
+    return Math.max(0, Math.floor(value));
+}
+
 const GEMINI_31_FLASH_IMAGE_05K_DIMENSIONS: Record<string, { width: number; height: number }> = {
     '1:1': { width: 512, height: 512 },
     '1:4': { width: 256, height: 1024 },
@@ -1034,6 +1041,7 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Handle model suffixes for thinking budget
             let thinkingBudget: number | null = null;
+            const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
 
             // Check if model has any of the defined suffixes
             for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
@@ -1042,6 +1050,10 @@ export class GeminiProvider extends BaseModelProvider {
                     model = model.slice(0, -suffix.length);
                     break;
                 }
+            }
+
+            if (thinkingBudgetFromSettings !== null) {
+                thinkingBudget = thinkingBudgetFromSettings;
             }
 
             // Prepare generation config

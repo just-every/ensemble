@@ -564,6 +564,10 @@ export class ClaudeProvider extends BaseModelProvider {
             // Enable thinking if specified for the model
             let thinking = undefined;
             let thinkingSet = false;
+            const thinkingBudgetFromSettings =
+                settings && typeof settings.thinking_budget === 'number' && Number.isFinite(settings.thinking_budget)
+                    ? Math.max(0, Math.floor(settings.thinking_budget))
+                    : null;
             for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
                 if (model.endsWith(suffix)) {
                     thinkingSet = true;
@@ -575,6 +579,18 @@ export class ClaudeProvider extends BaseModelProvider {
                     }
                     model = model.slice(0, -suffix.length);
                     break;
+                }
+            }
+
+            if (thinkingBudgetFromSettings !== null) {
+                thinkingSet = true;
+                if (thinkingBudgetFromSettings > 0) {
+                    thinking = {
+                        type: 'enabled',
+                        budget_tokens: thinkingBudgetFromSettings,
+                    };
+                } else {
+                    thinking = undefined;
                 }
             }
 

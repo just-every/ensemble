@@ -186,6 +186,33 @@ describe('GPT-5.4 support', () => {
         expect(requestParams.top_p).toBe(0.9);
     });
 
+    it('maps modelSettings.thinking_budget to OpenAI reasoning effort', async () => {
+        const provider = new OpenAIProvider('sk-test');
+        const create = vi.fn().mockResolvedValue(emptyStream());
+        (provider as any)._client = {
+            responses: {
+                create,
+            },
+        };
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return concise answer' }] as any,
+                'gpt-5.4',
+                {
+                    agent_id: 'test-gpt-thinking-budget',
+                    modelSettings: {
+                        thinking_budget: 0,
+                    },
+                } as any
+            )
+        );
+
+        const requestParams = create.mock.calls.at(0)?.[0];
+        expect(requestParams?.model).toBe('gpt-5.4');
+        expect(requestParams?.reasoning).toEqual({ effort: 'none' });
+    });
+
     it('defaults GPT-5.4 Pro to high reasoning and strips unsupported sampling params', async () => {
         const provider = new OpenAIProvider('sk-test');
         const create = vi.fn().mockResolvedValue(emptyStream());
