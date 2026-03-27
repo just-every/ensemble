@@ -212,6 +212,7 @@ export const MODEL_CLASSES = {
             'luma-photon-1', // Luma
             'ideogram-3.0', // Ideogram
             'midjourney-v7', // Midjourney
+            'grok-imagine-image-pro', // X.AI
             'flux-kontext-pro', // Fireworks
             'stability-ultra', // Stability
             'runway-gen4-image', // Runway
@@ -581,16 +582,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['grok-4.1-fast-reasoning'],
         provider: 'xai',
         cost: {
-            input_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.2,
-                price_above_threshold_per_million: 0.5,
-            },
-            output_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.5,
-                price_above_threshold_per_million: 1.0,
-            },
+            input_per_million: 0.2,
+            output_per_million: 0.5,
             cached_input_per_million: 0.05,
         },
         features: {
@@ -608,7 +601,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 85,
             reasoning: 88,
         },
-        description: 'Grok 4.1 Fast with extended reasoning. 2M context, tiered pricing at 128k threshold.',
+        description: 'Grok 4.1 Fast with extended reasoning. 2M context, flat pricing, text/image input.',
     },
 
     {
@@ -616,16 +609,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['grok-4.1-fast-non-reasoning'],
         provider: 'xai',
         cost: {
-            input_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.2,
-                price_above_threshold_per_million: 0.5,
-            },
-            output_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.5,
-                price_above_threshold_per_million: 1.0,
-            },
+            input_per_million: 0.2,
+            output_per_million: 0.5,
             cached_input_per_million: 0.05,
         },
         features: {
@@ -643,21 +628,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 82,
             reasoning: 80,
         },
-        description: 'Grok 4.1 Fast without reasoning. 2M context, tiered pricing at 128k threshold.',
+        description: 'Grok 4.1 Fast without reasoning. 2M context, flat pricing, text/image input.',
     },
 
-    // Grok-4 Premium model
+    // Grok-4 stable alias (currently Grok 4.20 reasoning)
     {
         id: 'grok-4',
-        aliases: ['grok-4-2025-09-01'],
+        aliases: ['grok-4-2025-09-01', 'grok-4.20-0309-reasoning'],
         provider: 'xai',
         cost: {
-            input_per_million: 3.0,
-            output_per_million: 15.0,
-            cached_input_per_million: 0.75,
+            input_per_million: 2.0,
+            output_per_million: 6.0,
+            cached_input_per_million: 0.2,
         },
         features: {
-            context_length: 256_000,
+            context_length: 2_000_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -671,7 +656,59 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 88,
             reasoning: 85,
         },
-        description: 'Grok-4 premium model with 256k context and vision capabilities.',
+        description: 'Grok-4 stable alias, currently resolving to the Grok 4.20 reasoning model with 2M context.',
+    },
+
+    {
+        id: 'grok-4.20-0309-non-reasoning',
+        provider: 'xai',
+        cost: {
+            input_per_million: 2.0,
+            output_per_million: 6.0,
+            cached_input_per_million: 0.2,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        score: 88,
+        scores: {
+            monologue: 90,
+            code: 85,
+            reasoning: 81,
+        },
+        description: 'Grok 4.20 non-reasoning model. 2M context with function calling and structured output.',
+    },
+
+    {
+        id: 'grok-4.20-multi-agent-0309',
+        provider: 'xai',
+        cost: {
+            input_per_million: 2.0,
+            output_per_million: 6.0,
+            cached_input_per_million: 0.2,
+        },
+        features: {
+            context_length: 2_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        score: 91,
+        scores: {
+            monologue: 93,
+            code: 89,
+            reasoning: 90,
+        },
+        description: 'Grok 4.20 multi-agent model with reasoning, structured output, and 2M context.',
     },
 
     // Grok-4 Fast models (September 2025) with tiered pricing
@@ -2788,6 +2825,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: 'Midjourney v7 text-to-image (via KIE API; requires third-party API key).',
+    },
+    {
+        id: 'grok-imagine-image-pro',
+        provider: 'xai',
+        cost: {
+            per_image: 0.07,
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: 'xAI Grok Imagine Image Pro for premium text-to-image and image-guided image generation.',
+    },
+    {
+        id: 'grok-imagine-image',
+        provider: 'xai',
+        cost: {
+            per_image: 0.02,
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description: 'xAI Grok Imagine Image for lower-cost text-to-image and image-guided image generation.',
     },
     {
         id: 'imagen-2',

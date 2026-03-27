@@ -4,6 +4,9 @@
  * We extend OpenAIChat as Grok is a drop in replacement
  */
 
+import type { AgentDefinition, ImageGenerationOpts } from '../types/types.js';
+import { costTracker } from '../utils/cost_tracker.js';
+import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { OpenAIChat } from './openai_chat.js';
 import OpenAI from 'openai';
 
@@ -31,6 +34,58 @@ export class GrokProvider extends OpenAIChat {
             }
         }
         return super.prepareParameters(requestParams);
+    }
+
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
+        const requestId = log_llm_request(agent.agent_id || 'default', 'xai', model, { prompt, opts }, new Date());
+        let success = false;
+
+        try {
+            if (opts.source_images || opts.mask) {
+                throw new Error('xAI image generation with source images or masks is not supported in Ensemble yet.');
+            }
+
+            const response = await this.client.images.generate({
+                model,
+                prompt,
+                n: opts.n || 1,
+            } as any);
+
+            const images = (response.data || [])
+                .map((item: any) => {
+                    if (typeof item?.b64_json === 'string' && item.b64_json.length > 0) {
+                        return `data:image/png;base64,${item.b64_json}`;
+                    }
+                    if (typeof item?.url === 'string' && item.url.length > 0) {
+                        return item.url;
+                    }
+                    return null;
+                })
+                .filter((image: string | null): image is string => image !== null);
+
+            if (!images.length) {
+                throw new Error('xAI image generation returned no images.');
+            }
+
+            costTracker.addUsage({
+                model,
+                image_count: images.length,
+                request_id: opts.request_id,
+                metadata: { source: 'xai' },
+            });
+            success = true;
+            return images;
+        } catch (error) {
+            log_llm_error(requestId, error);
+            throw error;
+        } finally {
+            log_llm_response(requestId, { ok: success });
+        }
     }
 }
 
