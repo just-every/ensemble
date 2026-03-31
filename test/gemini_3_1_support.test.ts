@@ -102,24 +102,6 @@ function makeSingleChunkStream(chunk: Record<string, unknown>) {
     };
 }
 
-function getPngDimensions(dataUrl: string): { width: number; height: number } {
-    const match = /^data:image\/png;base64,(.+)$/i.exec(dataUrl);
-    if (!match) {
-        throw new Error('Expected PNG data URL');
-    }
-
-    const buf = Buffer.from(match[1], 'base64');
-    if (buf.length < 24) {
-        throw new Error('PNG data too short');
-    }
-
-    // PNG IHDR stores width/height at bytes 16..23 (big-endian)
-    return {
-        width: buf.readUInt32BE(16),
-        height: buf.readUInt32BE(20),
-    };
-}
-
 describe('Gemini 3.x model support', () => {
     it('registers Gemini 3 Pro Preview and 3.1 compatibility aliases', () => {
         const canonical = findModel('gemini-3-pro-preview');
@@ -295,8 +277,7 @@ describe('Gemini 3.x model support', () => {
 
         expect(usageArg?.metadata?.cost_per_image).toBe(0.045);
         expect(requestArg?.config?.responseModalities).toEqual(['IMAGE']);
-        // Keep 0.5K internal; only send documented imageSize values to Gemini.
-        expect(requestArg?.config?.imageConfig?.imageSize).toBeUndefined();
+        expect(requestArg?.config?.imageConfig?.imageSize).toBe('512');
 
         usageSpy.mockRestore();
     });
@@ -320,12 +301,14 @@ describe('Gemini 3.x model support', () => {
         );
 
         const usageArg = usageSpy.mock.calls.at(-1)?.[0] as any;
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
         expect(usageArg?.metadata?.cost_per_image).toBe(0.045);
+        expect(requestArg?.config?.imageConfig?.imageSize).toBe('512');
 
         usageSpy.mockRestore();
     });
 
-    it('uses table resolution for 0.5K landscape outputs', async () => {
+    it('requests 512 landscape outputs for 0.5K Gemini 3.1 Flash Image calls', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
         (provider as any)._client = {
@@ -334,19 +317,19 @@ describe('Gemini 3.x model support', () => {
             },
         };
 
-        const images = await provider.createImage(
+        await provider.createImage(
             'A tiny landscape scene',
             'gemini-3.1-flash-image-preview',
             { agent_id: 'test-gemini-3.1-05k-landscape' } as any,
             { quality: 'low', size: 'landscape', n: 1 }
         );
 
-        const dims = getPngDimensions(images[0]);
-        expect(dims.width).toBe(632);
-        expect(dims.height).toBe(424);
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.config?.imageConfig?.imageSize).toBe('512');
+        expect(requestArg?.config?.imageConfig?.aspectRatio).toBe('3:2');
     });
 
-    it('supports narrow portrait ratios from the Gemini 3.1 Flash Image table', async () => {
+    it('requests 512 narrow portrait outputs for Gemini 3.1 Flash Image', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
         (provider as any)._client = {
@@ -355,7 +338,7 @@ describe('Gemini 3.x model support', () => {
             },
         };
 
-        const images = await provider.createImage(
+        await provider.createImage(
             'A tall fashion poster',
             'gemini-3.1-flash-image-preview',
             { agent_id: 'test-gemini-3.1-05k-1-4' } as any,
@@ -364,10 +347,7 @@ describe('Gemini 3.x model support', () => {
 
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
         expect(requestArg?.config?.imageConfig?.aspectRatio).toBe('1:4');
-
-        const dims = getPngDimensions(images[0]);
-        expect(dims.width).toBe(256);
-        expect(dims.height).toBe(1024);
+        expect(requestArg?.config?.imageConfig?.imageSize).toBe('512');
     });
 
     it('uses the correct 2K pricing for medium quality', async () => {

@@ -60,7 +60,6 @@ import {
     appendMessageWithImage,
     normalizeImageDataUrl,
     resizeAndTruncateForGemini,
-    resizeDataUrl,
 } from '../utils/image_utils.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
@@ -697,23 +696,6 @@ function parseThinkingBudget(value: unknown): number | null {
     }
     return Math.max(0, Math.floor(value));
 }
-
-const GEMINI_31_FLASH_IMAGE_05K_DIMENSIONS: Record<string, { width: number; height: number }> = {
-    '1:1': { width: 512, height: 512 },
-    '1:4': { width: 256, height: 1024 },
-    '1:8': { width: 192, height: 1536 },
-    '2:3': { width: 424, height: 632 },
-    '3:2': { width: 632, height: 424 },
-    '3:4': { width: 448, height: 600 },
-    '4:1': { width: 1024, height: 256 },
-    '4:3': { width: 600, height: 448 },
-    '4:5': { width: 464, height: 576 },
-    '5:4': { width: 576, height: 464 },
-    '8:1': { width: 1536, height: 192 },
-    '9:16': { width: 384, height: 688 },
-    '16:9': { width: 688, height: 384 },
-    '21:9': { width: 792, height: 168 },
-};
 
 const GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS: Record<string, { ar: string; imageSize: '1K' | '2K' | '4K' }> = {
     // 1K
@@ -1652,9 +1634,11 @@ export class GeminiProvider extends BaseModelProvider {
                     imageSize = '0.5K';
                 }
 
-                // Public docs currently list only 1K/2K/4K for `imageConfig.imageSize`.
-                // Keep 0.5K as an internal billing/selection tier and avoid sending unknown values.
-                const requestImageSize = imageSize === '0.5K' ? undefined : imageSize;
+                // Gemini's current API docs expose `512` as the 0.5K request size.
+                // Keep `0.5K` as the internal tier for pricing/selection, but translate
+                // it to Gemini's documented request value so worker runtimes do not rely
+                // on post-generation resizing to enforce the smaller tier.
+                const requestImageSize = imageSize === '0.5K' ? '512' : imageSize;
                 if (requestImageSize) imageConfig.imageSize = requestImageSize;
 
                 const thinkingConfig: Record<string, unknown> = {};
@@ -1676,36 +1660,6 @@ export class GeminiProvider extends BaseModelProvider {
                               } as any,
                           }
                         : undefined;
-
-                // For 0.5K, use a 512px short side and preserve requested aspect ratio.
-                const halfKTargetDimensions = (() => {
-                    if (!isGemini31FlashImageModel || imageSize !== '0.5K') return undefined;
-                    const ar = imageConfig.aspectRatio || '1:1';
-
-                    const exactDimensions = GEMINI_31_FLASH_IMAGE_05K_DIMENSIONS[ar];
-                    if (exactDimensions) return exactDimensions;
-
-                    const match = /^(\d+):(\d+)$/.exec(ar);
-                    if (!match) return { width: 512, height: 512 };
-
-                    const wRatio = Number(match[1]);
-                    const hRatio = Number(match[2]);
-                    if (!Number.isFinite(wRatio) || !Number.isFinite(hRatio) || wRatio <= 0 || hRatio <= 0) {
-                        return { width: 512, height: 512 };
-                    }
-
-                    if (wRatio >= hRatio) {
-                        return {
-                            width: Math.max(1, Math.round((wRatio / hRatio) * 512)),
-                            height: 512,
-                        };
-                    }
-
-                    return {
-                        width: 512,
-                        height: Math.max(1, Math.round((hRatio / wRatio) * 512)),
-                    };
-                })();
 
                 const perImageCost = this.getImageCost(model, imageSize);
 
@@ -1878,24 +1832,7 @@ export class GeminiProvider extends BaseModelProvider {
 
                                 if (part.inlineData?.data) {
                                     const mime = part.inlineData.mimeType || 'image/png';
-                                    let imageData = `data:${mime};base64,${part.inlineData.data}`;
-
-                                    // Enforce 0.5K output when requested for Gemini 3.1 Flash Image.
-                                    if (halfKTargetDimensions) {
-                                        try {
-                                            imageData = await resizeDataUrl(
-                                                imageData,
-                                                halfKTargetDimensions.width,
-                                                halfKTargetDimensions.height,
-                                                {
-                                                    fit: 'cover',
-                                                }
-                                            );
-                                        } catch (resizeError) {
-                                            console.warn('[Gemini] Failed to resize image to 0.5K, returning original image.');
-                                            console.warn(truncateLargeValues(resizeError));
-                                        }
-                                    }
+                                    const imageData = `data:${mime};base64,${part.inlineData.data}`;
 
                                     if (wantsSingleImage) {
                                         firstImage = imageData;
