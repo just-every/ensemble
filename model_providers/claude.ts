@@ -204,6 +204,44 @@ function cleanBase64Data(imageData: string): string {
     return imageData.replace(/^data:image\/[a-z]+;base64,/, '');
 }
 
+function finalizeClaudeToolArguments(currentToolCall: any): string | undefined {
+    const partialArgs = currentToolCall?.function?._partialArguments;
+    if (!partialArgs) {
+        return undefined;
+    }
+
+    try {
+        JSON.parse(partialArgs);
+        currentToolCall.function.arguments = partialArgs;
+        delete currentToolCall.function._partialArguments;
+        return undefined;
+    } catch (jsonError) {
+        console.warn(
+            `Invalid JSON in partial arguments for ${currentToolCall.function.name}: ${partialArgs}`,
+            jsonError
+        );
+
+        if (partialArgs.includes('}{')) {
+            const firstBraceIndex = partialArgs.indexOf('{');
+            const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
+            if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
+                const firstJsonStr = partialArgs.substring(firstBraceIndex, firstCloseBraceIndex);
+                try {
+                    JSON.parse(firstJsonStr);
+                    currentToolCall.function.arguments = firstJsonStr;
+                    delete currentToolCall.function._partialArguments;
+                    return undefined;
+                } catch (extractError) {
+                    console.error(`Failed to extract valid JSON: ${firstJsonStr}`, extractError);
+                }
+            }
+        }
+
+        delete currentToolCall.function._partialArguments;
+        return `Claude emitted malformed tool arguments for ${currentToolCall.function.name}.`;
+    }
+}
+
 /**
  * Processes images and adds them to the input array for Claude
  * Resizes images to max 1024px width and splits into sections if height > 768px
@@ -895,47 +933,17 @@ export class ClaudeProvider extends BaseModelProvider {
                     ) {
                         try {
                             // Finalize arguments if they were streamed partially
-                            if (currentToolCall.function._partialArguments) {
-                                // Validate that we have proper JSON before finalizing
-                                const partialArgs = currentToolCall.function._partialArguments;
-                                try {
-                                    JSON.parse(partialArgs); // Validate JSON
-                                    currentToolCall.function.arguments = partialArgs;
-                                } catch (jsonError) {
-                                    console.warn(
-                                        `Invalid JSON in partial arguments for ${currentToolCall.function.name}: ${partialArgs}`,
-                                        jsonError
-                                    );
-                                    // Try to extract the first valid JSON object if it's concatenated
-                                    if (partialArgs.includes('}{')) {
-                                        const firstBraceIndex = partialArgs.indexOf('{');
-                                        const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
-                                        if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
-                                            const firstJsonStr = partialArgs.substring(
-                                                firstBraceIndex,
-                                                firstCloseBraceIndex
-                                            );
-                                            try {
-                                                JSON.parse(firstJsonStr); // Validate extracted JSON
-                                                currentToolCall.function.arguments = firstJsonStr;
-                                                console.log(
-                                                    `Extracted valid JSON from partial arguments: ${firstJsonStr}`
-                                                );
-                                            } catch (extractError) {
-                                                console.error(
-                                                    `Failed to extract valid JSON: ${firstJsonStr}`,
-                                                    extractError
-                                                );
-                                                currentToolCall.function.arguments = '{}';
-                                            }
-                                        } else {
-                                            currentToolCall.function.arguments = '{}';
-                                        }
-                                    } else {
-                                        currentToolCall.function.arguments = '{}';
-                                    }
-                                }
-                                delete currentToolCall.function._partialArguments; // Clean up temporary field
+                            const malformedArgumentsError = finalizeClaudeToolArguments(currentToolCall);
+                            if (malformedArgumentsError) {
+                                log_llm_error(requestId, malformedArgumentsError);
+                                yield {
+                                    type: 'error',
+                                    error: malformedArgumentsError,
+                                    recoverable: false,
+                                };
+                                toolCallStarted = false;
+                                currentToolCall = null;
+                                continue;
                             }
                             yield {
                                 type: 'tool_start',
@@ -975,44 +983,17 @@ export class ClaudeProvider extends BaseModelProvider {
                             // Only emit tool_start if we haven't already emitted it
                             // This is a fallback in case content_block_stop didn't fire
                             // Finalize arguments if they were streamed partially with proper JSON validation
-                            if (currentToolCall.function._partialArguments) {
-                                const partialArgs = currentToolCall.function._partialArguments;
-                                try {
-                                    JSON.parse(partialArgs); // Validate JSON
-                                    currentToolCall.function.arguments = partialArgs;
-                                } catch (jsonError) {
-                                    console.warn(
-                                        `Invalid JSON in partial arguments at message_stop for ${currentToolCall.function.name}: ${partialArgs}`,
-                                        jsonError
-                                    );
-                                    // Try to extract the first valid JSON object if it's concatenated
-                                    if (partialArgs.includes('}{')) {
-                                        const firstBraceIndex = partialArgs.indexOf('{');
-                                        const firstCloseBraceIndex = partialArgs.indexOf('}') + 1;
-                                        if (firstBraceIndex !== -1 && firstCloseBraceIndex > firstBraceIndex) {
-                                            const firstJsonStr = partialArgs.substring(
-                                                firstBraceIndex,
-                                                firstCloseBraceIndex
-                                            );
-                                            try {
-                                                JSON.parse(firstJsonStr); // Validate extracted JSON
-                                                currentToolCall.function.arguments = firstJsonStr;
-                                                console.log(`Extracted valid JSON at message_stop: ${firstJsonStr}`);
-                                            } catch (extractError) {
-                                                console.error(
-                                                    `Failed to extract valid JSON at message_stop: ${firstJsonStr}`,
-                                                    extractError
-                                                );
-                                                currentToolCall.function.arguments = '{}';
-                                            }
-                                        } else {
-                                            currentToolCall.function.arguments = '{}';
-                                        }
-                                    } else {
-                                        currentToolCall.function.arguments = '{}';
-                                    }
-                                }
-                                delete currentToolCall.function._partialArguments;
+                            const malformedArgumentsError = finalizeClaudeToolArguments(currentToolCall);
+                            if (malformedArgumentsError) {
+                                log_llm_error(requestId, malformedArgumentsError);
+                                yield {
+                                    type: 'error',
+                                    error: malformedArgumentsError,
+                                    recoverable: false,
+                                };
+                                currentToolCall = null;
+                                toolCallStarted = false;
+                                continue;
                             }
 
                             yield {

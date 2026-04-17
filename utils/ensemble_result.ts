@@ -10,7 +10,9 @@ import {
     ResponseInputItem,
     ToolCallResult,
     AgentExportDefinition,
+    OperationStatusEvent,
 } from '../types/types.js';
+import { getEventError, isTerminalFailureEvent } from './failure_detection.js';
 
 /**
  * Result object containing all aggregated data from an ensemble stream
@@ -50,6 +52,16 @@ export interface EnsembleResult {
     /** Any errors that occurred */
     error?: string;
 
+    /** Structured failure metadata when the stream reports an authoritative failure */
+    failure?: {
+        operation?: 'request' | 'image' | 'result';
+        request_id?: string;
+        reason?: string;
+        terminal: boolean;
+        recoverable: boolean;
+        detectedAt: Date;
+    };
+
     /** All response output messages */
     responseOutputs?: ResponseInputItem[];
 
@@ -69,12 +81,23 @@ export interface EnsembleResult {
     messageIds: Set<string>;
 }
 
+export interface EnsembleResultOptions {
+    /**
+     * Stop consuming the stream as soon as a terminal failure is reported.
+     * This allows callers to retry immediately instead of waiting for stream_end.
+     */
+    failFast?: boolean;
+}
+
 /**
  * Converts an ensemble stream into a single result object
  * @param stream - The async generator stream from ensembleRequest or similar
  * @returns Promise resolving to the aggregated result
  */
-export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>): Promise<EnsembleResult> {
+export async function ensembleResult(
+    stream: AsyncGenerator<ProviderStreamEvent>,
+    options: EnsembleResultOptions = {}
+): Promise<EnsembleResult> {
     const result: EnsembleResult = {
         message: '',
         completed: false,
@@ -88,6 +111,53 @@ export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>
     const toolCalls = new Map<string, ToolCallResult>();
     const files: EnsembleResult['files'] = [];
     const responseOutputs: ResponseInputItem[] = [];
+    const finalizeAggregates = () => {
+        if (!result.message && messageDeltas.size > 0) {
+            const allDeltas: string[] = [];
+            for (const deltas of messageDeltas.values()) {
+                allDeltas.push(...deltas);
+            }
+            result.message = allDeltas.join('');
+        }
+
+        if (toolCalls.size > 0) {
+            result.tools = {
+                calls: Array.from(toolCalls.values()),
+                totalCalls: toolCalls.size,
+            };
+        }
+
+        if (files.length > 0) {
+            result.files = files;
+        }
+
+        if (responseOutputs.length > 0) {
+            result.responseOutputs = responseOutputs;
+        }
+    };
+    const consumeImmediateFollowupEvent = async (): Promise<ProviderStreamEvent | undefined> => {
+        const sentinel = Symbol('no_immediate_followup');
+        const nextEventPromise = stream.next();
+        const nextIteration = await Promise.race([
+            nextEventPromise,
+            new Promise<typeof sentinel>(resolve => {
+                setTimeout(() => resolve(sentinel), 0);
+            }),
+        ]);
+
+        if (nextIteration === sentinel) {
+            nextEventPromise.catch(() => {
+                // Ignore the follow-up event if failFast returns before it resolves.
+            });
+            return undefined;
+        }
+
+        if (nextIteration.done) {
+            return undefined;
+        }
+
+        return nextIteration.value;
+    };
 
     try {
         for await (const event of stream) {
@@ -133,13 +203,13 @@ export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>
                         }
 
                         // Handle thinking content
-                        if (thinkingDeltas.has(msgEvent.message_id)) {
-                            const thinking = thinkingDeltas.get(msgEvent.message_id)!;
+                        const thinking = thinkingDeltas.get(msgEvent.message_id);
+                        if (msgEvent.thinking_content || msgEvent.thinking_signature || thinking) {
                             result.thinking = {
-                                content: msgEvent.thinking_content || thinking.content.join(''),
+                                content: msgEvent.thinking_content || thinking?.content.join('') || '',
                                 signature:
                                     msgEvent.thinking_signature ||
-                                    (thinking.signature?.length ? thinking.signature.join('') : undefined),
+                                    (thinking?.signature?.length ? thinking.signature.join('') : undefined),
                             };
                         }
                     }
@@ -198,6 +268,89 @@ export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>
                 case 'error': {
                     const errorEvent = event as ErrorEvent;
                     result.error = errorEvent.error;
+
+                    if (isTerminalFailureEvent(event)) {
+                        const hadAuthoritativeFailure =
+                            result.failure?.operation !== undefined && result.failure.operation !== 'result';
+
+                        result.failure = {
+                            operation: result.failure?.operation ?? 'result',
+                            request_id: errorEvent.request_id ?? result.failure?.request_id,
+                            reason: result.failure?.reason,
+                            terminal: true,
+                            recoverable: false,
+                            detectedAt: result.failure?.detectedAt ?? new Date(),
+                        };
+
+                        if (options.failFast) {
+                            if (!hadAuthoritativeFailure) {
+                                const followupEvent = await consumeImmediateFollowupEvent();
+                                if (followupEvent?.type === 'operation_status') {
+                                    const statusEvent = followupEvent as OperationStatusEvent;
+                                    if (statusEvent.status === 'failed') {
+                                        const eventError = getEventError(followupEvent);
+                                        if (eventError) {
+                                            result.error = eventError;
+                                        }
+
+                                        result.failure = {
+                                            operation: statusEvent.operation,
+                                            request_id: statusEvent.request_id,
+                                            reason: statusEvent.reason,
+                                            terminal: statusEvent.terminal === true,
+                                            recoverable: statusEvent.recoverable === true,
+                                            detectedAt: new Date(),
+                                        };
+                                    }
+                                }
+                            }
+
+                            await stream.return(undefined);
+                            finalizeAggregates();
+                            result.completed = false;
+                            result.endTime = new Date();
+                            return result;
+                        }
+                    }
+                    break;
+                }
+
+                case 'operation_status': {
+                    const statusEvent = event as OperationStatusEvent;
+
+                    if (statusEvent.status === 'failed') {
+                        const eventError = getEventError(event);
+                        if (eventError) {
+                            result.error = eventError;
+                        }
+                    }
+
+                    if (statusEvent.status === 'failed') {
+                        result.failure = {
+                            operation: statusEvent.operation,
+                            request_id: statusEvent.request_id,
+                            reason: statusEvent.reason,
+                            terminal: statusEvent.terminal === true,
+                            recoverable: statusEvent.recoverable === true,
+                            detectedAt: new Date(),
+                        };
+
+                        if (options.failFast && statusEvent.terminal) {
+                            await stream.return(undefined);
+                            finalizeAggregates();
+                            result.completed = false;
+                            result.endTime = new Date();
+                            return result;
+                        }
+                    }
+
+                    if (statusEvent.status === 'completed') {
+                        if (!result.failure || result.failure.terminal !== true) {
+                            result.error = undefined;
+                            result.failure = undefined;
+                        }
+                    }
+
                     break;
                 }
 
@@ -216,41 +369,18 @@ export async function ensembleResult(stream: AsyncGenerator<ProviderStreamEvent>
                 }
 
                 case 'stream_end': {
-                    result.completed = true;
+                    if (result.failure?.terminal !== true) {
+                        result.completed = true;
+                    }
                     break;
                 }
             }
         }
 
-        // If no message_complete was received, join all deltas
-        if (!result.message && messageDeltas.size > 0) {
-            const allDeltas: string[] = [];
-            for (const deltas of messageDeltas.values()) {
-                allDeltas.push(...deltas);
-            }
-            result.message = allDeltas.join('');
-        }
+        finalizeAggregates();
 
-        // Add tools if any were called
-        if (toolCalls.size > 0) {
-            result.tools = {
-                calls: Array.from(toolCalls.values()),
-                totalCalls: toolCalls.size,
-            };
-        }
-
-        // Add files if any were received
-        if (files.length > 0) {
-            result.files = files;
-        }
-
-        // Add response outputs if any
-        if (responseOutputs.length > 0) {
-            result.responseOutputs = responseOutputs;
-        }
-
-        // Mark as completed if we finished the loop without errors
-        if (!result.error && !result.completed) {
+        // Mark as completed only when the stream ended without terminal failures or recorded errors.
+        if (!result.completed && result.failure?.terminal !== true && result.error === undefined) {
             result.completed = true;
         }
     } catch (error) {

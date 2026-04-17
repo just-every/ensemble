@@ -102,6 +102,7 @@ export interface ModelSettings {
     top_p?: number;
     top_k?: number;
     max_tokens?: number;
+    timeout_ms?: number; // Overall provider request timeout for chat/JSON generation
     stop_sequence?: string;
     seed?: number;
     /** Generic thinking budget in provider-specific units (provider implementations interpret this). */
@@ -300,6 +301,7 @@ export type StreamEventType =
     | 'design_grid'
     | 'console'
     | 'error'
+    | 'operation_status'
     | 'response_output'
     // New types for waiting on tools
     | 'tool_wait_start'
@@ -377,6 +379,25 @@ export interface ToolEvent extends StreamEventBase {
 export interface ErrorEvent extends StreamEventBase {
     type: 'error';
     error: string;
+    code?: string;
+    details?: unknown;
+    recoverable?: boolean;
+}
+
+/**
+ * Operation lifecycle event used to surface authoritative retry/failure status.
+ */
+export interface OperationStatusEvent extends StreamEventBase {
+    type: 'operation_status';
+    operation: 'request' | 'image' | 'result';
+    status: 'started' | 'retrying' | 'failed' | 'completed';
+    error?: string;
+    reason?: string;
+    recoverable?: boolean;
+    terminal?: boolean;
+    will_continue?: boolean;
+    attempt?: number;
+    max_attempts?: number;
 }
 
 /**
@@ -450,6 +471,7 @@ export type ProviderStreamEvent =
     | FileEvent
     | ToolEvent
     | ErrorEvent
+    | OperationStatusEvent
     | CostUpdateEvent
     | ResponseOutputEvent
     | AgentEvent;
@@ -884,6 +906,9 @@ export interface ImageGenerationOpts {
 
     /** Background transparency */
     background?: 'transparent' | 'opaque' | 'auto';
+
+    /** Optional timeout for the overall image operation, including provider SDK stalls */
+    timeout_ms?: number;
 
     /** Control how closely the output matches the input image (OpenAI experimental) */
     input_fidelity?: 'low' | 'medium' | 'high';

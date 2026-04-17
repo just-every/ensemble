@@ -116,6 +116,7 @@ console.log('Validation Result:', {
 ## Documentation
 
 - [Tool Execution Guide](docs/tool-execution.md) - Advanced tool calling features
+- [Failure Detection](docs/failure-detection.md) - Unified request/image failure signaling and fail-fast aggregation
 - [Interactive Demos](demo/) - Web-based demos for core features
 - Generated [API Reference](docs/api) with `npm run docs`
   
