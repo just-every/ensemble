@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
 import { createTraceContext } from '../utils/trace_context.js';
+import { createOperationStatusEvent, raceWithAbortAndTimeout, toTerminalErrorEvent } from '../utils/failure_detection.js';
 
 /**
  * Generate images from text prompts
@@ -56,7 +57,14 @@ export function ensembleImage(
             });
             requestStarted = true;
 
-            const images = await provider.createImage(prompt, model, agent, requestOptions);
+            const images = await raceWithAbortAndTimeout(
+                () => provider.createImage!(prompt, model, agent, requestOptions),
+                {
+                    operationName: `Image generation for ${model}`,
+                    abortSignal: agent.abortSignal,
+                    timeoutMs: requestOptions.timeout_ms,
+                }
+            );
             await trace.emitRequestEnd(tracedRequestId, {
                 status: 'completed',
                 image_count: images.length,
@@ -89,6 +97,13 @@ export function ensembleImage(
 
         // Emit start
         yield { type: 'image_start', request_id, timestamp: new Date().toISOString() } as ProviderStreamEvent;
+        yield createOperationStatusEvent({
+            operation: 'image',
+            status: 'started',
+            request_id,
+            will_continue: true,
+            terminal: false,
+        }) as ProviderStreamEvent;
 
         // Bridge cost updates for this request_id only
         const handler = (usage: any) => {
@@ -128,11 +143,29 @@ export function ensembleImage(
 
             // Final image_complete
             yield { type: 'image_complete', request_id, timestamp: new Date().toISOString() } as ProviderStreamEvent;
+            yield createOperationStatusEvent({
+                operation: 'image',
+                status: 'completed',
+                request_id,
+                terminal: true,
+                will_continue: false,
+            }) as ProviderStreamEvent;
 
             // Flush residual cost events
             while (iterator.queue.length) yield iterator.queue.shift() as ProviderStreamEvent;
         } catch (error: any) {
-            yield { type: 'error', request_id, error: String(error?.message || error) } as ProviderStreamEvent;
+            const errorMessage = String(error?.message || error);
+            yield createOperationStatusEvent({
+                operation: 'image',
+                status: 'failed',
+                request_id,
+                error: errorMessage,
+                recoverable: false,
+                terminal: true,
+                will_continue: false,
+                reason: 'provider_error',
+            }) as ProviderStreamEvent;
+            yield toTerminalErrorEvent({ request_id, error: errorMessage }) as ProviderStreamEvent;
         } finally {
             // remove listener
             costTracker.offAddUsage(handler);

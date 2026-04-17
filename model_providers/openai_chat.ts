@@ -678,7 +678,9 @@ export class OpenAIChat extends BaseModelProvider {
             if (settings?.json_schema) {
                 requestParams.response_format = {
                     type: 'json_schema',
-                    json_schema: settings.json_schema,
+                    json_schema: {
+                        ...settings.json_schema,
+                    },
                 };
             }
             // Check model features to determine tool support
@@ -1080,8 +1082,11 @@ export class OpenAIChat extends BaseModelProvider {
                     const completedToolCalls: ToolCall[] = Array.from(partialToolCallsByIndex.values()).filter(
                         call => call.id && call.function.name
                     );
+                    const validatedToolCalls: ToolCall[] = [];
+                    const malformedToolCallNames: string[] = [];
                     if (completedToolCalls.length > 0) {
                         for (const completedToolCall of completedToolCalls) {
+                            let toolCallMalformed = false;
                             // Validate and fix JSON arguments before yielding
                             if (completedToolCall.function.arguments) {
                                 try {
@@ -1104,22 +1109,41 @@ export class OpenAIChat extends BaseModelProvider {
                                             const parsed = JSON.parse(matches[0]);
                                             completedToolCall.function.arguments = JSON.stringify(parsed);
                                         } catch {
-                                            // If all else fails, use empty object
-                                            completedToolCall.function.arguments = '{}';
-                                            console.error(
-                                                `(${this.provider}) Could not parse arguments, using empty object`
-                                            );
+                                            toolCallMalformed = true;
+                                            console.error(`(${this.provider}) Could not parse tool arguments.`);
                                         }
                                     } else {
-                                        completedToolCall.function.arguments = '{}';
+                                        toolCallMalformed = true;
                                     }
                                 }
                             }
 
+                            if (toolCallMalformed) {
+                                malformedToolCallNames.push(completedToolCall.function.name);
+                                continue;
+                            }
+
+                            validatedToolCalls.push(completedToolCall);
+                        }
+
+                        if (malformedToolCallNames.length > 0) {
+                            const malformedToolCallError =
+                                malformedToolCallNames.length === 1
+                                    ? `Error (${this.provider}): Model emitted malformed tool arguments for ${malformedToolCallNames[0]}.`
+                                    : `Error (${this.provider}): Model emitted malformed tool arguments for ${malformedToolCallNames.join(', ')}.`;
+                            log_llm_error(requestId, malformedToolCallError);
                             yield {
-                                type: 'tool_start',
-                                tool_call: completedToolCall,
+                                type: 'error',
+                                error: malformedToolCallError,
+                                recoverable: false,
                             };
+                        } else {
+                            for (const completedToolCall of validatedToolCalls) {
+                                yield {
+                                    type: 'tool_start',
+                                    tool_call: completedToolCall,
+                                };
+                            }
                         }
                     } else {
                         log_llm_error(
@@ -1132,6 +1156,7 @@ export class OpenAIChat extends BaseModelProvider {
                         yield {
                             type: 'error',
                             error: `Error (${this.provider}): Model indicated tool calls, but none were parsed correctly.`,
+                            recoverable: false,
                         };
                     }
                 } else if (finishReason === 'length') {
@@ -1146,6 +1171,7 @@ export class OpenAIChat extends BaseModelProvider {
                     yield {
                         type: 'error',
                         error: `Error (${this.provider}): Response truncated (max_tokens). Partial: ${cleanedPartialContent.substring(0, 100)}...`,
+                        recoverable: false,
                     };
                 } else if (finishReason) {
                     const cleanedReasonContent = aggregatedContent.replaceAll(
@@ -1159,6 +1185,7 @@ export class OpenAIChat extends BaseModelProvider {
                     yield {
                         type: 'error',
                         error: `Error (${this.provider}): Response stopped due to: ${finishReason}. Content: ${cleanedReasonContent.substring(0, 100)}...`,
+                        recoverable: false,
                     };
                 } else {
                     // Handle stream ending without a finish reason

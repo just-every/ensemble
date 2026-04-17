@@ -30,9 +30,36 @@ import {
     convertToFunctionCallOutput,
 } from '../utils/message_converter.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
+import { createOperationStatusEvent, streamWithAbortAndTimeout, toTerminalErrorEvent } from '../utils/failure_detection.js';
+import { validateJsonResponseContent } from '../utils/json_schema.js';
+import { runningToolTracker } from '../utils/running_tool_tracker.js';
 
 const MAX_ERROR_ATTEMPTS = 5;
 const DEFAULT_TERMINAL_TOOL_NAMES = new Set(['task_complete', 'task_fatal_error']);
+const TOOL_FAILURE_FINALIZATION_TIMEOUT_MS = 50;
+
+const isTerminalRoundError = (error: unknown): boolean => {
+    const candidate = error as {
+        recoverable?: boolean;
+        code?: string;
+        name?: string;
+        message?: string;
+    };
+
+    if (candidate?.recoverable === false) {
+        return true;
+    }
+
+    if (candidate?.code === 'ETIMEDOUT' || candidate?.code === 'ABORT_ERR') {
+        return true;
+    }
+
+    if (candidate?.name === 'AbortError') {
+        return true;
+    }
+
+    return false;
+};
 
 const getTerminalToolNames = (agent: AgentDefinition): Set<string> => {
     const toolNames = new Set(DEFAULT_TERMINAL_TOOL_NAMES);
@@ -42,6 +69,14 @@ const getTerminalToolNames = (agent: AgentDefinition): Set<string> => {
         }
     }
     return toolNames;
+};
+
+const hasTerminalTextContent = (content: unknown, expectsStructuredOutput: boolean): content is string => {
+    if (typeof content !== 'string') {
+        return false;
+    }
+
+    return expectsStructuredOutput ? content.trim().length > 0 : content.length > 0;
 };
 
 // Set the ensemble request function in verification and image-to-text modules to avoid circular dependency
@@ -105,8 +140,13 @@ export async function* ensembleRequest(
     const maxRounds = agent?.maxToolCallRoundsPerTurn ?? Infinity;
     let hasToolCalls = false;
     let hasError = false;
+    let terminalErrorThisRound = false;
     let lastMessageContent = '';
+    const expectsStructuredOutput = Boolean(agent.modelSettings?.json_schema?.schema);
     const modelHistory: string[] = [];
+    let lifecycleRequestId: string | undefined;
+    let lastRoundRequestId: string | undefined;
+    let requestStartedStatusEmitted = false;
 
     await trace.emitTurnStart({
         input_messages: conversationHistory,
@@ -117,6 +157,7 @@ export async function* ensembleRequest(
         do {
             hasToolCalls = false;
             hasError = false;
+            terminalErrorThisRound = false;
             let terminalToolSucceededThisRound = false;
             let currentRoundRequestId: string | undefined;
             const currentRoundMessages: string[] = [];
@@ -125,6 +166,8 @@ export async function* ensembleRequest(
             let currentRoundRequestDuration: number | undefined;
             let currentRoundDurationWithTools: number | undefined;
             let currentRoundRequestCost: number | undefined;
+            let currentRoundLimitError: string | undefined;
+            const deferredTerminalErrors: ProviderStreamEvent[] = [];
             const terminalToolNames = getTerminalToolNames(agent);
 
             const model = await getModelFromAgent(
@@ -135,22 +178,58 @@ export async function* ensembleRequest(
             modelHistory.push(model);
 
             // Execute one round
-            const stream = executeRound(model, agent, history, totalToolCalls, maxToolCalls, trace);
+            const stream = executeRound(
+                model,
+                agent,
+                history,
+                totalToolCalls,
+                maxToolCalls,
+                trace,
+                !requestStartedStatusEmitted
+            );
 
             // Yield all events from this round
             try {
                 for await (const event of stream) {
-                    yield event;
+                    let normalizedEvent = event;
+                    if (normalizedEvent.type === 'error' && currentRoundToolCalls > 0) {
+                        const errorEvent = normalizedEvent as any;
+                        if (errorEvent.recoverable !== false) {
+                            normalizedEvent = {
+                                ...errorEvent,
+                                recoverable: false,
+                            } as ProviderStreamEvent;
+                        }
+                    }
 
-                    switch (event.type) {
+                    const isDeferredTerminalError =
+                        normalizedEvent.type === 'error' && (normalizedEvent as any).recoverable === false;
+
+                    if (isDeferredTerminalError) {
+                        deferredTerminalErrors.push(normalizedEvent);
+                    } else {
+                        yield normalizedEvent;
+                    }
+
+                    switch (normalizedEvent.type) {
                         case 'agent_start': {
-                            currentRoundRequestId = event.request_id;
+                            currentRoundRequestId = normalizedEvent.request_id;
+                            lastRoundRequestId = normalizedEvent.request_id;
+                            lifecycleRequestId ??= normalizedEvent.request_id;
+                            break;
+                        }
+
+                        case 'operation_status': {
+                            const statusEvent = normalizedEvent as any;
+                            if (statusEvent.operation === 'request' && statusEvent.status === 'started') {
+                                requestStartedStatusEmitted = true;
+                            }
                             break;
                         }
 
                         case 'message_complete': {
-                            const messageEvent = event as MessageEventBase;
-                            if (messageEvent.content) {
+                            const messageEvent = normalizedEvent as MessageEventBase;
+                            if (hasTerminalTextContent(messageEvent.content, expectsStructuredOutput)) {
                                 lastMessageContent = messageEvent.content;
                                 currentRoundMessages.push(messageEvent.content);
                             }
@@ -158,12 +237,12 @@ export async function* ensembleRequest(
                         }
 
                         case 'tool_start': {
-                            const toolEvent = event as ToolEvent;
+                            const toolEvent = normalizedEvent as ToolEvent;
                             if (toolEvent.tool_call) {
                                 const toolName = toolEvent.tool_call.function.name;
                                 currentRoundToolCalls += 1;
 
-                                await trace.emitToolStart(event.request_id, toolEvent.tool_call.id, {
+                                await trace.emitToolStart(normalizedEvent.request_id, toolEvent.tool_call.id, {
                                     tool_name: toolName,
                                     arguments: toolEvent.tool_call.function.arguments,
                                     arguments_formatted: toolEvent.tool_call.function.arguments_formatted,
@@ -179,7 +258,7 @@ export async function* ensembleRequest(
                         }
 
                         case 'tool_done': {
-                            const toolEvent = event as ToolEvent;
+                            const toolEvent = normalizedEvent as ToolEvent;
                             if (toolEvent.tool_call) {
                                 const toolName = toolEvent.tool_call.function.name;
                                 if (terminalToolNames.has(toolName) && !toolEvent.result?.error) {
@@ -197,7 +276,7 @@ export async function* ensembleRequest(
                         }
 
                         case 'agent_done': {
-                            const agentDoneEvent = event as any;
+                            const agentDoneEvent = normalizedEvent as any;
                             currentRoundRequestDuration = agentDoneEvent.request_duration;
                             currentRoundDurationWithTools = agentDoneEvent.duration_with_tools;
                             currentRoundRequestCost = agentDoneEvent.request_cost;
@@ -206,7 +285,10 @@ export async function* ensembleRequest(
 
                         case 'error': {
                             hasError = true;
-                            const errorEvent = event as any;
+                            const errorEvent = normalizedEvent as any;
+                            if (errorEvent.recoverable === false) {
+                                terminalErrorThisRound = true;
+                            }
                             if (errorEvent.error) {
                                 currentRoundErrors.push(String(errorEvent.error));
                             }
@@ -216,21 +298,27 @@ export async function* ensembleRequest(
                 }
             } catch (roundError) {
                 hasError = true;
+                terminalErrorThisRound = isTerminalRoundError(roundError);
                 const errorMessage = roundError instanceof Error ? roundError.message : String(roundError);
                 currentRoundErrors.push(errorMessage);
-                yield {
+                const roundErrorEvent = {
                     type: 'error',
                     request_id: currentRoundRequestId,
                     error: errorMessage,
-                    recoverable: true,
+                    recoverable: !terminalErrorThisRound,
                     timestamp: new Date().toISOString(),
                 } as ProviderStreamEvent;
+                if (terminalErrorThisRound) {
+                    deferredTerminalErrors.push(roundErrorEvent);
+                } else {
+                    yield roundErrorEvent;
+                }
             }
 
-            // A successful terminal tool call ends this turn immediately.
+            // A successful terminal tool call ends this turn immediately, but it must not
+            // erase any malformed-tool or stream errors that also occurred in the round.
             if (terminalToolSucceededThisRound) {
                 hasToolCalls = false;
-                hasError = false;
             }
 
             if (hasToolCalls) {
@@ -245,9 +333,18 @@ export async function* ensembleRequest(
                 ++errorRounds;
             }
 
-            const willRetryForError = hasError && errorRounds < MAX_ERROR_ATTEMPTS;
-            const willContinueForTools = hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls;
+            const willRetryForError = hasError && !terminalErrorThisRound && errorRounds < MAX_ERROR_ATTEMPTS;
+            const willContinueForTools =
+                !hasError && hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls;
             const willContinue = willRetryForError || willContinueForTools;
+
+            if (hasToolCalls && !willContinueForTools) {
+                if (toolCallRounds >= maxRounds) {
+                    currentRoundLimitError = `Tool call rounds limit reached (${maxRounds}).`;
+                } else if (totalToolCalls >= maxToolCalls) {
+                    currentRoundLimitError = `Tool call limit reached (${maxToolCalls}).`;
+                }
+            }
 
             let requestStatus = 'completed';
             if (hasError) {
@@ -255,6 +352,8 @@ export async function* ensembleRequest(
             } else if (hasToolCalls) {
                 requestStatus = willContinue ? 'waiting_for_followup_request' : 'tool_limit_reached';
             }
+
+            const requestStatusRequestId = lifecycleRequestId ?? currentRoundRequestId;
 
             if (currentRoundRequestId) {
                 await trace.emitRequestEnd(currentRoundRequestId, {
@@ -268,9 +367,51 @@ export async function* ensembleRequest(
                     request_cost: currentRoundRequestCost,
                 });
             }
+
+            if (hasError && requestStatusRequestId) {
+                yield createOperationStatusEvent({
+                    operation: 'request',
+                    status: willContinue ? 'retrying' : 'failed',
+                    request_id: requestStatusRequestId,
+                    error: currentRoundErrors.at(-1),
+                    reason: requestStatus,
+                    recoverable: willContinue,
+                    terminal: !willContinue,
+                    will_continue: willContinue,
+                    attempt: errorRounds,
+                    max_attempts: MAX_ERROR_ATTEMPTS,
+                }) as ProviderStreamEvent;
+            }
+
+            if (!hasError && requestStatusRequestId && currentRoundLimitError) {
+                yield createOperationStatusEvent({
+                    operation: 'request',
+                    status: 'failed',
+                    request_id: requestStatusRequestId,
+                    error: currentRoundLimitError,
+                    reason: requestStatus,
+                    recoverable: false,
+                    terminal: true,
+                    will_continue: false,
+                }) as ProviderStreamEvent;
+            }
+
+            for (const deferredTerminalError of deferredTerminalErrors) {
+                yield deferredTerminalError;
+            }
+
+            if (hasError && !willContinue) {
+                turnStatus = 'error';
+                turnEndReason = terminalErrorThisRound ? 'terminal_error' : 'max_error_attempts_reached';
+                turnError = currentRoundErrors.at(-1);
+            } else if (currentRoundLimitError) {
+                turnStatus = 'error';
+                turnEndReason = toolCallRounds >= maxRounds ? 'max_tool_call_rounds_reached' : 'max_tool_calls_reached';
+                turnError = currentRoundLimitError;
+            }
         } while (
-            (hasError && errorRounds < MAX_ERROR_ATTEMPTS) ||
-            (hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls)
+            (hasError && !terminalErrorThisRound && errorRounds < MAX_ERROR_ATTEMPTS) ||
+            (!hasError && hasToolCalls && toolCallRounds < maxRounds && totalToolCalls < maxToolCalls)
         );
 
         // If we hit limits, add a notification
@@ -285,19 +426,29 @@ export async function* ensembleRequest(
             turnEndReason = 'max_error_attempts_reached';
         }
 
-        // Perform verification if configured
-        if (agent?.verifier && lastMessageContent) {
-            const verificationResult = await performVerification(
+        // Perform verification only for otherwise successful turns.
+        if (turnStatus === 'completed' && agent?.verifier && lastMessageContent) {
+            const verificationResult = yield* performVerification(
                 agent,
                 lastMessageContent,
                 await history.getMessages()
             );
 
-            if (verificationResult) {
-                // Yield the verification result
-                for await (const event of verificationResult) {
-                    yield event;
-                }
+            if (!verificationResult.passed) {
+                turnStatus = 'error';
+                turnEndReason = 'verification_failed';
+                turnError = verificationResult.error;
+
+                yield createOperationStatusEvent({
+                    operation: 'request',
+                    status: 'failed',
+                    request_id: lifecycleRequestId ?? lastRoundRequestId,
+                    error: turnError,
+                    reason: 'verification_failed',
+                    recoverable: false,
+                    terminal: true,
+                    will_continue: false,
+                }) as ProviderStreamEvent;
             }
         }
     } catch (err) {
@@ -306,15 +457,35 @@ export async function* ensembleRequest(
         turnStatus = 'error';
         turnEndReason = 'exception';
         turnError = error.message || 'Unknown error';
-        yield {
-            type: 'error',
-            error: error.message || 'Unknown error',
+        yield createOperationStatusEvent({
+            operation: 'request',
+            status: 'failed',
+            request_id: lifecycleRequestId ?? lastRoundRequestId,
+            error: turnError,
+            reason: 'exception',
+            recoverable: false,
+            terminal: true,
+            will_continue: false,
+            max_attempts: MAX_ERROR_ATTEMPTS,
+        }) as ProviderStreamEvent;
+        yield toTerminalErrorEvent({
+            error: turnError,
             code: error.code,
             details: error.details,
             recoverable: error.recoverable,
-            timestamp: new Date().toISOString(),
-        } as ProviderStreamEvent;
+        }) as ProviderStreamEvent;
     } finally {
+        if (turnStatus === 'completed') {
+            yield createOperationStatusEvent({
+                operation: 'request',
+                status: 'completed',
+                request_id: lifecycleRequestId ?? lastRoundRequestId,
+                recoverable: false,
+                terminal: true,
+                will_continue: false,
+            }) as ProviderStreamEvent;
+        }
+
         await trace.emitTurnEnd(turnStatus, turnEndReason, {
             error: turnError,
             tool_call_rounds: toolCallRounds,
@@ -339,7 +510,8 @@ async function* executeRound(
     history: MessageHistory,
     currentToolCalls: number,
     maxToolCalls: number,
-    trace: TraceContext
+    trace: TraceContext,
+    emitStartedStatus: boolean
 ): AsyncGenerator<ProviderStreamEvent> {
     // Generate request ID and track timing
     const requestId = randomUUID();
@@ -373,6 +545,16 @@ async function* executeRound(
     // Also emit through global event controller
     await emitEvent(agentStartEvent, agent, model);
 
+    if (emitStartedStatus) {
+        yield createOperationStatusEvent({
+            operation: 'request',
+            status: 'started',
+            request_id: requestId,
+            will_continue: true,
+            terminal: false,
+        }) as ProviderStreamEvent;
+    }
+
     // Allow agent onRequest hook
     if (agent.onRequest) {
         [agent, messages] = await agent.onRequest(agent, messages);
@@ -396,12 +578,24 @@ async function* executeRound(
     });
 
     // Stream the response with retry support if available
-    const stream =
+    const rawStream: AsyncGenerator<ProviderStreamEvent> =
         'createResponseStreamWithRetry' in provider
             ? (provider as any).createResponseStreamWithRetry(messages, model, agent, requestId)
             : provider.createResponseStream(messages, model, agent, requestId);
+    const stream = streamWithAbortAndTimeout<ProviderStreamEvent>(rawStream, {
+        operationName: `Request generation for ${model}`,
+        abortSignal: agent.abortSignal,
+        timeoutMs: agent.modelSettings?.timeout_ms,
+    });
 
-    const toolPromises: Promise<ToolCallResult>[] = [];
+    type TrackedToolExecution = {
+        toolCall: ToolCall;
+        promise: Promise<ToolCallResult>;
+        settled: boolean;
+        result?: ToolCallResult;
+    };
+
+    const toolExecutions: TrackedToolExecution[] = [];
 
     // Map to store formatted arguments for each tool call
     const toolCallFormattedArgs = new Map<string, string>();
@@ -416,218 +610,310 @@ async function* executeRound(
         toolEventBuffer.push(event);
     };
 
-    for await (let event of stream) {
-        // Add request_id to all events from provider
-        event = { ...event, request_id: requestId };
-
-        // Handle tool_start events specially to add formatted arguments
-        if (event.type === 'tool_start') {
-            const toolEvent = event as ToolEvent;
-            if (toolEvent.tool_call) {
-                const toolCall = toolEvent.tool_call;
-
-                // Format arguments to match parameter order if possible
-                let argumentsFormatted: string | undefined;
-                try {
-                    // Find the tool definition to get parameter order
-                    const tool = agent.tools?.find(t => t.definition.function.name === toolCall.function.name);
-
-                    if (tool && 'definition' in tool && tool.definition.function.parameters.properties) {
-                        const parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
-                        if (typeof parsedArgs === 'object' && parsedArgs !== null && !Array.isArray(parsedArgs)) {
-                            // Get parameter names in the correct order
-                            const paramNames = Object.keys(tool.definition.function.parameters.properties);
-
-                            // Create ordered object
-                            const orderedArgs: Record<string, any> = {};
-                            for (const param of paramNames) {
-                                if (param in parsedArgs) {
-                                    orderedArgs[param] = parsedArgs[param];
-                                }
-                            }
-
-                            argumentsFormatted = JSON.stringify(orderedArgs, null, 2);
-                        }
-                    }
-                } catch (error) {
-                    // If formatting fails, we'll just use the original
-                    console.debug('Failed to format tool arguments:', error);
+    const structuredOutputSchema = agent.modelSettings?.json_schema?.strict === true
+        ? agent.modelSettings.json_schema.schema
+        : undefined;
+    let sawTerminalProviderEvent = false;
+    let sawTerminalProviderFailure = false;
+    const finalizeToolResults = async function* (mode: 'wait_all' | 'bounded_failure') {
+        if (mode === 'bounded_failure') {
+            const waitForPendingExecutions = async (executions: TrackedToolExecution[]) => {
+                if (executions.length === 0) {
+                    return;
                 }
 
-                // Store formatted arguments if we have them
-                if (argumentsFormatted) {
-                    toolCallFormattedArgs.set(toolCall.id, argumentsFormatted);
+                await Promise.race([
+                    Promise.all(executions.map(execution => execution.promise.then(() => undefined))),
+                    new Promise(resolve => setTimeout(resolve, TOOL_FAILURE_FINALIZATION_TIMEOUT_MS)),
+                ]);
+            };
+
+            await waitForPendingExecutions(toolExecutions.filter(execution => !execution.settled));
+
+            for (const execution of toolExecutions) {
+                if (execution.settled) {
+                    continue;
                 }
 
-                // Create a modified tool call with formatted arguments for the event
-                const modifiedEvent = {
-                    ...event,
-                    tool_call: {
-                        ...toolCall,
-                        function: {
-                            ...toolCall.function,
-                            arguments_formatted: argumentsFormatted,
-                        },
-                    },
-                };
+                const runningToolId = execution.toolCall.id || execution.toolCall.call_id;
+                if (runningToolId) {
+                    runningToolTracker.abortRunningTool(runningToolId);
+                }
+            }
 
-                // Update event to the modified one for further processing
-                event = modifiedEvent;
+            await waitForPendingExecutions(toolExecutions.filter(execution => !execution.settled));
+
+            for (const execution of toolExecutions) {
+                if (execution.settled) {
+                    continue;
+                }
+
+                execution.settled = true;
+                execution.result = createToolFinalizationFailureResult(execution.toolCall);
             }
         }
 
-        yield event;
+        const toolResults: ToolCallResult[] = mode === 'wait_all'
+            ? await Promise.all(toolExecutions.map(execution => execution.promise))
+            : toolExecutions.flatMap(execution => (execution.settled && execution.result ? [execution.result] : []));
+        const terminalToolNames = getTerminalToolNames(agent);
 
-        // Emit event through global event controller
-        await emitEvent(event, agent, model);
+        for (const toolResult of toolResults) {
+            const toolName = toolResult.toolCall.function.name;
+            const isTerminalTool = terminalToolNames.has(toolName);
 
-        // Handle different event types
-        switch (event.type) {
-            case 'cost_update': {
-                // Accumulate cost from cost_update events
-                const costEvent = event as any;
-                if (costEvent.usage?.cost) {
-                    totalCost += costEvent.usage.cost;
-                }
-                break;
-            }
+            const formattedArgs = toolCallFormattedArgs.get(toolResult.toolCall.id);
+            const toolCallWithFormattedArgs = formattedArgs
+                ? {
+                      ...toolResult.toolCall,
+                      function: {
+                          ...toolResult.toolCall.function,
+                          arguments_formatted: formattedArgs,
+                      },
+                  }
+                : toolResult.toolCall;
 
-            case 'message_complete': {
-                const messageEvent = event as MessageEventBase;
+            const toolDoneEvent: ProviderStreamEvent = {
+                type: 'tool_done',
+                request_id: requestId,
+                tool_call: toolCallWithFormattedArgs,
+                result: {
+                    call_id: toolResult.call_id || toolResult.id,
+                    output: toolResult.output,
+                    error: toolResult.error,
+                },
+            };
+            yield toolDoneEvent;
+            await emitEvent(toolDoneEvent, agent, model);
 
-                // Some providers emit assistant prefill/summary text in the same turn as tool_use.
-                // Persisting that assistant message after tool results can violate provider ordering
-                // constraints on follow-up requests (e.g. Claude requires next request to end on user
-                // tool_result after tool_use). Once a tool call has started in this round, ignore
-                // subsequent assistant message_complete payloads for history construction.
-                if (sawToolCallThisRound) {
-                    break;
-                }
+            if (!isTerminalTool) {
+                const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
 
-                if (
-                    messageEvent.thinking_content ||
-                    (!messageEvent.content && messageEvent.message_id) // Note that some providers require empty thinking nodes to be included in the conversation history
-                ) {
-                    const thinkingMessage = convertToThinkingMessage(messageEvent, model);
-
-                    if (agent.onThinking) {
-                        await agent.onThinking(thinkingMessage);
-                    }
-
-                    history.add(thinkingMessage);
-                    yield {
-                        type: 'response_output',
-                        message: thinkingMessage,
-                        request_id: requestId,
-                    };
-                }
-                if (messageEvent.content) {
-                    const contentMessage = convertToOutputMessage(messageEvent, model, 'completed');
-
-                    if (agent.onResponse) {
-                        await agent.onResponse(contentMessage);
-                    }
-
-                    history.add(contentMessage);
-                    yield {
-                        type: 'response_output',
-                        message: contentMessage,
-                        request_id: requestId,
-                    };
-                }
-                break;
-            }
-
-            case 'tool_start': {
-                const toolEvent = event as ToolEvent;
-                if (!toolEvent.tool_call) {
-                    break;
-                }
-                sawToolCallThisRound = true;
-
-                // Check if we'll exceed the limit
-                const remainingCalls = maxToolCalls - currentToolCalls;
-                if (remainingCalls <= 0) {
-                    console.warn(`Tool call limit reached (${maxToolCalls}). Skipping tool calls.`);
-                    // Don't count this as having tool calls if we're at the limit
-                    break;
-                }
-
-                const toolCall = toolEvent.tool_call;
-
-                // Add function call
-                const functionCall = convertToFunctionCall(toolCall, model, 'completed');
-
-                // Run tools in parallel
-                toolPromises.push(processToolCall(toolCall, agent));
-
-                history.add(functionCall);
-                yield {
+                history.add(functionOutput);
+                const functionOutputEvent: ProviderStreamEvent = {
                     type: 'response_output',
-                    message: functionCall,
+                    message: functionOutput,
                     request_id: requestId,
                 };
-                break;
-            }
-
-            case 'error': {
-                // Log errors but don't add them to messages
-                console.error('[executeRound] Error event:', truncateLargeValues((event as any).error));
-                break;
+                yield functionOutputEvent;
             }
         }
+
+        for (const bufferedEvent of toolEventBuffer) {
+            yield { ...bufferedEvent, request_id: requestId };
+        }
+    };
+
+    let streamFailure: unknown;
+
+    try {
+        for await (let event of stream) {
+            event = { ...event, request_id: requestId };
+
+            if (event.type === 'message_complete' && structuredOutputSchema) {
+                const messageEvent = event as MessageEventBase;
+                if (hasTerminalTextContent(messageEvent.content, true)) {
+                    const validationResult = validateJsonResponseContent(messageEvent.content, structuredOutputSchema);
+                    if (validationResult.ok === false) {
+                        event = toTerminalErrorEvent({
+                            request_id: requestId,
+                            error: validationResult.error,
+                        }) as ProviderStreamEvent;
+                    }
+                }
+            }
+
+            if (event.type === 'tool_start') {
+                const toolEvent = event as ToolEvent;
+                if (toolEvent.tool_call) {
+                    const toolCall = toolEvent.tool_call;
+
+                    let argumentsFormatted: string | undefined;
+                    try {
+                        const tool = agent.tools?.find(t => t.definition.function.name === toolCall.function.name);
+
+                        if (tool && 'definition' in tool && tool.definition.function.parameters.properties) {
+                            const parsedArgs = JSON.parse(toolCall.function.arguments || '{}');
+                            if (typeof parsedArgs === 'object' && parsedArgs !== null && !Array.isArray(parsedArgs)) {
+                                const paramNames = Object.keys(tool.definition.function.parameters.properties);
+
+                                const orderedArgs: Record<string, any> = {};
+                                for (const param of paramNames) {
+                                    if (param in parsedArgs) {
+                                        orderedArgs[param] = parsedArgs[param];
+                                    }
+                                }
+
+                                argumentsFormatted = JSON.stringify(orderedArgs, null, 2);
+                            }
+                        }
+                    } catch (error) {
+                        console.debug('Failed to format tool arguments:', error);
+                    }
+
+                    if (argumentsFormatted) {
+                        toolCallFormattedArgs.set(toolCall.id, argumentsFormatted);
+                    }
+
+                    event = {
+                        ...event,
+                        tool_call: {
+                            ...toolCall,
+                            function: {
+                                ...toolCall.function,
+                                arguments_formatted: argumentsFormatted,
+                            },
+                        },
+                    };
+                }
+            }
+
+            if (event.type === 'message_complete') {
+                const messageEvent = event as MessageEventBase;
+                if (hasTerminalTextContent(messageEvent.content, Boolean(structuredOutputSchema))) {
+                    sawTerminalProviderEvent = true;
+                }
+            } else if (event.type === 'tool_start' || event.type === 'file_complete' || event.type === 'error') {
+                sawTerminalProviderEvent = true;
+            }
+
+            if (
+                event.type === 'error' &&
+                ((event as any).recoverable === false || sawToolCallThisRound)
+            ) {
+                sawTerminalProviderFailure = true;
+            }
+
+            yield event;
+            await emitEvent(event, agent, model);
+
+            switch (event.type) {
+                case 'cost_update': {
+                    const costEvent = event as any;
+                    if (costEvent.usage?.cost) {
+                        totalCost += costEvent.usage.cost;
+                    }
+                    break;
+                }
+
+                case 'message_complete': {
+                    const messageEvent = event as MessageEventBase;
+                    if (sawToolCallThisRound) {
+                        break;
+                    }
+
+                    if (
+                        messageEvent.thinking_content ||
+                        (!messageEvent.content && messageEvent.message_id)
+                    ) {
+                        const thinkingMessage = convertToThinkingMessage(messageEvent, model);
+
+                        if (agent.onThinking) {
+                            await agent.onThinking(thinkingMessage);
+                        }
+
+                        history.add(thinkingMessage);
+                        yield {
+                            type: 'response_output',
+                            message: thinkingMessage,
+                            request_id: requestId,
+                        };
+                    }
+                    if (hasTerminalTextContent(messageEvent.content, Boolean(structuredOutputSchema))) {
+                        const contentMessage = convertToOutputMessage(messageEvent, model, 'completed');
+
+                        if (agent.onResponse) {
+                            await agent.onResponse(contentMessage);
+                        }
+
+                        history.add(contentMessage);
+                        yield {
+                            type: 'response_output',
+                            message: contentMessage,
+                            request_id: requestId,
+                        };
+                    }
+                    break;
+                }
+
+                case 'tool_start': {
+                    const toolEvent = event as ToolEvent;
+                    if (!toolEvent.tool_call) {
+                        break;
+                    }
+                    sawToolCallThisRound = true;
+
+                    const remainingCalls = maxToolCalls - currentToolCalls;
+                    if (remainingCalls <= 0) {
+                        console.warn(`Tool call limit reached (${maxToolCalls}). Skipping tool calls.`);
+                        break;
+                    }
+
+                    const toolCall = toolEvent.tool_call;
+                    const functionCall = convertToFunctionCall(toolCall, model, 'completed');
+
+                    const trackedExecution: TrackedToolExecution = {
+                        toolCall,
+                        promise: processToolCall(toolCall, agent),
+                        settled: false,
+                    };
+                    trackedExecution.promise = trackedExecution.promise.then(
+                        result => {
+                    if (!trackedExecution.settled) {
+                        trackedExecution.settled = true;
+                        trackedExecution.result = result;
+                    }
+                    return trackedExecution.result ?? result;
+                },
+                error => {
+                    const result = createToolFailureResult(toolCall, error);
+                    if (!trackedExecution.settled) {
+                        trackedExecution.settled = true;
+                        trackedExecution.result = result;
+                    }
+                    return trackedExecution.result ?? result;
+                }
+            );
+            toolExecutions.push(trackedExecution);
+
+                    history.add(functionCall);
+                    yield {
+                        type: 'response_output',
+                        message: functionCall,
+                        request_id: requestId,
+                    };
+                    break;
+                }
+
+                case 'error': {
+                    console.error('[executeRound] Error event:', truncateLargeValues((event as any).error));
+                    break;
+                }
+            }
+        }
+    } catch (error) {
+        streamFailure = error;
+    }
+
+    if (!sawTerminalProviderEvent && streamFailure === undefined) {
+        const emptyResponseError = toTerminalErrorEvent({
+            request_id: requestId,
+            error: `Provider ${provider.provider_id} ended the stream without any terminal content, tool calls, files, or errors.`,
+        }) as ProviderStreamEvent;
+        yield emptyResponseError;
+        await emitEvent(emptyResponseError, agent, model);
     }
 
     // Calculate request duration
     const request_duration = Date.now() - startTime;
 
-    // Complete then process any tool calls
-    const toolResults: ToolCallResult[] = await Promise.all(toolPromises);
-    const terminalToolNames = getTerminalToolNames(agent);
+    const shouldUseBoundedFailureFinalization =
+        sawTerminalProviderFailure || (streamFailure !== undefined && isTerminalRoundError(streamFailure));
 
-    for (const toolResult of toolResults) {
-        const toolName = toolResult.toolCall.function.name;
-        const isTerminalTool = terminalToolNames.has(toolName);
+    yield* finalizeToolResults(shouldUseBoundedFailureFinalization ? 'bounded_failure' : 'wait_all');
 
-        // Get the formatted arguments if we stored them
-        const formattedArgs = toolCallFormattedArgs.get(toolResult.toolCall.id);
-
-        // Create tool call with formatted arguments
-        const toolCallWithFormattedArgs = formattedArgs
-            ? {
-                  ...toolResult.toolCall,
-                  function: {
-                      ...toolResult.toolCall.function,
-                      arguments_formatted: formattedArgs,
-                  },
-              }
-            : toolResult.toolCall;
-
-        const toolDoneEvent: ProviderStreamEvent = {
-            type: 'tool_done',
-            request_id: requestId,
-            tool_call: toolCallWithFormattedArgs,
-            result: {
-                call_id: toolResult.call_id || toolResult.id,
-                output: toolResult.output,
-                error: toolResult.error,
-            },
-        };
-        yield toolDoneEvent;
-        // Emit tool done event through global event controller
-        await emitEvent(toolDoneEvent, agent, model);
-
-        // For terminal tools, don't add output to history or send it back to the model.
-        if (!isTerminalTool) {
-            const functionOutput = convertToFunctionCallOutput(toolResult, model, 'completed');
-
-            history.add(functionOutput);
-            yield {
-                type: 'response_output',
-                message: functionOutput,
-                request_id: requestId,
-            };
-        }
+    if (streamFailure !== undefined) {
+        throw streamFailure;
     }
 
     // Calculate full duration
@@ -648,11 +934,6 @@ async function* executeRound(
 
     // Also emit through global event controller
     await emitEvent(agentDoneEvent, agent, model);
-
-    // Yield any events that were buffered during tool execution
-    for (const bufferedEvent of toolEventBuffer) {
-        yield { ...bufferedEvent, request_id: requestId };
-    }
 }
 
 /**
@@ -663,8 +944,10 @@ async function* performVerification(
     output: string,
     messages: ResponseInput,
     attempt: number = 0
-): AsyncGenerator<ProviderStreamEvent> {
-    if (!agent.verifier) return;
+): AsyncGenerator<ProviderStreamEvent, { passed: boolean; error?: string }, void> {
+    if (!agent.verifier) {
+        return { passed: true };
+    }
 
     const maxAttempts = agent.maxVerificationAttempts || 2;
 
@@ -677,7 +960,7 @@ async function* performVerification(
             type: 'message_delta',
             content: '\n\n✓ Output verified',
         } as ProviderStreamEvent;
-        return;
+        return { passed: true };
     }
 
     // Verification failed
@@ -723,14 +1006,25 @@ async function* performVerification(
 
         // Verify the retry
         if (retryOutput) {
-            yield* performVerification(agent, retryOutput, messages, attempt + 1);
+            return yield* performVerification(agent, retryOutput, messages, attempt + 1);
         }
+
+        return {
+            passed: false,
+            error: 'Verification retry did not produce a final response.',
+        };
     } else {
         // Max attempts reached
+        const failureMessage = `Verification failed after ${maxAttempts} attempts: ${verification.reason}`;
         yield {
             type: 'message_delta',
-            content: `\n\n❌ Verification failed after ${maxAttempts} attempts: ${verification.reason}`,
+            content: `\n\n❌ ${failureMessage}`,
         } as ProviderStreamEvent;
+
+        return {
+            passed: false,
+            error: failureMessage,
+        };
     }
 }
 
@@ -740,13 +1034,13 @@ async function* performVerification(
 async function processToolCall(toolCall: ToolCall, agent: AgentDefinition): Promise<ToolCallResult> {
     // Process all tool calls in parallel
 
-    // Apply tool handler lifecycle if available
-    if (agent.onToolCall) {
-        await agent.onToolCall(toolCall);
-    }
-
     // Execute tool
     try {
+        // Apply tool handler lifecycle if available
+        if (agent.onToolCall) {
+            await agent.onToolCall(toolCall);
+        }
+
         if (!agent.tools) {
             throw new Error('No tools available for agent');
         }
@@ -778,25 +1072,39 @@ async function processToolCall(toolCall: ToolCall, agent: AgentDefinition): Prom
 
         return toolCallResult;
     } catch (error) {
-        // Handle tool error
-        const errorOutput =
-            error instanceof Error
-                ? `Tool execution failed: ${error.message}`
-                : `Tool execution failed: ${String(error)}`;
-
-        const toolCallResult: ToolCallResult = {
-            toolCall,
-            id: toolCall.id,
-            call_id: toolCall.call_id || toolCall.id,
-            error: errorOutput,
-        };
+        const toolCallResult = createToolFailureResult(toolCall, error);
 
         if (agent.onToolError) {
-            await agent.onToolError(toolCallResult);
+            try {
+                await agent.onToolError(toolCallResult);
+            } catch (hookError) {
+                console.error('[processToolCall] onToolError hook failed:', hookError);
+            }
         }
 
         return toolCallResult;
     }
+}
+
+function createToolFailureResult(toolCall: ToolCall, error: unknown): ToolCallResult {
+    const errorOutput =
+        error instanceof Error
+            ? `Tool execution failed: ${error.message}`
+            : `Tool execution failed: ${String(error)}`;
+
+    return {
+        toolCall,
+        id: toolCall.id,
+        call_id: toolCall.call_id || toolCall.id,
+        error: errorOutput,
+    };
+}
+
+function createToolFinalizationFailureResult(toolCall: ToolCall): ToolCallResult {
+    return createToolFailureResult(
+        toolCall,
+        'Tool did not finish before request finalization after a provider failure.'
+    );
 }
 
 /**

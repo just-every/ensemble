@@ -63,24 +63,54 @@ function requiresReasoning(modelName: string): boolean {
  * This includes adding required fields, setting additionalProperties: false,
  * and removing unsupported keywords
  */
-function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
+function deriveRequiredProperties(
+    sourceSchema: any,
+    propertyNames: string[],
+    mode: 'tool_parameters' | 'json_schema'
+) {
+    if (!sourceSchema?.properties || typeof sourceSchema.properties !== 'object') {
+        return undefined;
+    }
+
+    if (mode === 'tool_parameters') {
+        if (Array.isArray(sourceSchema.required)) {
+            const explicitlyRequired = new Set(sourceSchema.required);
+            return propertyNames.filter(name => explicitlyRequired.has(name));
+        }
+
+        return propertyNames.filter(name => sourceSchema.properties?.[name]?.optional !== true);
+    }
+
+    return propertyNames;
+}
+
+function processSchemaForOpenAI(
+    schema: any,
+    originalProperties?: any,
+    mode: 'tool_parameters' | 'json_schema' = 'tool_parameters'
+): any {
     // Clone schema to avoid modifying the original
     const processedSchema = JSON.parse(JSON.stringify(schema));
 
     // Recursively process the schema for OpenAI compatibility
-    const processSchemaRecursively = (schema: any) => {
-        if (!schema || typeof schema !== 'object') return;
+    const processSchemaRecursively = (currentSchema: any, sourceSchema?: any) => {
+        if (!currentSchema || typeof currentSchema !== 'object') return;
 
         // 1. Remove 'optional: true' flag
-        if (schema.optional === true) {
-            delete schema.optional;
+        if (currentSchema.optional === true) {
+            delete currentSchema.optional;
         }
 
         // 2. Convert 'oneOf' to 'anyOf'
-        if (Array.isArray(schema.oneOf)) {
-            schema.anyOf = schema.oneOf;
-            delete schema.oneOf;
+        if (Array.isArray(currentSchema.oneOf)) {
+            currentSchema.anyOf = currentSchema.oneOf;
+            delete currentSchema.oneOf;
         }
+
+        const variantSourceSchemas = {
+            anyOf: sourceSchema?.anyOf ?? sourceSchema?.oneOf,
+            allOf: sourceSchema?.allOf,
+        };
 
         // 3. Remove OpenAI-incompatible validation keywords
         const unsupportedKeywords = [
@@ -106,35 +136,41 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
             'default', // Remove default values as OpenAI doesn't support them
         ];
         unsupportedKeywords.forEach(keyword => {
-            if (schema[keyword] !== undefined) {
-                delete schema[keyword];
+            if (currentSchema[keyword] !== undefined) {
+                delete currentSchema[keyword];
             }
         });
 
         // Detect if it's an object-like schema
-        const isObject = schema.type === 'object' || (schema.type === undefined && schema.properties !== undefined);
+        const isObject =
+            currentSchema.type === 'object' ||
+            (currentSchema.type === undefined && currentSchema.properties !== undefined);
 
         // 4. Recurse into nested structures first
         // Process variants (anyOf, allOf)
         for (const key of ['anyOf', 'allOf'] as const) {
-            if (Array.isArray(schema[key])) {
-                schema[key].forEach((variantSchema: any) => processSchemaRecursively(variantSchema));
+            if (Array.isArray(currentSchema[key])) {
+                currentSchema[key].forEach((variantSchema: any, index: number) =>
+                    processSchemaRecursively(variantSchema, variantSourceSchemas[key]?.[index])
+                );
             }
         }
         // Process properties
-        if (isObject && schema.properties) {
-            for (const propName in schema.properties) {
-                processSchemaRecursively(schema.properties[propName]);
+        if (isObject && currentSchema.properties) {
+            for (const propName in currentSchema.properties) {
+                processSchemaRecursively(currentSchema.properties[propName], sourceSchema?.properties?.[propName]);
             }
         }
         // Process array items
-        if (schema.type === 'array' && schema.items !== undefined) {
-            if (Array.isArray(schema.items)) {
+        if (currentSchema.type === 'array' && currentSchema.items !== undefined) {
+            if (Array.isArray(currentSchema.items)) {
                 // Tuple validation
-                schema.items.forEach((itemSchema: any) => processSchemaRecursively(itemSchema));
-            } else if (typeof schema.items === 'object') {
+                currentSchema.items.forEach((itemSchema: any, index: number) =>
+                    processSchemaRecursively(itemSchema, sourceSchema?.items?.[index])
+                );
+            } else if (typeof currentSchema.items === 'object') {
                 // Single schema for all items
-                processSchemaRecursively(schema.items);
+                processSchemaRecursively(currentSchema.items, sourceSchema?.items);
             }
         }
 
@@ -142,45 +178,42 @@ function processSchemaForOpenAI(schema: any, originalProperties?: any): any {
         if (isObject) {
             // Always set additionalProperties: false for objects (required by OpenAI in strict mode)
             // This is necessary even for objects without properties
-            schema.additionalProperties = false;
+            currentSchema.additionalProperties = false;
 
             // Set 'required' array to include all current properties (required by OpenAI for strict mode)
-            if (schema.properties) {
-                const currentRequired = Object.keys(schema.properties);
+            if (currentSchema.properties) {
+                const currentRequired = deriveRequiredProperties(
+                    sourceSchema,
+                    Object.keys(currentSchema.properties),
+                    mode
+                );
                 // Only add required array if there are properties to require
-                if (currentRequired.length > 0) {
-                    schema.required = currentRequired;
+                if (currentRequired && currentRequired.length > 0) {
+                    currentSchema.required = currentRequired;
                 } else {
                     // If properties is an empty object {}, remove required
-                    delete schema.required;
+                    delete currentSchema.required;
                 }
             } else {
                 // If no properties field, remove required
-                delete schema.required;
+                delete currentSchema.required;
             }
         }
     };
 
     // Apply the recursive processing to the cloned schema
-    processSchemaRecursively(processedSchema);
+    processSchemaRecursively(processedSchema, schema);
 
-    // If original properties were provided (for tools), fix the top-level 'required' array
-    if (originalProperties) {
-        // AFTER recursion, fix the top-level 'required' array based on the ORIGINAL properties.
-        // This ensures top-level optional parameters are correctly handled, overriding the
-        // potentially stricter 'required' array set during recursion for the top-level object.
-        const topLevelRequired: string[] = [];
-        for (const propName in originalProperties) {
-            // Check the *original* property definition for the optional flag
-            if (!originalProperties[propName].optional) {
-                topLevelRequired.push(propName);
-            }
-        }
-        // Set the correct top-level required array on the processed schema
-        if (topLevelRequired.length > 0) {
+    // For tools, preserve caller-specified required subsets and optional flags at the top level.
+    if (mode === 'tool_parameters' && originalProperties && !Array.isArray(schema?.required)) {
+        const topLevelRequired = deriveRequiredProperties(
+            { properties: originalProperties, required: schema?.required },
+            Object.keys(originalProperties),
+            mode
+        );
+        if (topLevelRequired && topLevelRequired.length > 0) {
             processedSchema.required = topLevelRequired;
         } else {
-            // Ensure the top-level object has no required array if no properties were originally required
             delete processedSchema.required;
         }
     }
@@ -524,7 +557,10 @@ export class OpenAIProvider extends BaseModelProvider {
         try {
             // Extract options with defaults, mapping to the original function parameters
             model = model || 'gpt-image-1.5';
-            const number_of_images = opts?.n || 1;
+            const number_of_images = opts?.n ?? 1;
+            if (!Number.isInteger(number_of_images) || number_of_images < 1) {
+                throw new Error('[OpenAI] ImageGenerationOpts.n must be a positive integer.');
+            }
 
             // Map quality options
             let quality: 'low' | 'medium' | 'high' | 'auto' = 'auto';
@@ -599,6 +635,11 @@ export class OpenAIProvider extends BaseModelProvider {
                     if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
                         // Handle URL case - fetch the image
                         const imageResponse = await fetch(imageData);
+                        if (!imageResponse.ok) {
+                            throw new Error(
+                                `[OpenAI] Failed to fetch source image: ${imageResponse.status} ${imageResponse.statusText}`
+                            );
+                        }
                         const imageBuffer = await imageResponse.arrayBuffer();
                         const ct = imageResponse.headers.get('content-type') || 'image/png';
 
@@ -731,6 +772,10 @@ export class OpenAIProvider extends BaseModelProvider {
             }
 
             // Extract the base64 image data for all images
+            if (!Array.isArray(response.data)) {
+                throw new Error('OpenAI image response did not include a data array');
+            }
+
             const imageDataUrls = response.data.map(item => {
                 const imageData = item?.b64_json;
                 if (!imageData) {
@@ -1349,7 +1394,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 requestParams.text = {
                     format: {
                         ...wrapperWithoutSchema, // name, type:'json_schema', etc.
-                        schema: processSchemaForOpenAI(schema),
+                        schema: processSchemaForOpenAI(schema, undefined, 'json_schema'),
                     },
                 };
             }
@@ -1729,16 +1774,19 @@ export class OpenAIProvider extends BaseModelProvider {
                 // Clean up: Check if any tool calls were started but not completed
                 if (toolCallStates.size > 0) {
                     console.warn(`Stream ended with ${toolCallStates.size} incomplete tool call(s).`);
-                    for (const [, toolCall] of toolCallStates.entries()) {
-                        // Optionally yield incomplete tool calls if appropriate for your application
-                        if (toolCall.function.name) {
-                            // Check if it was minimally valid
-                            yield {
-                                type: 'tool_start', // Or maybe 'tool_incomplete'?
-                                tool_call: toolCall as ToolCall,
-                            };
-                        }
-                    }
+                    const incompleteToolNames = Array.from(toolCallStates.values())
+                        .map(toolCall => toolCall.function.name)
+                        .filter((name): name is string => typeof name === 'string' && name.length > 0);
+                    const errorMessage =
+                        incompleteToolNames.length > 0
+                            ? `OpenAI response ended with incomplete tool call arguments for: ${incompleteToolNames.join(', ')}`
+                            : 'OpenAI response ended with incomplete tool call arguments.';
+                    log_llm_error(requestId, errorMessage);
+                    yield {
+                        type: 'error',
+                        error: errorMessage,
+                        recoverable: false,
+                    };
                     toolCallStates.clear(); // Clear the map
                 }
                 // Flush any buffered d
