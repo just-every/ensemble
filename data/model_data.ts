@@ -207,6 +207,7 @@ export const MODEL_CLASSES = {
         models: [
             // One top pick per image provider
             'gpt-image-2', // OpenAI
+            'codex-gpt-image-2', // Codex CLI
             'gemini-3-pro-image-preview', // Google
             'seedream-4', // ByteDance
             'luma-photon-1', // Luma
@@ -2402,6 +2403,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
 
     // Image generation models
+    {
+        id: 'codex-gpt-image-2',
+        provider: 'codex',
+        cost: {
+            per_image: 0,
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            'Codex CLI built-in image generation and editing through $imagegen, backed by gpt-image-2 and billed through Codex usage rather than the OpenAI API.',
+    },
     {
         id: 'gpt-image-2',
         aliases: ['gpt-image-2-2026-04-21'],

@@ -5,18 +5,38 @@ import path from 'path';
 import { BaseModelProvider } from './base_provider.js';
 import {
     AgentDefinition,
+    ImageGenerationOpts,
     ModelSettings,
     ProviderStreamEvent,
-    ResponseContent,
     ResponseInput,
     ResponseInputItem,
 } from '../types/types.js';
+import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
+import {
+    CodexImageAttachmentWriter,
+    listCodexGeneratedImages,
+    newestFirst,
+    readGeneratedCodexImages,
+} from './codex_assets.js';
 
 type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 type CodexReasoningEffortInput = 'none' | 'minimal' | CodexReasoningEffort;
 
 const CODEX_MODEL_PREFIX = 'codex-';
+const CODEX_GPT_IMAGE_MODEL = 'codex-gpt-image-2';
+const CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA = {
+    type: 'object',
+    properties: {
+        images: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+        },
+    },
+    required: ['images'],
+    additionalProperties: false,
+};
 const CODEX_DISABLED_FEATURES = [
     'plugins',
     'apps',
@@ -106,61 +126,59 @@ function resolveCodexHome(settings?: ModelSettings): string {
     return path.join(homedir(), '.codex_zemaj');
 }
 
-function requireTextContent(content: ResponseContent, context: string): string {
-    if (typeof content === 'string') {
-        return content;
-    }
-
-    const textParts: string[] = [];
-    for (const part of content) {
-        if (part.type !== 'input_text') {
-            throw new Error(`Codex provider v1 only supports text content; ${context} contains ${part.type}.`);
-        }
-        textParts.push(part.text);
-    }
-    return textParts.join('\n');
-}
-
-function serializeMessageForCodex(message: ResponseInputItem): { instruction?: string; prompt?: string } {
+async function serializeMessageForCodex(
+    message: ResponseInputItem,
+    imageWriter: CodexImageAttachmentWriter
+): Promise<{ instruction?: string; prompt?: string; images: string[] }> {
     if (message.type === 'message') {
-        const content = requireTextContent(message.content, `${message.role} message`);
+        const { text: content, images } = await imageWriter.collectContent(message.content, `${message.role} message`);
         if (message.role === 'system' || message.role === 'developer') {
-            return { instruction: content };
+            return { instruction: content, images };
         }
-        return { prompt: `${message.role.toUpperCase()}:\n${content}` };
+        return { prompt: `${message.role.toUpperCase()}:\n${content}`, images };
     }
 
     if (message.type === 'thinking') {
+        const { text: content, images } = await imageWriter.collectContent(message.content, 'thinking message');
         return {
-            prompt: `ASSISTANT THINKING SUMMARY:\n${requireTextContent(message.content, 'thinking message')}`,
+            prompt: `ASSISTANT THINKING SUMMARY:\n${content}`,
+            images,
         };
     }
 
     if (message.type === 'function_call') {
         return {
             prompt: `ASSISTANT TOOL CALL ${message.name}:\n${message.arguments}`,
+            images: [],
         };
     }
 
     if (message.type === 'function_call_output') {
         return {
             prompt: `TOOL OUTPUT ${message.name ?? message.call_id}:\n${message.output}`,
+            images: [],
         };
     }
 
-    return { prompt: JSON.stringify(message) };
+    return { prompt: JSON.stringify(message), images: [] };
 }
 
-function buildCodexInput(messages: ResponseInput, agent: AgentDefinition): { instructions: string; prompt: string } {
+async function buildCodexInput(
+    messages: ResponseInput,
+    agent: AgentDefinition,
+    imageWriter: CodexImageAttachmentWriter
+): Promise<{ instructions: string; prompt: string; images: string[] }> {
     const instructions: string[] = [];
     const prompt: string[] = [];
+    const images: string[] = [];
 
     if (agent.instructions?.trim()) {
         instructions.push(agent.instructions.trim());
     }
 
     for (const message of messages) {
-        const serialized = serializeMessageForCodex(message);
+        const serialized = await serializeMessageForCodex(message, imageWriter);
+        images.push(...serialized.images);
         if (serialized.instruction?.trim()) {
             instructions.push(serialized.instruction.trim());
         }
@@ -172,6 +190,7 @@ function buildCodexInput(messages: ResponseInput, agent: AgentDefinition): { ins
     return {
         instructions: instructions.join('\n\n'),
         prompt: prompt.length > 0 ? prompt.join('\n\n') : 'Please proceed.',
+        images,
     };
 }
 
@@ -204,6 +223,10 @@ function createAbortError(): Error & { code?: string } {
     const error = new Error('Codex CLI request aborted.') as Error & { code?: string };
     error.code = 'ABORT_ERR';
     return error;
+}
+
+function isBrokenPipeError(error: unknown): boolean {
+    return error instanceof Error && (error as NodeJS.ErrnoException).code === 'EPIPE';
 }
 
 async function runCodexExec(options: {
@@ -260,6 +283,24 @@ async function runCodexExec(options: {
         child.stderr?.on('data', chunk => {
             stderr += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
         });
+        child.stdout?.once('error', error => {
+            if (isBrokenPipeError(error)) {
+                return;
+            }
+            finish(error);
+        });
+        child.stderr?.once('error', error => {
+            if (isBrokenPipeError(error)) {
+                return;
+            }
+            finish(error);
+        });
+        child.stdin?.once('error', error => {
+            if (isBrokenPipeError(error)) {
+                return;
+            }
+            finish(error);
+        });
 
         child.once('error', error => {
             finish(error);
@@ -278,10 +319,22 @@ async function runCodexExec(options: {
             finish();
         });
 
-        child.stdin?.end(options.prompt);
+        try {
+            child.stdin?.end(options.prompt);
+        } catch (error) {
+            if (!isBrokenPipeError(error)) {
+                finish(error instanceof Error ? error : new Error(String(error)));
+            }
+        }
     });
 
     return { stdout, stderr };
+}
+
+function disabledFeatureArgs(allowImageGeneration = false): string[] {
+    return CODEX_DISABLED_FEATURES.filter(feature => !(allowImageGeneration && feature === 'image_generation')).flatMap(
+        feature => ['--disable', feature]
+    );
 }
 
 async function executeCodexRequest(
@@ -298,14 +351,18 @@ async function executeCodexRequest(
     const { model: codexModel, effort } = resolveCodexModel(model, settings);
     const codexHome = resolveCodexHome(settings);
     const cwd = agent.cwd || process.cwd();
-    const { instructions, prompt } = buildCodexInput(messages, agent);
     const tempDir = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-'));
+    const imageWriter = new CodexImageAttachmentWriter(tempDir, cwd);
+    const { instructions, prompt, images } = await buildCodexInput(messages, agent, imageWriter);
+    const hasInstructions = instructions.trim().length > 0;
     const instructionsPath = path.join(tempDir, 'instructions.md');
     const lastMessagePath = path.join(tempDir, 'last-message.json');
     const schemaPath = settings?.json_schema?.schema ? path.join(tempDir, 'schema.json') : undefined;
 
     try {
-        await writeFile(instructionsPath, instructions, 'utf8');
+        if (hasInstructions) {
+            await writeFile(instructionsPath, instructions, 'utf8');
+        }
         if (schemaPath) {
             await writeFile(schemaPath, JSON.stringify(settings!.json_schema!.schema, null, 2), 'utf8');
         }
@@ -315,14 +372,14 @@ async function executeCodexRequest(
             '--ephemeral',
             '--ignore-user-config',
             '--ignore-rules',
-            ...CODEX_DISABLED_FEATURES.flatMap(feature => ['--disable', feature]),
+            ...disabledFeatureArgs(),
             '-m',
             codexModel,
             '-c',
             `model_reasoning_effort=${JSON.stringify(effort)}`,
-            '-c',
-            `model_instructions_file=${JSON.stringify(instructionsPath)}`,
+            ...(hasInstructions ? ['-c', `model_instructions_file=${JSON.stringify(instructionsPath)}`] : []),
             ...(schemaPath ? ['--output-schema', schemaPath] : []),
+            ...(images.length > 0 ? ['--image', images.join(',')] : []),
             '--output-last-message',
             lastMessagePath,
             '--cd',
@@ -339,6 +396,7 @@ async function executeCodexRequest(
                 args: commandArgs,
                 cwd,
                 prompt,
+                images,
                 schema: settings?.json_schema?.schema,
             },
             new Date(),
@@ -380,6 +438,117 @@ async function executeCodexRequest(
     }
 }
 
+function buildCodexImagePrompt(prompt: string, opts: ImageGenerationOpts = {}): string {
+    const count = opts.n && opts.n > 0 ? Math.floor(opts.n) : 1;
+    const details = [
+        '$imagegen',
+        `Generate ${count} image${count === 1 ? '' : 's'} for this request.`,
+        opts.source_images ? 'Use the attached image input(s) as reference material for the generation or edit.' : undefined,
+        opts.size ? `Requested size or aspect ratio: ${opts.size}.` : undefined,
+        opts.quality ? `Requested quality: ${opts.quality}.` : undefined,
+        opts.background ? `Requested background: ${opts.background}.` : undefined,
+        opts.input_fidelity ? `Requested input fidelity: ${opts.input_fidelity}.` : undefined,
+        'Return only JSON matching the supplied schema. The images array must contain generated image file paths, data URLs, or HTTPS URLs.',
+        '',
+        prompt,
+    ].filter(Boolean);
+
+    return details.join('\n');
+}
+
+async function executeCodexImageGeneration(
+    prompt: string,
+    model: string,
+    agent: AgentDefinition,
+    opts: ImageGenerationOpts = {}
+): Promise<string[]> {
+    if (model !== CODEX_GPT_IMAGE_MODEL) {
+        throw new Error(`Codex image generation only supports ${CODEX_GPT_IMAGE_MODEL}.`);
+    }
+    if (opts.mask) {
+        throw new Error('Codex image generation does not support mask inputs through Ensemble.');
+    }
+
+    const settings = agent.modelSettings;
+    const codexHome = resolveCodexHome(settings);
+    const cwd = agent.cwd || process.cwd();
+    const tempDir = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-'));
+    const imageWriter = new CodexImageAttachmentWriter(tempDir, cwd);
+    const lastMessagePath = path.join(tempDir, 'last-message.json');
+    const schemaPath = path.join(tempDir, 'image-output-schema.json');
+
+    try {
+        const images = await imageWriter.materializeSourceImages(opts.source_images);
+        await writeFile(schemaPath, JSON.stringify(CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA, null, 2), 'utf8');
+
+        const beforeGeneratedImages = new Set(await listCodexGeneratedImages(codexHome));
+        const commandArgs = [
+            'exec',
+            '--ephemeral',
+            '--ignore-user-config',
+            '--ignore-rules',
+            ...disabledFeatureArgs(true),
+            '--output-schema',
+            schemaPath,
+            ...(images.length > 0 ? ['--image', images.join(',')] : []),
+            '--output-last-message',
+            lastMessagePath,
+            '--cd',
+            cwd,
+            '-',
+        ];
+        const codexPrompt = buildCodexImagePrompt(prompt, opts);
+        const loggedRequestId = log_llm_request(
+            agent.agent_id || 'default',
+            'codex',
+            model,
+            {
+                command: 'codex',
+                args: commandArgs,
+                cwd,
+                prompt: codexPrompt,
+                images,
+                schema: CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA,
+            },
+            new Date(),
+            opts.request_id,
+            agent.tags
+        );
+
+        await runCodexExec({
+            commandArgs,
+            cwd,
+            env: {
+                ...process.env,
+                CODEX_HOME: codexHome,
+            },
+            prompt: codexPrompt,
+            abortSignal: agent.abortSignal,
+        });
+
+        const rawLastMessage = await readFile(lastMessagePath, 'utf8');
+        const afterGeneratedImages = await listCodexGeneratedImages(codexHome);
+        const newGeneratedImages = await newestFirst(afterGeneratedImages.filter(filePath => !beforeGeneratedImages.has(filePath)));
+        const generatedImages = await readGeneratedCodexImages(rawLastMessage, cwd, newGeneratedImages);
+        log_llm_response(loggedRequestId, { image_count: generatedImages.length, images: generatedImages });
+        costTracker.addUsage({
+            model,
+            image_count: generatedImages.length,
+            request_id: opts.request_id,
+            metadata: {
+                source: 'codex',
+                billing: 'codex_usage',
+            },
+        });
+        return generatedImages;
+    } catch (error) {
+        log_llm_error(opts.request_id, error);
+        throw error;
+    } finally {
+        await rm(tempDir, { recursive: true, force: true });
+    }
+}
+
 export class CodexProvider extends BaseModelProvider {
     constructor() {
         super('codex');
@@ -413,6 +582,15 @@ export class CodexProvider extends BaseModelProvider {
                 recoverable: false,
             };
         }
+    }
+
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
+        return executeCodexImageGeneration(prompt, model, agent, opts);
     }
 }
 
