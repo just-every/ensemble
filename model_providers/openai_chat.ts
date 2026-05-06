@@ -22,7 +22,8 @@ import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { ModelProviderID } from '../data/model_data.js'; // Adjust path as needed
-import { appendMessageWithImage, normalizeImageDataUrl, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
+import { mapOpenAIChatImageDetail } from '../utils/image_detail.js';
 // import { convertImageToTextIfNeeded } from '../utils/image_to_text.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
@@ -149,8 +150,7 @@ async function convertToOpenAITools(tools: ToolFunction[]): Promise<OpenAI.Chat.
 }
 
 /**
- * Processes images and adds them to the input array for OpenAI
- * Resizes images to max 1024px width and splits into sections if height > 768px
+ * Processes extracted images and adds them to the input array for OpenAI.
  *
  * @param input - The input array to add images to
  * @param images - Record of image IDs to base64 image data
@@ -164,62 +164,21 @@ export async function addImagesToInput(
 ): Promise<OpenAI.Chat.Completions.ChatCompletionMessageParam[]> {
     // Add developer messages for each image
     for (const [image_id, imageData] of Object.entries(images)) {
-        try {
-            // Resize and split the image if needed
-            const processedImages = await resizeAndSplitForOpenAI(imageData);
-
-            // Create a content array for the message
-            const messageContent = [];
-
-            // Add description text first
-            if (processedImages.length === 1) {
-                // Single image (no splitting needed)
-                messageContent.push({
+        input.push({
+            role: 'user',
+            content: [
+                {
                     type: 'text',
                     text: `[image #${image_id}] from the ${source}`,
-                });
-            } else {
-                // Multiple segments - explain the splitting
-                messageContent.push({
-                    type: 'text',
-                    text: `[image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
-                });
-            }
-
-            // Add all image segments to the same message
-            for (const imageSegment of processedImages) {
-                messageContent.push({
+                },
+                {
                     type: 'image_url',
                     image_url: {
-                        url: imageSegment,
+                        url: imageData,
                     },
-                });
-            }
-
-            // Add the complete message with all segments
-            input.push({
-                role: 'user',
-                content: messageContent,
-            });
-        } catch (error) {
-            console.error(`Error processing image ${image_id}:`, error);
-            // If image processing fails, add the original image as a fallback
-            input.push({
-                role: 'user',
-                content: [
-                    {
-                        type: 'text',
-                        text: `[image #${image_id}] from the ${source} (raw image)`,
-                    },
-                    {
-                        type: 'image_url',
-                        image_url: {
-                            url: imageData,
-                        },
-                    },
-                ],
-            });
-        }
+                },
+            ],
+        });
     }
     return input;
 }
@@ -248,22 +207,21 @@ async function convertContentPartsToOpenAI(
             if (!imageUrl) continue;
 
             if (imageUrl.startsWith('data:')) {
-                const processedImages = await resizeAndSplitForOpenAI(imageUrl);
-                for (const processedImage of processedImages) {
-                    parts.push({
-                        type: 'image_url',
-                        image_url: {
-                            url: processedImage,
-                            ...(item.detail ? { detail: item.detail } : {}),
-                        },
-                    });
-                }
-            } else {
+                const detail = mapOpenAIChatImageDetail(item.detail);
                 parts.push({
                     type: 'image_url',
                     image_url: {
                         url: imageUrl,
-                        ...(item.detail ? { detail: item.detail } : {}),
+                        ...(detail ? { detail } : {}),
+                    },
+                });
+            } else {
+                const detail = mapOpenAIChatImageDetail(item.detail);
+                parts.push({
+                    type: 'image_url',
+                    image_url: {
+                        url: imageUrl,
+                        ...(detail ? { detail } : {}),
                     },
                 });
             }

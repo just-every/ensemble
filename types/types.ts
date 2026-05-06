@@ -161,9 +161,11 @@ export interface ResponseContentText {
     text: string;
 }
 
+export type ImageInputDetail = 'low' | 'medium' | 'high' | 'original' | 'auto';
+
 export interface ResponseContentImage {
     type: 'input_image';
-    detail: 'high' | 'low' | 'auto';
+    detail?: ImageInputDetail;
     file_id?: string;
     image_url?: string;
 }
@@ -174,7 +176,7 @@ export interface ResponseContentImageData {
     url?: string; // http(s) URL
     file_id?: string;
     mime_type?: string; // e.g. image/png
-    detail?: 'high' | 'low' | 'auto';
+    detail?: ImageInputDetail;
 }
 
 export interface ResponseContentFileInput {
@@ -893,6 +895,13 @@ export interface ImageGenerationOpts {
 
     /** Quality of the generated image */
     quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'auto';
+
+    /**
+     * Provider-neutral detail hint for source image inputs.
+     * OpenAI maps this to input/detail fidelity where supported; Gemini maps it to mediaResolution.
+     * When omitted, Ensemble leaves provider defaults untouched.
+     */
+    detail?: ImageInputDetail;
 
     /** Style of the generated image (OpenAI specific) */
     style?: 'vivid' | 'natural';

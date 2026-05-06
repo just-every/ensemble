@@ -121,8 +121,7 @@
     "vitest": "^4.1.5"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.60.2",
-    "sharp": "^0.34.5"
+    "@rollup/rollup-linux-x64-gnu": "^4.60.2"
   },
   "overrides": {
     "js-yaml": "4.1.1",

@@ -57,7 +57,7 @@ export interface OpenAIMessageContent {
     text?: string;
     image_url?: {
         url: string;
-        detail?: 'low' | 'high' | 'auto';
+        detail?: 'low' | 'medium' | 'high' | 'original' | 'auto';
     };
 }
 

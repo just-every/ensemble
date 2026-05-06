@@ -59,8 +59,8 @@ import { isPaused } from '../utils/pause_controller.js';
 import {
     appendMessageWithImage,
     normalizeImageDataUrl,
-    resizeAndTruncateForGemini,
 } from '../utils/image_utils.js';
+import { chooseImageDetailFromInput, mapGeminiMediaResolution } from '../utils/image_detail.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
@@ -390,8 +390,7 @@ function mergeImageMetadata(target: ImageGenerationMetadata, source: ImageGenera
 }
 
 /**
- * Processes images and adds them to the input array for OpenAI
- * Resizes images to max 1024px width and splits into sections if height > 768px
+ * Processes extracted images and adds them to the input array for Gemini.
  *
  * @param input - The input array to add images to
  * @param images - Record of image IDs to base64 image data
@@ -401,10 +400,8 @@ function mergeImageMetadata(target: ImageGenerationMetadata, source: ImageGenera
 async function addImagesToInput(input: Content[], images: Record<string, string>, source: string): Promise<Content[]> {
     // Add developer messages for each image
     for (const [image_id, imageData] of Object.entries(images)) {
-        // Resize and split the image if needed
-        const processedImageData = await resizeAndTruncateForGemini(imageData);
-        const mimeType = getImageMimeType(processedImageData);
-        const cleanedImageData = cleanBase64Data(processedImageData);
+        const mimeType = getImageMimeType(imageData);
+        const cleanedImageData = cleanBase64Data(imageData);
 
         input.push({
             role: 'user',
@@ -597,24 +594,12 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                             if (match) {
                                 const mimeType = match[1];
                                 const base64Data = match[2];
-                                // Resize image for Gemini if needed
-                                const processedData = await resizeAndTruncateForGemini(imageUrl);
-                                const processedMatch = processedData.match(/^data:([^;]+);base64,(.+)$/);
-                                if (processedMatch) {
-                                    parts.push({
-                                        inlineData: {
-                                            mimeType: processedMatch[1],
-                                            data: processedMatch[2],
-                                        },
-                                    });
-                                } else {
-                                    parts.push({
-                                        inlineData: {
-                                            mimeType: mimeType,
-                                            data: base64Data,
-                                        },
-                                    });
-                                }
+                                parts.push({
+                                    inlineData: {
+                                        mimeType: mimeType,
+                                        data: base64Data,
+                                    },
+                                });
                             }
                         } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
                             // Handle URL-based images
@@ -732,6 +717,11 @@ const GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS: Record<string, { ar: string; imageSi
     '5504x3072': { ar: '16:9', imageSize: '4K' },
     '6336x2688': { ar: '21:9', imageSize: '4K' },
 };
+
+function toGeminiMediaResolution(detail: ReturnType<typeof chooseImageDetailFromInput>): MediaResolution | undefined {
+    const mapped = mapGeminiMediaResolution(detail);
+    return mapped ? MediaResolution[mapped] : undefined;
+}
 
 /**
  * Gemini model provider implementation
@@ -997,6 +987,7 @@ export class GeminiProvider extends BaseModelProvider {
         const chunks: GenerateContentResponse[] = [];
         try {
             // --- Prepare Request ---
+            const requestedImageDetail = chooseImageDetailFromInput(messages);
             const contents = await convertToGeminiContents(model, messages);
 
             // Safety check for empty contents
@@ -1108,6 +1099,10 @@ export class GeminiProvider extends BaseModelProvider {
             }
             if (agent.abortSignal) {
                 config.abortSignal = agent.abortSignal;
+            }
+            const mediaResolution = toGeminiMediaResolution(requestedImageDetail);
+            if (mediaResolution) {
+                config.mediaResolution = mediaResolution;
             }
 
             // Check if any tools require special handling
@@ -1667,6 +1662,7 @@ export class GeminiProvider extends BaseModelProvider {
                         : undefined;
 
                 const perImageCost = this.getImageCost(model, imageSize);
+                const sourceImageMediaResolution = toGeminiMediaResolution(opts?.detail);
 
                 const makeOne = async (): Promise<{ images: string[]; metadata: ImageGenerationMetadata }> => {
                     const requestParams: GenerateContentParameters = {
@@ -1730,6 +1726,7 @@ export class GeminiProvider extends BaseModelProvider {
                             // unnecessary text output tokens.
                             responseModalities: [Modality.IMAGE],
                             ...(Object.keys(imageConfig).length ? { imageConfig } : {}),
+                            ...(sourceImageMediaResolution ? { mediaResolution: sourceImageMediaResolution } : {}),
                             ...(googleSearchTool ? { tools: [googleSearchTool] as any } : {}),
                             ...(Object.keys(thinkingConfig).length ? { thinkingConfig: thinkingConfig as any } : {}),
                         },

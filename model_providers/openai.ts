@@ -26,7 +26,8 @@ import OpenAI, { toFile } from 'openai';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_request, log_llm_response, log_llm_error } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import { appendMessageWithImage, normalizeImageDataUrl, resizeAndSplitForOpenAI } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
+import { mapOpenAIImageDetail, mapOpenAIImageInputFidelity } from '../utils/image_detail.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 import { hasEventHandler } from '../utils/event_controller.js';
@@ -162,8 +163,7 @@ async function convertToOpenAITools(requestParams: any, tools?: ToolFunction[] |
 }
 
 /**
- * Processes images and adds them to the input array for OpenAI
- * Resizes images to max 1024px width and splits into sections if height > 768px
+ * Processes extracted images and adds them to the input array for OpenAI.
  *
  * @param input - The input array to add images to
  * @param images - Record of image IDs to base64 image data
@@ -177,62 +177,20 @@ async function addImagesToInput(
 ): Promise<ResponseInput> {
     // Add developer messages for each image
     for (const [image_id, imageData] of Object.entries(images)) {
-        try {
-            // Resize and split the image if needed
-            const processedImages = await resizeAndSplitForOpenAI(imageData);
-
-            // Create a content array for the message
-            const messageContent = [];
-
-            // Add description text first
-            if (processedImages.length === 1) {
-                // Single image (no splitting needed)
-                messageContent.push({
+        input.push({
+            type: 'message',
+            role: 'user',
+            content: [
+                {
                     type: 'input_text',
                     text: `[image #${image_id}] from the ${source}`,
-                });
-            } else {
-                // Multiple segments - explain the splitting
-                messageContent.push({
-                    type: 'input_text',
-                    text: `[image #${image_id}] from the ${source} (split into ${processedImages.length} parts, each up to 768px high)`,
-                });
-            }
-
-            // Add all image segments to the same message
-            for (const imageSegment of processedImages) {
-                messageContent.push({
+                },
+                {
                     type: 'input_image',
-                    image_url: imageSegment,
-                    detail: 'high',
-                });
-            }
-
-            // Add the complete message with all segments
-            input.push({
-                type: 'message',
-                role: 'user',
-                content: messageContent,
-            });
-        } catch (error) {
-            console.error(`Error processing image ${image_id}:`, error);
-            // If image processing fails, add the original image as a fallback
-            input.push({
-                type: 'message',
-                role: 'user',
-                content: [
-                    {
-                        type: 'input_text',
-                        text: `This is [image #${image_id}] from the ${source} (raw image)`,
-                    },
-                    {
-                        type: 'input_image',
-                        image_url: imageData,
-                        detail: 'high',
-                    },
-                ],
-            });
-        }
+                    image_url: imageData,
+                },
+            ],
+        });
     }
     return input;
 }
@@ -256,19 +214,18 @@ async function convertContentPartsToOpenAI(content: ResponseContent): Promise<Re
             if (!imageUrl) continue;
 
             if (imageUrl.startsWith('data:')) {
-                const processedImages = await resizeAndSplitForOpenAI(imageUrl);
-                for (const processedImage of processedImages) {
-                    parts.push({
-                        type: 'input_image',
-                        image_url: processedImage,
-                        detail: item.detail || 'auto',
-                    });
-                }
-            } else {
+                const detail = mapOpenAIImageDetail(item.detail);
                 parts.push({
                     type: 'input_image',
                     image_url: imageUrl,
-                    detail: item.detail || 'auto',
+                    ...(detail ? { detail } : {}),
+                });
+            } else {
+                const detail = mapOpenAIImageDetail(item.detail);
+                parts.push({
+                    type: 'input_image',
+                    image_url: imageUrl,
+                    ...(detail ? { detail } : {}),
                 });
             }
         }
@@ -413,7 +370,8 @@ export class OpenAIProvider extends BaseModelProvider {
             const background: 'transparent' | 'opaque' | 'auto' = opts?.background || 'auto';
 
             // Extract input_fidelity if provided
-            const input_fidelity: 'low' | 'medium' | 'high' | undefined = opts?.input_fidelity;
+            const input_fidelity: 'low' | 'medium' | 'high' | undefined =
+                opts?.input_fidelity ?? mapOpenAIImageInputFidelity(opts?.detail);
 
             // Get source images if provided
             const source_images = opts?.source_images;

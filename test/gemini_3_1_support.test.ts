@@ -193,6 +193,84 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
     });
 
+    it('maps image detail to Gemini mediaResolution only when requested', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: 'ok' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const dataUrl = `data:image/png;base64,${ONE_PX_PNG_BASE64}`;
+        for await (const _event of provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: [
+                        { type: 'input_text', text: 'Describe this image.' },
+                        { type: 'image', data: dataUrl, detail: 'medium' },
+                    ],
+                },
+            ] as any,
+            'gemini-3-flash-preview',
+            { agent_id: 'test-gemini-image-detail' } as any,
+            'req-gemini-image-detail'
+        )) {
+            // Drain stream.
+        }
+
+        let requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.config?.mediaResolution).toBe('MEDIA_RESOLUTION_MEDIUM');
+        expect(requestArg?.contents?.[0]?.parts?.filter((part: any) => part.inlineData)).toEqual([
+            {
+                inlineData: {
+                    mimeType: 'image/png',
+                    data: ONE_PX_PNG_BASE64,
+                },
+            },
+        ]);
+
+        generateContentStream.mockClear();
+        for await (const _event of provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: [
+                        { type: 'input_text', text: 'Describe this image.' },
+                        { type: 'image', data: dataUrl },
+                    ],
+                },
+            ] as any,
+            'gemini-3-flash-preview',
+            { agent_id: 'test-gemini-image-detail-default' } as any,
+            'req-gemini-image-detail-default'
+        )) {
+            // Drain stream.
+        }
+
+        requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.config?.mediaResolution).toBeUndefined();
+    });
+
     it('maps modelSettings.thinking_budget to Gemini thinking budget', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(

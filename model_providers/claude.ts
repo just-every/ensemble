@@ -35,7 +35,7 @@ import { createProviderErrorEvent } from '../utils/failure_detection.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
 import { findModel } from '../data/model_data.js';
-import { appendMessageWithImage, normalizeImageDataUrl, resizeAndTruncateForClaude } from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 
@@ -144,13 +144,12 @@ async function convertContentPartsToClaude(content: ResponseContent): Promise<an
                 continue;
             }
 
-            const processedImageData = await resizeAndTruncateForClaude(normalized.dataUrl);
             blocks.push({
                 type: 'image',
                 source: {
                     type: 'base64',
-                    media_type: getImageMediaType(processedImageData),
-                    data: cleanBase64Data(processedImageData),
+                    media_type: getImageMediaType(normalized.dataUrl),
+                    data: cleanBase64Data(normalized.dataUrl),
                 },
             });
         }
@@ -294,8 +293,7 @@ function finalizeClaudeToolArguments(currentToolCall: any): string | undefined {
 }
 
 /**
- * Processes images and adds them to the input array for Claude
- * Resizes images to max 1024px width and splits into sections if height > 768px
+ * Processes extracted images and adds them to the input array for Claude.
  *
  * @param input - The input array to add images to
  * @param images - Record of image IDs to base64 image data
@@ -305,10 +303,8 @@ function finalizeClaudeToolArguments(currentToolCall: any): string | undefined {
 async function addImagesToInput(input: any[], images: Record<string, string>, source: string): Promise<any[]> {
     // Add placeholder text and image for each
     for (const [image_id, imageData] of Object.entries(images)) {
-        // Resize and split the image if needed
-        const processedImageData = await resizeAndTruncateForClaude(imageData);
-        const mediaType = getImageMediaType(processedImageData);
-        const cleanedImageData = cleanBase64Data(processedImageData);
+        const mediaType = getImageMediaType(imageData);
+        const cleanedImageData = cleanBase64Data(imageData);
 
         // Add placeholder text
         input.push({

@@ -201,7 +201,9 @@ Supported image fields:
 - `url`: http(s) URL
 - `file_id`: provider file reference (when supported)
 - `mime_type`: image mime type (recommended when passing raw base64)
-- `detail`: `high` | `low` | `auto` (for providers that support detail hints)
+- `detail`: `low` | `medium` | `high` | `original` | `auto` (optional provider-native detail hint)
+
+Ensemble passes image pixels through unchanged. It does not resize, split, crop, or compress image inputs. When `detail` is present, OpenAI receives the closest native image detail value and Gemini receives the corresponding `mediaResolution`; when it is omitted, provider defaults are left untouched.
 
 ```ts
 import { ensembleRequest } from '@just-every/ensemble';
