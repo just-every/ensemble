@@ -53,7 +53,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3-flash-preview', // Google
             'claude-sonnet-4-6', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -76,7 +76,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-2.5-pro', // Google
             'claude-sonnet-4-6', // Anthropic
-            'grok-4-1-fast-reasoning', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -87,7 +87,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5-pro', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-opus-4-7', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -109,7 +109,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-sonnet-4-6', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -120,7 +120,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-opus-4-7', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -131,7 +131,7 @@ export const MODEL_CLASSES = {
             'gpt-5.3-codex', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-opus-4-7', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
             'qwen3-coder', // OpenRouter
         ],
         random: true,
@@ -143,7 +143,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3-flash-preview', // Google
             'claude-sonnet-4-6', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -166,7 +166,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-opus-4-7', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
     },
@@ -197,7 +197,7 @@ export const MODEL_CLASSES = {
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
             'claude-opus-4-7', // Anthropic
-            'grok-4', // X.AI
+            'grok-4.3', // X.AI
         ],
         random: true,
         description: 'Models with very large context windows for processing long documents',
@@ -575,6 +575,26 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     //
     // XAI models (Grok)
     //
+
+    {
+        id: 'grok-4.3',
+        provider: 'xai',
+        cost: {
+            input_per_million: 1.25,
+            output_per_million: 2.5,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'reasoning',
+        description:
+            "Grok 4.3, xAI's latest recommended reasoning model with 1M context, multimodal input, streaming, tools, structured output, and low/medium/high reasoning effort.",
+    },
 
     // Grok-4.1 Fast models with tiered pricing
     {

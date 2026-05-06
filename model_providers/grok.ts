@@ -153,6 +153,13 @@ export class GrokProvider extends OpenAIChat {
                 };
             }
         }
+
+        const reasoningEffort = (requestParams as any).reasoning?.effort;
+        if (requestParams.model === 'grok-4.3' && reasoningEffort) {
+            (requestParams as any).reasoning_effort = reasoningEffort;
+            delete (requestParams as any).reasoning;
+        }
+
         return super.prepareParameters(requestParams);
     }
 
