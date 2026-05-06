@@ -6,6 +6,7 @@ import { geminiProvider } from '../model_providers/gemini.js';
 import { grokProvider } from '../model_providers/grok.js';
 import { deepSeekProvider } from '../model_providers/deepseek.js';
 import { openRouterProvider } from '../model_providers/openrouter.js';
+import { codexProvider } from '../model_providers/codex.js';
 
 beforeEach(() => {
     process.env.OPENAI_API_KEY =
@@ -18,9 +19,7 @@ beforeEach(() => {
             : 'sk-ant-test';
     process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'test';
     process.env.XAI_API_KEY =
-        process.env.XAI_API_KEY && process.env.XAI_API_KEY.startsWith('xai-')
-            ? process.env.XAI_API_KEY
-            : 'xai-test';
+        process.env.XAI_API_KEY && process.env.XAI_API_KEY.startsWith('xai-') ? process.env.XAI_API_KEY : 'xai-test';
     process.env.DEEPSEEK_API_KEY =
         process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.startsWith('sk-')
             ? process.env.DEEPSEEK_API_KEY
@@ -31,6 +30,11 @@ beforeEach(() => {
 describe('getModelProvider', () => {
     it('returns OpenAI provider', () => {
         expect(getModelProvider('gpt-3.5-turbo')).toBe(openaiProvider);
+    });
+
+    it('returns Codex CLI provider for codex-prefixed models', () => {
+        expect(getModelProvider('codex-gpt-5.5')).toBe(codexProvider);
+        expect(getModelProvider('codex-gpt-5.3-codex')).toBe(codexProvider);
     });
 
     it('returns OpenAI provider for chatgpt image models', () => {

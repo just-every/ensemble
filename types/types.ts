@@ -115,6 +115,7 @@ export interface ModelSettings {
     tool_timeout_ms?: number; // Per-tool timeout override used by tool execution manager
     tool_timeout_behavior?: 'background' | 'error'; // Timeout handling mode for long-running tools
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
+    codex_home?: string; // Codex CLI provider home directory override
 
     // OpenAI-specific settings (will be ignored by other providers)
     verbosity?: 'low' | 'medium' | 'high'; // Controls response verbosity (OpenAI only)
@@ -621,6 +622,7 @@ export type ModelProviderID =
     | 'fal'
     | 'runway'
     | 'bytedance'
+    | 'codex'
     | 'test';
 
 // ================================================================

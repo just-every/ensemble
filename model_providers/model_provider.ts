@@ -37,6 +37,7 @@ import { stabilityProvider } from './stability.js';
 import { falProvider } from './fal.js';
 import { runwayProvider } from './runway.js';
 import { bytedanceProvider } from './bytedance.js';
+import { codexProvider } from './codex.js';
 import { MODEL_CLASSES, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
 
 // Provider lookup by ID for explicit model matches
@@ -56,6 +57,7 @@ const PROVIDER_BY_ID: Record<ModelProviderID, ModelProvider> = {
     fal: falProvider,
     runway: runwayProvider,
     bytedance: bytedanceProvider,
+    codex: codexProvider,
     test: testProvider,
 };
 
@@ -66,6 +68,9 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
 
     // OpenRouter models (must come before OpenAI to take precedence)
     'gpt-oss-': openRouterProvider, // Open source GPT models via OpenRouter
+
+    // Codex CLI opt-in models
+    'codex-': codexProvider,
 
     // OpenAI models
     'gpt-': openaiProvider,
@@ -78,7 +83,6 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'chatgpt-image': openaiProvider, // ChatGPT image generation models
     'gpt-image': openaiProvider, // GPT-Image-1 model
     'tts-': openaiProvider, // TTS models
-    'codex-': openaiProvider, // Coding models
 
     // Claude/Anthropic models
     'claude-': claudeProvider,
@@ -170,6 +174,8 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return !!process.env.FAL_KEY;
         case 'bytedance' as any:
             return !!(process.env.ARK_API_KEY || process.env.BYTEPLUS_API_KEY || process.env.BYTEDANCE_API_KEY);
+        case 'codex':
+            return true;
         // Replicate removed
         case 'runway' as any:
             return !!process.env.RUNWAY_API_KEY && process.env.RUNWAY_API_KEY.startsWith('key_');
@@ -207,6 +213,10 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'openrouter';
     }
 
+    if (model.startsWith('codex-')) {
+        return 'codex';
+    }
+
     if (
         model.startsWith('gpt-') ||
         model.startsWith('o1') ||
@@ -241,10 +251,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'runway' as any;
     } else if (model.startsWith('seedream-') || model.startsWith('bytedance-') || model.startsWith('byteplus-')) {
         return 'bytedance' as any;
-    } else if (
-        model.startsWith('recraft-') ||
-        model.startsWith('fal-')
-    ) {
+    } else if (model.startsWith('recraft-') || model.startsWith('fal-')) {
         return 'fal' as any;
     } else if (model.startsWith('grok-')) {
         return 'xai';

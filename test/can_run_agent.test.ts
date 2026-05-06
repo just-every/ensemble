@@ -93,6 +93,17 @@ describe('canRunAgent', () => {
             });
         });
 
+        it('should handle Codex CLI provider without API keys', async () => {
+            const result = await canRunAgent({ model: 'codex-gpt-5.5' });
+
+            expect(result).toMatchObject({
+                canRun: true,
+                model: 'codex-gpt-5.5',
+                provider: 'codex',
+                missingProvider: undefined,
+            });
+        });
+
         it('routes Google text embeddings to the Google provider', async () => {
             process.env.GOOGLE_API_KEY = 'test-google-key';
 
