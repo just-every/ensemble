@@ -939,6 +939,21 @@ export interface ImageGenerationOpts {
     /** BytePlus: guidance scale (not supported by seedream-4.0; included for API compatibility) */
     guidance_scale?: number;
 
+    /** FAL image2svg controls */
+    image2svg?: {
+        colormode?: 'color' | 'binary';
+        hierarchical?: 'stacked' | 'cutout';
+        mode?: 'spline' | 'polygon';
+        filter_speckle?: number;
+        color_precision?: number;
+        layer_difference?: number;
+        corner_threshold?: number;
+        length_threshold?: number;
+        max_iterations?: number;
+        splice_threshold?: number;
+        path_precision?: number;
+    };
+
     /** Internal: correlation id used to tag cost events from providers */
     request_id?: string;
 

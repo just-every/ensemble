@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-05-08
+- Added FAL slash-path endpoint mapping and explicit `fal-ai/image2svg` support with one-source-image request handling, SVG output extraction, and $0.005 per-image pricing metadata.
+
 ## 2026-05-03
 - Added current OpenRouter model entries for GLM-5.1, Kimi K2.6, DeepSeek V4 Pro/Flash, and Qwen3.6 Plus/35B/27B with pricing, context, modality, and alias metadata.
 - Updated legacy GLM-5 aliases to resolve to the current GLM-5.1 OpenRouter model.

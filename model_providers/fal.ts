@@ -1,12 +1,27 @@
 import { BaseModelProvider } from './base_provider.js';
 import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
+import { findModel } from '../data/model_data.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { normalizeImageDataUrl } from '../utils/image_utils.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 
 // FAL.ai – used directly for Runway Gen-4 Image and Recraft v3
 // Also used as fallback for Flux family
-type FalEndpoint = { path: string; bodyMode: 'top' | 'input' | 'remove-background' };
+type FalEndpoint = { path: string; bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' };
+
+const IMAGE2SVG_OPTION_KEYS = [
+    'colormode',
+    'hierarchical',
+    'mode',
+    'filter_speckle',
+    'color_precision',
+    'layer_difference',
+    'corner_threshold',
+    'length_threshold',
+    'max_iterations',
+    'splice_threshold',
+    'path_precision',
+] as const;
 
 function mapImageSize(size?: ImageGenerationOpts['size']): string | { width: number; height: number } | undefined {
     if (!size) return undefined;
@@ -33,24 +48,28 @@ export class FALProvider extends BaseModelProvider {
         if (m === 'fal-ai/ideogram/remove-background' || m === 'ideogram-remove-background') {
             return { path: 'fal-ai/ideogram/remove-background', bodyMode: 'remove-background' };
         }
+        if (m === 'fal-ai/image2svg' || m === 'image2svg' || m === 'fal-image2svg') {
+            return { path: 'fal-ai/image2svg', bodyMode: 'image2svg' };
+        }
         if (m.startsWith('recraft')) return { path: 'fal-ai/recraft/v3/text-to-image', bodyMode: 'top' };
         if (m.includes('runway') || m.includes('gen4')) return { path: 'runwayml/gen4-image', bodyMode: 'input' };
         // flux fallbacks
         if (m.includes('schnell')) return { path: 'fal-ai/flux/schnell', bodyMode: 'top' };
         if (m.includes('dev')) return { path: 'fal-ai/flux/dev', bodyMode: 'top' };
         if (m.includes('kontext') || m.includes('pro')) return { path: 'fal-ai/flux-pro/kontext', bodyMode: 'top' };
+        if (m.startsWith('fal-ai/')) return { path: model, bodyMode: 'top' };
         return { path: 'fal-ai/flux/schnell', bodyMode: 'top' };
     }
 
-    private imageUrlForRemoveBackground(opts: ImageGenerationOpts): string {
+    private singleSourceImageUrl(opts: ImageGenerationOpts, modelName: string): string {
         const sourceImages = opts.source_images;
         if (!sourceImages) {
-            throw new Error('fal-ai/ideogram/remove-background requires exactly one source image.');
+            throw new Error(`${modelName} requires exactly one source image.`);
         }
 
         const rawImages = Array.isArray(sourceImages) ? sourceImages : [sourceImages];
         if (rawImages.length !== 1) {
-            throw new Error('fal-ai/ideogram/remove-background supports exactly one source image per request.');
+            throw new Error(`${modelName} supports exactly one source image per request.`);
         }
 
         const rawImage = rawImages[0];
@@ -65,11 +84,25 @@ export class FALProvider extends BaseModelProvider {
             (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:image/'))
         ) {
             throw new Error(
-                'fal-ai/ideogram/remove-background expects the source image to be a public URL or a data:image/... base64 URI.'
+                `${modelName} expects the source image to be a public URL or a data:image/... base64 URI.`
             );
         }
 
         return imageUrl;
+    }
+
+    private buildImage2SvgBody(opts: ImageGenerationOpts): Record<string, unknown> {
+        const body: Record<string, unknown> = {
+            image_url: this.singleSourceImageUrl(opts, 'fal-ai/image2svg'),
+        };
+        const image2svg = opts.image2svg || {};
+        for (const key of IMAGE2SVG_OPTION_KEYS) {
+            const value = image2svg[key];
+            if (value !== undefined) {
+                body[key] = value;
+            }
+        }
+        return body;
     }
 
     private buildBody(
@@ -79,12 +112,16 @@ export class FALProvider extends BaseModelProvider {
     ): Record<string, unknown> {
         if (bodyMode === 'remove-background') {
             const body: Record<string, unknown> = {
-                image_url: this.imageUrlForRemoveBackground(opts),
+                image_url: this.singleSourceImageUrl(opts, 'fal-ai/ideogram/remove-background'),
             };
             if (opts?.response_format === 'b64_json') {
                 body.sync_mode = true;
             }
             return body;
+        }
+
+        if (bodyMode === 'image2svg') {
+            return this.buildImage2SvgBody(opts);
         }
 
         const size = mapImageSize(opts.size);
@@ -142,12 +179,14 @@ export class FALProvider extends BaseModelProvider {
             const data = await res.json();
             const images = this.extractImages(data);
             if (!images.length) throw new Error('FAL: no image url in response');
-            costTracker.addUsage({
-                model,
-                image_count: images.length,
-                request_id: opts?.request_id,
-                metadata: { source: 'fal' },
-            });
+            if (findModel(model)) {
+                costTracker.addUsage({
+                    model,
+                    image_count: images.length,
+                    request_id: opts?.request_id,
+                    metadata: { source: 'fal' },
+                });
+            }
             return images;
         } catch (err) {
             log_llm_error(requestId, err);

@@ -364,6 +364,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'image_generation',
         description: 'Ideogram background removal via FAL.ai. Removes the background from one source image.',
     },
+    {
+        id: 'fal-ai/image2svg',
+        aliases: ['image2svg', 'fal-image2svg'],
+        provider: 'fal',
+        cost: { per_image: 0.005 },
+        features: { input_modality: ['image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'FAL Image2SVG. Converts one raster source image into an SVG file.',
+    },
     // Embedding models
     {
         id: 'text-embedding-3-small',

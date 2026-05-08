@@ -113,6 +113,7 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'runway-': runwayProvider,
     // Legacy alias removed: 'runwayml-*' models should use 'runway-*' with the official Runway provider
     'recraft-': falProvider,
+    'fal-ai/': falProvider,
     'fal-': falProvider,
 
     // ByteDance / BytePlus ModelArk (OpenAI-compatible)
@@ -251,7 +252,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'runway' as any;
     } else if (model.startsWith('seedream-') || model.startsWith('bytedance-') || model.startsWith('byteplus-')) {
         return 'bytedance' as any;
-    } else if (model.startsWith('recraft-') || model.startsWith('fal-')) {
+    } else if (model.startsWith('recraft-') || model.startsWith('fal-ai/') || model.startsWith('fal-')) {
         return 'fal' as any;
     } else if (model.startsWith('grok-')) {
         return 'xai';

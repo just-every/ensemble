@@ -422,6 +422,7 @@ New providers added
 - Runway Gen-4 Image – via FAL.ai.
 - Recraft v3 – via FAL.ai (supports text-to-vector and vector-style outputs).
 - Ideogram remove background – via FAL.ai (`fal-ai/ideogram/remove-background`, one source image per request).
+- Image2SVG – via FAL.ai (`fal-ai/image2svg`, one source image per request, returns SVG file URLs).
 
 Environment
 
