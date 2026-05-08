@@ -421,6 +421,7 @@ New providers added
 - Stability AI (Stable Image Ultra/SDXL) – REST v2beta endpoints supporting text-to-image and image-to-image.
 - Runway Gen-4 Image – via FAL.ai.
 - Recraft v3 – via FAL.ai (supports text-to-vector and vector-style outputs).
+- Ideogram remove background – via FAL.ai (`fal-ai/ideogram/remove-background`, one source image per request).
 
 Environment
 

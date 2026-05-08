@@ -355,6 +355,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'image_generation',
         description: 'Recraft V3 via FAL.ai (text‑to‑image / vector styles).',
     },
+    {
+        id: 'fal-ai/ideogram/remove-background',
+        aliases: ['ideogram-remove-background'],
+        provider: 'fal',
+        cost: { per_image: 0.01 },
+        features: { input_modality: ['image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description: 'Ideogram background removal via FAL.ai. Removes the background from one source image.',
+    },
     // Embedding models
     {
         id: 'text-embedding-3-small',
