@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-05-08
+- Added FAL Ideogram V3 support (`fal-ai/ideogram/v3` and `fal-ai/ideogram/v3/edit`) with source-image plus mask request shaping, transparent-mask to white-edit mask mapping, `quality` to `rendering_speed` mapping, and tier-aware image cost tracking.
 - Added FAL slash-path endpoint mapping and explicit `fal-ai/image2svg` support with one-source-image request handling, SVG output extraction, and $0.005 per-image pricing metadata.
 - Added explicit OpenRouter support for `qwen/qwen3.6-flash` and `qwen/qwen3.6-max-preview` with current pricing, aliases, context, and modality metadata.
 

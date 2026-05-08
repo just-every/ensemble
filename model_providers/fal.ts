@@ -3,11 +3,15 @@ import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '
 import { findModel } from '../data/model_data.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { normalizeImageDataUrl } from '../utils/image_utils.js';
+import { mapTransparentEditMaskForFalIdeogram } from '../utils/ideogram_mask.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 
 // FAL.ai – used directly for Runway Gen-4 Image and Recraft v3
 // Also used as fallback for Flux family
-type FalEndpoint = { path: string; bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' };
+type FalEndpoint = {
+    path: string;
+    bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' | 'ideogram-v3' | 'ideogram-v3-edit';
+};
 
 const IMAGE2SVG_OPTION_KEYS = [
     'colormode',
@@ -33,6 +37,24 @@ function mapImageSize(size?: ImageGenerationOpts['size']): string | { width: num
     return undefined;
 }
 
+function mapIdeogramV3RenderingSpeed(quality?: ImageGenerationOpts['quality']): 'TURBO' | 'BALANCED' | 'QUALITY' {
+    if (quality === 'low') return 'TURBO';
+    if (quality === 'high' || quality === 'hd') return 'QUALITY';
+    return 'BALANCED';
+}
+
+function ideogramV3CostPerImage(renderingSpeed: 'TURBO' | 'BALANCED' | 'QUALITY'): number {
+    if (renderingSpeed === 'TURBO') return 0.03;
+    if (renderingSpeed === 'QUALITY') return 0.09;
+    return 0.06;
+}
+
+function clampFalIdeogramImageCount(n?: number): number {
+    const count = Math.floor(Number(n || 1));
+    if (!Number.isFinite(count)) return 1;
+    return Math.max(1, Math.min(8, count));
+}
+
 export class FALProvider extends BaseModelProvider {
     constructor() {
         super('fal' as any);
@@ -47,6 +69,17 @@ export class FALProvider extends BaseModelProvider {
         const m = model.toLowerCase();
         if (m === 'fal-ai/ideogram/remove-background' || m === 'ideogram-remove-background') {
             return { path: 'fal-ai/ideogram/remove-background', bodyMode: 'remove-background' };
+        }
+        if (m === 'fal-ai/ideogram/v3' || m === 'fal-ideogram-v3' || m === 'fal-ai-ideogram-v3') {
+            return { path: 'fal-ai/ideogram/v3', bodyMode: 'ideogram-v3' };
+        }
+        if (
+            m === 'fal-ai/ideogram/v3/edit' ||
+            m === 'ideogram-v3-edit' ||
+            m === 'fal-ideogram-v3-edit' ||
+            m === 'fal-ai-ideogram-v3-edit'
+        ) {
+            return { path: 'fal-ai/ideogram/v3/edit', bodyMode: 'ideogram-v3-edit' };
         }
         if (m === 'fal-ai/image2svg' || m === 'image2svg' || m === 'fal-image2svg') {
             return { path: 'fal-ai/image2svg', bodyMode: 'image2svg' };
@@ -83,12 +116,27 @@ export class FALProvider extends BaseModelProvider {
             !imageUrl ||
             (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:image/'))
         ) {
-            throw new Error(
-                `${modelName} expects the source image to be a public URL or a data:image/... base64 URI.`
-            );
+            throw new Error(`${modelName} expects the source image to be a public URL or a data:image/... base64 URI.`);
         }
 
         return imageUrl;
+    }
+
+    private maskUrl(opts: ImageGenerationOpts, modelName: string): string {
+        if (!opts.mask) {
+            throw new Error(`${modelName} requires a mask image.`);
+        }
+
+        const normalized = normalizeImageDataUrl({ data: opts.mask });
+        const maskUrl = normalized.url || normalized.dataUrl;
+        if (
+            !maskUrl ||
+            (!maskUrl.startsWith('http://') && !maskUrl.startsWith('https://') && !maskUrl.startsWith('data:image/'))
+        ) {
+            throw new Error(`${modelName} expects the mask to be a public URL or a data:image/... base64 URI.`);
+        }
+
+        return mapTransparentEditMaskForFalIdeogram(maskUrl);
     }
 
     private buildImage2SvgBody(opts: ImageGenerationOpts): Record<string, unknown> {
@@ -101,6 +149,70 @@ export class FALProvider extends BaseModelProvider {
             if (value !== undefined) {
                 body[key] = value;
             }
+        }
+        return body;
+    }
+
+    private sourceImageUrls(opts: ImageGenerationOpts): string[] {
+        const sourceImages = opts.source_images;
+        if (!sourceImages) return [];
+        const rawImages = Array.isArray(sourceImages) ? sourceImages : [sourceImages];
+        return rawImages.map(rawImage => {
+            const normalized =
+                typeof rawImage === 'string'
+                    ? normalizeImageDataUrl({ data: rawImage })
+                    : normalizeImageDataUrl({ data: rawImage.data });
+            const imageUrl = normalized.url || normalized.dataUrl;
+            if (
+                !imageUrl ||
+                (!imageUrl.startsWith('http://') &&
+                    !imageUrl.startsWith('https://') &&
+                    !imageUrl.startsWith('data:image/'))
+            ) {
+                throw new Error(
+                    'fal-ai/ideogram/v3 expects style reference images to be public URLs or data:image/... base64 URIs.'
+                );
+            }
+            return imageUrl;
+        });
+    }
+
+    private buildIdeogramV3Body(prompt: string, opts: ImageGenerationOpts): Record<string, unknown> {
+        const renderingSpeed = mapIdeogramV3RenderingSpeed(opts.quality);
+        const body: Record<string, unknown> = {
+            prompt,
+            rendering_speed: renderingSpeed,
+            num_images: clampFalIdeogramImageCount(opts.n),
+        };
+        const size = mapImageSize(opts.size);
+        if (size) body.image_size = size;
+        if (opts?.response_format === 'b64_json') {
+            body.sync_mode = true;
+        }
+        if (typeof opts.seed === 'number' && Number.isFinite(opts.seed)) {
+            body.seed = Math.floor(opts.seed);
+        }
+        const imageUrls = this.sourceImageUrls(opts);
+        if (imageUrls.length > 0) {
+            body.image_urls = imageUrls;
+        }
+        return body;
+    }
+
+    private buildIdeogramV3EditBody(prompt: string, opts: ImageGenerationOpts): Record<string, unknown> {
+        const renderingSpeed = mapIdeogramV3RenderingSpeed(opts.quality);
+        const body: Record<string, unknown> = {
+            prompt,
+            image_url: this.singleSourceImageUrl(opts, 'fal-ai/ideogram/v3/edit'),
+            mask_url: this.maskUrl(opts, 'fal-ai/ideogram/v3/edit'),
+            rendering_speed: renderingSpeed,
+            num_images: clampFalIdeogramImageCount(opts.n),
+        };
+        if (opts?.response_format === 'b64_json') {
+            body.sync_mode = true;
+        }
+        if (typeof opts.seed === 'number' && Number.isFinite(opts.seed)) {
+            body.seed = Math.floor(opts.seed);
         }
         return body;
     }
@@ -122,6 +234,14 @@ export class FALProvider extends BaseModelProvider {
 
         if (bodyMode === 'image2svg') {
             return this.buildImage2SvgBody(opts);
+        }
+
+        if (bodyMode === 'ideogram-v3') {
+            return this.buildIdeogramV3Body(prompt, opts);
+        }
+
+        if (bodyMode === 'ideogram-v3-edit') {
+            return this.buildIdeogramV3EditBody(prompt, opts);
         }
 
         const size = mapImageSize(opts.size);
@@ -180,11 +300,23 @@ export class FALProvider extends BaseModelProvider {
             const images = this.extractImages(data);
             if (!images.length) throw new Error('FAL: no image url in response');
             if (findModel(model)) {
+                const renderingSpeed =
+                    bodyMode === 'ideogram-v3' || bodyMode === 'ideogram-v3-edit'
+                        ? mapIdeogramV3RenderingSpeed(opts.quality)
+                        : null;
                 costTracker.addUsage({
                     model,
                     image_count: images.length,
                     request_id: opts?.request_id,
-                    metadata: { source: 'fal' },
+                    metadata: {
+                        source: 'fal',
+                        ...(renderingSpeed
+                            ? {
+                                  rendering_speed: renderingSpeed,
+                                  cost_per_image: ideogramV3CostPerImage(renderingSpeed),
+                              }
+                            : {}),
+                    },
                 });
             }
             return images;
