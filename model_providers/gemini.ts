@@ -675,11 +675,60 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-max': 24576,
 };
 
+const THINKING_LEVEL_CONFIGS = {
+    minimal: 'MINIMAL',
+    low: 'LOW',
+    medium: 'MEDIUM',
+    high: 'HIGH',
+} as const;
+
+type GeminiThinkingLevel = (typeof THINKING_LEVEL_CONFIGS)[keyof typeof THINKING_LEVEL_CONFIGS];
+
+const THINKING_LEVEL_SUFFIX_CONFIGS: Record<string, GeminiThinkingLevel> = {
+    '-minimal': 'MINIMAL',
+    '-low': 'LOW',
+    '-medium': 'MEDIUM',
+    '-high': 'HIGH',
+};
+
 function parseThinkingBudget(value: unknown): number | null {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
         return null;
     }
     return Math.max(0, Math.floor(value));
+}
+
+function parseThinkingLevel(value: unknown): GeminiThinkingLevel | null {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value !== 'string') {
+        throw new Error('Gemini thinking_level must be one of: minimal, low, medium, high.');
+    }
+
+    const level = value.trim().toLowerCase();
+    if (level in THINKING_LEVEL_CONFIGS) {
+        return THINKING_LEVEL_CONFIGS[level as keyof typeof THINKING_LEVEL_CONFIGS];
+    }
+
+    throw new Error('Gemini thinking_level must be one of: minimal, low, medium, high.');
+}
+
+function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | null {
+    if (model.includes('gemini-3.1-pro-preview') || model.includes('gemini-3-pro-preview')) {
+        return new Set(['LOW', 'MEDIUM', 'HIGH']);
+    }
+    if (model.includes('gemini-3.1-flash-lite-preview') || model.includes('gemini-3-flash-preview')) {
+        return new Set(['MINIMAL', 'LOW', 'MEDIUM', 'HIGH']);
+    }
+    if (model.includes('gemini-3.1-flash-image-preview')) {
+        return new Set(['MINIMAL', 'HIGH']);
+    }
+    if (model.includes('gemini-3-pro-image-preview')) {
+        return new Set(['HIGH']);
+    }
+
+    return null;
 }
 
 const GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS: Record<string, { ar: string; imageSize: '1K' | '2K' | '4K' }> = {
@@ -1014,9 +1063,25 @@ export class GeminiProvider extends BaseModelProvider {
 
             // Handle model suffixes for thinking budget
             let thinkingBudget: number | null = null;
+            let thinkingLevel: GeminiThinkingLevel | null = null;
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
+            const thinkingLevelFromSettings = parseThinkingLevel(settings?.thinking_level);
 
-            // Check if model has any of the defined suffixes
+            for (const [suffix, level] of Object.entries(THINKING_LEVEL_SUFFIX_CONFIGS)) {
+                if (!model.endsWith(suffix)) {
+                    continue;
+                }
+
+                const baseModel = model.slice(0, -suffix.length);
+                const supportedThinkingLevels = getSupportedThinkingLevels(baseModel);
+                if (supportedThinkingLevels?.has(level)) {
+                    thinkingLevel = level;
+                    model = baseModel;
+                }
+                break;
+            }
+
+            // Check if model has any of the legacy budget suffixes
             for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
                 if (model.endsWith(suffix)) {
                     thinkingBudget = budget;
@@ -1028,6 +1093,19 @@ export class GeminiProvider extends BaseModelProvider {
             if (thinkingBudgetFromSettings !== null) {
                 thinkingBudget = thinkingBudgetFromSettings;
             }
+            if (thinkingLevelFromSettings !== null) {
+                if (thinkingBudget !== null || thinkingLevel !== null) {
+                    throw new Error(
+                        'Gemini thinking_level cannot be combined with thinking_budget or a model thinking suffix.'
+                    );
+                }
+                thinkingLevel = thinkingLevelFromSettings;
+            }
+            if (thinkingLevel !== null && thinkingBudget !== null) {
+                throw new Error(
+                    'Gemini thinking_level cannot be combined with thinking_budget or a model thinking suffix.'
+                );
+            }
 
             // Prepare generation config
             const config: GenerateContentConfig = {
@@ -1036,8 +1114,9 @@ export class GeminiProvider extends BaseModelProvider {
                 },
             };
 
-            // Add thinking configuration if suffix was detected
-            if (thinkingBudget !== null) {
+            if (thinkingLevel !== null) {
+                (config as any).thinkingConfig.thinkingLevel = thinkingLevel;
+            } else if (thinkingBudget !== null) {
                 // thinkingBudget exists in runtime API but not in TypeScript definitions
                 (config as any).thinkingConfig.thinkingBudget = thinkingBudget;
             }

@@ -188,7 +188,24 @@ Key configuration options:
 - `maxToolCallRoundsPerTurn` - Limits sequential rounds where each round can have multiple parallel tool calls
 - `modelSettings` - Provider-specific parameters like temperature, max_tokens, etc.
 - `modelSettings.timeout_ms` - Whole outer-request timeout budget shared across retries and tool completion
+- `modelSettings.thinking_level` - Native thinking level where supported, such as Gemini 3 `minimal`, `low`, `medium`, or `high`
 - `retryOptions` - Outer retry/backoff policy for recoverable request failures
+
+Gemini 3 native thinking levels can be requested directly:
+
+```ts
+const result = await ensembleResult(
+    ensembleRequest([{ type: 'message', role: 'user', content: 'Solve this carefully.' }], {
+        model: 'gemini-3-flash-preview',
+        modelSettings: {
+            thinking_level: 'high',
+        },
+    })
+);
+```
+
+For Gemini, `thinking_level` is mutually exclusive with numeric `thinking_budget` and model suffix shortcuts such as `-high`.
+When a Gemini model supports native thinking levels, suffixes like `-low`, `-medium`, and `-high` are sent as `thinkingLevel` values instead of numeric budgets.
 
 ### Multimodal Input (Images)
 

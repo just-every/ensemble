@@ -145,7 +145,7 @@ describe('Gemini 3.x model support', () => {
         expect(resolved).toBe('o4-mini-high');
     });
 
-    it('forwards thinkingBudget=0 for Gemini -low text requests', async () => {
+    it('forwards thinkingLevel=LOW for Gemini -low text requests when supported', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(
             makeSingleChunkStream({
@@ -190,7 +190,57 @@ describe('Gemini 3.x model support', () => {
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
         expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
         expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('LOW');
+        expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+    });
+
+    it('keeps numeric thinkingBudget suffixes for Gemini models without native thinking levels', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const stream = provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-2.5-flash-low',
+            { agent_id: 'test-gemini-legacy-low-thinking-budget' } as any,
+            'req-legacy-low-thinking'
+        );
+
+        for await (const _event of stream) {
+            // Drain stream.
+        }
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.model).toBe('gemini-2.5-flash');
+        expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBeUndefined();
     });
 
     it('maps image detail to Gemini mediaResolution only when requested', async () => {
@@ -321,6 +371,143 @@ describe('Gemini 3.x model support', () => {
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
         expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
+    });
+
+    it('maps modelSettings.thinking_level to Gemini thinking level', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const stream = provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-3-flash-preview',
+            {
+                agent_id: 'test-gemini-thinking-level-settings',
+                modelSettings: {
+                    thinking_level: 'high',
+                },
+            } as any,
+            'req-thinking-level-settings'
+        );
+
+        for await (const _event of stream) {
+            // Drain stream.
+        }
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.model).toBe('gemini-3-flash-preview');
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('HIGH');
+        expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+    });
+
+    it('maps Gemini -high suffix to native thinking level when supported', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const stream = provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-3-flash-preview-high',
+            { agent_id: 'test-gemini-high-thinking-level-suffix' } as any,
+            'req-thinking-level-high-suffix'
+        );
+
+        for await (const _event of stream) {
+            // Drain stream.
+        }
+
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(requestArg?.model).toBe('gemini-3-flash-preview');
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('HIGH');
+        expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+    });
+
+    it('rejects Gemini thinking_level combined with thinking_budget', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn();
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const events = [];
+        for await (const event of provider.createResponseStream(
+            [
+                {
+                    type: 'message',
+                    role: 'user',
+                    content: 'Return JSON.',
+                },
+            ] as any,
+            'gemini-3-flash-preview',
+            {
+                agent_id: 'test-gemini-thinking-level-budget-conflict',
+                modelSettings: {
+                    thinking_level: 'high',
+                    thinking_budget: 12288,
+                },
+            } as any,
+            'req-thinking-level-budget-conflict'
+        )) {
+            events.push(event);
+        }
+
+        expect(generateContentStream).not.toHaveBeenCalled();
+        expect(events.some(event => event.type === 'error' && event.error.includes('thinking_level'))).toBe(true);
     });
 
     it('passes abort signals through config for Gemini streaming requests', async () => {

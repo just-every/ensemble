@@ -109,6 +109,8 @@ export interface ModelSettings {
     seed?: number;
     /** Generic thinking budget in provider-specific units (provider implementations interpret this). */
     thinking_budget?: number;
+    /** Native provider thinking level where supported, such as Gemini 3 `thinkingLevel`. */
+    thinking_level?: 'minimal' | 'low' | 'medium' | 'high';
     text?: { format: string };
     tool_choice?: 'auto' | 'none' | 'required' | { type: string; function: { name: string } };
     sequential_tools?: boolean; // Run tools sequentially instead of in parallel
