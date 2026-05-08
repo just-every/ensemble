@@ -3329,6 +3329,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             'Qwen3.6 Plus via OpenRouter. Flagship Qwen 3.6 model with 1M context, multimodal input, reasoning support, and strong agentic coding performance.',
     },
 
+    // Qwen3.6 Flash (via OpenRouter)
+    {
+        id: 'qwen/qwen3.6-flash',
+        aliases: ['Qwen3.6 Flash', 'qwen3.6-flash', 'qwen-3.6-flash'],
+        provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3.6-flash',
+        cost: {
+            input_per_million: 0.25,
+            cached_input_per_million: 0.3125,
+            output_per_million: 1.5,
+        },
+        features: {
+            context_length: 1000000,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Qwen3.6 Flash via OpenRouter. Fast multimodal Qwen 3.6 model with 1M context and reasoning support.',
+    },
+
     // Qwen3.6 35B A3B (via OpenRouter)
     {
         id: 'qwen/qwen3.6-35b-a3b',
@@ -3353,6 +3379,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         description:
             'Qwen3.6 35B A3B via OpenRouter. Open-weight multimodal sparse MoE model with 35B total parameters, 3B active parameters, and integrated thinking mode.',
+    },
+
+    // Qwen3.6 Max Preview (via OpenRouter)
+    {
+        id: 'qwen/qwen3.6-max-preview',
+        aliases: ['Qwen3.6 Max Preview', 'qwen3.6-max-preview', 'qwen-3.6-max-preview'],
+        provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3.6-max-preview',
+        cost: {
+            input_per_million: 1.04,
+            cached_input_per_million: 1.3,
+            output_per_million: 6.24,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Qwen3.6 Max Preview via OpenRouter. High-capability Qwen 3.6 preview model with 262k context and reasoning support.',
     },
 
     // Qwen3.6 27B (via OpenRouter)

@@ -87,7 +87,9 @@ describe('latest OpenRouter model support', () => {
 
     it('registers Qwen 3.6 Plus and current smaller Qwen 3.6 variants', async () => {
         const plus = findModel('Qwen 3.6');
+        const flash = findModel('qwen3.6-flash');
         const a3b = findModel('qwen3.6-35b-a3b');
+        const maxPreview = findModel('qwen3.6-max-preview');
         const dense = findModel('qwen3.6-27b');
 
         expect(plus?.id).toBe('qwen/qwen3.6-plus');
@@ -110,6 +112,27 @@ describe('latest OpenRouter model support', () => {
             reasoning_output: true,
         });
 
+        expect(flash?.id).toBe('qwen/qwen3.6-flash');
+        expect(await getModelFromAgent({ agent_id: 'qwen-flash', model: 'qwen-3.6-flash' } as any)).toBe(
+            'qwen/qwen3.6-flash'
+        );
+        expect(getProviderFromModel('qwen/qwen3.6-flash')).toBe('openrouter');
+        expect(flash?.cost).toMatchObject({
+            input_per_million: 0.25,
+            cached_input_per_million: 0.3125,
+            output_per_million: 1.5,
+        });
+        expect(flash?.features).toMatchObject({
+            context_length: 1000000,
+            max_output_tokens: 65536,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        });
+
         expect(a3b?.id).toBe('qwen/qwen3.6-35b-a3b');
         expect(a3b?.cost).toMatchObject({
             input_per_million: 0.1612,
@@ -117,6 +140,27 @@ describe('latest OpenRouter model support', () => {
             output_per_million: 0.96525,
         });
         expect(a3b?.features?.max_output_tokens).toBe(65536);
+
+        expect(maxPreview?.id).toBe('qwen/qwen3.6-max-preview');
+        expect(await getModelFromAgent({ agent_id: 'qwen-max-preview', model: 'qwen-3.6-max-preview' } as any)).toBe(
+            'qwen/qwen3.6-max-preview'
+        );
+        expect(getProviderFromModel('qwen/qwen3.6-max-preview')).toBe('openrouter');
+        expect(maxPreview?.cost).toMatchObject({
+            input_per_million: 1.04,
+            cached_input_per_million: 1.3,
+            output_per_million: 6.24,
+        });
+        expect(maxPreview?.features).toMatchObject({
+            context_length: 262144,
+            max_output_tokens: 65536,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        });
 
         expect(dense?.id).toBe('qwen/qwen3.6-27b');
         expect(dense?.cost).toMatchObject({
