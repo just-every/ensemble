@@ -342,8 +342,13 @@ describe('Codex provider', () => {
 
     it('aborts the codex subprocess when the agent abort signal fires', async () => {
         let child: ReturnType<typeof createMockChild> | undefined;
+        let markSpawned!: () => void;
+        const spawned = new Promise<void>(resolve => {
+            markSpawned = resolve;
+        });
         spawnMock.mockImplementation(() => {
             child = createMockChild();
+            markSpawned();
             return child;
         });
 
@@ -360,9 +365,7 @@ describe('Codex provider', () => {
             )
         );
 
-        for (let attempt = 0; attempt < 20 && !child; attempt++) {
-            await new Promise(resolve => setImmediate(resolve));
-        }
+        await spawned;
         controller.abort();
         const events = await eventsPromise;
 
