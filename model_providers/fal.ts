@@ -10,7 +10,7 @@ import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_l
 // Also used as fallback for Flux family
 type FalEndpoint = {
     path: string;
-    bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' | 'ideogram-v3' | 'ideogram-v3-edit';
+    bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' | 'ideogram-v3' | 'ideogram-v3-edit' | 'outpaint';
 };
 
 const IMAGE2SVG_OPTION_KEYS = [
@@ -83,6 +83,13 @@ export class FALProvider extends BaseModelProvider {
         }
         if (m === 'fal-ai/image2svg' || m === 'image2svg' || m === 'fal-image2svg') {
             return { path: 'fal-ai/image2svg', bodyMode: 'image2svg' };
+        }
+        if (
+            m === 'fal-ai/image-apps-v2/outpaint' ||
+            m === 'fal-image-apps-v2-outpaint' ||
+            m === 'fal-ai-image-apps-v2-outpaint'
+        ) {
+            return { path: 'fal-ai/image-apps-v2/outpaint', bodyMode: 'outpaint' };
         }
         if (m.startsWith('recraft')) return { path: 'fal-ai/recraft/v3/text-to-image', bodyMode: 'top' };
         if (m.includes('runway') || m.includes('gen4')) return { path: 'runwayml/gen4-image', bodyMode: 'input' };
@@ -217,6 +224,47 @@ export class FALProvider extends BaseModelProvider {
         return body;
     }
 
+    private buildOutpaintBody(prompt: string, opts: ImageGenerationOpts): Record<string, unknown> {
+        const body: Record<string, unknown> = {
+            image_url: this.singleSourceImageUrl(opts, 'fal-ai/image-apps-v2/outpaint'),
+            num_images: clampFalIdeogramImageCount(opts.n),
+        };
+
+        if (prompt) {
+            body.prompt = prompt;
+        }
+
+        if (opts.expand_left !== undefined) {
+            body.expand_left = opts.expand_left;
+        }
+        if (opts.expand_right !== undefined) {
+            body.expand_right = opts.expand_right;
+        }
+        if (opts.expand_top !== undefined) {
+            body.expand_top = opts.expand_top;
+        }
+        if (opts.expand_bottom !== undefined) {
+            body.expand_bottom = opts.expand_bottom;
+        }
+        if (opts.zoom_out_percentage !== undefined) {
+            body.zoom_out_percentage = opts.zoom_out_percentage;
+        }
+        if (opts.enable_safety_checker !== undefined) {
+            body.enable_safety_checker = opts.enable_safety_checker;
+        }
+        if (opts.output_format) {
+            body.output_format = opts.output_format;
+        }
+        if (opts?.response_format === 'b64_json') {
+            body.sync_mode = true;
+        }
+        if (typeof opts.seed === 'number' && Number.isFinite(opts.seed)) {
+            body.seed = Math.floor(opts.seed);
+        }
+
+        return body;
+    }
+
     private buildBody(
         prompt: string,
         bodyMode: FalEndpoint['bodyMode'],
@@ -242,6 +290,9 @@ export class FALProvider extends BaseModelProvider {
 
         if (bodyMode === 'ideogram-v3-edit') {
             return this.buildIdeogramV3EditBody(prompt, opts);
+        }
+        if (bodyMode === 'outpaint') {
+            return this.buildOutpaintBody(prompt, opts);
         }
 
         const size = mapImageSize(opts.size);
@@ -274,6 +325,33 @@ export class FALProvider extends BaseModelProvider {
         return images;
     }
 
+    private getOutpaintCostImageCount(data: any, fallbackImageCount: number): number {
+        const candidates = data?.images || data?.output?.images || [];
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return fallbackImageCount;
+        }
+
+        let totalMegapixels = 0;
+        for (const item of candidates) {
+            if (!item || typeof item !== 'object') {
+                return fallbackImageCount;
+            }
+
+            const width = typeof item.width === 'number' ? item.width : undefined;
+            const height = typeof item.height === 'number' ? item.height : undefined;
+            if (!width || !height) {
+                return fallbackImageCount;
+            }
+
+            if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
+                return fallbackImageCount;
+            }
+            totalMegapixels += (width * height) / 1_000_000;
+        }
+
+        return totalMegapixels;
+    }
+
     async createImage(
         prompt: string,
         model: string,
@@ -300,13 +378,15 @@ export class FALProvider extends BaseModelProvider {
             const images = this.extractImages(data);
             if (!images.length) throw new Error('FAL: no image url in response');
             if (findModel(model)) {
+                const imageCount =
+                    bodyMode === 'outpaint' ? this.getOutpaintCostImageCount(data, images.length) : images.length;
                 const renderingSpeed =
                     bodyMode === 'ideogram-v3' || bodyMode === 'ideogram-v3-edit'
                         ? mapIdeogramV3RenderingSpeed(opts.quality)
                         : null;
                 costTracker.addUsage({
                     model,
-                    image_count: images.length,
+                    image_count: imageCount,
                     request_id: opts?.request_id,
                     metadata: {
                         source: 'fal',

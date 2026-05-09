@@ -383,6 +383,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Ideogram V3 image editing via FAL.ai. Inpaints one source image with a same-dimension mask. TURBO is $0.03/image, BALANCED is $0.06/image, and QUALITY is $0.09/image.',
     },
     {
+        id: 'fal-ai/image-apps-v2/outpaint',
+        aliases: ['fal-image-apps-v2-outpaint', 'fal-ai-image-apps-v2-outpaint'],
+        provider: 'fal',
+        cost: { per_image: 0.035 },
+        features: { input_modality: ['text', 'image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description:
+            'FAL image-apps-v2 outpaint. Charges are billed at $0.035 per output megapixel.',
+    },
+    {
         id: 'fal-ai/image2svg',
         aliases: ['image2svg', 'fal-image2svg'],
         provider: 'fal',

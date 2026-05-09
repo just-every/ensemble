@@ -941,6 +941,21 @@ export interface ImageGenerationOpts {
     /** BytePlus: guidance scale (not supported by seedream-4.0; included for API compatibility) */
     guidance_scale?: number;
 
+    /** FAL image-apps-v2/outpaint: number of pixels to expand the canvas to the left (0-700) */
+    expand_left?: number;
+    /** FAL image-apps-v2/outpaint: number of pixels to expand the canvas to the right (0-700) */
+    expand_right?: number;
+    /** FAL image-apps-v2/outpaint: number of pixels to expand the canvas at the top (0-700) */
+    expand_top?: number;
+    /** FAL image-apps-v2/outpaint: number of pixels to expand the canvas at the bottom (0-700) */
+    expand_bottom?: number;
+    /** FAL image-apps-v2/outpaint: percentage to zoom out the image */
+    zoom_out_percentage?: number;
+    /** FAL image-apps-v2/outpaint: output image format */
+    output_format?: 'png' | 'jpeg' | 'jpg' | 'webp';
+    /** FAL image-apps-v2/outpaint: toggle safety checker */
+    enable_safety_checker?: boolean;
+
     /** FAL image2svg controls */
     image2svg?: {
         colormode?: 'color' | 'binary';
