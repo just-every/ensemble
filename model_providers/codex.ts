@@ -17,7 +17,7 @@ import {
     CodexImageAttachmentWriter,
     listCodexGeneratedImages,
     newestFirst,
-    readGeneratedCodexImages,
+    readGeneratedCodexImageFiles,
 } from './codex_assets.js';
 
 type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
@@ -25,18 +25,6 @@ type CodexReasoningEffortInput = 'none' | 'minimal' | CodexReasoningEffort;
 
 const CODEX_MODEL_PREFIX = 'codex-';
 const CODEX_GPT_IMAGE_MODEL = 'codex-gpt-image-2';
-const CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA = {
-    type: 'object',
-    properties: {
-        images: {
-            type: 'array',
-            items: { type: 'string' },
-            minItems: 1,
-        },
-    },
-    required: ['images'],
-    additionalProperties: false,
-};
 const CODEX_DISABLED_FEATURES = [
     'plugins',
     'apps',
@@ -442,13 +430,14 @@ function buildCodexImagePrompt(prompt: string, opts: ImageGenerationOpts = {}): 
     const count = opts.n && opts.n > 0 ? Math.floor(opts.n) : 1;
     const details = [
         '$imagegen',
-        `Generate ${count} image${count === 1 ? '' : 's'} for this request.`,
+        `Generate exactly ${count} image${count === 1 ? '' : 's'} for this request.`,
+        'Actually invoke the image generation tool. Do not invent or predict file paths.',
+        'After generation completes, return only the generated local image file path(s), one per line.',
         opts.source_images ? 'Use the attached image input(s) as reference material for the generation or edit.' : undefined,
         opts.size ? `Requested size or aspect ratio: ${opts.size}.` : undefined,
         opts.quality ? `Requested quality: ${opts.quality}.` : undefined,
         opts.background ? `Requested background: ${opts.background}.` : undefined,
         opts.input_fidelity ? `Requested input fidelity: ${opts.input_fidelity}.` : undefined,
-        'Return only JSON matching the supplied schema. The images array must contain generated image file paths, data URLs, or HTTPS URLs.',
         '',
         prompt,
     ].filter(Boolean);
@@ -475,11 +464,10 @@ async function executeCodexImageGeneration(
     const tempDir = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-'));
     const imageWriter = new CodexImageAttachmentWriter(tempDir, cwd);
     const lastMessagePath = path.join(tempDir, 'last-message.json');
-    const schemaPath = path.join(tempDir, 'image-output-schema.json');
+    const expectedImageCount = opts.n && opts.n > 0 ? Math.floor(opts.n) : 1;
 
     try {
         const images = await imageWriter.materializeSourceImages(opts.source_images);
-        await writeFile(schemaPath, JSON.stringify(CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA, null, 2), 'utf8');
 
         const beforeGeneratedImages = new Set(await listCodexGeneratedImages(codexHome));
         const commandArgs = [
@@ -488,8 +476,6 @@ async function executeCodexImageGeneration(
             '--ignore-user-config',
             '--ignore-rules',
             ...disabledFeatureArgs(true),
-            '--output-schema',
-            schemaPath,
             ...(images.length > 0 ? ['--image', images.join(',')] : []),
             '--output-last-message',
             lastMessagePath,
@@ -508,7 +494,7 @@ async function executeCodexImageGeneration(
                 cwd,
                 prompt: codexPrompt,
                 images,
-                schema: CODEX_IMAGE_GENERATION_OUTPUT_SCHEMA,
+                expected_image_count: expectedImageCount,
             },
             new Date(),
             opts.request_id,
@@ -529,8 +515,12 @@ async function executeCodexImageGeneration(
         const rawLastMessage = await readFile(lastMessagePath, 'utf8');
         const afterGeneratedImages = await listCodexGeneratedImages(codexHome);
         const newGeneratedImages = await newestFirst(afterGeneratedImages.filter(filePath => !beforeGeneratedImages.has(filePath)));
-        const generatedImages = await readGeneratedCodexImages(rawLastMessage, cwd, newGeneratedImages);
-        log_llm_response(loggedRequestId, { image_count: generatedImages.length, images: generatedImages });
+        const generatedImages = await readGeneratedCodexImageFiles(newGeneratedImages, expectedImageCount);
+        log_llm_response(loggedRequestId, {
+            image_count: generatedImages.length,
+            generated_image_paths: newGeneratedImages.slice(0, expectedImageCount),
+            last_message: rawLastMessage.trim(),
+        });
         costTracker.addUsage({
             model,
             image_count: generatedImages.length,

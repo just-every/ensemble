@@ -184,58 +184,22 @@ export async function listCodexGeneratedImages(codexHome: string): Promise<strin
     return images;
 }
 
-export async function readGeneratedCodexImages(
-    rawContent: string,
-    cwd: string,
-    newGeneratedImagePaths: string[] = []
-): Promise<string[]> {
-    const parsed = JSON.parse(rawContent.trim());
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.images)) {
-        throw new Error('Codex image generation response must be JSON with an images array.');
+export async function readGeneratedCodexImageFiles(generatedImagePaths: string[], expectedCount: number): Promise<string[]> {
+    if (generatedImagePaths.length < expectedCount) {
+        throw new Error(
+            `Codex image generation created ${generatedImagePaths.length} image artifact${
+                generatedImagePaths.length === 1 ? '' : 's'
+            }, expected ${expectedCount}.`
+        );
     }
 
-    const images: string[] = [];
-    const unusedGeneratedImages = [...newGeneratedImagePaths];
-    for (const image of parsed.images) {
-        if (typeof image !== 'string' || !image.trim()) {
-            throw new Error('Codex image generation response images must be non-empty strings.');
-        }
-        images.push(await normalizeGeneratedImageReference(image.trim(), cwd, unusedGeneratedImages));
-    }
-
-    if (images.length === 0) {
-        throw new Error('Codex image generation response did not include any images.');
-    }
-
-    return images;
-}
-
-async function normalizeGeneratedImageReference(
-    reference: string,
-    cwd: string,
-    unusedGeneratedImages: string[]
-): Promise<string> {
-    if (reference.startsWith('data:image/') || isHttpUrl(reference)) {
-        return reference;
-    }
-
-    const filePath = path.isAbsolute(reference) ? reference : path.resolve(cwd, reference);
-    try {
-        const data = await readFile(filePath);
-        return `data:${mimeFromPath(filePath)};base64,${data.toString('base64')}`;
-    } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-            throw error;
-        }
-    }
-
-    const generatedPath = unusedGeneratedImages.shift();
-    if (!generatedPath) {
-        throw new Error(`Codex image generation returned an unreadable image path: ${reference}`);
-    }
-
-    const data = await readFile(generatedPath);
-    return `data:${mimeFromPath(generatedPath)};base64,${data.toString('base64')}`;
+    const selectedPaths = generatedImagePaths.slice(0, expectedCount);
+    return Promise.all(
+        selectedPaths.map(async filePath => {
+            const data = await readFile(filePath);
+            return `data:${mimeFromPath(filePath)};base64,${data.toString('base64')}`;
+        })
+    );
 }
 
 export async function newestFirst(paths: string[]): Promise<string[]> {

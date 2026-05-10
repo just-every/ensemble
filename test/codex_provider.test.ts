@@ -438,6 +438,7 @@ describe('Codex provider', () => {
 
     it('runs codex-gpt-image-2 through Codex image generation with source images', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-test-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-home-'));
         const sourcePng =
             'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+XxkAAAAASUVORK5CYII=';
         const generatedPng = Buffer.from(sourcePng.split(',')[1], 'base64');
@@ -448,20 +449,29 @@ describe('Codex provider', () => {
                 expect(invocation.args).not.toContain('image_generation');
                 expect(invocation.args).not.toContain('-m');
                 expect(getArg(invocation.args, '--cd')).toBe(cwd);
-                expect(getArg(invocation.args, '--output-schema')).toContain('image-output-schema.json');
+                expect(invocation.args).not.toContain('--output-schema');
                 const imageArg = getArg(invocation.args, '--image');
                 expect(await readFile(imageArg)).toEqual(Buffer.from(sourcePng.split(',')[1], 'base64'));
                 expect(invocation.stdin).toContain('$imagegen');
+                expect(invocation.stdin).toContain('Actually invoke the image generation tool.');
                 expect(invocation.stdin).toContain('Requested size or aspect ratio: 1024x1024.');
                 expect(invocation.stdin).toContain('Requested quality: high.');
-                await writeFile(path.join(cwd, 'generated.png'), generatedPng);
+                const generatedDir = path.join(codexHome, 'generated_images', 'session-id');
+                await mkdir(generatedDir, { recursive: true });
+                await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
             });
 
             const provider = new CodexProvider();
             const images = await provider.createImage(
                 'Create a polished app icon from the reference.',
                 'codex-gpt-image-2',
-                { agent_id: 'test-codex-image-generation', cwd } as any,
+                {
+                    agent_id: 'test-codex-image-generation',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
                 {
                     source_images: [sourcePng],
                     size: '1024x1024',
@@ -472,10 +482,11 @@ describe('Codex provider', () => {
             expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
         } finally {
             await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
         }
     });
 
-    it('uses new Codex generated image artifacts when the final JSON path is unreadable', async () => {
+    it('returns new Codex generated image artifacts instead of last-message paths', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
         const generatedPng = Buffer.from('generated-codex-image');
@@ -502,6 +513,34 @@ describe('Codex provider', () => {
             );
 
             expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
+    it('fails Codex image generation when no new image artifact is created', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
+
+        try {
+            mockSuccessfulCodex('/Users/example/.codex/generated_images/predicted-but-missing.png');
+
+            const provider = new CodexProvider();
+            await expect(
+                provider.createImage(
+                    'Create one image.',
+                    'codex-gpt-image-2',
+                    {
+                        agent_id: 'test-codex-image-missing-artifact',
+                        cwd,
+                        modelSettings: {
+                            codex_home: codexHome,
+                        },
+                    } as any,
+                    {}
+                )
+            ).rejects.toThrow('Codex image generation created 0 image artifacts, expected 1.');
         } finally {
             await rm(cwd, { recursive: true, force: true });
             await rm(codexHome, { recursive: true, force: true });
