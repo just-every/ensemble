@@ -126,6 +126,7 @@ describe('Codex provider', () => {
             expect(invocation.args).toContain('--ephemeral');
             expect(invocation.args).toContain('--ignore-user-config');
             expect(invocation.args).toContain('--ignore-rules');
+            expect(invocation.args).toContain('--skip-git-repo-check');
             expect(invocation.args.filter(arg => arg === '--disable')).toHaveLength(13);
             expect(invocation.args).toContain('model_reasoning_effort="high"');
             expect(invocation.args.some(arg => arg.startsWith('model_instructions_file='))).toBe(false);
@@ -446,6 +447,7 @@ describe('Codex provider', () => {
         try {
             mockSuccessfulCodex('{"images":["generated.png"]}', async invocation => {
                 expect(invocation.args.filter(arg => arg === '--disable')).toHaveLength(12);
+                expect(invocation.args).toContain('--skip-git-repo-check');
                 expect(invocation.args).not.toContain('image_generation');
                 expect(invocation.args).not.toContain('-m');
                 expect(getArg(invocation.args, '--cd')).toBe(cwd);
