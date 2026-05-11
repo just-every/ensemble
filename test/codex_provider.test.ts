@@ -451,7 +451,9 @@ describe('Codex provider', () => {
                 expect(invocation.args).toContain('--skip-git-repo-check');
                 expect(invocation.args).not.toContain('image_generation');
                 expect(invocation.args).not.toContain('-m');
-                expect(getArg(invocation.args, '--cd')).toBe(cwd);
+                const codexOutputDir = getArg(invocation.args, '--cd');
+                expect(codexOutputDir).toContain('ensemble-codex-image-');
+                expect(codexOutputDir).not.toBe(cwd);
                 expect(invocation.options.env.CODEX_HOME).toBe(codexHome);
                 expect(invocation.args).not.toContain('--output-schema');
                 const imageArg = getArg(invocation.args, '--image');
@@ -460,9 +462,7 @@ describe('Codex provider', () => {
                 expect(invocation.stdin).toContain('Actually invoke the image generation tool.');
                 expect(invocation.stdin).toContain('Requested size or aspect ratio: 1024x1024.');
                 expect(invocation.stdin).toContain('Requested quality: high.');
-                const generatedDir = path.join(codexHome, 'generated_images', 'session-id');
-                await mkdir(generatedDir, { recursive: true });
-                await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
+                await writeFile(path.join(codexOutputDir, 'generated.png'), generatedPng);
             });
 
             const provider = new CodexProvider();
@@ -499,9 +499,7 @@ describe('Codex provider', () => {
             mockSuccessfulCodex('{"images":["generated.png"]}', async invocation => {
                 expect(getArg(invocation.args, '-m')).toBe('gpt-5.3-codex-spark');
                 expect(invocation.args).toContain('model_reasoning_effort="medium"');
-                const generatedDir = path.join(codexHome, 'generated_images', 'session-id');
-                await mkdir(generatedDir, { recursive: true });
-                await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
+                await writeFile(path.join(getArg(invocation.args, '--cd'), 'generated.png'), generatedPng);
             });
 
             const provider = new CodexProvider();
@@ -527,10 +525,9 @@ describe('Codex provider', () => {
         }
     });
 
-    it('falls back to the next Codex prompt model when the first image prompt model produces no artifact', async () => {
+    it('caches Codex prompt models that cannot call image generation', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-fallback-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-fallback-home-'));
-        const generatedPng = Buffer.from('generated-with-fallback-prompt-model');
         let invocationCount = 0;
 
         try {
@@ -541,15 +538,22 @@ describe('Codex provider', () => {
                     try {
                         if (invocationCount === 1) {
                             expect(getArg(args, '-m')).toBe('gpt-5.3-codex-spark');
-                            await writeFile(getArg(args, '--output-last-message'), 'No image was generated.', 'utf8');
+                            await writeFile(
+                                getArg(args, '--output-last-message'),
+                                'Cannot fulfill: this session has no callable image generation tool/API available.',
+                                'utf8'
+                            );
                         } else {
                             expect(command).toBe('codex');
                             expect(getArg(args, '-m')).toBe('gpt-5.5');
                             expect(args).toContain('model_reasoning_effort="low"');
-                            const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'session-id');
-                            await mkdir(generatedDir, { recursive: true });
-                            await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
-                            await writeFile(getArg(args, '--output-last-message'), '{"images":["generated.png"]}', 'utf8');
+                            const outputPath = path.join(cwd, `fallback-${invocationCount}.png`);
+                            await writeFile(outputPath, Buffer.from(`generated-with-fallback-${invocationCount}`));
+                            await writeFile(
+                                getArg(args, '--output-last-message'),
+                                JSON.stringify({ images: [outputPath] }),
+                                'utf8'
+                            );
                         }
                         child.emit('close', 0, null);
                     } catch (error) {
@@ -577,23 +581,44 @@ describe('Codex provider', () => {
             );
 
             expect(invocationCount).toBe(2);
-            expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+            expect(images).toEqual([
+                `data:image/png;base64,${Buffer.from('generated-with-fallback-2').toString('base64')}`,
+            ]);
+
+            const nextImages = await provider.createImage(
+                'Create another image.',
+                'codex-gpt-image-2',
+                {
+                    agent_id: 'test-codex-image-prompt-model-fallback-repeat',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
+                {
+                    prompt_model: 'codex-gpt-5.3-codex-spark',
+                    prompt_model_fallbacks: ['codex-gpt-5.5-low'],
+                }
+            );
+
+            expect(invocationCount).toBe(3);
+            expect(nextImages).toEqual([
+                `data:image/png;base64,${Buffer.from('generated-with-fallback-3').toString('base64')}`,
+            ]);
         } finally {
             await rm(cwd, { recursive: true, force: true });
             await rm(codexHome, { recursive: true, force: true });
         }
     });
 
-    it('falls back to global generated image artifacts when response paths are missing', async () => {
+    it('recovers images saved to the isolated Codex output directory when response paths are missing', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
         const generatedPng = Buffer.from('generated-codex-image');
 
         try {
-            mockSuccessfulCodex('{"images":["/missing/generated-image.png"]}', async () => {
-                const generatedDir = path.join(codexHome, 'generated_images', 'session-id');
-                await mkdir(generatedDir, { recursive: true });
-                await writeFile(path.join(generatedDir, 'ig_real.png'), generatedPng);
+            mockSuccessfulCodex('{"images":["/missing/generated-image.png"]}', async ({ args }) => {
+                await writeFile(path.join(getArg(args, '--cd'), 'ig_real.png'), generatedPng);
             });
 
             const provider = new CodexProvider();
@@ -617,20 +642,17 @@ describe('Codex provider', () => {
         }
     });
 
-    it('prefers image paths from the Codex last message over concurrent global artifacts', async () => {
+    it('prefers image paths from the Codex last message over isolated output artifacts', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
         const responsePng = Buffer.from('response-image');
-        const globalPng = Buffer.from('global-sibling-image');
+        const outputPng = Buffer.from('output-image');
         const responsePath = path.join(cwd, 'response.png');
 
         try {
-            mockSuccessfulCodex(JSON.stringify({ images: [responsePath] }), async () => {
+            mockSuccessfulCodex(JSON.stringify({ images: [responsePath] }), async ({ args }) => {
                 await writeFile(responsePath, responsePng);
-
-                const globalGeneratedDir = path.join(codexHome, 'generated_images', 'other-session-id');
-                await mkdir(globalGeneratedDir, { recursive: true });
-                await writeFile(path.join(globalGeneratedDir, 'ig_global.png'), globalPng);
+                await writeFile(path.join(getArg(args, '--cd'), 'ig_output.png'), outputPng);
             });
 
             const provider = new CodexProvider();
@@ -718,7 +740,7 @@ describe('Codex provider', () => {
         }
     });
 
-    it('serializes Codex generated-image fallback per Codex home', async () => {
+    it('runs Codex image artifact recovery concurrently with isolated output directories', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
         let activeExecutions = 0;
@@ -736,14 +758,8 @@ describe('Codex provider', () => {
 
                 try {
                     await new Promise(resolve => setTimeout(resolve, 25));
-                    const generatedDir = path.join(
-                        options.env.CODEX_HOME,
-                        'generated_images',
-                        `session-${invocationIndex}`
-                    );
-                    await mkdir(generatedDir, { recursive: true });
                     await writeFile(
-                        path.join(generatedDir, `ig_${invocationIndex}.png`),
+                        path.join(getArg(args, '--cd'), `ig_${invocationIndex}.png`),
                         Buffer.from(`image-${invocationIndex}`)
                     );
                     await writeFile(
@@ -791,11 +807,11 @@ describe('Codex provider', () => {
                 ),
             ]);
 
-            expect(maxActiveExecutions).toBe(1);
             expect([firstImages[0], secondImages[0]].sort()).toEqual([
                 `data:image/png;base64,${Buffer.from('image-1').toString('base64')}`,
                 `data:image/png;base64,${Buffer.from('image-2').toString('base64')}`,
             ].sort());
+            expect(maxActiveExecutions).toBeGreaterThan(1);
         } finally {
             await rm(cwd, { recursive: true, force: true });
             await rm(codexHome, { recursive: true, force: true });

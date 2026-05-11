@@ -170,8 +170,7 @@ export class CodexImageAttachmentWriter {
     }
 }
 
-export async function listCodexGeneratedImages(codexHome: string): Promise<string[]> {
-    const root = path.join(codexHome, 'generated_images');
+export async function listCodexOutputImages(outputDir: string): Promise<string[]> {
     const images: string[] = [];
 
     async function walk(dir: string): Promise<void> {
@@ -195,7 +194,7 @@ export async function listCodexGeneratedImages(codexHome: string): Promise<strin
         }
     }
 
-    await walk(root);
+    await walk(outputDir);
     return images;
 }
 
