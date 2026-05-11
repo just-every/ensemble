@@ -4,6 +4,9 @@ import type { ImageGenerationOpts, ResponseContent, ResponseContentImageData } f
 import { isValidBase64 } from '../utils/image_validation.js';
 
 const DATA_URL_PATTERN = /^data:([^;]+);base64,(.+)$/i;
+const IMAGE_PATH_PATTERN = /\.(png|jpe?g|webp|gif)$/i;
+const IMAGE_PATH_CANDIDATE_PATTERN =
+    /(\/[^\s"'`<>]+?\.(?:png|jpe?g|webp|gif)|(?:\.{1,2}\/)?[A-Za-z0-9._~@%+=:,/-]+?\.(?:png|jpe?g|webp|gif))/gi;
 
 function isHttpUrl(value: string): boolean {
     return value.startsWith('http://') || value.startsWith('https://');
@@ -24,6 +27,19 @@ function mimeFromPath(filePath: string): string {
     return 'image/png';
 }
 
+function maybeJsonStrings(value: unknown): string[] {
+    if (typeof value === 'string') {
+        return [value];
+    }
+    if (Array.isArray(value)) {
+        return value.flatMap(maybeJsonStrings);
+    }
+    if (value && typeof value === 'object') {
+        return Object.values(value).flatMap(maybeJsonStrings);
+    }
+    return [];
+}
+
 async function existingLocalPath(value: string, cwd: string): Promise<string | undefined> {
     const resolved = path.isAbsolute(value) ? value : path.resolve(cwd, value);
     try {
@@ -42,10 +58,7 @@ export class CodexImageAttachmentWriter {
         private readonly cwd: string
     ) {}
 
-    async collectContent(
-        content: ResponseContent,
-        context: string
-    ): Promise<{ text: string; images: string[] }> {
+    async collectContent(content: ResponseContent, context: string): Promise<{ text: string; images: string[] }> {
         if (typeof content === 'string') {
             return { text: content, images: [] };
         }
@@ -61,7 +74,9 @@ export class CodexImageAttachmentWriter {
 
             if (part.type === 'input_image') {
                 if (part.file_id) {
-                    throw new Error(`Codex provider does not support file_id image inputs; ${context} contains file_id.`);
+                    throw new Error(
+                        `Codex provider does not support file_id image inputs; ${context} contains file_id.`
+                    );
                 }
                 if (!part.image_url) {
                     throw new Error(`Codex provider image input is missing image_url; ${context}.`);
@@ -115,9 +130,7 @@ export class CodexImageAttachmentWriter {
         }
 
         const buffer =
-            part.data instanceof Uint8Array
-                ? Buffer.from(part.data)
-                : Buffer.from(new Uint8Array(part.data));
+            part.data instanceof Uint8Array ? Buffer.from(part.data) : Buffer.from(new Uint8Array(part.data));
         return this.writeImageBuffer(buffer, part.mime_type || 'image/png');
     }
 
@@ -130,7 +143,9 @@ export class CodexImageAttachmentWriter {
         if (isHttpUrl(value)) {
             const response = await fetch(value);
             if (!response.ok) {
-                throw new Error(`Codex provider failed to fetch image ${value}: ${response.status} ${response.statusText}`);
+                throw new Error(
+                    `Codex provider failed to fetch image ${value}: ${response.status} ${response.statusText}`
+                );
             }
             const responseMime = response.headers.get('content-type') || mimeType || 'image/png';
             return this.writeImageBuffer(Buffer.from(await response.arrayBuffer()), responseMime);
@@ -184,7 +199,10 @@ export async function listCodexGeneratedImages(codexHome: string): Promise<strin
     return images;
 }
 
-export async function readGeneratedCodexImageFiles(generatedImagePaths: string[], expectedCount: number): Promise<string[]> {
+export async function readGeneratedCodexImageFiles(
+    generatedImagePaths: string[],
+    expectedCount: number
+): Promise<string[]> {
     if (generatedImagePaths.length < expectedCount) {
         throw new Error(
             `Codex image generation created ${generatedImagePaths.length} image artifact${
@@ -200,6 +218,57 @@ export async function readGeneratedCodexImageFiles(generatedImagePaths: string[]
             return `data:${mimeFromPath(filePath)};base64,${data.toString('base64')}`;
         })
     );
+}
+
+export async function readCodexImageFiles(imagePaths: string[]): Promise<string[]> {
+    return Promise.all(
+        imagePaths.map(async filePath => {
+            const data = await readFile(filePath);
+            return `data:${mimeFromPath(filePath)};base64,${data.toString('base64')}`;
+        })
+    );
+}
+
+export async function extractExistingCodexImagePaths(rawLastMessage: string, cwd: string): Promise<string[]> {
+    const trimmed = rawLastMessage.trim();
+    if (!trimmed) return [];
+
+    let candidates: string[] = [];
+    try {
+        candidates = maybeJsonStrings(JSON.parse(trimmed));
+    } catch {
+        candidates = [trimmed];
+    }
+
+    const seen = new Set<string>();
+    const paths: string[] = [];
+    const pathCandidates = candidates
+        .flatMap(value => value.split(/\r?\n/))
+        .flatMap(candidate => {
+            const trimmedCandidate = candidate
+                .trim()
+                .replace(/^[-*]\s+/, '')
+                .replace(/^["'`]+|["'`,]+$/g, '');
+            const embedded = Array.from(trimmedCandidate.matchAll(IMAGE_PATH_CANDIDATE_PATTERN), match => match[0]);
+            return embedded.length > 0 ? embedded : [trimmedCandidate];
+        });
+    for (const candidate of pathCandidates) {
+        const cleaned = candidate.replace(/[.,;:)\]}]+$/g, '');
+        if (!cleaned || cleaned.startsWith('data:image/') || !IMAGE_PATH_PATTERN.test(cleaned)) {
+            continue;
+        }
+        const resolved = path.isAbsolute(cleaned) ? cleaned : path.resolve(cwd, cleaned);
+        try {
+            await access(resolved);
+        } catch {
+            continue;
+        }
+        if (!seen.has(resolved)) {
+            seen.add(resolved);
+            paths.push(resolved);
+        }
+    }
+    return paths;
 }
 
 export async function newestFirst(paths: string[]): Promise<string[]> {
