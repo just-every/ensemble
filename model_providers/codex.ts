@@ -16,10 +16,12 @@ import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_l
 import {
     CodexImageAttachmentWriter,
     extractExistingCodexImagePaths,
+    listCodexGeneratedImages,
     listCodexOutputImages,
     newestFirst,
     readCodexImageFiles,
 } from './codex_assets.js';
+import { prepareIsolatedCodexHome } from './codex_home.js';
 
 type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 type CodexReasoningEffortInput = 'none' | 'minimal' | CodexReasoningEffort;
@@ -505,6 +507,7 @@ async function executeCodexImageGeneration(
     const tempDir = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-'));
     const inputDir = path.join(tempDir, 'input');
     const outputDir = path.join(tempDir, 'output');
+    const isolatedCodexHome = await prepareIsolatedCodexHome(codexHome, tempDir);
     const imageWriter = new CodexImageAttachmentWriter(inputDir, cwd);
     const lastMessagePath = path.join(tempDir, 'last-message.json');
     const expectedImageCount = opts.n && opts.n > 0 ? Math.floor(opts.n) : 1;
@@ -563,6 +566,7 @@ async function executeCodexImageGeneration(
                         args: commandArgs,
                         cwd: outputDir,
                         caller_cwd: cwd,
+                        codex_home: isolatedCodexHome,
                         prompt: codexPrompt,
                         images,
                         prompt_model: promptModelAttempt,
@@ -579,7 +583,7 @@ async function executeCodexImageGeneration(
                     cwd: outputDir,
                     env: {
                         ...process.env,
-                        CODEX_HOME: codexHome,
+                        CODEX_HOME: isolatedCodexHome,
                     },
                     prompt: codexPrompt,
                     abortSignal: agent.abortSignal,
@@ -588,8 +592,9 @@ async function executeCodexImageGeneration(
                 const rawLastMessage = await readFile(lastMessagePath, 'utf8');
                 const responseImagePaths = await extractExistingCodexImagePaths(rawLastMessage, outputDir);
                 const outputImagePaths = await newestFirst(await listCodexOutputImages(outputDir));
+                const generatedImagePaths = await newestFirst(await listCodexGeneratedImages(isolatedCodexHome));
                 const selectedImagePaths: string[] = [];
-                for (const filePath of [...responseImagePaths, ...outputImagePaths]) {
+                for (const filePath of [...responseImagePaths, ...outputImagePaths, ...generatedImagePaths]) {
                     if (selectedImagePaths.includes(filePath)) continue;
                     selectedImagePaths.push(filePath);
                     if (selectedImagePaths.length >= expectedImageCount) break;
@@ -610,6 +615,7 @@ async function executeCodexImageGeneration(
                     generated_image_paths: selectedImagePaths,
                     response_image_paths: responseImagePaths,
                     output_image_paths: outputImagePaths,
+                    codex_home_image_paths: generatedImagePaths,
                     last_message: rawLastMessage.trim(),
                 });
                 costTracker.addUsage({

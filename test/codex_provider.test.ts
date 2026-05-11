@@ -456,7 +456,8 @@ describe('Codex provider', () => {
                 const codexOutputDir = getArg(invocation.args, '--cd');
                 expect(codexOutputDir).toContain('ensemble-codex-image-');
                 expect(codexOutputDir).not.toBe(cwd);
-                expect(invocation.options.env.CODEX_HOME).toBe(codexHome);
+                expect(invocation.options.env.CODEX_HOME).not.toBe(codexHome);
+                expect(invocation.options.env.CODEX_HOME).toContain('ensemble-codex-image-');
                 expect(invocation.args).not.toContain('--output-schema');
                 const imageArg = getArg(invocation.args, '--image');
                 expect(await readFile(imageArg)).toEqual(Buffer.from(sourcePng.split(',')[1], 'base64'));
@@ -644,6 +645,39 @@ describe('Codex provider', () => {
         }
     });
 
+    it('recovers images saved to the isolated Codex home when response paths are missing', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
+        const generatedPng = Buffer.from('generated-codex-home-image');
+
+        try {
+            mockSuccessfulCodex('/Users/example/.codex/generated_images/predicted-but-missing.png', async ({ options }) => {
+                const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'test-session');
+                await mkdir(generatedDir, { recursive: true });
+                await writeFile(path.join(generatedDir, 'ig_real.png'), generatedPng);
+            });
+
+            const provider = new CodexProvider();
+            const images = await provider.createImage(
+                'Create one image.',
+                'codex-gpt-image-2',
+                {
+                    agent_id: 'test-codex-image-home-artifact-recovery',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
+                {}
+            );
+
+            expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
     it('prefers image paths from the Codex last message over isolated output artifacts', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
@@ -742,7 +776,7 @@ describe('Codex provider', () => {
         }
     });
 
-    it('runs Codex image artifact recovery concurrently with isolated output directories', async () => {
+    it('runs Codex image artifact recovery concurrently with isolated Codex homes', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
         let activeExecutions = 0;
@@ -760,10 +794,9 @@ describe('Codex provider', () => {
 
                 try {
                     await new Promise(resolve => setTimeout(resolve, 25));
-                    await writeFile(
-                        path.join(getArg(args, '--cd'), `ig_${invocationIndex}.png`),
-                        Buffer.from(`image-${invocationIndex}`)
-                    );
+                    const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', `session-${invocationIndex}`);
+                    await mkdir(generatedDir, { recursive: true });
+                    await writeFile(path.join(generatedDir, `ig_${invocationIndex}.png`), Buffer.from(`image-${invocationIndex}`));
                     await writeFile(
                         getArg(args, '--output-last-message'),
                         'No generated local image file path was returned.',

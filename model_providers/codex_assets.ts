@@ -198,6 +198,10 @@ export async function listCodexOutputImages(outputDir: string): Promise<string[]
     return images;
 }
 
+export async function listCodexGeneratedImages(codexHome: string): Promise<string[]> {
+    return listCodexOutputImages(path.join(codexHome, 'generated_images'));
+}
+
 export async function readGeneratedCodexImageFiles(
     generatedImagePaths: string[],
     expectedCount: number
