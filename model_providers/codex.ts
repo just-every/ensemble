@@ -448,6 +448,22 @@ function buildCodexImagePrompt(prompt: string, opts: ImageGenerationOpts = {}): 
     return details.join('\n');
 }
 
+type CodexImagePromptModelAttempt = (ReturnType<typeof resolveCodexModel> & { requested: string }) | null;
+
+function resolveCodexImagePromptModelAttempts(
+    opts: ImageGenerationOpts,
+    settings?: ModelSettings
+): CodexImagePromptModelAttempt[] {
+    const requestedModels = [opts.prompt_model, ...(opts.prompt_model_fallbacks ?? [])]
+        .map(model => model?.trim() ?? '')
+        .filter((model, index, models): model is string => model.length > 0 && models.indexOf(model) === index);
+    if (requestedModels.length === 0) return [null];
+    return requestedModels.map(requested => ({
+        requested,
+        ...resolveCodexModel(requested, settings),
+    }));
+}
+
 async function executeCodexImageGeneration(
     prompt: string,
     model: string,
@@ -472,88 +488,111 @@ async function executeCodexImageGeneration(
     try {
         return await runWithCodexImageArtifactLock(codexHome, async () => {
             const images = await imageWriter.materializeSourceImages(opts.source_images);
+            const promptModelAttempts = resolveCodexImagePromptModelAttempts(opts, settings);
+            const promptModelErrors: string[] = [];
 
-            const beforeGeneratedImages = new Set(await listCodexGeneratedImages(codexHome));
-            const commandArgs = [
-                'exec',
-                '--ephemeral',
-                '--ignore-user-config',
-                '--ignore-rules',
-                '--skip-git-repo-check',
-                ...disabledFeatureArgs(true),
-                ...(images.length > 0 ? ['--image', images.join(',')] : []),
-                '--output-last-message',
-                lastMessagePath,
-                '--cd',
-                cwd,
-                '-',
-            ];
-            const codexPrompt = buildCodexImagePrompt(prompt, opts);
-            const loggedRequestId = log_llm_request(
-                agent.agent_id || 'default',
-                'codex',
-                model,
-                {
-                    command: 'codex',
-                    args: commandArgs,
-                    cwd,
-                    prompt: codexPrompt,
-                    images,
-                    expected_image_count: expectedImageCount,
-                },
-                new Date(),
-                opts.request_id,
-                agent.tags
-            );
+            for (const promptModelAttempt of promptModelAttempts) {
+                try {
+                    const beforeGeneratedImages = new Set(await listCodexGeneratedImages(codexHome));
+                    const commandArgs = [
+                        'exec',
+                        '--ephemeral',
+                        '--ignore-user-config',
+                        '--ignore-rules',
+                        '--skip-git-repo-check',
+                        ...disabledFeatureArgs(true),
+                        ...(promptModelAttempt
+                            ? [
+                                  '-m',
+                                  promptModelAttempt.model,
+                                  '-c',
+                                  `model_reasoning_effort=${JSON.stringify(promptModelAttempt.effort)}`,
+                              ]
+                            : []),
+                        ...(images.length > 0 ? ['--image', images.join(',')] : []),
+                        '--output-last-message',
+                        lastMessagePath,
+                        '--cd',
+                        cwd,
+                        '-',
+                    ];
+                    const codexPrompt = buildCodexImagePrompt(prompt, opts);
+                    const loggedRequestId = log_llm_request(
+                        agent.agent_id || 'default',
+                        'codex',
+                        model,
+                        {
+                            command: 'codex',
+                            args: commandArgs,
+                            cwd,
+                            prompt: codexPrompt,
+                            images,
+                            prompt_model: promptModelAttempt,
+                            image_model: model,
+                            expected_image_count: expectedImageCount,
+                        },
+                        new Date(),
+                        opts.request_id,
+                        agent.tags
+                    );
 
-            await runCodexExec({
-                commandArgs,
-                cwd,
-                env: {
-                    ...process.env,
-                    CODEX_HOME: codexHome,
-                },
-                prompt: codexPrompt,
-                abortSignal: agent.abortSignal,
-            });
+                    await runCodexExec({
+                        commandArgs,
+                        cwd,
+                        env: {
+                            ...process.env,
+                            CODEX_HOME: codexHome,
+                        },
+                        prompt: codexPrompt,
+                        abortSignal: agent.abortSignal,
+                    });
 
-            const rawLastMessage = await readFile(lastMessagePath, 'utf8');
-            const responseImagePaths = await extractExistingCodexImagePaths(rawLastMessage, cwd);
-            const afterGeneratedImages = await listCodexGeneratedImages(codexHome);
-            const newGeneratedImages = await newestFirst(
-                afterGeneratedImages.filter(filePath => !beforeGeneratedImages.has(filePath))
-            );
-            const selectedImagePaths: string[] = [];
-            for (const filePath of [...responseImagePaths, ...newGeneratedImages]) {
-                if (selectedImagePaths.includes(filePath)) continue;
-                selectedImagePaths.push(filePath);
-                if (selectedImagePaths.length >= expectedImageCount) break;
+                    const rawLastMessage = await readFile(lastMessagePath, 'utf8');
+                    const responseImagePaths = await extractExistingCodexImagePaths(rawLastMessage, cwd);
+                    const afterGeneratedImages = await listCodexGeneratedImages(codexHome);
+                    const newGeneratedImages = await newestFirst(
+                        afterGeneratedImages.filter(filePath => !beforeGeneratedImages.has(filePath))
+                    );
+                    const selectedImagePaths: string[] = [];
+                    for (const filePath of [...responseImagePaths, ...newGeneratedImages]) {
+                        if (selectedImagePaths.includes(filePath)) continue;
+                        selectedImagePaths.push(filePath);
+                        if (selectedImagePaths.length >= expectedImageCount) break;
+                    }
+                    if (selectedImagePaths.length < expectedImageCount) {
+                        throw new Error(
+                            `Codex image generation resolved ${selectedImagePaths.length} image artifact${
+                                selectedImagePaths.length === 1 ? '' : 's'
+                            }, expected ${expectedImageCount}.`
+                        );
+                    }
+                    const generatedImages = await readCodexImageFiles(selectedImagePaths);
+                    log_llm_response(loggedRequestId, {
+                        image_count: generatedImages.length,
+                        generated_image_paths: selectedImagePaths,
+                        response_image_paths: responseImagePaths,
+                        global_fallback_image_paths: newGeneratedImages,
+                        last_message: rawLastMessage.trim(),
+                    });
+                    costTracker.addUsage({
+                        model,
+                        image_count: generatedImages.length,
+                        request_id: opts.request_id,
+                        metadata: {
+                            source: 'codex',
+                            billing: 'codex_usage',
+                            prompt_model: promptModelAttempt?.requested ?? null,
+                        },
+                    });
+                    return generatedImages;
+                } catch (error) {
+                    const label = promptModelAttempt?.requested ?? 'default Codex image prompt model';
+                    const message = error instanceof Error ? error.message : String(error);
+                    promptModelErrors.push(`${label}: ${message}`);
+                }
             }
-            if (selectedImagePaths.length < expectedImageCount) {
-                throw new Error(
-                    `Codex image generation resolved ${selectedImagePaths.length} image artifact${
-                        selectedImagePaths.length === 1 ? '' : 's'
-                    }, expected ${expectedImageCount}.`
-                );
-            }
-            const generatedImages = await readCodexImageFiles(selectedImagePaths);
-            log_llm_response(loggedRequestId, {
-                image_count: generatedImages.length,
-                generated_image_paths: selectedImagePaths,
-                response_image_paths: responseImagePaths,
-                global_fallback_image_paths: newGeneratedImages,
-                last_message: rawLastMessage.trim(),
-            });
-            costTracker.addUsage({
-                model,
-                image_count: generatedImages.length,
-                request_id: opts.request_id,
-                metadata: {
-                    source: 'codex',
-                    billing: 'codex_usage',
-                },
-            });
-            return generatedImages;
+
+            throw new Error(`Codex image generation failed for every prompt model.\n${promptModelErrors.join('\n')}`);
         });
     } catch (error) {
         log_llm_error(opts.request_id, error);

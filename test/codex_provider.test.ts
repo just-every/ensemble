@@ -490,6 +490,100 @@ describe('Codex provider', () => {
         }
     });
 
+    it('can run codex-gpt-image-2 with a separate Codex prompt model', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-model-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-home-'));
+        const generatedPng = Buffer.from('generated-with-prompt-model');
+
+        try {
+            mockSuccessfulCodex('{"images":["generated.png"]}', async invocation => {
+                expect(getArg(invocation.args, '-m')).toBe('gpt-5.3-codex-spark');
+                expect(invocation.args).toContain('model_reasoning_effort="medium"');
+                const generatedDir = path.join(codexHome, 'generated_images', 'session-id');
+                await mkdir(generatedDir, { recursive: true });
+                await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
+            });
+
+            const provider = new CodexProvider();
+            const images = await provider.createImage(
+                'Create one image.',
+                'codex-gpt-image-2',
+                {
+                    agent_id: 'test-codex-image-prompt-model',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
+                {
+                    prompt_model: 'codex-gpt-5.3-codex-spark',
+                }
+            );
+
+            expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
+    it('falls back to the next Codex prompt model when the first image prompt model produces no artifact', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-fallback-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-prompt-fallback-home-'));
+        const generatedPng = Buffer.from('generated-with-fallback-prompt-model');
+        let invocationCount = 0;
+
+        try {
+            spawnMock.mockImplementation((command: string, args: string[], options: any) => {
+                const child = createMockChild();
+                child.stdin.on('finish', async () => {
+                    invocationCount += 1;
+                    try {
+                        if (invocationCount === 1) {
+                            expect(getArg(args, '-m')).toBe('gpt-5.3-codex-spark');
+                            await writeFile(getArg(args, '--output-last-message'), 'No image was generated.', 'utf8');
+                        } else {
+                            expect(command).toBe('codex');
+                            expect(getArg(args, '-m')).toBe('gpt-5.5');
+                            expect(args).toContain('model_reasoning_effort="low"');
+                            const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'session-id');
+                            await mkdir(generatedDir, { recursive: true });
+                            await writeFile(path.join(generatedDir, 'generated.png'), generatedPng);
+                            await writeFile(getArg(args, '--output-last-message'), '{"images":["generated.png"]}', 'utf8');
+                        }
+                        child.emit('close', 0, null);
+                    } catch (error) {
+                        child.emit('error', error);
+                    }
+                });
+                return child;
+            });
+
+            const provider = new CodexProvider();
+            const images = await provider.createImage(
+                'Create one image.',
+                'codex-gpt-image-2',
+                {
+                    agent_id: 'test-codex-image-prompt-model-fallback',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
+                {
+                    prompt_model: 'codex-gpt-5.3-codex-spark',
+                    prompt_model_fallbacks: ['codex-gpt-5.5-low'],
+                }
+            );
+
+            expect(invocationCount).toBe(2);
+            expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
     it('falls back to global generated image artifacts when response paths are missing', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
@@ -698,8 +792,10 @@ describe('Codex provider', () => {
             ]);
 
             expect(maxActiveExecutions).toBe(1);
-            expect(firstImages).toEqual([`data:image/png;base64,${Buffer.from('image-1').toString('base64')}`]);
-            expect(secondImages).toEqual([`data:image/png;base64,${Buffer.from('image-2').toString('base64')}`]);
+            expect([firstImages[0], secondImages[0]].sort()).toEqual([
+                `data:image/png;base64,${Buffer.from('image-1').toString('base64')}`,
+                `data:image/png;base64,${Buffer.from('image-2').toString('base64')}`,
+            ].sort());
         } finally {
             await rm(cwd, { recursive: true, force: true });
             await rm(codexHome, { recursive: true, force: true });

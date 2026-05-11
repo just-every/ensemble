@@ -899,6 +899,20 @@ export interface ImageGenerationOpts {
     quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'auto';
 
     /**
+     * Text/prompt model used by providers that route image generation through a prompting agent.
+     * For codex-gpt-image-2 this controls the Codex CLI model that invokes $imagegen;
+     * the image model remains the top-level model passed to ensembleImage.
+     */
+    prompt_model?: string;
+
+    /**
+     * Ordered fallback prompt models for providers that support prompt_model.
+     * For codex-gpt-image-2, each fallback retries the Codex CLI prompt runner while keeping
+     * the same top-level image model.
+     */
+    prompt_model_fallbacks?: string[];
+
+    /**
      * Provider-neutral detail hint for source image inputs.
      * OpenAI maps this to input/detail fidelity where supported; Gemini maps it to mediaResolution.
      * When omitted, Ensemble leaves provider defaults untouched.
