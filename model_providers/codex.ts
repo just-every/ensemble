@@ -535,6 +535,8 @@ async function executeCodexImageGeneration(
                     '--ignore-user-config',
                     '--ignore-rules',
                     '--skip-git-repo-check',
+                    '--enable',
+                    'image_generation',
                     ...disabledFeatureArgs(true),
                     ...(promptModelAttempt
                         ? [

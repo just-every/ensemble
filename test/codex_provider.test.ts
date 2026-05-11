@@ -448,8 +448,10 @@ describe('Codex provider', () => {
         try {
             mockSuccessfulCodex('{"images":["generated.png"]}', async invocation => {
                 expect(invocation.args.filter(arg => arg === '--disable')).toHaveLength(12);
+                expect(invocation.args.filter(arg => arg === '--enable')).toHaveLength(1);
+                expect(getArg(invocation.args, '--enable')).toBe('image_generation');
                 expect(invocation.args).toContain('--skip-git-repo-check');
-                expect(invocation.args).not.toContain('image_generation');
+                expect(invocation.args.some((arg, index) => arg === '--disable' && invocation.args[index + 1] === 'image_generation')).toBe(false);
                 expect(invocation.args).not.toContain('-m');
                 const codexOutputDir = getArg(invocation.args, '--cd');
                 expect(codexOutputDir).toContain('ensemble-codex-image-');
