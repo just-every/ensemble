@@ -393,6 +393,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             'FAL image-apps-v2 outpaint. Charges are billed at $0.035 per output megapixel.',
     },
     {
+        id: 'fal-ai/flux-2-pro/outpaint',
+        aliases: ['fal-flux-2-pro-outpaint', 'fal-ai-flux-2-pro-outpaint'],
+        provider: 'fal',
+        cost: { per_image: 0.03 },
+        features: { input_modality: ['image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description:
+            'FAL FLUX.2 Pro outpaint. Charges $0.03 for the first output megapixel, plus $0.015 per extra billable megapixel.',
+    },
+    {
         id: 'fal-ai/image2svg',
         aliases: ['image2svg', 'fal-image2svg'],
         provider: 'fal',

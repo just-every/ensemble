@@ -220,19 +220,96 @@ function isBrokenPipeError(error: unknown): boolean {
     return error instanceof Error && (error as NodeJS.ErrnoException).code === 'EPIPE';
 }
 
+type CodexExecStreamSummary = {
+    text: string;
+    length: number;
+    truncated: boolean;
+};
+
+type CodexExecDiagnostics = {
+    command: 'codex';
+    args: string[];
+    cwd: string;
+    pid: number | null;
+    started_at: string;
+    closed_at: string | null;
+    duration_ms: number | null;
+    exit_code: number | null;
+    signal: NodeJS.Signals | null;
+    stdout: CodexExecStreamSummary;
+    stderr: CodexExecStreamSummary;
+};
+
+type CodexExecError = Error & {
+    codex_exec?: CodexExecDiagnostics;
+};
+
+const MAX_CODEX_EXEC_STREAM_LOG_CHARS = 20_000;
+
+function summarizeCodexExecStream(value: string): CodexExecStreamSummary {
+    if (value.length <= MAX_CODEX_EXEC_STREAM_LOG_CHARS) {
+        return {
+            text: value,
+            length: value.length,
+            truncated: false,
+        };
+    }
+
+    const half = Math.floor(MAX_CODEX_EXEC_STREAM_LOG_CHARS / 2);
+    return {
+        text: `${value.slice(0, half)}\n...[truncated ${value.length - MAX_CODEX_EXEC_STREAM_LOG_CHARS} chars]...\n${value.slice(-half)}`,
+        length: value.length,
+        truncated: true,
+    };
+}
+
+function serializeCodexExecError(error: unknown): unknown {
+    if (!(error instanceof Error)) return error;
+    return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        codex_exec: (error as CodexExecError).codex_exec,
+    };
+}
+
 async function runCodexExec(options: {
     commandArgs: string[];
     cwd: string;
     env: NodeJS.ProcessEnv;
     prompt: string;
     abortSignal?: AbortSignal;
-}): Promise<{ stdout: string; stderr: string }> {
+}): Promise<{ stdout: string; stderr: string; diagnostics: CodexExecDiagnostics }> {
     if (options.abortSignal?.aborted) {
         throw createAbortError();
     }
 
     let stdout = '';
     let stderr = '';
+    const startedMs = Date.now();
+    const diagnostics: CodexExecDiagnostics = {
+        command: 'codex',
+        args: [...options.commandArgs],
+        cwd: options.cwd,
+        pid: null,
+        started_at: new Date(startedMs).toISOString(),
+        closed_at: null,
+        duration_ms: null,
+        exit_code: null,
+        signal: null,
+        stdout: summarizeCodexExecStream(''),
+        stderr: summarizeCodexExecStream(''),
+    };
+
+    const refreshDiagnostics = (code: number | null = null, signal: NodeJS.Signals | null = null): void => {
+        const closedMs = Date.now();
+        diagnostics.closed_at = new Date(closedMs).toISOString();
+        diagnostics.duration_ms = closedMs - startedMs;
+        diagnostics.exit_code = code;
+        diagnostics.signal = signal;
+        diagnostics.stdout = summarizeCodexExecStream(stdout);
+        diagnostics.stderr = summarizeCodexExecStream(stderr);
+    };
 
     await new Promise<void>((resolve, reject) => {
         let settled = false;
@@ -243,6 +320,7 @@ async function runCodexExec(options: {
             env: options.env,
             stdio: ['pipe', 'pipe', 'pipe'],
         });
+        diagnostics.pid = child.pid ?? null;
 
         const cleanup = () => {
             if (options.abortSignal) {
@@ -255,6 +333,7 @@ async function runCodexExec(options: {
             settled = true;
             cleanup();
             if (error) {
+                (error as CodexExecError).codex_exec = diagnostics;
                 reject(error);
             } else {
                 resolve();
@@ -294,10 +373,12 @@ async function runCodexExec(options: {
         });
 
         child.once('error', error => {
+            refreshDiagnostics();
             finish(error);
         });
 
         child.once('close', (code, signal) => {
+            refreshDiagnostics(code, signal);
             if (abortError) {
                 finish(abortError);
                 return;
@@ -319,7 +400,7 @@ async function runCodexExec(options: {
         }
     });
 
-    return { stdout, stderr };
+    return { stdout, stderr, diagnostics };
 }
 
 function disabledFeatureArgs(allowImageGeneration = false): string[] {
@@ -396,16 +477,27 @@ async function executeCodexRequest(
             agent.tags
         );
 
-        await runCodexExec({
-            commandArgs,
-            cwd,
-            env: {
-                ...process.env,
-                CODEX_HOME: codexHome,
-            },
-            prompt,
-            abortSignal: agent.abortSignal,
-        });
+        let codexExecDiagnostics: CodexExecDiagnostics;
+        try {
+            codexExecDiagnostics = (
+                await runCodexExec({
+                    commandArgs,
+                    cwd,
+                    env: {
+                        ...process.env,
+                        CODEX_HOME: codexHome,
+                    },
+                    prompt,
+                    abortSignal: agent.abortSignal,
+                })
+            ).diagnostics;
+        } catch (error) {
+            log_llm_error(loggedRequestId, {
+                error: serializeCodexExecError(error),
+                codex_exec: error instanceof Error ? (error as CodexExecError).codex_exec : undefined,
+            });
+            throw error;
+        }
 
         let rawLastMessage: string;
         try {
@@ -420,7 +512,7 @@ async function executeCodexRequest(
         }
 
         const content = normalizeLastMessageContent(rawLastMessage, Boolean(schemaPath));
-        log_llm_response(loggedRequestId, { content });
+        log_llm_response(loggedRequestId, { content, codex_exec: codexExecDiagnostics });
         return content;
     } catch (error) {
         log_llm_error(requestId, error);
@@ -578,16 +670,27 @@ async function executeCodexImageGeneration(
                     agent.tags
                 );
 
-                await runCodexExec({
-                    commandArgs,
-                    cwd: outputDir,
-                    env: {
-                        ...process.env,
-                        CODEX_HOME: isolatedCodexHome,
-                    },
-                    prompt: codexPrompt,
-                    abortSignal: agent.abortSignal,
-                });
+                let codexExecDiagnostics: CodexExecDiagnostics;
+                try {
+                    codexExecDiagnostics = (
+                        await runCodexExec({
+                            commandArgs,
+                            cwd: outputDir,
+                            env: {
+                                ...process.env,
+                                CODEX_HOME: isolatedCodexHome,
+                            },
+                            prompt: codexPrompt,
+                            abortSignal: agent.abortSignal,
+                        })
+                    ).diagnostics;
+                } catch (error) {
+                    log_llm_error(loggedRequestId, {
+                        error: serializeCodexExecError(error),
+                        codex_exec: error instanceof Error ? (error as CodexExecError).codex_exec : undefined,
+                    });
+                    throw error;
+                }
 
                 const rawLastMessage = await readFile(lastMessagePath, 'utf8');
                 const responseImagePaths = await extractExistingCodexImagePaths(rawLastMessage, outputDir);
@@ -617,6 +720,7 @@ async function executeCodexImageGeneration(
                     output_image_paths: outputImagePaths,
                     codex_home_image_paths: generatedImagePaths,
                     last_message: rawLastMessage.trim(),
+                    codex_exec: codexExecDiagnostics,
                 });
                 costTracker.addUsage({
                     model,

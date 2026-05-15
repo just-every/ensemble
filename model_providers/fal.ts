@@ -2,6 +2,7 @@ import { BaseModelProvider } from './base_provider.js';
 import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { findModel } from '../data/model_data.js';
 import { costTracker } from '../utils/cost_tracker.js';
+import { calculateFalFlux2ProOutpaintCostFromImages } from '../utils/fal_flux_outpaint_pricing.js';
 import { normalizeImageDataUrl } from '../utils/image_utils.js';
 import { mapTransparentEditMaskForFalIdeogram } from '../utils/ideogram_mask.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
@@ -10,7 +11,15 @@ import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_l
 // Also used as fallback for Flux family
 type FalEndpoint = {
     path: string;
-    bodyMode: 'top' | 'input' | 'remove-background' | 'image2svg' | 'ideogram-v3' | 'ideogram-v3-edit' | 'outpaint';
+    bodyMode:
+        | 'top'
+        | 'input'
+        | 'remove-background'
+        | 'image2svg'
+        | 'ideogram-v3'
+        | 'ideogram-v3-edit'
+        | 'outpaint'
+        | 'flux-2-pro-outpaint';
 };
 
 const IMAGE2SVG_OPTION_KEYS = [
@@ -91,6 +100,13 @@ export class FALProvider extends BaseModelProvider {
         ) {
             return { path: 'fal-ai/image-apps-v2/outpaint', bodyMode: 'outpaint' };
         }
+        if (
+            m === 'fal-ai/flux-2-pro/outpaint' ||
+            m === 'fal-flux-2-pro-outpaint' ||
+            m === 'fal-ai-flux-2-pro-outpaint'
+        ) {
+            return { path: 'fal-ai/flux-2-pro/outpaint', bodyMode: 'flux-2-pro-outpaint' };
+        }
         if (m.startsWith('recraft')) return { path: 'fal-ai/recraft/v3/text-to-image', bodyMode: 'top' };
         if (m.includes('runway') || m.includes('gen4')) return { path: 'runwayml/gen4-image', bodyMode: 'input' };
         // flux fallbacks
@@ -157,6 +173,39 @@ export class FALProvider extends BaseModelProvider {
                 body[key] = value;
             }
         }
+        return body;
+    }
+
+    private buildFlux2ProOutpaintBody(opts: ImageGenerationOpts): Record<string, unknown> {
+        const body: Record<string, unknown> = {
+            image_url: this.singleSourceImageUrl(opts, 'fal-ai/flux-2-pro/outpaint'),
+        };
+
+        if (opts.expand_left !== undefined) {
+            body.expand_left = opts.expand_left;
+        }
+        if (opts.expand_right !== undefined) {
+            body.expand_right = opts.expand_right;
+        }
+        if (opts.expand_top !== undefined) {
+            body.expand_top = opts.expand_top;
+        }
+        if (opts.expand_bottom !== undefined) {
+            body.expand_bottom = opts.expand_bottom;
+        }
+        if (opts.auto_crop !== undefined) {
+            body.auto_crop = opts.auto_crop;
+        }
+        if (opts.enable_safety_checker !== undefined) {
+            body.enable_safety_checker = opts.enable_safety_checker;
+        }
+        if (opts.output_format) {
+            body.output_format = opts.output_format;
+        }
+        if (opts?.response_format === 'b64_json') {
+            body.sync_mode = true;
+        }
+
         return body;
     }
 
@@ -294,6 +343,9 @@ export class FALProvider extends BaseModelProvider {
         if (bodyMode === 'outpaint') {
             return this.buildOutpaintBody(prompt, opts);
         }
+        if (bodyMode === 'flux-2-pro-outpaint') {
+            return this.buildFlux2ProOutpaintBody(opts);
+        }
 
         const size = mapImageSize(opts.size);
         const bodyInput: any = bodyMode === 'top' ? { prompt } : { input: { prompt } };
@@ -378,6 +430,10 @@ export class FALProvider extends BaseModelProvider {
             const images = this.extractImages(data);
             if (!images.length) throw new Error('FAL: no image url in response');
             if (findModel(model)) {
+                const fluxOutpaintCost =
+                    bodyMode === 'flux-2-pro-outpaint'
+                        ? calculateFalFlux2ProOutpaintCostFromImages(data?.images || data?.output?.images)
+                        : null;
                 const imageCount =
                     bodyMode === 'outpaint' ? this.getOutpaintCostImageCount(data, images.length) : images.length;
                 const renderingSpeed =
@@ -387,9 +443,16 @@ export class FALProvider extends BaseModelProvider {
                 costTracker.addUsage({
                     model,
                     image_count: imageCount,
+                    ...(fluxOutpaintCost ? { cost: fluxOutpaintCost.cost } : {}),
                     request_id: opts?.request_id,
                     metadata: {
                         source: 'fal',
+                        ...(fluxOutpaintCost
+                            ? {
+                                  billable_megapixels: fluxOutpaintCost.billableMegapixels,
+                                  priced_images: fluxOutpaintCost.pricedImages,
+                              }
+                            : {}),
                         ...(renderingSpeed
                             ? {
                                   rendering_speed: renderingSpeed,

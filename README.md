@@ -441,6 +441,7 @@ New providers added
 - Ideogram V3 – via FAL.ai (`fal-ai/ideogram/v3` for creation and `fal-ai/ideogram/v3/edit` for masked editing).
 - Ideogram remove background – via FAL.ai (`fal-ai/ideogram/remove-background`, one source image per request).
 - Image outpaint – via FAL.ai (`fal-ai/image-apps-v2/outpaint`, one source image per request, directional expansion).
+- FLUX.2 Pro outpaint – via FAL.ai (`fal-ai/flux-2-pro/outpaint`, one source image per request, directional expansion up to 2048px).
 - Image2SVG – via FAL.ai (`fal-ai/image2svg`, one source image per request, returns SVG file URLs).
 
 Environment

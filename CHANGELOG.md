@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-05-15
+- Added explicit FAL FLUX.2 Pro outpaint support (`fal-ai/flux-2-pro/outpaint`) with image-to-image request shaping, `auto_crop` support, directional expansion options, and stepped megapixel cost tracking.
+
 ## 2026-05-08
 - Added FAL Ideogram V3 support (`fal-ai/ideogram/v3` and `fal-ai/ideogram/v3/edit`) with source-image plus mask request shaping, transparent-mask to white-edit mask mapping, `quality` to `rendering_speed` mapping, and tier-aware image cost tracking.
 - Added FAL slash-path endpoint mapping and explicit `fal-ai/image2svg` support with one-source-image request handling, SVG output extraction, and $0.005 per-image pricing metadata.
