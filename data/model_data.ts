@@ -356,6 +356,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Recraft V3 via FAL.ai (text‑to‑image / vector styles).',
     },
     {
+        id: 'fal-ai/recraft/upscale/crisp',
+        aliases: ['recraft-upscale-crisp', 'fal-recraft-upscale-crisp', 'fal-ai-recraft-upscale-crisp'],
+        provider: 'fal',
+        cost: { per_image: 0.004 },
+        features: { input_modality: ['image'], output_modality: ['image'] },
+        class: 'image_generation',
+        description:
+            'Recraft Crisp Upscale via FAL.ai. Enhances one source raster image with detail-focused crisp upscaling.',
+    },
+    {
         id: 'fal-ai/ideogram/remove-background',
         aliases: ['ideogram-remove-background'],
         provider: 'fal',

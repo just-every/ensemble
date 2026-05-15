@@ -2,6 +2,7 @@
 
 ## 2026-05-15
 - Added explicit FAL FLUX.2 Pro outpaint support (`fal-ai/flux-2-pro/outpaint`) with image-to-image request shaping, `auto_crop` support, directional expansion options, and stepped megapixel cost tracking.
+- Added explicit FAL Recraft Crisp Upscale support (`fal-ai/recraft/upscale/crisp`) with one-source-image request shaping, safety checker forwarding, and $0.004 per-image pricing.
 
 ## 2026-05-08
 - Added FAL Ideogram V3 support (`fal-ai/ideogram/v3` and `fal-ai/ideogram/v3/edit`) with source-image plus mask request shaping, transparent-mask to white-edit mask mapping, `quality` to `rendering_speed` mapping, and tier-aware image cost tracking.

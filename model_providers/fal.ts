@@ -16,6 +16,7 @@ type FalEndpoint = {
         | 'input'
         | 'remove-background'
         | 'image2svg'
+        | 'recraft-upscale-crisp'
         | 'ideogram-v3'
         | 'ideogram-v3-edit'
         | 'outpaint'
@@ -92,6 +93,14 @@ export class FALProvider extends BaseModelProvider {
         }
         if (m === 'fal-ai/image2svg' || m === 'image2svg' || m === 'fal-image2svg') {
             return { path: 'fal-ai/image2svg', bodyMode: 'image2svg' };
+        }
+        if (
+            m === 'fal-ai/recraft/upscale/crisp' ||
+            m === 'recraft-upscale-crisp' ||
+            m === 'fal-recraft-upscale-crisp' ||
+            m === 'fal-ai-recraft-upscale-crisp'
+        ) {
+            return { path: 'fal-ai/recraft/upscale/crisp', bodyMode: 'recraft-upscale-crisp' };
         }
         if (
             m === 'fal-ai/image-apps-v2/outpaint' ||
@@ -173,6 +182,21 @@ export class FALProvider extends BaseModelProvider {
                 body[key] = value;
             }
         }
+        return body;
+    }
+
+    private buildRecraftUpscaleCrispBody(opts: ImageGenerationOpts): Record<string, unknown> {
+        const body: Record<string, unknown> = {
+            image_url: this.singleSourceImageUrl(opts, 'fal-ai/recraft/upscale/crisp'),
+        };
+
+        if (opts.enable_safety_checker !== undefined) {
+            body.enable_safety_checker = opts.enable_safety_checker;
+        }
+        if (opts?.response_format === 'b64_json') {
+            body.sync_mode = true;
+        }
+
         return body;
     }
 
@@ -331,6 +355,10 @@ export class FALProvider extends BaseModelProvider {
 
         if (bodyMode === 'image2svg') {
             return this.buildImage2SvgBody(opts);
+        }
+
+        if (bodyMode === 'recraft-upscale-crisp') {
+            return this.buildRecraftUpscaleCrispBody(opts);
         }
 
         if (bodyMode === 'ideogram-v3') {
