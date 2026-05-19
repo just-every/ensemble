@@ -1,5 +1,5 @@
 import { BaseModelProvider } from './base_provider.js';
-import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent, ResponseInput } from '../types/types.js';
+import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { fetchWithTimeout } from '../utils/fetch_with_timeout.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
@@ -22,10 +22,16 @@ export class LumaProvider extends BaseModelProvider {
 
     // Text streaming not supported for Luma image models
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Luma provider does not support text streaming');
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts?: ImageGenerationOpts): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]> {
         const apiKey = process.env.LUMA_API_KEY;
         if (!apiKey) throw new Error('Luma provider: LUMA_API_KEY is not set');
 
@@ -70,27 +76,43 @@ export class LumaProvider extends BaseModelProvider {
             };
 
             const createTimeout = 20000;
-            let res = await withRetries(() => fetchWithTimeout(`${LUMA_BASE}/generations/image`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(body),
-            }, createTimeout), 3);
+            let res = await withRetries(
+                () =>
+                    fetchWithTimeout(
+                        `${LUMA_BASE}/generations/image`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${apiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(body),
+                        },
+                        createTimeout
+                    ),
+                3
+            );
             if (!res.ok) {
                 // Retry once without image_urls if server rejects unknown param
                 const text = await res.text();
                 if (srcs.length && (res.status === 400 || res.status === 422)) {
                     delete (body as any).image_ref;
-                    res = await withRetries(() => fetchWithTimeout(`${LUMA_BASE}/generations/image`, {
-                        method: 'POST',
-                        headers: {
-                            Authorization: `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(body),
-                    }, 20000), 3);
+                    res = await withRetries(
+                        () =>
+                            fetchWithTimeout(
+                                `${LUMA_BASE}/generations/image`,
+                                {
+                                    method: 'POST',
+                                    headers: {
+                                        Authorization: `Bearer ${apiKey}`,
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify(body),
+                                },
+                                20000
+                            ),
+                        3
+                    );
                 }
                 if (!res.ok) throw new Error(`Luma create failed: ${res.status} ${text}`);
             }
@@ -99,7 +121,12 @@ export class LumaProvider extends BaseModelProvider {
             if (job?.state === 'completed' && (job?.assets?.image || job?.assets?.image_url)) {
                 const url: string | undefined = job.assets?.image || job.assets?.image_url;
                 if (url) {
-                    costTracker.addUsage({ model, image_count: 1, request_id: opts?.request_id, metadata: { source: 'luma', mode: 'sync' } });
+                    costTracker.addUsage({
+                        model,
+                        image_count: 1,
+                        request_id: opts?.request_id,
+                        metadata: { source: 'luma', mode: 'sync' },
+                    });
                     success = true;
                     return [url];
                 }
@@ -114,11 +141,19 @@ export class LumaProvider extends BaseModelProvider {
             while (true) {
                 let r: any;
                 try {
-                    r = await withRetries(() => fetchWithTimeout(`${LUMA_BASE}/generations/${id}`, {
-                        headers: { Authorization: `Bearer ${apiKey}` },
-                    }, 15000), 2);
+                    r = await withRetries(
+                        () =>
+                            fetchWithTimeout(
+                                `${LUMA_BASE}/generations/${id}`,
+                                {
+                                    headers: { Authorization: `Bearer ${apiKey}` },
+                                },
+                                15000
+                            ),
+                        2
+                    );
                 } catch (error) {
-                    throw new Error(`Luma poll failed for ${id}: ${error?.message || error}`);
+                    throw new Error(`Luma poll failed for ${id}: ${error?.message || error}`, { cause: error });
                 }
                 if (!r.ok) throw new Error(`Luma poll failed: ${r.status} ${await r.text()}`);
                 const data = await r.json();
@@ -127,7 +162,12 @@ export class LumaProvider extends BaseModelProvider {
                     const url: string | undefined = data.assets?.image || data.output?.image_url || data.url;
                     if (!url) throw new Error('Luma: completed without image url');
                     // Return URL; avoid altering pixels
-                    costTracker.addUsage({ model, image_count: 1, request_id: opts?.request_id, metadata: { source: 'luma' } });
+                    costTracker.addUsage({
+                        model,
+                        image_count: 1,
+                        request_id: opts?.request_id,
+                        metadata: { source: 'luma' },
+                    });
                     success = true;
                     return [url];
                 }

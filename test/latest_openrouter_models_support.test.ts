@@ -85,6 +85,42 @@ describe('latest OpenRouter model support', () => {
         });
     });
 
+    it('registers Tencent Hy3 Preview with reasoning suffix aliases', async () => {
+        const model = findModel('Hy3 Preview');
+
+        expect(model?.id).toBe('tencent/hy3-preview');
+        expect(await getModelFromAgent({ agent_id: 'hy3', model: 'hy3-preview' } as any)).toBe('tencent/hy3-preview');
+        expect(await getModelFromAgent({ agent_id: 'hy3-low', model: 'hy3-preview-low' } as any)).toBe(
+            'tencent/hy3-preview-low'
+        );
+        expect(await getModelFromAgent({ agent_id: 'hy3-high', model: 'hy3-preview-high' } as any)).toBe(
+            'tencent/hy3-preview-high'
+        );
+        expect(await getModelFromAgent({ agent_id: 'hy3-none', model: 'hy3-preview-none' } as any)).toBe(
+            'tencent/hy3-preview-none'
+        );
+        expect(await getModelFromAgent({ agent_id: 'hy3-disabled', model: 'hy3-preview-disabled' } as any)).toBe(
+            'tencent/hy3-preview-disabled'
+        );
+        expect(getProviderFromModel('tencent/hy3-preview')).toBe('openrouter');
+        expect(getProviderFromModel('tencent/hy3-preview-high')).toBe('openrouter');
+        expect(model?.cost).toMatchObject({
+            input_per_million: 0.066,
+            cached_input_per_million: 0.029,
+            output_per_million: 0.26,
+        });
+        expect(model?.features).toMatchObject({
+            context_length: 262144,
+            max_output_tokens: 262144,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: false,
+            reasoning_output: true,
+        });
+    });
+
     it('registers Qwen 3.6 Plus and current smaller Qwen 3.6 variants', async () => {
         const plus = findModel('Qwen 3.6');
         const flash = findModel('qwen3.6-flash');

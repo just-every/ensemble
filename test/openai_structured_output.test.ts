@@ -33,7 +33,8 @@ describe('OpenAI structured output request formatting', () => {
             },
         };
 
-        const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+XxkAAAAASUVORK5CYII=';
+        const dataUrl =
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+XxkAAAAASUVORK5CYII=';
         await drain(
             provider.createResponseStream(
                 [
@@ -106,6 +107,7 @@ describe('OpenAI structured output request formatting', () => {
         const provider = new OpenAIProvider('sk-test');
         const create = vi.fn().mockResolvedValue({
             async *[Symbol.asyncIterator]() {
+                yield* [];
                 throw new Error('fetch failed: ECONNRESET');
             },
         });

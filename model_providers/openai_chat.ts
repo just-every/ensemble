@@ -671,7 +671,15 @@ export class OpenAIChat extends BaseModelProvider {
 
             // Define mapping for OpenAI style reasoning effort configurations
             // Works for OpenRouter
-            const REASONING_EFFORT_CONFIGS: Array<string> = ['low', 'medium', 'high'];
+            const REASONING_EFFORT_CONFIGS: Array<{ suffix: string; effort: string }> = [
+                { suffix: 'none', effort: 'none' },
+                { suffix: 'disabled', effort: 'none' },
+                { suffix: 'minimal', effort: 'minimal' },
+                { suffix: 'low', effort: 'low' },
+                { suffix: 'medium', effort: 'medium' },
+                { suffix: 'high', effort: 'high' },
+                { suffix: 'xhigh', effort: 'xhigh' },
+            ];
             const parseThinkingBudget = (value: unknown): number | null => {
                 if (typeof value !== 'number' || !Number.isFinite(value)) {
                     return null;
@@ -690,12 +698,12 @@ export class OpenAIChat extends BaseModelProvider {
                     ? mapThinkingBudgetToReasoningEffort(thinkingBudgetFromSettings)
                     : undefined;
 
-            for (const effort of REASONING_EFFORT_CONFIGS) {
-                const suffix = `-${effort}`;
+            for (const config of REASONING_EFFORT_CONFIGS) {
+                const suffix = `-${config.suffix}`;
                 if (model.endsWith(suffix)) {
                     // Apply the specific reasoning effort and remove the suffix
                     overrideParams.reasoning = {
-                        effort: effort,
+                        effort: config.effort,
                     };
                     model = model.slice(0, -suffix.length);
                     requestParams.model = model; // Update the model in the request

@@ -13,7 +13,8 @@ const RUNWAY_VERSION = process.env.RUNWAY_API_VERSION || '2024-11-06';
 
 function mapRatio(size?: ImageGenerationOpts['size']): string {
     const s = String(size || 'square');
-    if (s === 'landscape' || s === '1792x1024' || s === '1536x1024' || s === '1920x1080' || s === '1280x720') return '1920:1080';
+    if (s === 'landscape' || s === '1792x1024' || s === '1536x1024' || s === '1920x1080' || s === '1280x720')
+        return '1920:1080';
     if (s === 'portrait' || s === '1024x1792' || s === '1080x1920' || s === '720x1280') return '1080:1920';
     return '1024:1024';
 }
@@ -43,10 +44,16 @@ export class RunwayProvider extends BaseModelProvider {
     }
 
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Runway provider does not support text streaming');
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts: ImageGenerationOpts = {}): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
         const apiKey = process.env.RUNWAY_API_KEY;
         const requestId = log_llm_request(agent.agent_id || 'default', 'runway', model, { prompt, opts }, new Date());
         let success = false;
@@ -57,7 +64,7 @@ export class RunwayProvider extends BaseModelProvider {
             const body: any = {
                 promptText: prompt,
                 ratio: mapRatio(opts.size),
-                model: (model && model.toLowerCase().includes('turbo')) ? 'gen4_image_turbo' : 'gen4_image',
+                model: model && model.toLowerCase().includes('turbo') ? 'gen4_image_turbo' : 'gen4_image',
             };
             if (opts?.source_images) {
                 const srcs = Array.isArray(opts.source_images) ? opts.source_images : [opts.source_images];
@@ -67,15 +74,23 @@ export class RunwayProvider extends BaseModelProvider {
                 });
             }
 
-            const createRes = await withRetries(() => fetchWithTimeout(`${RUNWAY_BASE}/v1/text_to_image`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${apiKey}`,
-                    'X-Runway-Version': RUNWAY_VERSION,
-                },
-                body: JSON.stringify(body),
-            }, 20000), 3);
+            const createRes = await withRetries(
+                () =>
+                    fetchWithTimeout(
+                        `${RUNWAY_BASE}/v1/text_to_image`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${apiKey}`,
+                                'X-Runway-Version': RUNWAY_VERSION,
+                            },
+                            body: JSON.stringify(body),
+                        },
+                        20000
+                    ),
+                3
+            );
             if (!createRes.ok) throw new Error(`Runway create failed: ${createRes.status} ${await createRes.text()}`);
             const created = await createRes.json();
             const id: string | undefined = created?.id || created?.task?.id;
@@ -87,12 +102,20 @@ export class RunwayProvider extends BaseModelProvider {
             const timeoutMs = 180000;
             let urls: string[] = [];
             while (true) {
-                const response = await withRetries(() => fetchWithTimeout(pollUrl, {
-                    headers: {
-                        Authorization: `Bearer ${apiKey}`,
-                        'X-Runway-Version': RUNWAY_VERSION,
-                    },
-                }, 15000), 2);
+                const response = await withRetries(
+                    () =>
+                        fetchWithTimeout(
+                            pollUrl,
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${apiKey}`,
+                                    'X-Runway-Version': RUNWAY_VERSION,
+                                },
+                            },
+                            15000
+                        ),
+                    2
+                );
 
                 if (!response.ok) throw new Error(`Runway poll failed: ${response.status} ${await response.text()}`);
                 const info = await response.json();
@@ -115,7 +138,11 @@ export class RunwayProvider extends BaseModelProvider {
                 tryPush(info?.assets);
                 tryPush(info?.task?.output);
 
-                if (status === 'succeeded' || status === 'completed' || (extracted.length > 0 && (status === 'success' || status === ''))) {
+                if (
+                    status === 'succeeded' ||
+                    status === 'completed' ||
+                    (extracted.length > 0 && (status === 'success' || status === ''))
+                ) {
                     urls = extracted;
                     break;
                 }
@@ -127,7 +154,12 @@ export class RunwayProvider extends BaseModelProvider {
             }
 
             if (!urls.length) throw new Error('Runway: no image url in response');
-            costTracker.addUsage({ model, image_count: urls.length, request_id: opts?.request_id, metadata: { source: 'runway' } });
+            costTracker.addUsage({
+                model,
+                image_count: urls.length,
+                request_id: opts?.request_id,
+                metadata: { source: 'runway' },
+            });
             success = true;
             return urls;
         } catch (err) {

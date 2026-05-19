@@ -326,7 +326,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     {
         id: 'sd3.5-large-turbo',
         provider: 'stability',
-        cost: { per_image: 0.10 },
+        cost: { per_image: 0.1 },
         features: { input_modality: ['text', 'image'], output_modality: ['image'] },
         class: 'image_generation',
         description: 'Stability SD3.5 Large Turbo.',
@@ -381,7 +381,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: { per_image: 0.06 },
         features: { input_modality: ['text', 'image'], output_modality: ['image'] },
         class: 'image_generation',
-        description: 'Ideogram V3 text-to-image via FAL.ai. TURBO is $0.03/image, BALANCED is $0.06/image, and QUALITY is $0.09/image.',
+        description:
+            'Ideogram V3 text-to-image via FAL.ai. TURBO is $0.03/image, BALANCED is $0.06/image, and QUALITY is $0.09/image.',
     },
     {
         id: 'fal-ai/ideogram/v3/edit',
@@ -390,7 +391,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: { per_image: 0.06 },
         features: { input_modality: ['text', 'image'], output_modality: ['image'] },
         class: 'image_generation',
-        description: 'Ideogram V3 image editing via FAL.ai. Inpaints one source image with a same-dimension mask. TURBO is $0.03/image, BALANCED is $0.06/image, and QUALITY is $0.09/image.',
+        description:
+            'Ideogram V3 image editing via FAL.ai. Inpaints one source image with a same-dimension mask. TURBO is $0.03/image, BALANCED is $0.06/image, and QUALITY is $0.09/image.',
     },
     {
         id: 'fal-ai/image-apps-v2/outpaint',
@@ -399,8 +401,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: { per_image: 0.035 },
         features: { input_modality: ['text', 'image'], output_modality: ['image'] },
         class: 'image_generation',
-        description:
-            'FAL image-apps-v2 outpaint. Charges are billed at $0.035 per output megapixel.',
+        description: 'FAL image-apps-v2 outpaint. Charges are billed at $0.035 per output megapixel.',
     },
     {
         id: 'fal-ai/flux-2-pro/outpaint',
@@ -1629,7 +1630,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'code',
         score: 97,
-        description: 'GPT-5.3 Codex — latest top-tier coding model with image input and strong agentic coding performance.',
+        description:
+            'GPT-5.3 Codex — latest top-tier coding model with image input and strong agentic coding performance.',
     },
 
     // GPT-4o models
@@ -2110,11 +2112,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Opus 4.5 (November 2025)
     {
         id: 'claude-opus-4-5-20251101',
-        aliases: [
-            'claude-opus-4-5',
-            'claude-opus-4.5',
-            'claude-4.5-opus',
-        ],
+        aliases: ['claude-opus-4-5', 'claude-opus-4.5', 'claude-4.5-opus'],
         provider: 'anthropic',
         cost: {
             input_per_million: 15.0,
@@ -2187,7 +2185,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             max_output_tokens: 128000,
         },
         class: 'reasoning',
-        description: 'Claude Opus 4.7 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
+        description:
+            'Claude Opus 4.7 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
     },
 
     //
@@ -2270,10 +2269,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     },
     {
         id: 'gemini-2.5-flash',
-        aliases: [
-            'gemini-2.5-flash-preview-05-20',
-            'gemini-2.5-flash-preview-04-17',
-        ],
+        aliases: ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-flash-preview-04-17'],
         provider: 'google',
         cost: {
             input_per_million: {
@@ -2390,8 +2386,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         score: 90,
-        description:
-            'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
+        description: 'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
     },
 
     // Gemini 3 Pro Image (preview)
@@ -2947,8 +2942,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: false,
         },
         class: 'image_generation',
-        description:
-            "Gemini 2.5 Flash Image Preview: fast, natively multimodal image generation and editing.",
+        description: 'Gemini 2.5 Flash Image Preview: fast, natively multimodal image generation and editing.',
     },
     {
         id: 'gemini-3.1-flash-image-preview',
@@ -3607,6 +3601,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             'DeepSeek V4 Flash via OpenRouter. Efficiency-optimized 284B-parameter MoE model with 13B active parameters and 1M context.',
     },
 
+    // Tencent Hy3 preview (via OpenRouter)
+    {
+        id: 'tencent/hy3-preview',
+        aliases: ['Tencent Hy3 Preview', 'Hy3 Preview', 'Hy3-preview', 'hy3-preview'],
+        provider: 'openrouter',
+        openrouter_id: 'tencent/hy3-preview',
+        cost: {
+            input_per_million: 0.066,
+            cached_input_per_million: 0.029,
+            output_per_million: 0.26,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: false,
+            max_output_tokens: 262144,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Tencent Hy3 preview via OpenRouter. High-efficiency MoE model for agentic workflows with configurable disabled, low, and high reasoning modes.',
+    },
+
     // Kimi K2.5 (via OpenRouter)
     {
         id: 'moonshotai/kimi-k2.5',
@@ -3676,7 +3696,7 @@ export function findModel(modelId: string): ModelEntry | undefined {
     if (aliasMatch) return aliasMatch;
 
     // If model ends in a known effort/variant suffix, remove suffix and try again
-    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-max'];
+    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-disabled', '-max'];
     for (const suffix of suffixes) {
         if (modelId.endsWith(suffix)) {
             const baseName = modelId.slice(0, -suffix.length);

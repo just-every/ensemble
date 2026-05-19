@@ -543,7 +543,13 @@ export class OpenAIProvider extends BaseModelProvider {
                     is_edit: !!source_images,
                 };
                 const tokenUsageRecord = response.usage
-                    ? buildOpenAIImageUsageRecord(model, response.usage, response.data.length, opts?.request_id, usageMetadata)
+                    ? buildOpenAIImageUsageRecord(
+                          model,
+                          response.usage,
+                          response.data.length,
+                          opts?.request_id,
+                          usageMetadata
+                      )
                     : undefined;
 
                 if (tokenUsageRecord) {
@@ -1069,7 +1075,14 @@ export class OpenAIProvider extends BaseModelProvider {
 
             // Support configuring reasoning effort via model suffixes.
             // Note: the OpenAI SDK's ReasoningEffort type may lag docs, so we cast.
-            const REASONING_EFFORT_CONFIGS: OpenAIReasoningEffort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+            const REASONING_EFFORT_CONFIGS: OpenAIReasoningEffort[] = [
+                'none',
+                'minimal',
+                'low',
+                'medium',
+                'high',
+                'xhigh',
+            ];
             let requestedReasoningEffort: OpenAIReasoningEffort | undefined;
 
             for (const effort of REASONING_EFFORT_CONFIGS) {
@@ -1084,7 +1097,9 @@ export class OpenAIProvider extends BaseModelProvider {
 
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
             const thinkingBudgetEffort =
-                thinkingBudgetFromSettings !== null ? mapThinkingBudgetToReasoningEffort(thinkingBudgetFromSettings) : undefined;
+                thinkingBudgetFromSettings !== null
+                    ? mapThinkingBudgetToReasoningEffort(thinkingBudgetFromSettings)
+                    : undefined;
             if (thinkingBudgetEffort !== undefined) {
                 requestedReasoningEffort = thinkingBudgetEffort;
             }

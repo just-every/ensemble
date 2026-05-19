@@ -58,21 +58,16 @@ describe('FAL image2svg support', () => {
         );
         vi.stubGlobal('fetch', fetchMock);
 
-        const images = await provider.createImage(
-            '',
-            'fal-ai/image2svg',
-            { agent_id: 'test-fal-image2svg' } as any,
-            {
-                source_images: ['https://example.com/source.png'],
-                image2svg: {
-                    colormode: 'binary',
-                    hierarchical: 'cutout',
-                    mode: 'polygon',
-                    path_precision: 2,
-                },
-                request_id: 'image2svg-request',
-            }
-        );
+        const images = await provider.createImage('', 'fal-ai/image2svg', { agent_id: 'test-fal-image2svg' } as any, {
+            source_images: ['https://example.com/source.png'],
+            image2svg: {
+                colormode: 'binary',
+                hierarchical: 'cutout',
+                mode: 'polygon',
+                path_precision: 2,
+            },
+            request_id: 'image2svg-request',
+        });
 
         expect(images).toEqual(['https://example.com/output.svg']);
         expect(fetchMock).toHaveBeenCalledWith('https://fal.run/fal-ai/image2svg', {
@@ -130,14 +125,9 @@ describe('FAL image2svg support', () => {
         ).rejects.toThrow('requires exactly one source image');
 
         await expect(
-            provider.createImage(
-                '',
-                'fal-ai/image2svg',
-                { agent_id: 'test-fal-image2svg' } as any,
-                {
-                    source_images: ['https://example.com/one.png', 'https://example.com/two.png'],
-                }
-            )
+            provider.createImage('', 'fal-ai/image2svg', { agent_id: 'test-fal-image2svg' } as any, {
+                source_images: ['https://example.com/one.png', 'https://example.com/two.png'],
+            })
         ).rejects.toThrow('supports exactly one source image');
     });
 });

@@ -56,10 +56,7 @@ import { BaseModelProvider } from './base_provider.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { isPaused } from '../utils/pause_controller.js';
-import {
-    appendMessageWithImage,
-    normalizeImageDataUrl,
-} from '../utils/image_utils.js';
+import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
 import { chooseImageDetailFromInput, mapGeminiMediaResolution } from '../utils/image_detail.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
@@ -69,7 +66,7 @@ import { truncateLargeValues } from '../utils/truncate_utils.js';
  * Recursively convert parameter schema to Gemini format
  */
 function convertParameterToGeminiFormat(param: any): any {
-    let type: Type = Type.STRING;
+    let type: Type;
 
     switch (param.type) {
         case 'string':
@@ -236,7 +233,10 @@ async function convertToGeminiFunctionDeclarations(tools: ToolFunction[]): Promi
     const declarations = await Promise.all(
         tools.map(async tool => {
             // Special handling for native tools (not function declarations)
-            if (tool.definition.function.name === 'google_web_search' || tool.definition.function.name === 'code_execution') {
+            if (
+                tool.definition.function.name === 'google_web_search' ||
+                tool.definition.function.name === 'code_execution'
+            ) {
                 // Return null for these special tools - we'll handle them separately in the config
                 return null;
             }
@@ -495,7 +495,7 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
     for (const msg of messages) {
         if (msg.type === 'function_call') {
             // Function call from assistant to be included as a model message
-            let args: Record<string, unknown> = {};
+            let args: Record<string, unknown>;
             try {
                 const parsedArgs = JSON.parse(msg.arguments || '{}');
                 args = typeof parsedArgs === 'object' && parsedArgs !== null ? parsedArgs : { value: parsedArgs };
@@ -512,8 +512,7 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
             }
 
             const explicitThoughtSignature = extractThoughtSignatureFromMessage(msg);
-            const thoughtSignature =
-                explicitThoughtSignature || pendingFunctionCallSignature || latestThoughtSignature;
+            const thoughtSignature = explicitThoughtSignature || pendingFunctionCallSignature || latestThoughtSignature;
             if (explicitThoughtSignature) {
                 pendingFunctionCallSignature = explicitThoughtSignature;
                 latestThoughtSignature = explicitThoughtSignature;
@@ -587,7 +586,8 @@ async function convertToGeminiContents(model: string, messages: ResponseInput): 
                             mime_type: 'mime_type' in item ? item.mime_type : undefined,
                         });
                         // Convert input_image/image to Gemini's inlineData format
-                        const imageUrl = normalized.dataUrl || normalized.url || ('image_url' in item ? item.image_url : '');
+                        const imageUrl =
+                            normalized.dataUrl || normalized.url || ('image_url' in item ? item.image_url : '');
                         if (imageUrl.startsWith('data:')) {
                             // Parse data URL: data:image/png;base64,xxx
                             const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -1293,11 +1293,11 @@ export class GeminiProvider extends BaseModelProvider {
 
             const response = useNonStreamingJsonResponse
                 ? (async function* (provider: GeminiProvider) {
-                      yield (await (provider.client.models as any).generateContent(requestParams)) as GenerateContentResponse;
+                      yield (await (provider.client.models as any).generateContent(
+                          requestParams
+                      )) as GenerateContentResponse;
                   })(this)
-                : this.retryStreamOnIncompleteJson(() =>
-                      this.client.models.generateContentStream(requestParams)
-                  );
+                : this.retryStreamOnIncompleteJson(() => this.client.models.generateContentStream(requestParams));
 
             let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
 
@@ -1346,7 +1346,9 @@ export class GeminiProvider extends BaseModelProvider {
                     for (const fc of chunk.functionCalls) {
                         if (fc && fc.name) {
                             const thoughtSignature =
-                                normalizeThoughtSignature((fc as any).thoughtSignature || (fc as any).thought_signature) ||
+                                normalizeThoughtSignature(
+                                    (fc as any).thoughtSignature || (fc as any).thought_signature
+                                ) ||
                                 functionCallPartSignatures.shift() ||
                                 sharedFunctionCallSignature;
                             if (thoughtSignature) {
@@ -1603,16 +1605,16 @@ export class GeminiProvider extends BaseModelProvider {
 
             const thinkingOptions = opts?.thinking;
             const hasThinkingOptionsObject =
-                thinkingOptions !== null &&
-                typeof thinkingOptions === 'object' &&
-                !Array.isArray(thinkingOptions);
+                thinkingOptions !== null && typeof thinkingOptions === 'object' && !Array.isArray(thinkingOptions);
 
             const includeThoughts =
-                hasThinkingOptionsObject && (thinkingOptions as { include_thoughts?: unknown }).include_thoughts === true;
+                hasThinkingOptionsObject &&
+                (thinkingOptions as { include_thoughts?: unknown }).include_thoughts === true;
             const requestedThinkingLevel = hasThinkingOptionsObject
                 ? (thinkingOptions as { level?: unknown }).level
                 : undefined;
-            const thinkingLevel = requestedThinkingLevel === 'high' ? 'High' : requestedThinkingLevel ? 'Minimal' : undefined;
+            const thinkingLevel =
+                requestedThinkingLevel === 'high' ? 'High' : requestedThinkingLevel ? 'Minimal' : undefined;
             if (requestedThinkingLevel && !isGemini31FlashImageModel) {
                 console.warn(
                     '[Gemini] thinking.level is currently supported for gemini-3.1-flash-image-preview only. Ignoring thinking level.'
@@ -1753,7 +1755,7 @@ export class GeminiProvider extends BaseModelProvider {
                                     // If source images provided, include them as parts first
                                     ...(Array.isArray(opts?.source_images)
                                         ? (opts!.source_images as any[])
-                                              .map((img: any) => typeof img === 'string' ? { _src: img } : img)
+                                              .map((img: any) => (typeof img === 'string' ? { _src: img } : img))
                                               .map((it: any) => {
                                                   const src: string = it?.data || it?._src || it;
                                                   if (typeof src !== 'string') return null;
@@ -1778,24 +1780,29 @@ export class GeminiProvider extends BaseModelProvider {
                                               })
                                               .filter(Boolean)
                                         : typeof opts?.source_images === 'string'
-                                        ? [
-                                              (() => {
-                                                  const s = String(opts?.source_images);
-                                                  if (s.startsWith('data:')) {
-                                                      const m = /^data:([^;]+);base64,(.+)$/i.exec(s);
-                                                      return m
-                                                          ? { inlineData: { mimeType: m[1] || 'image/png', data: m[2] } }
-                                                          : null;
-                                                  }
-                                                  return {
-                                                      fileData: {
-                                                          mimeType: inferImageMimeTypeFromUrl(s),
-                                                          fileUri: s,
-                                                      },
-                                                  };
-                                              })(),
-                                          ].filter(Boolean)
-                                        : []),
+                                          ? [
+                                                (() => {
+                                                    const s = String(opts?.source_images);
+                                                    if (s.startsWith('data:')) {
+                                                        const m = /^data:([^;]+);base64,(.+)$/i.exec(s);
+                                                        return m
+                                                            ? {
+                                                                  inlineData: {
+                                                                      mimeType: m[1] || 'image/png',
+                                                                      data: m[2],
+                                                                  },
+                                                              }
+                                                            : null;
+                                                    }
+                                                    return {
+                                                        fileData: {
+                                                            mimeType: inferImageMimeTypeFromUrl(s),
+                                                            fileUri: s,
+                                                        },
+                                                    };
+                                                })(),
+                                            ].filter(Boolean)
+                                          : []),
                                     { text: prompt },
                                 ],
                             },
@@ -1885,7 +1892,8 @@ export class GeminiProvider extends BaseModelProvider {
 
                             const parts = cand.content?.parts || [];
                             for (const part of parts) {
-                                const thoughtSignature = (part as any).thoughtSignature || (part as any).thought_signature;
+                                const thoughtSignature =
+                                    (part as any).thoughtSignature || (part as any).thought_signature;
                                 if (thoughtSignature) {
                                     metadata = mergeImageMetadata(metadata, {
                                         model,
@@ -1899,7 +1907,9 @@ export class GeminiProvider extends BaseModelProvider {
                                             thought: true,
                                             type: part.inlineData?.data ? 'image' : 'text',
                                             ...(part.text ? { text: part.text } : {}),
-                                            ...(part.inlineData?.mimeType ? { mime_type: part.inlineData.mimeType } : {}),
+                                            ...(part.inlineData?.mimeType
+                                                ? { mime_type: part.inlineData.mimeType }
+                                                : {}),
                                             ...(part.inlineData?.data ? { data: part.inlineData.data } : {}),
                                             ...(thoughtSignature ? { thought_signature: thoughtSignature } : {}),
                                         };

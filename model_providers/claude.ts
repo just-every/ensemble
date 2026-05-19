@@ -77,10 +77,7 @@ function mapThinkingBudgetToClaudeAdaptiveEffort(budget: number): ClaudeAdaptive
 }
 
 function getSuffixedBaseModel(model: string): { baseModel: string; suffix: string } {
-    const suffixes = [
-        ...Object.keys(CLAUDE_ADAPTIVE_EFFORT_SUFFIXES),
-        ...Object.keys(THINKING_BUDGET_CONFIGS),
-    ];
+    const suffixes = [...Object.keys(CLAUDE_ADAPTIVE_EFFORT_SUFFIXES), ...Object.keys(THINKING_BUDGET_CONFIGS)];
     for (const suffix of suffixes) {
         if (model.endsWith(suffix)) {
             return {
@@ -346,7 +343,7 @@ async function convertToClaudeMessage(
 
     // --- Handle Tool Use (Function Call) ---
     if (msg.type === 'function_call') {
-        let inputArgs: Record<string, unknown> = {};
+        let inputArgs: Record<string, unknown>;
         try {
             // Claude expects 'input' as an object
             const argsString = msg.arguments || '{}';
@@ -584,9 +581,7 @@ export class ClaudeProvider extends BaseModelProvider {
                     continue;
                 }
 
-                const thinkingBlocks = msg.content
-                    .filter(isThinkingBlock)
-                    .map(block => ({ ...block }));
+                const thinkingBlocks = msg.content.filter(isThinkingBlock).map(block => ({ ...block }));
                 const nonThinkingBlocks = msg.content.filter(block => !isThinkingBlock(block));
 
                 if (nonThinkingBlocks.length === 0) {

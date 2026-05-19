@@ -81,7 +81,12 @@ class CostTracker {
         ): boolean => {
             if (!costStructure || typeof costStructure !== 'object') return false;
             if ('peak_price_per_million' in costStructure) return true;
-            if ('text' in costStructure || 'audio' in costStructure || 'video' in costStructure || 'image' in costStructure) {
+            if (
+                'text' in costStructure ||
+                'audio' in costStructure ||
+                'video' in costStructure ||
+                'image' in costStructure
+            ) {
                 const modalityPrice = costStructure as ModalityPrice;
                 return ['text', 'audio', 'video', 'image'].some(modality =>
                     hasTimeBasedPricing(modalityPrice[modality as keyof ModalityPrice])
@@ -167,16 +172,10 @@ class CostTracker {
         };
 
         // Determine how many input tokens are non-cached vs cached
-        let nonCachedInputTokens = 0;
-        let actualCachedTokens = 0;
-
-        if (cached_tokens > 0 && model.cost?.cached_input_per_million !== undefined) {
-            actualCachedTokens = cached_tokens;
-            nonCachedInputTokens = Math.max(0, original_input_tokens - cached_tokens);
-        } else {
-            nonCachedInputTokens = original_input_tokens;
-            actualCachedTokens = 0;
-        }
+        const actualCachedTokens =
+            cached_tokens > 0 && model.cost?.cached_input_per_million !== undefined ? cached_tokens : 0;
+        const nonCachedInputTokens =
+            actualCachedTokens > 0 ? Math.max(0, original_input_tokens - actualCachedTokens) : original_input_tokens;
 
         // Calculate Input Token Cost (Non-Cached Part)
         if (nonCachedInputTokens > 0 && model.cost?.input_per_million !== undefined) {

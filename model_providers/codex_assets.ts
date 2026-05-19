@@ -236,7 +236,7 @@ export async function extractExistingCodexImagePaths(rawLastMessage: string, cwd
     const trimmed = rawLastMessage.trim();
     if (!trimmed) return [];
 
-    let candidates: string[] = [];
+    let candidates: string[];
     try {
         candidates = maybeJsonStrings(JSON.parse(trimmed));
     } catch {

@@ -58,7 +58,7 @@ export async function* ensembleLive(
     let messageHistory: MessageHistory | null = null;
     let totalToolCalls = 0;
     let currentTurnToolCalls = 0;
-    let isSessionActive = true;
+    const isSessionActive = true;
     let totalCost = 0;
     let totalTokens = 0;
     let requestStarted = false;
@@ -381,7 +381,6 @@ export async function* ensembleLive(
         if (session && session.isActive()) {
             await session.close();
         }
-        isSessionActive = false;
 
         // Emit end event
         const duration = Date.now() - startTime;

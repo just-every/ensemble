@@ -85,10 +85,7 @@ function resolveConfiguredToolTimeoutMs(agent: AgentDefinition): number | null {
     return Math.max(MIN_TOOL_TIMEOUT_MS, Math.min(MAX_TOOL_TIMEOUT_MS, Math.floor(parsed)));
 }
 
-function resolveToolTimeoutBehavior(
-    agent: AgentDefinition,
-    hasStatusTracking: boolean
-): 'background' | 'error' {
+function resolveToolTimeoutBehavior(agent: AgentDefinition, hasStatusTracking: boolean): 'background' | 'error' {
     const raw = String((agent.modelSettings as any)?.tool_timeout_behavior || '')
         .trim()
         .toLowerCase();
@@ -115,7 +112,7 @@ export async function executeToolWithLifecycle(
     try {
         args = prepareToolArguments(argsString, tool);
     } catch (error) {
-        throw new Error(`Invalid JSON in tool arguments: ${error}`);
+        throw new Error(`Invalid JSON in tool arguments: ${error}`, { cause: error });
     }
 
     // Register with tracker
@@ -265,7 +262,7 @@ export function prepareToolArguments(argsString: string, tool: ToolFunction): an
             args = JSON.parse(argsString);
         }
     } catch (error) {
-        throw new Error(`Invalid JSON in tool arguments: ${error}`);
+        throw new Error(`Invalid JSON in tool arguments: ${error}`, { cause: error });
     }
 
     if (typeof args === 'object' && args !== null && !Array.isArray(args)) {

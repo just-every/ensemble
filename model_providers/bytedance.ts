@@ -19,7 +19,13 @@ function mapSize(size?: ImageGenerationOpts['size']): string | undefined {
     if (s === 'landscape') return '1536x1024';
     if (s === 'portrait') return '1024x1536';
     // BytePlus presets
-    if (s.toUpperCase() === '2K' || s.toUpperCase() === '4K' || s.toUpperCase() === '720P' || s.toUpperCase() === '1080P') return s;
+    if (
+        s.toUpperCase() === '2K' ||
+        s.toUpperCase() === '4K' ||
+        s.toUpperCase() === '720P' ||
+        s.toUpperCase() === '1080P'
+    )
+        return s;
     // pass through explicit sizes
     if (/^\d+x\d+$/i.test(s)) return s;
     return undefined;
@@ -29,7 +35,7 @@ function normalizeModelId(model: string): string {
     // Allow friendly alias 'seedream-4' to call official release id
     if (model === 'seedream-4' || model === 'seedream-4.0') return 'seedream-4-0-250828';
     // Strip provider prefix if present (e.g., bytedance/seedream-4.0)
-    return model.replace(/^bytedance[\/:-]/, '');
+    return model.replace(/^bytedance[/:-]/, '');
 }
 
 export class ByteDanceProvider extends BaseModelProvider {
@@ -39,17 +45,26 @@ export class ByteDanceProvider extends BaseModelProvider {
 
     // Text streaming not supported via this provider in our integration
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Bytedance provider does not support text streaming');
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts: ImageGenerationOpts = {}): Promise<string[]> {
-        const apiKey =
-            process.env.ARK_API_KEY ||
-            process.env.BYTEPLUS_API_KEY ||
-            process.env.BYTEDANCE_API_KEY;
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
+        const apiKey = process.env.ARK_API_KEY || process.env.BYTEPLUS_API_KEY || process.env.BYTEDANCE_API_KEY;
         if (!apiKey) throw new Error('Bytedance provider: set ARK_API_KEY (or BYTEPLUS_API_KEY/BYTEDANCE_API_KEY)');
 
-        const requestId = log_llm_request(agent.agent_id || 'default', 'bytedance', model, { prompt, opts }, new Date());
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'bytedance',
+            model,
+            { prompt, opts },
+            new Date()
+        );
         try {
             const n = Math.max(1, Math.min(10, opts.n || 1));
             const size = mapSize(opts.size) || '1024x1024';
@@ -73,7 +88,9 @@ export class ByteDanceProvider extends BaseModelProvider {
 
             // Basic i2i support if a single source image URL or base64 is provided
             if (opts?.source_images) {
-                const arr = Array.isArray(opts.source_images) ? (opts.source_images as any[]) : [opts.source_images as any];
+                const arr = Array.isArray(opts.source_images)
+                    ? (opts.source_images as any[])
+                    : [opts.source_images as any];
                 const images: string[] = [];
                 for (const s of arr.slice(0, 10)) {
                     const v = typeof s === 'string' ? s : s?.data;
@@ -87,14 +104,18 @@ export class ByteDanceProvider extends BaseModelProvider {
                 }
             }
 
-            const res = await fetchWithTimeout(`${ARK_BASE}/images/generations`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
+            const res = await fetchWithTimeout(
+                `${ARK_BASE}/images/generations`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(body),
                 },
-                body: JSON.stringify(body),
-            }, 60000);
+                60000
+            );
 
             if (!res.ok) {
                 const text = await res.text();
@@ -187,7 +208,12 @@ export class ByteDanceProvider extends BaseModelProvider {
 
             if (!out.length) throw new Error('Bytedance: no image result in response');
 
-            costTracker.addUsage({ model, image_count: out.length, request_id: opts?.request_id, metadata: { source: 'bytedance', usage: observedUsage } });
+            costTracker.addUsage({
+                model,
+                image_count: out.length,
+                request_id: opts?.request_id,
+                metadata: { source: 'bytedance', usage: observedUsage },
+            });
             log_llm_response(requestId, { ok: true, image_count: out.length });
             return out;
         } catch (err) {

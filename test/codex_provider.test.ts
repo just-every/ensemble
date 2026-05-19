@@ -15,6 +15,8 @@ import { MODEL_REGISTRY, findModel } from '../data/model_data.js';
 import { CodexProvider, resolveCodexModel } from '../model_providers/codex.js';
 import { getProviderFromModel } from '../model_providers/model_provider.js';
 import { ensembleRequest } from '../core/ensemble_request.js';
+import { costTracker } from '../utils/cost_tracker.js';
+import type { ModelUsage } from '../types/types.js';
 
 async function collect(stream: AsyncIterable<any>): Promise<any[]> {
     const events: any[] = [];
@@ -46,7 +48,8 @@ function getArg(args: string[], flag: string): string {
 
 function mockSuccessfulCodex(
     content: string,
-    inspect?: (invocation: { command: string; args: string[]; options: any; stdin: string }) => void | Promise<void>
+    inspect?: (invocation: { command: string; args: string[]; options: any; stdin: string }) => void | Promise<void>,
+    stdout = ''
 ) {
     spawnMock.mockImplementation((command: string, args: string[], options: any) => {
         const child = createMockChild();
@@ -58,6 +61,7 @@ function mockSuccessfulCodex(
         child.stdin.on('finish', async () => {
             try {
                 await inspect?.({ command, args, options, stdin });
+                if (stdout) child.stdout.write(stdout);
                 await writeFile(getArg(args, '--output-last-message'), content, 'utf8');
                 child.emit('close', 0, null);
             } catch (error) {
@@ -123,6 +127,7 @@ describe('Codex provider', () => {
             expect(invocation.command).toBe('codex');
             expect(getArg(invocation.args, '-m')).toBe('gpt-5.5');
             expect(getArg(invocation.args, '--cd')).toBe('/tmp/project');
+            expect(invocation.args).toContain('--json');
             expect(invocation.args).toContain('--ephemeral');
             expect(invocation.args).toContain('--ignore-user-config');
             expect(invocation.args).toContain('--ignore-rules');
@@ -151,6 +156,49 @@ describe('Codex provider', () => {
         );
 
         expect(events.find(event => event.type === 'message_complete')?.content).toBe('Done.');
+    });
+
+    it('captures real Codex CLI JSON usage through the cost tracker', async () => {
+        const usageEvents: ModelUsage[] = [];
+        const onUsage = (usage: ModelUsage) => {
+            usageEvents.push(usage);
+        };
+        costTracker.onAddUsage(onUsage);
+        try {
+            mockSuccessfulCodex(
+                'Done.',
+                undefined,
+                [
+                    '{"type":"thread.started","thread_id":"thread-test"}',
+                    '{"type":"turn.completed","usage":{"input_tokens":28882,"cached_input_tokens":20864,"output_tokens":2,"reasoning_output_tokens":0}}',
+                    '',
+                ].join('\n')
+            );
+
+            const provider = new CodexProvider();
+            await collect(
+                provider.createResponseStream(
+                    [{ type: 'message', role: 'user', content: 'Reply OK' }] as any,
+                    'codex-gpt-5.5',
+                    { agent_id: 'test-codex-usage' } as any
+                )
+            );
+
+            expect(usageEvents.at(-1)).toMatchObject({
+                model: 'gpt-5.5',
+                input_tokens: 28882,
+                cached_tokens: 20864,
+                output_tokens: 2,
+                total_tokens: 28884,
+                metadata: {
+                    source: 'codex_cli_json',
+                    reasoning_output_tokens: 0,
+                },
+            });
+            expect(typeof usageEvents.at(-1)?.cost).toBe('number');
+        } finally {
+            costTracker.offAddUsage(onUsage);
+        }
     });
 
     it('passes image inputs to codex exec with --image attachments', async () => {
@@ -451,7 +499,11 @@ describe('Codex provider', () => {
                 expect(invocation.args.filter(arg => arg === '--enable')).toHaveLength(1);
                 expect(getArg(invocation.args, '--enable')).toBe('image_generation');
                 expect(invocation.args).toContain('--skip-git-repo-check');
-                expect(invocation.args.some((arg, index) => arg === '--disable' && invocation.args[index + 1] === 'image_generation')).toBe(false);
+                expect(
+                    invocation.args.some(
+                        (arg, index) => arg === '--disable' && invocation.args[index + 1] === 'image_generation'
+                    )
+                ).toBe(false);
                 expect(invocation.args).not.toContain('-m');
                 const codexOutputDir = getArg(invocation.args, '--cd');
                 expect(codexOutputDir).toContain('ensemble-codex-image-');
@@ -534,7 +586,7 @@ describe('Codex provider', () => {
         let invocationCount = 0;
 
         try {
-            spawnMock.mockImplementation((command: string, args: string[], options: any) => {
+            spawnMock.mockImplementation((command: string, args: string[], _options: any) => {
                 const child = createMockChild();
                 child.stdin.on('finish', async () => {
                     invocationCount += 1;
@@ -651,11 +703,14 @@ describe('Codex provider', () => {
         const generatedPng = Buffer.from('generated-codex-home-image');
 
         try {
-            mockSuccessfulCodex('/Users/example/.codex/generated_images/predicted-but-missing.png', async ({ options }) => {
-                const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'test-session');
-                await mkdir(generatedDir, { recursive: true });
-                await writeFile(path.join(generatedDir, 'ig_real.png'), generatedPng);
-            });
+            mockSuccessfulCodex(
+                '/Users/example/.codex/generated_images/predicted-but-missing.png',
+                async ({ options }) => {
+                    const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'test-session');
+                    await mkdir(generatedDir, { recursive: true });
+                    await writeFile(path.join(generatedDir, 'ig_real.png'), generatedPng);
+                }
+            );
 
             const provider = new CodexProvider();
             const images = await provider.createImage(
@@ -794,9 +849,16 @@ describe('Codex provider', () => {
 
                 try {
                     await new Promise(resolve => setTimeout(resolve, 25));
-                    const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', `session-${invocationIndex}`);
+                    const generatedDir = path.join(
+                        options.env.CODEX_HOME,
+                        'generated_images',
+                        `session-${invocationIndex}`
+                    );
                     await mkdir(generatedDir, { recursive: true });
-                    await writeFile(path.join(generatedDir, `ig_${invocationIndex}.png`), Buffer.from(`image-${invocationIndex}`));
+                    await writeFile(
+                        path.join(generatedDir, `ig_${invocationIndex}.png`),
+                        Buffer.from(`image-${invocationIndex}`)
+                    );
                     await writeFile(
                         getArg(args, '--output-last-message'),
                         'No generated local image file path was returned.',
@@ -842,10 +904,12 @@ describe('Codex provider', () => {
                 ),
             ]);
 
-            expect([firstImages[0], secondImages[0]].sort()).toEqual([
-                `data:image/png;base64,${Buffer.from('image-1').toString('base64')}`,
-                `data:image/png;base64,${Buffer.from('image-2').toString('base64')}`,
-            ].sort());
+            expect([firstImages[0], secondImages[0]].sort()).toEqual(
+                [
+                    `data:image/png;base64,${Buffer.from('image-1').toString('base64')}`,
+                    `data:image/png;base64,${Buffer.from('image-2').toString('base64')}`,
+                ].sort()
+            );
             expect(maxActiveExecutions).toBeGreaterThan(1);
         } finally {
             await rm(cwd, { recursive: true, force: true });

@@ -23,6 +23,7 @@ export class StabilityProvider extends BaseModelProvider {
     }
 
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Stability provider does not support text streaming');
     }
 
@@ -34,9 +35,20 @@ export class StabilityProvider extends BaseModelProvider {
         return `${STABILITY_BASE}/stable-image/generate/sd3`;
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts: ImageGenerationOpts = {}): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
         const apiKey = process.env.STABILITY_API_KEY;
-        const requestId = log_llm_request(agent.agent_id || 'default', 'stability', model, { prompt, opts }, new Date());
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'stability',
+            model,
+            { prompt, opts },
+            new Date()
+        );
         try {
             if (!apiKey) throw new Error('STABILITY_API_KEY is not set');
 
@@ -100,7 +112,12 @@ export class StabilityProvider extends BaseModelProvider {
                 const b64 = Buffer.from(buf).toString('base64');
                 const mime = contentType.split(';')[0];
                 const dataUrl = `data:${mime};base64,${b64}`;
-                costTracker.addUsage({ model, image_count: 1, request_id: opts?.request_id, metadata: { source: 'stability' } });
+                costTracker.addUsage({
+                    model,
+                    image_count: 1,
+                    request_id: opts?.request_id,
+                    metadata: { source: 'stability' },
+                });
                 return [dataUrl];
             }
             const json = await res.json();
@@ -112,7 +129,12 @@ export class StabilityProvider extends BaseModelProvider {
             if (json?.image) images.push(`data:image/png;base64,${json.image}`);
             if (json?.images?.[0]?.base64) images.push(`data:image/png;base64,${json.images[0].base64}`);
             if (!images.length) throw new Error('Stability: no image in response');
-            costTracker.addUsage({ model, image_count: images.length, request_id: opts?.request_id, metadata: { source: 'stability' } });
+            costTracker.addUsage({
+                model,
+                image_count: images.length,
+                request_id: opts?.request_id,
+                metadata: { source: 'stability' },
+            });
             return images;
         } catch (err) {
             log_llm_error(requestId, err);

@@ -262,7 +262,6 @@ export class QuotaTracker {
                     console.log(
                         `[QuotaTracker] OpenAI GPT-4 family daily limit reached: ${freeQuota.gpt4Family.used} > ${freeQuota.gpt4Family.limit}`
                     );
-                    significantChange = true; // Exceeding quota is significant
                     this.sendQuotaUpdate(); // Update immediately when quota is exceeded
                     return false; // Exceeded quota
                 }
@@ -288,7 +287,6 @@ export class QuotaTracker {
                     console.log(
                         `[QuotaTracker] OpenAI GPT-Mini family daily limit reached: ${freeQuota.gptMiniFamily.used} > ${freeQuota.gptMiniFamily.limit}`
                     );
-                    significantChange = true; // Exceeding quota is significant
                     this.sendQuotaUpdate(); // Update immediately when quota is exceeded
                     return false; // Exceeded quota
                 }
@@ -338,7 +336,6 @@ export class QuotaTracker {
                 console.log(
                     `[QuotaTracker] ${provider} model ${model} daily token limit reached: ${modelQuota.dailyTokensUsed} > ${modelQuota.dailyTokenLimit}`
                 );
-                significantChange = true; // Exceeding quota is significant
                 this.sendQuotaUpdate(); // Update immediately when quota is exceeded
                 return false; // Exceeded quota
             }
@@ -348,7 +345,6 @@ export class QuotaTracker {
                 console.log(
                     `[QuotaTracker] ${provider} model ${model} daily request limit reached: ${modelQuota.dailyRequestsUsed} > ${modelQuota.dailyRequestLimit}`
                 );
-                significantChange = true; // Exceeding quota is significant
                 this.sendQuotaUpdate(); // Update immediately when quota is exceeded
                 return false; // Exceeded quota
             }

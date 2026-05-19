@@ -129,7 +129,9 @@ describe('GPT-5 Multiple Function Calls', () => {
             } catch (error) {
                 // Check if it's the specific error we're trying to fix
                 if (error instanceof Error && error.message.includes("required 'reasoning' item")) {
-                    throw new Error('GPT-5 reasoning/function call ordering error still present: ' + error.message);
+                    throw new Error('GPT-5 reasoning/function call ordering error still present: ' + error.message, {
+                        cause: error,
+                    });
                 }
                 throw error;
             }
@@ -238,7 +240,9 @@ describe('GPT-5 Multiple Function Calls', () => {
             console.log('Complex history test passed!');
         } catch (error) {
             if (error instanceof Error && error.message.includes("required 'reasoning' item")) {
-                throw new Error('GPT-5 reasoning/function call ordering error in complex history: ' + error.message);
+                throw new Error('GPT-5 reasoning/function call ordering error in complex history: ' + error.message, {
+                    cause: error,
+                });
             }
             throw error;
         }

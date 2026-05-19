@@ -25,6 +25,7 @@ export class FireworksProvider extends BaseModelProvider {
     }
 
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Fireworks provider does not support text streaming');
     }
 
@@ -42,10 +43,21 @@ export class FireworksProvider extends BaseModelProvider {
         return model;
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts: ImageGenerationOpts = {}): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: ImageGenerationOpts = {}
+    ): Promise<string[]> {
         const apiKey = process.env.FIREWORKS_API_KEY;
         const falKey = process.env.FAL_KEY; // fallback
-        const requestId = log_llm_request(agent.agent_id || 'default', 'fireworks', model, { prompt, opts }, new Date());
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'fireworks',
+            model,
+            { prompt, opts },
+            new Date()
+        );
 
         try {
             if (!apiKey) throw new Error('FIREWORKS_API_KEY is not set');
@@ -64,14 +76,23 @@ export class FireworksProvider extends BaseModelProvider {
                     if (typeof v === 'string') input_image = v;
                 }
 
-                const res = await fetchWithTimeout(createUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${apiKey}`,
+                const res = await fetchWithTimeout(
+                    createUrl,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${apiKey}`,
+                        },
+                        body: JSON.stringify({
+                            prompt,
+                            aspect_ratio: aspect_ratio,
+                            output_format: 'png',
+                            ...(input_image ? { input_image } : {}),
+                        }),
                     },
-                    body: JSON.stringify({ prompt, aspect_ratio: aspect_ratio, output_format: 'png', ...(input_image ? { input_image } : {}) }),
-                }, 60000);
+                    60000
+                );
 
                 if (!res.ok) {
                     // Fallback to FAL if configured
@@ -89,14 +110,18 @@ export class FireworksProvider extends BaseModelProvider {
                 const started = Date.now();
                 const timeoutMs = 240000;
                 while (true) {
-                    const r = await fetchWithTimeout(pollUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${apiKey}`,
+                    const r = await fetchWithTimeout(
+                        pollUrl,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${apiKey}`,
+                            },
+                            body: JSON.stringify({ id }),
                         },
-                        body: JSON.stringify({ id }),
-                    }, 60000);
+                        60000
+                    );
                     if (!r.ok) throw new Error(`Fireworks Kontext poll failed: ${r.status} ${await r.text()}`);
                     const out = await r.json();
                     const status = String(out.status || '').toLowerCase();
@@ -118,7 +143,12 @@ export class FireworksProvider extends BaseModelProvider {
                         }
                         if (!urls.length) throw new Error('Fireworks Kontext: no image result found');
 
-                        costTracker.addUsage({ model, image_count: urls.length, request_id: opts?.request_id, metadata: { source: 'fireworks', model: modelId } });
+                        costTracker.addUsage({
+                            model,
+                            image_count: urls.length,
+                            request_id: opts?.request_id,
+                            metadata: { source: 'fireworks', model: modelId },
+                        });
                         return urls;
                     }
                     if (status.includes('error') || status.includes('failed')) {
@@ -144,7 +174,7 @@ export class FireworksProvider extends BaseModelProvider {
                     const urls = await this.fallbackToFAL(prompt, model, opts);
                     log_llm_response(requestId, { ok: true, fallback: 'fal' });
                     return urls;
-                } catch (_) {
+                } catch {
                     // ignore, rethrow original
                 }
             }
@@ -157,7 +187,7 @@ export class FireworksProvider extends BaseModelProvider {
     private async fallbackToFAL(prompt: string, model: string, opts: ImageGenerationOpts = {}): Promise<string[]> {
         // Map Fireworks FLUX variants to FAL endpoints where possible
         const lower = model.toLowerCase();
-        let endpoint = '';
+        let endpoint: string;
         if (lower.includes('schnell')) endpoint = 'fal-ai/flux/schnell';
         else if (lower.includes('dev')) endpoint = 'fal-ai/flux/dev';
         else if (lower.includes('pro') || lower.includes('kontext')) endpoint = 'fal-ai/flux-pro/kontext';
@@ -181,7 +211,12 @@ export class FireworksProvider extends BaseModelProvider {
         for (const im of arr) if (im?.url) images.push(im.url);
         if (!images.length && data?.url) images.push(data.url);
         if (!images.length) throw new Error('FAL fallback: no image url');
-        costTracker.addUsage({ model, image_count: images.length, request_id: opts?.request_id, metadata: { source: 'fal-fallback' } });
+        costTracker.addUsage({
+            model,
+            image_count: images.length,
+            request_id: opts?.request_id,
+            metadata: { source: 'fal-fallback' },
+        });
         return images;
     }
 }

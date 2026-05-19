@@ -144,7 +144,9 @@ function shouldTreatAllOfObjectAsClosed(schema: any): boolean {
         return objectCandidate.type === 'object' || typeof objectCandidate.properties === 'object';
     });
 
-    return objectBranches.length > 0 && objectBranches.every((candidate: any) => candidate?.additionalProperties === false);
+    return (
+        objectBranches.length > 0 && objectBranches.every((candidate: any) => candidate?.additionalProperties === false)
+    );
 }
 
 function shouldRelaxAllOfObjectBranches(schema: any): boolean {
@@ -161,7 +163,9 @@ function shouldRelaxAllOfObjectBranches(schema: any): boolean {
         return objectCandidate.type === 'object' || typeof objectCandidate.properties === 'object';
     });
 
-    return objectBranches.length > 0 && objectBranches.every((candidate: any) => candidate?.additionalProperties === false);
+    return (
+        objectBranches.length > 0 && objectBranches.every((candidate: any) => candidate?.additionalProperties === false)
+    );
 }
 
 function relaxAllOfObjectBranch(candidate: any): any {
@@ -229,7 +233,9 @@ function validateAgainstSchema(value: unknown, schema: any, path = '$'): Validat
     }
 
     if (Array.isArray(schema.oneOf)) {
-        const matches = schema.oneOf.filter((candidate: unknown) => validateAgainstSchema(value, candidate, path).ok).length;
+        const matches = schema.oneOf.filter(
+            (candidate: unknown) => validateAgainstSchema(value, candidate, path).ok
+        ).length;
         if (matches !== 1) {
             return {
                 ok: false,
@@ -402,7 +408,11 @@ function validateAgainstSchema(value: unknown, schema: any, path = '$'): Validat
             }
 
             if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
-                const result = validateAgainstSchema(objectValue[key], schema.additionalProperties, joinPath(path, key));
+                const result = validateAgainstSchema(
+                    objectValue[key],
+                    schema.additionalProperties,
+                    joinPath(path, key)
+                );
                 if (!result.ok) {
                     return result;
                 }

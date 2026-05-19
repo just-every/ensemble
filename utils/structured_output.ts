@@ -36,7 +36,8 @@ function exampleFromSchema(schema: unknown, depth = 0): unknown {
     const type = firstSchemaType(typedSchema);
     if (type === 'object' || typedSchema.properties) {
         const example: Record<string, unknown> = {};
-        const properties = typedSchema.properties && typeof typedSchema.properties === 'object' ? typedSchema.properties : {};
+        const properties =
+            typedSchema.properties && typeof typedSchema.properties === 'object' ? typedSchema.properties : {};
         const keys = Object.keys(properties);
         const required = Array.isArray(typedSchema.required)
             ? typedSchema.required.filter((value: unknown): value is string => typeof value === 'string')

@@ -58,9 +58,7 @@ export function chooseHighestImageDetail(details: Array<ImageInputDetail | undef
 
 function collectDetailsFromContent(content: ResponseContent): Array<ImageInputDetail | undefined> {
     if (!Array.isArray(content)) return [];
-    return content
-        .filter(item => item.type === 'input_image' || item.type === 'image')
-        .map(item => item.detail);
+    return content.filter(item => item.type === 'input_image' || item.type === 'image').map(item => item.detail);
 }
 
 export function chooseImageDetailFromInput(input: ResponseInput): ImageInputDetail | undefined {

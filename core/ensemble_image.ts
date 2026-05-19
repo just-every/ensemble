@@ -93,14 +93,21 @@ export function ensembleImage(
         // Bridge cost updates for this request_id only
         const handler = (usage: any) => {
             if (usage?.request_id === request_id) {
-                const ev: ProviderStreamEvent = { type: 'cost_update', usage, request_id, timestamp: new Date().toISOString() } as any;
+                const ev: ProviderStreamEvent = {
+                    type: 'cost_update',
+                    usage,
+                    request_id,
+                    timestamp: new Date().toISOString(),
+                } as any;
                 // push synchronously so consumers can flush immediately after provider returns
                 iterator.push(ev);
             }
         };
         const iterator: { queue: ProviderStreamEvent[]; push: (e: ProviderStreamEvent) => void } = {
             queue: [],
-            push(e) { this.queue.push(e); },
+            push(e) {
+                this.queue.push(e);
+            },
         };
         costTracker.onAddUsage(handler);
 

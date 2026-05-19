@@ -377,7 +377,7 @@ export async function getModelFromAgent(
     // Resolve any aliases to the actual model ID
     // But preserve suffixes if they were explicitly provided.
     // Provider implementations may interpret these as reasoning or thinking controls.
-    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-max'];
+    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-disabled', '-max'];
     let suffix = '';
     let baseModel = model;
 

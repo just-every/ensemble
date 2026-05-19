@@ -79,10 +79,7 @@ function stringifyFailureMessage(value: unknown): string {
     }
 }
 
-export function normalizeFailure(
-    failure: unknown,
-    overrides: FailureNormalizationOptions = {}
-): FailureClassification {
+export function normalizeFailure(failure: unknown, overrides: FailureNormalizationOptions = {}): FailureClassification {
     const candidate = failure as {
         error?: unknown;
         message?: unknown;
@@ -105,10 +102,7 @@ export function normalizeFailure(
 
     if (
         recoverable === undefined &&
-        (code === 'ETIMEDOUT' ||
-            code === 'ABORT_ERR' ||
-            code === 'ABORT_ERROR' ||
-            candidate?.name === 'AbortError')
+        (code === 'ETIMEDOUT' || code === 'ABORT_ERR' || code === 'ABORT_ERROR' || candidate?.name === 'AbortError')
     ) {
         recoverable = false;
     }

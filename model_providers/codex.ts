@@ -7,6 +7,7 @@ import {
     AgentDefinition,
     ImageGenerationOpts,
     ModelSettings,
+    ModelUsage,
     ProviderStreamEvent,
     ResponseInput,
     ResponseInputItem,
@@ -240,6 +241,14 @@ type CodexExecDiagnostics = {
     stderr: CodexExecStreamSummary;
 };
 
+type CodexCliUsage = {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+    reasoning_output_tokens?: number;
+    total_tokens?: number;
+};
+
 type CodexExecError = Error & {
     codex_exec?: CodexExecDiagnostics;
 };
@@ -261,6 +270,54 @@ function summarizeCodexExecStream(value: string): CodexExecStreamSummary {
         length: value.length,
         truncated: true,
     };
+}
+
+function codexUsageFromJsonl(stdout: string, model: string, requestId?: string): ModelUsage | undefined {
+    let latestUsage: CodexCliUsage | undefined;
+    for (const line of stdout.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(trimmed);
+        } catch {
+            continue;
+        }
+        if (!isRecord(parsed) || parsed.type !== 'turn.completed' || !isRecord(parsed.usage)) continue;
+        const usage = parsed.usage;
+        latestUsage = {
+            input_tokens: finiteNumber(usage.input_tokens),
+            cached_input_tokens: finiteNumber(usage.cached_input_tokens),
+            output_tokens: finiteNumber(usage.output_tokens),
+            reasoning_output_tokens: finiteNumber(usage.reasoning_output_tokens),
+            total_tokens: finiteNumber(usage.total_tokens),
+        };
+    }
+
+    if (!latestUsage) return undefined;
+    const inputTokens = latestUsage.input_tokens ?? 0;
+    const outputTokens = latestUsage.output_tokens ?? 0;
+    if (inputTokens === 0 && outputTokens === 0) return undefined;
+    return {
+        model,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        total_tokens: latestUsage.total_tokens ?? inputTokens + outputTokens,
+        cached_tokens: latestUsage.cached_input_tokens,
+        request_id: requestId,
+        metadata: {
+            source: 'codex_cli_json',
+            reasoning_output_tokens: latestUsage.reasoning_output_tokens ?? 0,
+        },
+    };
+}
+
+function finiteNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function serializeCodexExecError(error: unknown): unknown {
@@ -441,6 +498,7 @@ async function executeCodexRequest(
 
         const commandArgs = [
             'exec',
+            '--json',
             '--ephemeral',
             '--ignore-user-config',
             '--ignore-rules',
@@ -479,18 +537,19 @@ async function executeCodexRequest(
 
         let codexExecDiagnostics: CodexExecDiagnostics;
         try {
-            codexExecDiagnostics = (
-                await runCodexExec({
-                    commandArgs,
-                    cwd,
-                    env: {
-                        ...process.env,
-                        CODEX_HOME: codexHome,
-                    },
-                    prompt,
-                    abortSignal: agent.abortSignal,
-                })
-            ).diagnostics;
+            const codexExecResult = await runCodexExec({
+                commandArgs,
+                cwd,
+                env: {
+                    ...process.env,
+                    CODEX_HOME: codexHome,
+                },
+                prompt,
+                abortSignal: agent.abortSignal,
+            });
+            codexExecDiagnostics = codexExecResult.diagnostics;
+            const usage = codexUsageFromJsonl(codexExecResult.stdout, codexModel, loggedRequestId);
+            if (usage) costTracker.addUsage(usage);
         } catch (error) {
             log_llm_error(loggedRequestId, {
                 error: serializeCodexExecError(error),
@@ -529,7 +588,9 @@ function buildCodexImagePrompt(prompt: string, opts: ImageGenerationOpts = {}): 
         `Generate exactly ${count} image${count === 1 ? '' : 's'} for this request.`,
         'Actually invoke the image generation tool. Do not invent or predict file paths.',
         'After generation completes, return only the generated local image file path(s), one per line.',
-        opts.source_images ? 'Use the attached image input(s) as reference material for the generation or edit.' : undefined,
+        opts.source_images
+            ? 'Use the attached image input(s) as reference material for the generation or edit.'
+            : undefined,
         opts.size ? `Requested size or aspect ratio: ${opts.size}.` : undefined,
         opts.quality ? `Requested quality: ${opts.quality}.` : undefined,
         opts.background ? `Requested background: ${opts.background}.` : undefined,
@@ -572,11 +633,8 @@ function cacheImagePromptModelCapabilityFailure(codexHome: string, requested: st
 function isImagePromptModelCapabilityFailure(message: string): boolean {
     const normalized = message.toLowerCase();
     return (
-        normalized.includes('no callable image generation tool')
-        || (
-            normalized.includes('cannot fulfill')
-            && normalized.includes('image generation tool')
-        )
+        normalized.includes('no callable image generation tool') ||
+        (normalized.includes('cannot fulfill') && normalized.includes('image generation tool'))
     );
 }
 
@@ -614,8 +672,8 @@ async function executeCodexImageGeneration(
 
         for (const promptModelAttempt of promptModelAttempts) {
             if (
-                promptModelAttempt
-                && hasCachedImagePromptModelCapabilityFailure(codexHome, promptModelAttempt.requested)
+                promptModelAttempt &&
+                hasCachedImagePromptModelCapabilityFailure(codexHome, promptModelAttempt.requested)
             ) {
                 promptModelErrors.push(
                     `${promptModelAttempt.requested}: skipped after this Codex home already proved the prompt model cannot call image generation.`
@@ -707,9 +765,7 @@ async function executeCodexImageGeneration(
                     throw new Error(
                         `Codex image generation resolved ${selectedImagePaths.length} image artifact${
                             selectedImagePaths.length === 1 ? '' : 's'
-                        }, expected ${expectedImageCount}.${
-                            lastMessage ? ` Last message: ${lastMessage}` : ''
-                        }`
+                        }, expected ${expectedImageCount}.${lastMessage ? ` Last message: ${lastMessage}` : ''}`
                     );
                 }
                 const generatedImages = await readCodexImageFiles(selectedImagePaths);

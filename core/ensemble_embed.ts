@@ -66,7 +66,6 @@ const embeddingCache = new Map<
 export async function ensembleEmbed(text: string, agent: AgentDefinition, options?: EmbedOpts): Promise<number[]> {
     const trace = createTraceContext(agent, 'embedding');
     const requestId = randomUUID();
-    let requestStarted = false;
     let turnStatus: 'completed' | 'error' = 'completed';
     let requestStatus = 'completed';
     let requestError: string | undefined;
@@ -85,7 +84,6 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
             options,
         },
     });
-    requestStarted = true;
 
     try {
         // Default to 1536 dimensions for text-embedding-3-small
@@ -180,13 +178,11 @@ export async function ensembleEmbed(text: string, agent: AgentDefinition, option
         requestError = error instanceof Error ? error.message : String(error);
         throw error;
     } finally {
-        if (requestStarted) {
-            await trace.emitRequestEnd(requestId, {
-                status: requestStatus,
-                error: requestError,
-                ...requestMetadata,
-            });
-        }
+        await trace.emitRequestEnd(requestId, {
+            status: requestStatus,
+            error: requestError,
+            ...requestMetadata,
+        });
         await trace.emitTurnEnd(turnStatus, turnStatus === 'completed' ? 'completed' : 'exception', {
             error: requestError,
         });

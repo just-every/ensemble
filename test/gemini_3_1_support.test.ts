@@ -919,7 +919,7 @@ describe('Gemini 3.x model support', () => {
                 { agent_id: 'test-gemini-2.5-thinking-malformed' } as any,
                 {
                     n: 1,
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
                     thinking: 'not-an-object' as any,
                 }
             )

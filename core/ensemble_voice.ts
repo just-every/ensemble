@@ -56,7 +56,6 @@ export async function* ensembleVoice(
     const isElevenLabs = model.startsWith('eleven_');
     const trace = createTraceContext(agent, 'voice_generation');
     const requestId = randomUUID();
-    let requestStarted = false;
     let turnStatus: 'completed' | 'error' = 'completed';
     let requestStatus = 'completed';
     let requestError: string | undefined;
@@ -85,7 +84,6 @@ export async function* ensembleVoice(
             options: streamOptions,
         },
     });
-    requestStarted = true;
 
     // Determine effective format after any conversions
     const effectiveFormat = isGemini || (isElevenLabs && isPCM) ? 'wav' : format;
@@ -171,7 +169,8 @@ export async function* ensembleVoice(
             provider = getModelProvider(model);
         } catch (error) {
             throw new Error(
-                `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to initialize provider for model ${model}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                { cause: error }
             );
         }
 
@@ -381,14 +380,12 @@ export async function* ensembleVoice(
         requestError = error instanceof Error ? error.message : String(error);
         throw error;
     } finally {
-        if (requestStarted) {
-            await trace.emitRequestEnd(requestId, {
-                status: requestStatus,
-                error: requestError,
-                first_byte_ms: firstByteTime ? firstByteTime - startTime : undefined,
-                total_time_ms: Date.now() - startTime,
-            });
-        }
+        await trace.emitRequestEnd(requestId, {
+            status: requestStatus,
+            error: requestError,
+            first_byte_ms: firstByteTime ? firstByteTime - startTime : undefined,
+            total_time_ms: Date.now() - startTime,
+        });
         await trace.emitTurnEnd(turnStatus, turnStatus === 'completed' ? 'completed' : 'exception', {
             error: requestError,
         });

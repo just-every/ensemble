@@ -1,5 +1,5 @@
 import { BaseModelProvider } from './base_provider.js';
-import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent, ResponseInput } from '../types/types.js';
+import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { fetchWithTimeout } from '../utils/fetch_with_timeout.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
@@ -22,17 +22,29 @@ export class MidjourneyProvider extends BaseModelProvider {
     }
 
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Midjourney provider does not support text streaming');
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts?: ImageGenerationOpts): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]> {
         const apiKey = process.env.MIDJOURNEY_API_KEY || process.env.MJ_API_KEY || process.env.KIE_API_KEY;
         if (!apiKey) throw new Error('Midjourney provider: MIDJOURNEY_API_KEY (or KIE_API_KEY) is not set');
         if (!process.env.MIDJOURNEY_API_KEY && process.env.MJ_API_KEY) {
             console.warn('[Midjourney] MJ_API_KEY is deprecated. Please set MIDJOURNEY_API_KEY instead.');
         }
 
-        const requestId = log_llm_request(agent.agent_id || 'default', 'midjourney', model, { prompt, opts }, new Date());
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'midjourney',
+            model,
+            { prompt, opts },
+            new Date()
+        );
         try {
             const aspect = mapMJAspect(opts?.size) || '1:1';
             const n = Math.max(1, Math.min(4, opts?.n || 1));
@@ -65,17 +77,21 @@ export class MidjourneyProvider extends BaseModelProvider {
                 // KIE accepts either fileUrl or fileUrls; prefer fileUrls
                 body.fileUrls = fileUrls;
             }
-            const headers: Record<string,string> = {
+            const headers: Record<string, string> = {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${apiKey}`,
             };
-            const res = await fetchWithTimeout(`${KIE_BASE}/api/v1/mj/generate`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(body),
-            }, 20000);
+            const res = await fetchWithTimeout(
+                `${KIE_BASE}/api/v1/mj/generate`,
+                {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                },
+                20000
+            );
             const data = await res.json().catch(async () => ({ code: res.status, msg: await res.text() }));
-            if (!res.ok || data?.code && data.code !== 200) {
+            if (!res.ok || (data?.code && data.code !== 200)) {
                 throw new Error(`MJ create failed: code=${data?.code ?? res.status} msg=${data?.msg ?? ''}`);
             }
             const taskId = data?.data?.taskId || data?.taskId || data?.id;
@@ -88,9 +104,13 @@ export class MidjourneyProvider extends BaseModelProvider {
             let notFoundCount = 0;
             while (true) {
                 // Prefer GET with query param
-                const r = await fetchWithTimeout(`${KIE_BASE}/api/v1/mj/record-info?taskId=${encodeURIComponent(taskId)}`, {
-                    headers: { Authorization: `Bearer ${apiKey}` },
-                }, 15000);
+                const r = await fetchWithTimeout(
+                    `${KIE_BASE}/api/v1/mj/record-info?taskId=${encodeURIComponent(taskId)}`,
+                    {
+                        headers: { Authorization: `Bearer ${apiKey}` },
+                    },
+                    15000
+                );
                 const info: any = await r.json().catch(async () => ({ code: r.status, msg: await r.text() }));
                 const code = info?.code ?? r.status;
                 const status = info?.data?.status || info?.status;
@@ -104,7 +124,12 @@ export class MidjourneyProvider extends BaseModelProvider {
                         throw new Error(`Midjourney poll error: code=${code} msg=${info?.msg ?? ''}`);
                     }
                 }
-                const list = info?.data?.resultInfoJson?.resultUrls || info?.data?.resultUrls || info?.resultInfoJson?.resultUrls || info?.resultUrls || [];
+                const list =
+                    info?.data?.resultInfoJson?.resultUrls ||
+                    info?.data?.resultUrls ||
+                    info?.resultInfoJson?.resultUrls ||
+                    info?.resultUrls ||
+                    [];
                 const urls: string[] = (list || [])
                     .map((u: any) => (typeof u === 'string' ? u : u?.resultUrl))
                     .filter(Boolean);
@@ -122,7 +147,12 @@ export class MidjourneyProvider extends BaseModelProvider {
                 await new Promise(r2 => setTimeout(r2, 1000));
             }
 
-            costTracker.addUsage({ model, image_count: images.length, request_id: opts?.request_id, metadata: { source: 'kie' } });
+            costTracker.addUsage({
+                model,
+                image_count: images.length,
+                request_id: opts?.request_id,
+                metadata: { source: 'kie' },
+            });
             return images;
         } catch (err) {
             log_llm_error(requestId, err);

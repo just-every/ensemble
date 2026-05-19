@@ -69,4 +69,58 @@ describe('OpenAI chat provider thinking budget', () => {
         expect(requestParams).toBeDefined();
         expect(requestParams.reasoning).toBeUndefined();
     });
+
+    it('maps OpenRouter reasoning suffixes and strips them from the requested model id', async () => {
+        const provider = new OpenAIChat('openrouter', 'sk-test', 'https://openrouter.ai/api/v1');
+        const create = vi.fn().mockResolvedValue(emptyStream());
+        (provider as any)._client = {
+            chat: {
+                completions: {
+                    create,
+                },
+            },
+        };
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return concise answer' }] as any,
+                'tencent/hy3-preview-none',
+                {
+                    agent_id: 'test-openrouter-reasoning-disabled-suffix',
+                } as any
+            )
+        );
+
+        const disabledRequestParams = create.mock.calls.at(0)?.[0];
+        expect(disabledRequestParams?.model).toBe('tencent/hy3-preview');
+        expect(disabledRequestParams?.reasoning).toEqual({ effort: 'none' });
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return concise answer' }] as any,
+                'tencent/hy3-preview-high',
+                {
+                    agent_id: 'test-openrouter-reasoning-high-suffix',
+                } as any
+            )
+        );
+
+        const highRequestParams = create.mock.calls.at(1)?.[0];
+        expect(highRequestParams?.model).toBe('tencent/hy3-preview');
+        expect(highRequestParams?.reasoning).toEqual({ effort: 'high' });
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return concise answer' }] as any,
+                'tencent/hy3-preview-disabled',
+                {
+                    agent_id: 'test-openrouter-reasoning-disabled-word-suffix',
+                } as any
+            )
+        );
+
+        const disabledWordRequestParams = create.mock.calls.at(2)?.[0];
+        expect(disabledWordRequestParams?.model).toBe('tencent/hy3-preview');
+        expect(disabledWordRequestParams?.reasoning).toEqual({ effort: 'none' });
+    });
 });

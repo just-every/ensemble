@@ -11,9 +11,7 @@ vi.mock('../utils/quota_tracker.js', () => ({
 
 // Mock environment variables for testing
 process.env.OPENAI_API_KEY =
-    process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')
-        ? process.env.OPENAI_API_KEY
-        : 'sk-test';
+    process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-') ? process.env.OPENAI_API_KEY : 'sk-test';
 process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'test-key';
 process.env.ANTHROPIC_API_KEY =
     process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-')
@@ -82,23 +80,14 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat');
             expect(model).not.toBe('grok-4');
             // Should only select from scored models that aren't disabled
-            expect([
-                'gemini-3-flash-preview',
-                'gpt-5.5',
-                'claude-sonnet-4-6',
-            ]).toContain(model);
+            expect(['gemini-3-flash-preview', 'gpt-5.5', 'claude-sonnet-4-6']).toContain(model);
         }
     });
 
     it('should handle all models being disabled gracefully', async () => {
         const agent: AgentDefinition = {
             modelClass: 'mini',
-            disabledModels: [
-                'gpt-5.4-nano',
-                'claude-haiku-4-5-20251001',
-                'gemini-2.5-flash-lite',
-                'grok-3-mini',
-            ],
+            disabledModels: ['gpt-5.4-nano', 'claude-haiku-4-5-20251001', 'gemini-2.5-flash-lite', 'grok-3-mini'],
         };
 
         // Should still return a model (fallback behavior)

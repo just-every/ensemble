@@ -136,7 +136,8 @@ export function extractBase64Image(content: string): ExtractBase64ImageResult {
     // Optional explicit id prefix format:
     //   [image #<id>]data:image/png;base64,...
     // When present, <id> is used directly. We do not infer ids heuristically.
-    const imgRegex = /(?:\[image\s*#([A-Za-z0-9._:-]{1,128})\]\s*)?data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,[A-Za-z0-9+/\s]*={0,2}/gi;
+    const imgRegex =
+        /(?:\[image\s*#([A-Za-z0-9._:-]{1,128})\]\s*)?data:(?:image\/)?([a-zA-Z0-9.+-]+);base64,[A-Za-z0-9+/\s]*={0,2}/gi;
 
     // Replace all instances and build a map of image_id -> image_data
     const images: Record<string, string> = {};
@@ -333,8 +334,7 @@ export function normalizeImageDataUrl(input: {
         const payload = match[2] || '';
         const { mime, charset, isBase64 } = getMimeFromMeta(meta);
 
-        const normalizedBase64 =
-            isBase64 || looksLikeBase64(payload) ? normalizeBase64String(payload) : null;
+        const normalizedBase64 = isBase64 || looksLikeBase64(payload) ? normalizeBase64String(payload) : null;
         if (normalizedBase64) {
             const detected = detectImageType(normalizedBase64);
             const baseMime = mime || input.mime_type || detected || 'image/png';

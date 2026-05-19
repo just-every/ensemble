@@ -1,5 +1,5 @@
 import { BaseModelProvider } from './base_provider.js';
-import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent, ResponseInput } from '../types/types.js';
+import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 
@@ -10,8 +10,21 @@ function mapResolution(size?: ImageGenerationOpts['size']): string | undefined {
     const s = String(size);
     // Ideogram supports a set of fixed resolutions
     const allowed = new Set([
-        '1792x1024', '1536x1024', '1365x1024', '1280x720', '1024x1024', '1024x1536', '1216x832', '1088x1088',
-        '1216x1216', '1344x1344', '1536x1536', '1792x1792', '1792x1024', '1792x1792', '1024x1792'
+        '1792x1024',
+        '1536x1024',
+        '1365x1024',
+        '1280x720',
+        '1024x1024',
+        '1024x1536',
+        '1216x832',
+        '1088x1088',
+        '1216x1216',
+        '1344x1344',
+        '1536x1536',
+        '1792x1792',
+        '1792x1024',
+        '1792x1792',
+        '1024x1792',
     ]);
     if (allowed.has(s)) return s;
     if (s === 'square') return '1024x1024';
@@ -26,10 +39,16 @@ export class IdeogramProvider extends BaseModelProvider {
     }
 
     async *createResponseStream(): AsyncGenerator<ProviderStreamEvent> {
+        yield* [] as ProviderStreamEvent[];
         throw new Error('Ideogram provider does not support text streaming');
     }
 
-    async createImage(prompt: string, model: string, agent: AgentDefinition, opts?: ImageGenerationOpts): Promise<string[]> {
+    async createImage(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts?: ImageGenerationOpts
+    ): Promise<string[]> {
         const apiKey = process.env.IDEOGRAM_API_KEY;
         if (!apiKey) throw new Error('Ideogram provider: IDEOGRAM_API_KEY is not set');
 
@@ -49,7 +68,7 @@ export class IdeogramProvider extends BaseModelProvider {
                 let imgBlob: Blob | null = null;
                 let maskBlob: Blob | null = null;
                 try {
-                    const toBlob = async (val: any, fallbackName: string) => {
+                    const toBlob = async (val: any) => {
                         if (!val) return null;
                         const s = typeof val === 'string' ? val : val?.data || val;
                         if (typeof s !== 'string') return null;
@@ -67,10 +86,10 @@ export class IdeogramProvider extends BaseModelProvider {
                         }
                         return null;
                     };
-                    imgBlob = await toBlob(src, 'image.png');
-                    if (opts?.mask) maskBlob = await toBlob(opts.mask, 'mask.png');
+                    imgBlob = await toBlob(src);
+                    if (opts?.mask) maskBlob = await toBlob(opts.mask);
                 } catch (e) {
-                    throw new Error(`Ideogram: failed to load source image/mask: ${e}`);
+                    throw new Error(`Ideogram: failed to load source image/mask: ${e}`, { cause: e });
                 }
                 if (!imgBlob) throw new Error('Ideogram edit: no usable source image');
 
@@ -91,7 +110,12 @@ export class IdeogramProvider extends BaseModelProvider {
                 const data = await res.json();
                 const urls: string[] = (data?.data || []).map((d: any) => d?.url).filter(Boolean);
                 if (!urls.length) throw new Error('Ideogram edit: no image URLs returned');
-                costTracker.addUsage({ model, image_count: urls.length, request_id: opts?.request_id, metadata: { source: 'ideogram', mode: 'edit' } });
+                costTracker.addUsage({
+                    model,
+                    image_count: urls.length,
+                    request_id: opts?.request_id,
+                    metadata: { source: 'ideogram', mode: 'edit' },
+                });
                 return urls;
             }
 
@@ -117,7 +141,12 @@ export class IdeogramProvider extends BaseModelProvider {
             const urls: string[] = (data?.data || []).map((d: any) => d?.url).filter(Boolean);
             if (urls.length === 0) throw new Error('Ideogram: no image URLs returned');
 
-            costTracker.addUsage({ model, image_count: urls.length, request_id: opts?.request_id, metadata: { source: 'ideogram' } });
+            costTracker.addUsage({
+                model,
+                image_count: urls.length,
+                request_id: opts?.request_id,
+                metadata: { source: 'ideogram' },
+            });
             return urls;
         } catch (err) {
             log_llm_error(requestId, err);

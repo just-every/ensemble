@@ -486,16 +486,10 @@ export class MessageHistory {
         let normalized = output;
 
         // Do not count embedded image payloads inside serialized tool results as plain text.
-        normalized = normalized.replace(
-            /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/g,
-            '[image]'
-        );
+        normalized = normalized.replace(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/g, '[image]');
 
         // Also collapse common raw-base64 image fields if they appear without a data URL prefix.
-        normalized = normalized.replace(
-            /"data"\s*:\s*"([A-Za-z0-9+/=\s]{512,})"/g,
-            '"data":"[image]"'
-        );
+        normalized = normalized.replace(/"data"\s*:\s*"([A-Za-z0-9+/=\s]{512,})"/g, '"data":"[image]"');
 
         return normalized.length;
     }

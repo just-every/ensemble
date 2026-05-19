@@ -170,9 +170,9 @@ describe('request lifecycle', () => {
         expect(attempts).toBe(2);
         expect(toolDone?.result?.output).toBe('sunny');
         expect(statuses.map(event => event.status)).toEqual(['started', 'retrying', 'completed']);
-        expect(events.some(event => event.type === 'message_complete' && (event as any).content === 'Recovered response')).toBe(
-            true
-        );
+        expect(
+            events.some(event => event.type === 'message_complete' && (event as any).content === 'Recovered response')
+        ).toBe(true);
     });
 
     it('bounds tool finalization after a terminal provider failure', async () => {
@@ -291,53 +291,53 @@ describe('request lifecycle', () => {
         const secondTool = vi.fn(async () => 'utc');
         const events = await Promise.race([
             collectEvents(
-                ensembleRequest(
-                    [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                    {
-                        agent_id: 'sequential-agent',
-                        model: 'test-model',
-                        modelSettings: {
-                            sequential_tools: true,
+                ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                    agent_id: 'sequential-agent',
+                    model: 'test-model',
+                    modelSettings: {
+                        sequential_tools: true,
+                    },
+                    tools: [
+                        {
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'lookup_weather',
+                                    description: 'Lookup weather',
+                                    parameters: { type: 'object', properties: {}, required: [] },
+                                },
+                            },
+                            function: vi.fn(
+                                async (_args?: unknown, abortSignal?: AbortSignal) =>
+                                    new Promise((_, reject) => {
+                                        abortSignal?.addEventListener(
+                                            'abort',
+                                            () => reject(new Error('first sequential tool aborted')),
+                                            { once: true }
+                                        );
+                                    })
+                            ),
+                            injectAbortSignal: true,
                         },
-                        tools: [
-                            {
-                                definition: {
-                                    type: 'function',
-                                    function: {
-                                        name: 'lookup_weather',
-                                        description: 'Lookup weather',
-                                        parameters: { type: 'object', properties: {}, required: [] },
-                                    },
+                        {
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'lookup_time',
+                                    description: 'Lookup time',
+                                    parameters: { type: 'object', properties: {}, required: [] },
                                 },
-                                function: vi.fn(
-                                    async (_args?: unknown, abortSignal?: AbortSignal) =>
-                                        new Promise((_, reject) => {
-                                            abortSignal?.addEventListener(
-                                                'abort',
-                                                () => reject(new Error('first sequential tool aborted')),
-                                                { once: true }
-                                            );
-                                        })
-                                ),
-                                injectAbortSignal: true,
                             },
-                            {
-                                definition: {
-                                    type: 'function',
-                                    function: {
-                                        name: 'lookup_time',
-                                        description: 'Lookup time',
-                                        parameters: { type: 'object', properties: {}, required: [] },
-                                    },
-                                },
-                                function: secondTool,
-                            },
-                        ],
-                    }
-                )
+                            function: secondTool,
+                        },
+                    ],
+                })
             ),
             new Promise<ProviderStreamEvent[]>((_, reject) => {
-                setTimeout(() => reject(new Error('ensembleRequest hung during sequential terminal finalization')), 250);
+                setTimeout(
+                    () => reject(new Error('ensembleRequest hung during sequential terminal finalization')),
+                    250
+                );
             }),
         ]);
 
@@ -362,6 +362,7 @@ describe('request lifecycle', () => {
         vi.mocked(getModelProvider).mockReturnValue({
             provider_id: 'timeout-provider',
             createResponseStream: vi.fn().mockImplementation(async function* (_messages, _model, agent) {
+                yield* [] as ProviderStreamEvent[];
                 agent.abortSignal?.addEventListener('abort', () => {
                     aborted = true;
                 });
@@ -370,15 +371,12 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    modelSettings: {
-                        timeout_ms: 10,
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                modelSettings: {
+                    timeout_ms: 10,
+                },
+            })
         );
 
         const errorEvent = events.find(event => event.type === 'error') as any;
@@ -414,31 +412,28 @@ describe('request lifecycle', () => {
 
         const events = await Promise.race([
             collectEvents(
-                ensembleRequest(
-                    [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                    {
-                        model: 'test-model',
-                        modelSettings: {
-                            timeout_ms: 10,
-                        },
-                        tools: [
-                            {
-                                definition: {
-                                    type: 'function',
-                                    function: {
-                                        name: 'lookup_weather',
-                                        description: 'Lookup weather',
-                                        parameters: { type: 'object', properties: {}, required: [] },
-                                    },
+                ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                    model: 'test-model',
+                    modelSettings: {
+                        timeout_ms: 10,
+                    },
+                    tools: [
+                        {
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'lookup_weather',
+                                    description: 'Lookup weather',
+                                    parameters: { type: 'object', properties: {}, required: [] },
                                 },
-                                function: vi.fn(async () => {
-                                    await new Promise(() => undefined);
-                                    return 'sunny';
-                                }),
                             },
-                        ],
-                    }
-                )
+                            function: vi.fn(async () => {
+                                await new Promise(() => undefined);
+                                return 'sunny';
+                            }),
+                        },
+                    ],
+                })
             ),
             new Promise<ProviderStreamEvent[]>((_, reject) => {
                 setTimeout(() => reject(new Error('ensembleRequest hung while awaiting tool completion')), 250);
@@ -488,28 +483,25 @@ describe('request lifecycle', () => {
 
         const events = await Promise.race([
             collectEvents(
-                ensembleRequest(
-                    [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                    {
-                        model: 'test-model',
-                        tools: [
-                            {
-                                definition: {
-                                    type: 'function',
-                                    function: {
-                                        name: 'lookup_weather',
-                                        description: 'Lookup weather',
-                                        parameters: { type: 'object', properties: {}, required: [] },
-                                    },
+                ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                    model: 'test-model',
+                    tools: [
+                        {
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'lookup_weather',
+                                    description: 'Lookup weather',
+                                    parameters: { type: 'object', properties: {}, required: [] },
                                 },
-                                function: vi.fn(async () => {
-                                    await new Promise(() => undefined);
-                                    return 'sunny';
-                                }),
                             },
-                        ],
-                    }
-                )
+                            function: vi.fn(async () => {
+                                await new Promise(() => undefined);
+                                return 'sunny';
+                            }),
+                        },
+                    ],
+                })
             ),
             new Promise<ProviderStreamEvent[]>((_, reject) => {
                 setTimeout(() => reject(new Error('ensembleRequest hung after bounded tool finalization')), 250);
@@ -532,6 +524,7 @@ describe('request lifecycle', () => {
             } as ProviderStreamEvent;
         });
         const createResponseStreamWithRetry = vi.fn().mockImplementation(async function* () {
+            yield* [] as ProviderStreamEvent[];
             throw new Error('provider retry wrapper should not be called');
         });
 
@@ -573,16 +566,13 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    retryOptions: {
-                        maxRetries: 1,
-                        onRetry,
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                retryOptions: {
+                    maxRetries: 1,
+                    onRetry,
+                },
+            })
         );
 
         const statuses = events.filter(event => event.type === 'operation_status') as any[];
@@ -624,15 +614,12 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    retryOptions: {
-                        maxRetries: 1,
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                retryOptions: {
+                    maxRetries: 1,
+                },
+            })
         );
 
         const errorEvent = events.find(event => event.type === 'error') as any;
@@ -667,15 +654,12 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    retryOptions: {
-                        maxRetries: 1,
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                retryOptions: {
+                    maxRetries: 1,
+                },
+            })
         );
 
         const errorEvent = events.find(event => event.type === 'error') as any;
@@ -727,35 +711,32 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    modelSettings: {
-                        tool_choice: 'required',
-                    },
-                    tools: [
-                        {
-                            definition: {
-                                type: 'function',
-                                function: {
-                                    name: 'lookup_weather',
-                                    description: 'Lookup weather',
-                                    parameters: { type: 'object', properties: {}, required: [] },
-                                },
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                modelSettings: {
+                    tool_choice: 'required',
+                },
+                tools: [
+                    {
+                        definition: {
+                            type: 'function',
+                            function: {
+                                name: 'lookup_weather',
+                                description: 'Lookup weather',
+                                parameters: { type: 'object', properties: {}, required: [] },
                             },
-                            function: vi.fn(async () => 'sunny'),
                         },
-                    ],
-                }
-            )
+                        function: vi.fn(async () => 'sunny'),
+                    },
+                ],
+            })
         );
 
         expect(seenToolChoices).toEqual(['required', undefined]);
         expect(events.filter(event => event.type === 'tool_done')).toHaveLength(1);
-        expect(events.some(event => event.type === 'message_complete' && (event as any).content === 'Weather is sunny')).toBe(
-            true
-        );
+        expect(
+            events.some(event => event.type === 'message_complete' && (event as any).content === 'Weather is sunny')
+        ).toBe(true);
         expect(events.some(event => event.type === 'operation_status' && (event as any).status === 'completed')).toBe(
             true
         );
@@ -787,16 +768,13 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    retryOptions: {
-                        maxRetries: 1,
-                        additionalRetryableErrors: ['CUSTOM_RETRY'],
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                retryOptions: {
+                    maxRetries: 1,
+                    additionalRetryableErrors: ['CUSTOM_RETRY'],
+                },
+            })
         );
 
         const statuses = events.filter(event => event.type === 'operation_status') as any[];
@@ -839,18 +817,15 @@ describe('request lifecycle', () => {
             } as any);
 
             const eventsPromise = collectEvents(
-                ensembleRequest(
-                    [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                    {
-                        model: 'test-model',
-                        retryOptions: {
-                            maxRetries: 1,
-                            initialDelay: 100,
-                            maxDelay: 100,
-                            backoffMultiplier: 1,
-                        },
-                    }
-                )
+                ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                    model: 'test-model',
+                    retryOptions: {
+                        maxRetries: 1,
+                        initialDelay: 100,
+                        maxDelay: 100,
+                        backoffMultiplier: 1,
+                    },
+                })
             );
 
             await vi.advanceTimersByTimeAsync(99);
@@ -897,18 +872,15 @@ describe('request lifecycle', () => {
             } as any);
 
             const eventsPromise = collectEvents(
-                ensembleRequest(
-                    [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                    {
-                        model: 'test-model',
-                        modelSettings: {
-                            timeout_ms: 10,
-                        },
-                        retryOptions: {
-                            maxRetries: 1,
-                        },
-                    }
-                )
+                ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                    model: 'test-model',
+                    modelSettings: {
+                        timeout_ms: 10,
+                    },
+                    retryOptions: {
+                        maxRetries: 1,
+                    },
+                })
             );
 
             await vi.advanceTimersByTimeAsync(10);
@@ -938,15 +910,12 @@ describe('request lifecycle', () => {
         });
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'missing-model',
-                    retryOptions: {
-                        maxRetries: 3,
-                    },
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'missing-model',
+                retryOptions: {
+                    maxRetries: 3,
+                },
+            })
         );
 
         const errorEvent = events.find(event => event.type === 'error') as any;
@@ -965,12 +934,9 @@ describe('request lifecycle', () => {
         );
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    modelClass: 'reasoning_mini',
-                }
-            )
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                modelClass: 'reasoning_mini',
+            })
         );
 
         const statuses = events.filter(event => event.type === 'operation_status') as any[];
@@ -998,9 +964,7 @@ describe('request lifecycle', () => {
                         type: 'message_complete',
                         message_id: `verifier-${verifierCalls}`,
                         content:
-                            verifierCalls === 1
-                                ? '{"status":"fail","reason":"Please retry"}'
-                                : '{"status":"pass"}',
+                            verifierCalls === 1 ? '{"status":"fail","reason":"Please retry"}' : '{"status":"pass"}',
                     } as ProviderStreamEvent;
                     return;
                 }
@@ -1015,17 +979,14 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                verifier: {
                     model: 'test-model',
-                    verifier: {
-                        model: 'test-model',
-                        name: 'verifier',
-                    },
-                    maxVerificationAttempts: 2,
-                }
-            )
+                    name: 'verifier',
+                },
+                maxVerificationAttempts: 2,
+            })
         );
 
         const statuses = events.filter(event => event.type === 'operation_status') as any[];
@@ -1081,31 +1042,28 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    modelSettings: {
-                        json_schema: {
-                            name: 'score_result',
-                            type: 'json_schema',
-                            strict: true,
-                            schema: {
-                                type: 'object',
-                                properties: {
-                                    score: {
-                                        type: 'number',
-                                        exclusiveMinimum: 1,
-                                        exclusiveMaximum: 5,
-                                    },
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                modelSettings: {
+                    json_schema: {
+                        name: 'score_result',
+                        type: 'json_schema',
+                        strict: true,
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                score: {
+                                    type: 'number',
+                                    exclusiveMinimum: 1,
+                                    exclusiveMaximum: 5,
                                 },
-                                required: ['score'],
-                                additionalProperties: false,
                             },
+                            required: ['score'],
+                            additionalProperties: false,
                         },
                     },
-                }
-            )
+                },
+            })
         );
 
         const errorEvent = events.find(event => event.type === 'error') as any;
@@ -1142,26 +1100,23 @@ describe('request lifecycle', () => {
         } as any);
 
         const events = await collectEvents(
-            ensembleRequest(
-                [{ type: 'message', role: 'user', content: 'Hello' } as any],
-                {
-                    model: 'test-model',
-                    maxToolCalls: 0,
-                    tools: [
-                        {
-                            definition: {
-                                type: 'function',
-                                function: {
-                                    name: 'lookup_weather',
-                                    description: 'Lookup weather',
-                                    parameters: { type: 'object', properties: {}, required: [] },
-                                },
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                maxToolCalls: 0,
+                tools: [
+                    {
+                        definition: {
+                            type: 'function',
+                            function: {
+                                name: 'lookup_weather',
+                                description: 'Lookup weather',
+                                parameters: { type: 'object', properties: {}, required: [] },
                             },
-                            function: vi.fn(async () => 'sunny'),
                         },
-                    ],
-                }
-            )
+                        function: vi.fn(async () => 'sunny'),
+                    },
+                ],
+            })
         );
 
         const completedStatus = events.find(

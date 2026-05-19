@@ -72,11 +72,7 @@ export function normalizeOpenAIImageSize(model: string, size?: ImageGenerationOp
     return 'auto';
 }
 
-export function getOpenAIImageCostEstimate(
-    model: string,
-    quality: OpenAIImageQuality,
-    size: OpenAIImageSize
-): number {
+export function getOpenAIImageCostEstimate(model: string, quality: OpenAIImageQuality, size: OpenAIImageSize): number {
     const normalizedQuality = quality === 'auto' ? 'medium' : quality;
     const sizeClass = size === '1536x1024' || size === '1024x1536' ? 'large' : 'square';
 

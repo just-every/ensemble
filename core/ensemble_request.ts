@@ -114,10 +114,7 @@ const getOuterRequestTimeoutMs = (agent: AgentDefinition): number | undefined =>
     return Math.floor(timeoutMs);
 };
 
-const getRemainingRequestTimeoutMs = (
-    requestTimeoutMs?: number,
-    requestStartedAt?: number
-): number | undefined => {
+const getRemainingRequestTimeoutMs = (requestTimeoutMs?: number, requestStartedAt?: number): number | undefined => {
     if (requestTimeoutMs === undefined || requestStartedAt === undefined) {
         return undefined;
     }
@@ -400,10 +397,7 @@ export async function* ensembleRequest(
                     ),
                     {
                         recoverable: false,
-                        reason:
-                            toolCallRounds >= maxRounds
-                                ? 'max_tool_call_rounds_reached'
-                                : 'max_tool_calls_reached',
+                        reason: toolCallRounds >= maxRounds ? 'max_tool_call_rounds_reached' : 'max_tool_calls_reached',
                         ...getFailureRetryOverrides(agent),
                     }
                 );
@@ -636,9 +630,10 @@ async function* executeRound(options: {
 
     const terminalToolNames = getTerminalToolNames(roundAgent);
     const expectsStructuredOutput = Boolean(roundAgent.modelSettings?.json_schema?.schema);
-    const structuredOutputSchema = roundAgent.modelSettings?.json_schema?.strict === true
-        ? roundAgent.modelSettings.json_schema.schema
-        : undefined;
+    const structuredOutputSchema =
+        roundAgent.modelSettings?.json_schema?.strict === true
+            ? roundAgent.modelSettings.json_schema.schema
+            : undefined;
 
     const toolExecutions: TrackedToolExecution[] = [];
     const toolCallFormattedArgs = new Map<string, string>();
@@ -661,10 +656,7 @@ async function* executeRound(options: {
                 return;
             }
 
-            await Promise.race([
-                completionPromise,
-                new Promise(resolve => setTimeout(resolve, timeoutMs)),
-            ]);
+            await Promise.race([completionPromise, new Promise(resolve => setTimeout(resolve, timeoutMs))]);
         };
 
         const waitForAllExecutions = async (
@@ -675,9 +667,9 @@ async function* executeRound(options: {
                 return true;
             }
 
-            const completionPromise = Promise.all(executions.map(execution => execution.promise.then(() => undefined))).then(
-                () => true
-            );
+            const completionPromise = Promise.all(
+                executions.map(execution => execution.promise.then(() => undefined))
+            ).then(() => true);
 
             if (!abortSignal) {
                 return completionPromise;
@@ -745,7 +737,8 @@ async function* executeRound(options: {
                         : undefined;
 
                     if (leakedRunningTool) {
-                        const failureResult = execution.result ?? createToolFinalizationFailureResult(execution.toolCall);
+                        const failureResult =
+                            execution.result ?? createToolFinalizationFailureResult(execution.toolCall);
                         await runningToolTracker.failRunningTool(
                             runningToolId,
                             failureResult.error || 'Tool execution failed during bounded finalization.'
@@ -758,7 +751,9 @@ async function* executeRound(options: {
         const toolResults =
             finalizationMode === 'wait_all'
                 ? await Promise.all(toolExecutions.map(execution => execution.promise))
-                : toolExecutions.flatMap(execution => (execution.settled && execution.result ? [execution.result] : []));
+                : toolExecutions.flatMap(execution =>
+                      execution.settled && execution.result ? [execution.result] : []
+                  );
 
         for (const toolResult of toolResults) {
             const toolName = toolResult.toolCall.function.name;
@@ -916,10 +911,7 @@ async function* executeRound(options: {
                         break;
                     }
 
-                    if (
-                        messageEvent.thinking_content ||
-                        (!messageEvent.content && messageEvent.message_id)
-                    ) {
+                    if (messageEvent.thinking_content || (!messageEvent.content && messageEvent.message_id)) {
                         const thinkingMessage = convertToThinkingMessage(messageEvent, model);
                         if (roundAgent.onThinking) {
                             await roundAgent.onThinking(thinkingMessage);
@@ -1216,9 +1208,7 @@ async function processToolCall(toolCall: ToolCall, agent: AgentDefinition): Prom
 
 function createToolFailureResult(toolCall: ToolCall, error: unknown): ToolCallResult {
     const errorOutput =
-        error instanceof Error
-            ? `Tool execution failed: ${error.message}`
-            : `Tool execution failed: ${String(error)}`;
+        error instanceof Error ? `Tool execution failed: ${error.message}` : `Tool execution failed: ${String(error)}`;
 
     return {
         toolCall,

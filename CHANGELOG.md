@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-05-19
+- Added explicit OpenRouter support for Tencent Hy3 Preview (`tencent/hy3-preview`) with current pricing, cache pricing, context, tool/reasoning metadata, aliases, and reasoning suffix handling including `-none`, `-disabled`, `-low`, and `-high`.
+
 ## 2026-05-15
 - Added explicit FAL FLUX.2 Pro outpaint support (`fal-ai/flux-2-pro/outpaint`) with image-to-image request shaping, `auto_crop` support, directional expansion options, and stepped megapixel cost tracking.
 - Added explicit FAL Recraft Crisp Upscale support (`fal-ai/recraft/upscale/crisp`) with one-source-image request shaping, safety checker forwarding, and $0.004 per-image pricing.

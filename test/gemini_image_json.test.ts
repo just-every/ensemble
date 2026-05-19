@@ -89,8 +89,7 @@ describe('Gemini image JSON output (live)', () => {
             expect(inlinePart?.inlineData?.data).not.toContain('data:image');
             const textPart = parts.find(
                 (part: any) =>
-                    typeof part?.text === 'string' &&
-                    part.text.includes('Analyze this image and return JSON')
+                    typeof part?.text === 'string' && part.text.includes('Analyze this image and return JSON')
             );
             expect(textPart).toBeTruthy();
 
