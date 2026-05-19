@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { findModel } from '../data/model_data.js';
-import { getModelFromAgent } from '../model_providers/model_provider.js';
+import { getModelFromAgent, getProviderFromModel } from '../model_providers/model_provider.js';
 import { GeminiProvider } from '../model_providers/gemini.js';
 import { costTracker } from '../utils/cost_tracker.js';
 
@@ -103,6 +103,30 @@ function makeSingleChunkStream(chunk: Record<string, unknown>) {
 }
 
 describe('Gemini 3.x model support', () => {
+    it('registers Gemini 3.5 Flash with Google provider metadata', async () => {
+        const model = findModel('gemini-3.5-flash');
+
+        expect(model?.id).toBe('gemini-3.5-flash');
+        expect(await getModelFromAgent({ agent_id: 'test-gemini-3-5', model: 'gemini-3.5-flash' } as any)).toBe(
+            'gemini-3.5-flash'
+        );
+        expect(getProviderFromModel('gemini-3.5-flash')).toBe('google');
+        expect(model?.cost).toMatchObject({
+            input_per_million: 1.5,
+            output_per_million: 9.0,
+            cached_input_per_million: 0.15,
+        });
+        expect(model?.features).toMatchObject({
+            context_length: 1_000_000,
+            max_output_tokens: 65536,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        });
+    });
+
     it('registers Gemini 3 Pro Preview and 3.1 compatibility aliases', () => {
         const canonical = findModel('gemini-3-pro-preview');
         const fallbackAlias = findModel('gemini-3.1-pro-preview');
@@ -192,6 +216,70 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
         expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('LOW');
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+    });
+
+    it('maps Gemini 3.5 Flash suffixes to native thinking levels', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockImplementation(() =>
+            Promise.resolve(
+                makeSingleChunkStream({
+                    candidates: [
+                        {
+                            content: {
+                                parts: [{ text: '{"ok":true}' }],
+                            },
+                        },
+                    ],
+                    usageMetadata: {
+                        promptTokenCount: 10,
+                        candidatesTokenCount: 5,
+                        totalTokenCount: 15,
+                    },
+                })
+            )
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const suffixExpectations = [
+            ['none', 'MINIMAL'],
+            ['disabled', 'MINIMAL'],
+            ['minimal', 'MINIMAL'],
+            ['low', 'LOW'],
+            ['medium', 'MEDIUM'],
+            ['high', 'HIGH'],
+            ['max', 'HIGH'],
+            ['xhigh', 'HIGH'],
+        ] as const;
+
+        for (const [suffix, thinkingLevel] of suffixExpectations) {
+            const stream = provider.createResponseStream(
+                [
+                    {
+                        type: 'message',
+                        role: 'user',
+                        content: 'Return JSON.',
+                    },
+                ] as any,
+                `gemini-3.5-flash-${suffix}`,
+                { agent_id: `test-gemini-3-5-${suffix}` } as any,
+                `req-thinking-level-${suffix}`
+            );
+
+            for await (const _event of stream) {
+                // Drain stream.
+            }
+
+            const requestArg = generateContentStream.mock.calls.at(-1)?.[0] as any;
+            expect(requestArg?.model).toBe('gemini-3.5-flash');
+            expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
+            expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe(thinkingLevel);
+            expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+        }
     });
 
     it('keeps numeric thinkingBudget suffixes for Gemini models without native thinking levels', async () => {

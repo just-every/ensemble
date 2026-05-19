@@ -685,10 +685,14 @@ const THINKING_LEVEL_CONFIGS = {
 type GeminiThinkingLevel = (typeof THINKING_LEVEL_CONFIGS)[keyof typeof THINKING_LEVEL_CONFIGS];
 
 const THINKING_LEVEL_SUFFIX_CONFIGS: Record<string, GeminiThinkingLevel> = {
+    '-none': 'MINIMAL',
+    '-disabled': 'MINIMAL',
     '-minimal': 'MINIMAL',
     '-low': 'LOW',
     '-medium': 'MEDIUM',
     '-high': 'HIGH',
+    '-max': 'HIGH',
+    '-xhigh': 'HIGH',
 };
 
 function parseThinkingBudget(value: unknown): number | null {
@@ -718,7 +722,11 @@ function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | n
     if (model.includes('gemini-3.1-pro-preview') || model.includes('gemini-3-pro-preview')) {
         return new Set(['LOW', 'MEDIUM', 'HIGH']);
     }
-    if (model.includes('gemini-3.1-flash-lite-preview') || model.includes('gemini-3-flash-preview')) {
+    if (
+        model.includes('gemini-3.5-flash') ||
+        model.includes('gemini-3.1-flash-lite') ||
+        model.includes('gemini-3-flash-preview')
+    ) {
         return new Set(['MINIMAL', 'LOW', 'MEDIUM', 'HIGH']);
     }
     if (model.includes('gemini-3.1-flash-image-preview')) {
