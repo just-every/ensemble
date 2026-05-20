@@ -3,6 +3,7 @@
 ## Unreleased
 - Added Gemini 3.5 Flash (`gemini-3.5-flash`) provider metadata, pricing, and native Gemini thinking-level suffix handling.
 - Mapped Gemini native thinking suffixes `-none`, `-disabled`, `-minimal`, `-low`, `-medium`, `-high`, `-max`, and `-xhigh` to provider `thinkingLevel` values where supported.
+- Translated `modelSettings.thinking_budget` to native Gemini `thinkingLevel` values for Gemini 3/3.5 models while keeping numeric `thinkingBudget` for Gemini 2.5 models.
 
 ## 2026-05-19
 - Added explicit OpenRouter support for Tencent Hy3 Preview (`tencent/hy3-preview`) with current pricing, cache pricing, context, tool/reasoning metadata, aliases, and reasoning suffix handling including `-none`, `-disabled`, `-low`, and `-high`.

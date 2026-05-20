@@ -684,6 +684,8 @@ const THINKING_LEVEL_CONFIGS = {
 
 type GeminiThinkingLevel = (typeof THINKING_LEVEL_CONFIGS)[keyof typeof THINKING_LEVEL_CONFIGS];
 
+const THINKING_LEVEL_ORDER: GeminiThinkingLevel[] = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'];
+
 const THINKING_LEVEL_SUFFIX_CONFIGS: Record<string, GeminiThinkingLevel> = {
     '-none': 'MINIMAL',
     '-disabled': 'MINIMAL',
@@ -700,6 +702,47 @@ function parseThinkingBudget(value: unknown): number | null {
         return null;
     }
     return Math.max(0, Math.floor(value));
+}
+
+function chooseSupportedThinkingLevel(
+    preferredLevel: GeminiThinkingLevel,
+    supportedThinkingLevels: Set<GeminiThinkingLevel>
+): GeminiThinkingLevel {
+    if (supportedThinkingLevels.has(preferredLevel)) {
+        return preferredLevel;
+    }
+
+    const preferredIndex = THINKING_LEVEL_ORDER.indexOf(preferredLevel);
+    let closestLevel: GeminiThinkingLevel | null = null;
+    let closestDistance = Infinity;
+
+    for (const level of supportedThinkingLevels) {
+        const distance = Math.abs(THINKING_LEVEL_ORDER.indexOf(level) - preferredIndex);
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestLevel = level;
+        }
+    }
+
+    return closestLevel || 'HIGH';
+}
+
+function mapThinkingBudgetToThinkingLevel(
+    budget: number,
+    supportedThinkingLevels: Set<GeminiThinkingLevel>
+): GeminiThinkingLevel {
+    let preferredLevel: GeminiThinkingLevel;
+    if (budget === 0) {
+        preferredLevel = 'MINIMAL';
+    } else if (budget <= 1024) {
+        preferredLevel = 'LOW';
+    } else if (budget <= 7168) {
+        preferredLevel = 'MEDIUM';
+    } else {
+        preferredLevel = 'HIGH';
+    }
+
+    return chooseSupportedThinkingLevel(preferredLevel, supportedThinkingLevels);
 }
 
 function parseThinkingLevel(value: unknown): GeminiThinkingLevel | null {
@@ -1099,7 +1142,21 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             if (thinkingBudgetFromSettings !== null) {
-                thinkingBudget = thinkingBudgetFromSettings;
+                if (thinkingLevel !== null) {
+                    throw new Error(
+                        'Gemini thinking_budget cannot be combined with thinking_level or a model thinking suffix.'
+                    );
+                }
+
+                const supportedThinkingLevels = getSupportedThinkingLevels(model);
+                if (supportedThinkingLevels) {
+                    thinkingLevel = mapThinkingBudgetToThinkingLevel(
+                        thinkingBudgetFromSettings,
+                        supportedThinkingLevels
+                    );
+                } else {
+                    thinkingBudget = thinkingBudgetFromSettings;
+                }
             }
             if (thinkingLevelFromSettings !== null) {
                 if (thinkingBudget !== null || thinkingLevel !== null) {

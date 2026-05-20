@@ -409,7 +409,73 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.config?.mediaResolution).toBeUndefined();
     });
 
-    it('maps modelSettings.thinking_budget to Gemini thinking budget', async () => {
+    it('maps modelSettings.thinking_budget to native Gemini thinking levels when supported', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(
+            makeSingleChunkStream({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: '{"ok":true}' }],
+                        },
+                    },
+                ],
+                usageMetadata: {
+                    promptTokenCount: 10,
+                    candidatesTokenCount: 5,
+                    totalTokenCount: 15,
+                },
+            })
+        );
+
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const budgetExpectations = [
+            ['gemini-3.5-flash', 0, 'MINIMAL'],
+            ['gemini-3.5-flash', 512, 'LOW'],
+            ['gemini-3.5-flash', 2048, 'MEDIUM'],
+            ['gemini-3.5-flash', 12288, 'HIGH'],
+            ['gemini-3-flash-preview', 0, 'MINIMAL'],
+            ['gemini-3.1-flash-lite-preview', 0, 'MINIMAL'],
+            ['gemini-3.1-pro-preview', 0, 'LOW'],
+            ['gemini-3.1-flash-image-preview', 2048, 'HIGH'],
+        ] as const;
+
+        for (const [model, thinkingBudget, thinkingLevel] of budgetExpectations) {
+            const stream = provider.createResponseStream(
+                [
+                    {
+                        type: 'message',
+                        role: 'user',
+                        content: 'Return JSON.',
+                    },
+                ] as any,
+                model,
+                {
+                    agent_id: `test-gemini-thinking-budget-${model}-${thinkingBudget}`,
+                    modelSettings: {
+                        thinking_budget: thinkingBudget,
+                    },
+                } as any,
+                `req-thinking-budget-${model}-${thinkingBudget}`
+            );
+
+            for await (const _event of stream) {
+                // Drain stream.
+            }
+
+            const requestArg = generateContentStream.mock.calls.at(-1)?.[0] as any;
+            expect(requestArg?.model).toBe(model);
+            expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe(thinkingLevel);
+            expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
+        }
+    });
+
+    it('keeps modelSettings.thinking_budget numeric for Gemini models without native thinking levels', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(
             makeSingleChunkStream({
@@ -442,14 +508,14 @@ describe('Gemini 3.x model support', () => {
                     content: 'Return JSON.',
                 },
             ] as any,
-            'gemini-3.1-flash-lite-preview',
+            'gemini-2.5-flash',
             {
-                agent_id: 'test-gemini-thinking-budget-settings',
+                agent_id: 'test-gemini-legacy-thinking-budget-settings',
                 modelSettings: {
                     thinking_budget: 0,
                 },
             } as any,
-            'req-thinking-budget-settings'
+            'req-legacy-thinking-budget-settings'
         );
 
         for await (const _event of stream) {
@@ -457,8 +523,9 @@ describe('Gemini 3.x model support', () => {
         }
 
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
-        expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
+        expect(requestArg?.model).toBe('gemini-2.5-flash');
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBe(0);
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBeUndefined();
     });
 
     it('maps modelSettings.thinking_level to Gemini thinking level', async () => {

@@ -206,6 +206,7 @@ const result = await ensembleResult(
 
 For Gemini, `thinking_level` is mutually exclusive with numeric `thinking_budget` and model suffix shortcuts such as `-high`.
 When a Gemini model supports native thinking levels, suffixes like `-none`, `-minimal`, `-low`, `-medium`, `-high`, and `-max` are sent as `thinkingLevel` values instead of numeric budgets.
+For native Gemini thinking-level models, numeric `thinking_budget` values are also translated to the closest supported `thinkingLevel`; Gemini 2.5 models still receive `thinkingBudget`.
 For Gemini 3 Flash-family models, `-none` maps to the provider-native `minimal` level because Gemini does not support full thinking-off.
 
 ### Multimodal Input (Images)
