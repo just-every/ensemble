@@ -50,7 +50,7 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 type ClaudeAdaptiveEffort = 'low' | 'medium' | 'high' | 'xhigh';
 type ClaudeAdaptiveEffortOrOff = ClaudeAdaptiveEffort | 'off';
 
-const CLAUDE_OPUS_4_7_ID = 'claude-opus-4-7';
+const CLAUDE_ADAPTIVE_OPUS_MODEL_IDS = new Set(['claude-opus-4-7', 'claude-opus-4-8']);
 const CLAUDE_ADAPTIVE_EFFORT_SUFFIXES: Record<string, ClaudeAdaptiveEffortOrOff> = {
     '-none': 'off',
     '-minimal': 'low',
@@ -89,9 +89,10 @@ function getSuffixedBaseModel(model: string): { baseModel: string; suffix: strin
     return { baseModel: model, suffix: '' };
 }
 
-function isClaudeOpus47Model(model: string): boolean {
+function isClaudeAdaptiveOpusModel(model: string): boolean {
     const { baseModel } = getSuffixedBaseModel(model);
-    return findModel(baseModel)?.id === CLAUDE_OPUS_4_7_ID || baseModel === CLAUDE_OPUS_4_7_ID;
+    const canonicalId = findModel(baseModel)?.id ?? baseModel;
+    return CLAUDE_ADAPTIVE_OPUS_MODEL_IDS.has(canonicalId);
 }
 
 // Content has many forms... here we extract them all!
@@ -646,9 +647,9 @@ export class ClaudeProvider extends BaseModelProvider {
             let outputConfig: any = undefined;
             let thinkingSet = false;
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
-            const isClaude47 = isClaudeOpus47Model(model);
+            const isAdaptiveOpus = isClaudeAdaptiveOpusModel(model);
 
-            if (isClaude47) {
+            if (isAdaptiveOpus) {
                 let adaptiveEffort: ClaudeAdaptiveEffortOrOff | undefined;
                 for (const [suffix, effort] of Object.entries(CLAUDE_ADAPTIVE_EFFORT_SUFFIXES)) {
                     if (model.endsWith(suffix)) {
@@ -663,7 +664,7 @@ export class ClaudeProvider extends BaseModelProvider {
                 }
 
                 const modelEntry = findModel(model);
-                if (modelEntry?.id === CLAUDE_OPUS_4_7_ID) {
+                if (modelEntry && CLAUDE_ADAPTIVE_OPUS_MODEL_IDS.has(modelEntry.id)) {
                     model = modelEntry.id;
                 }
 
@@ -748,8 +749,8 @@ export class ClaudeProvider extends BaseModelProvider {
             const thinkingEnabled = thinking !== undefined;
 
             // Anthropic requires temperature=1 whenever thinking is enabled.
-            // Claude Opus 4.7 rejects non-default sampling parameters, so omit them.
-            const requestTemperature = isClaude47 ? undefined : thinkingEnabled ? 1 : settings?.temperature;
+            // Adaptive Opus requests reject non-default sampling parameters, so omit them.
+            const requestTemperature = isAdaptiveOpus ? undefined : thinkingEnabled ? 1 : settings?.temperature;
 
             // Preprocess *and* convert messages for Claude in one pass
             const claudeMessages = await this.prepareClaudeMessages(messages, model, thinkingEnabled);

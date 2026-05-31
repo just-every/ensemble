@@ -1,7 +1,9 @@
 import { spawn } from 'child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir, homedir } from 'os';
 import path from 'path';
+import { setTimeout as sleep } from 'timers/promises';
 import { BaseModelProvider } from './base_provider.js';
 import {
     AgentDefinition,
@@ -11,6 +13,9 @@ import {
     ProviderStreamEvent,
     ResponseInput,
     ResponseInputItem,
+    ResponseJSONSchema,
+    ToolCall,
+    ToolFunction,
 } from '../types/types.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
@@ -44,6 +49,14 @@ const CODEX_DISABLED_FEATURES = [
     'goals',
     'personality',
 ] as const;
+
+type CodexToolTransport = 'structured' | 'filesystem';
+
+type CodexProviderModelSettings = ModelSettings & {
+    codex_tool_transport?: CodexToolTransport;
+    codex_workspace_files?: Record<string, string>;
+    codex_workspace_instructions?: string;
+};
 
 const REASONING_EFFORT_SUFFIXES: CodexReasoningEffortInput[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
@@ -253,6 +266,24 @@ type CodexExecError = Error & {
     codex_exec?: CodexExecDiagnostics;
 };
 
+type CodexRequestOptions = {
+    extraInstructions?: string;
+    jsonSchema?: ResponseJSONSchema;
+    allowShellTool?: boolean;
+    filesystemTools?: ToolFunction[];
+    useTempCwd?: boolean;
+};
+
+type CodexToolAction =
+    | {
+          action: 'tool_calls';
+          toolCalls: ToolCall[];
+      }
+    | {
+          action: 'final_response';
+          content: string;
+      };
+
 const MAX_CODEX_EXEC_STREAM_LOG_CHARS = 20_000;
 
 function summarizeCodexExecStream(value: string): CodexExecStreamSummary {
@@ -272,7 +303,12 @@ function summarizeCodexExecStream(value: string): CodexExecStreamSummary {
     };
 }
 
-function codexUsageFromJsonl(stdout: string, model: string, requestId?: string): ModelUsage | undefined {
+function codexUsageFromJsonl(
+    stdout: string,
+    model: string,
+    requestId?: string,
+    metadata?: Record<string, unknown>
+): ModelUsage | undefined {
     let latestUsage: CodexCliUsage | undefined;
     for (const line of stdout.split(/\r?\n/)) {
         const trimmed = line.trim();
@@ -306,6 +342,7 @@ function codexUsageFromJsonl(stdout: string, model: string, requestId?: string):
         cached_tokens: latestUsage.cached_input_tokens,
         request_id: requestId,
         metadata: {
+            ...metadata,
             source: 'codex_cli_json',
             reasoning_output_tokens: latestUsage.reasoning_output_tokens ?? 0,
         },
@@ -318,6 +355,493 @@ function finiteNumber(value: unknown): number | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getCodexProviderSettings(settings?: ModelSettings): CodexProviderModelSettings | undefined {
+    return settings as CodexProviderModelSettings | undefined;
+}
+
+function compactJson(value: unknown): string {
+    return JSON.stringify(value);
+}
+
+function getToolNames(tools: ToolFunction[]): string[] {
+    return tools.map(tool => tool.definition.function.name);
+}
+
+function getTerminalToolNameSet(agent: AgentDefinition): Set<string> {
+    return new Set(
+        (agent.terminalToolNames ?? []).filter(
+            (name): name is string => typeof name === 'string' && name.trim().length > 0
+        )
+    );
+}
+
+function getAvailableTerminalToolNames(tools: ToolFunction[], agent: AgentDefinition): string[] {
+    const terminalNames = getTerminalToolNameSet(agent);
+    if (terminalNames.size === 0) return [];
+    return getToolNames(tools).filter(name => terminalNames.has(name));
+}
+
+function createCodexToolOutputSchema(tools: ToolFunction[], agent: AgentDefinition): ResponseJSONSchema {
+    const requiresTerminalTool = getAvailableTerminalToolNames(tools, agent).length > 0;
+    return {
+        name: 'codex_tool_action',
+        type: 'json_schema',
+        description: 'A simulated Ensemble tool action for Codex CLI provider requests.',
+        schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+                action: {
+                    type: 'string',
+                    enum: requiresTerminalTool ? ['tool_calls'] : ['tool_calls', 'final_response'],
+                    description: requiresTerminalTool
+                        ? 'Use tool_calls. This request is only complete after calling a terminal tool.'
+                        : 'Use tool_calls when requesting Ensemble tool execution; use final_response only when no tool is needed.',
+                },
+                toolCalls: {
+                    type: 'array',
+                    description:
+                        'Tool calls to execute in parallel for this turn. Empty when action is final_response.',
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: {
+                            name: {
+                                type: 'string',
+                                enum: getToolNames(tools),
+                            },
+                            argumentsJson: {
+                                type: 'string',
+                                description:
+                                    'A compact JSON string containing the complete arguments object for the named tool.',
+                            },
+                        },
+                        required: ['name', 'argumentsJson'],
+                    },
+                },
+                finalResponse: {
+                    type: 'string',
+                    description: 'Final assistant response. Use an empty string when action is tool_calls.',
+                },
+            },
+            required: ['action', 'toolCalls', 'finalResponse'],
+        },
+    };
+}
+
+function describeCodexToolChoice(settings?: ModelSettings): string {
+    const toolChoice = settings?.tool_choice;
+    if (toolChoice === 'required') {
+        return 'This turn requires at least one tool call.';
+    }
+    if (toolChoice === 'none') {
+        return 'This turn forbids tool calls; return final_response.';
+    }
+    if (typeof toolChoice === 'object' && toolChoice?.type === 'function' && toolChoice.function?.name) {
+        return `This turn requires the ${toolChoice.function.name} tool.`;
+    }
+    return 'Use tool_calls when a tool result is needed; otherwise use final_response.';
+}
+
+function buildCodexToolInstructions(tools: ToolFunction[], agent: AgentDefinition): string {
+    const settings = agent.modelSettings;
+    const terminalToolNames = getAvailableTerminalToolNames(tools, agent);
+    const toolDescriptions = tools
+        .map(tool => {
+            const fn = tool.definition.function;
+            return [
+                `Tool: ${fn.name}`,
+                `Description: ${fn.description}`,
+                `Parameters JSON schema: ${compactJson(fn.parameters)}`,
+            ].join('\n');
+        })
+        .join('\n\n');
+
+    return [
+        'You are using Ensemble simulated tool mode.',
+        'You cannot execute these tools yourself. Instead, respond only with JSON matching the provided output schema.',
+        describeCodexToolChoice(settings),
+        'For action "tool_calls", include one or more entries in toolCalls and set finalResponse to an empty string.',
+        terminalToolNames.length > 0
+            ? `This request is not complete until you call one of these terminal tools: ${terminalToolNames.join(', ')}. Do not use final_response.`
+            : 'For action "final_response", set toolCalls to an empty array and put the final answer in finalResponse.',
+        'Use exact tool names.',
+        'Set argumentsJson to a compact JSON string containing the complete arguments object for the named tool.',
+        'For example, the arguments object {"label":"ok"} must be encoded as "{\\"label\\":\\"ok\\"}".',
+        '',
+        'Available tools:',
+        toolDescriptions,
+    ].join('\n');
+}
+
+function validateCodexWorkspaceRelativePath(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/').replace(/^\.\/+/, '');
+    if (
+        !normalized ||
+        path.isAbsolute(normalized) ||
+        normalized.split('/').some(part => part === '..' || part === '')
+    ) {
+        throw new Error(`Invalid Codex workspace file path: ${filePath}`);
+    }
+    return normalized;
+}
+
+async function writeCodexWorkspaceFiles(tempDir: string, files?: Record<string, string>): Promise<string[]> {
+    const written: string[] = [];
+    for (const [rawPath, content] of Object.entries(files ?? {})) {
+        const relativePath = validateCodexWorkspaceRelativePath(rawPath);
+        const targetPath = path.join(tempDir, relativePath);
+        await mkdir(path.dirname(targetPath), { recursive: true });
+        await writeFile(targetPath, content, 'utf8');
+        written.push(relativePath);
+    }
+    return written.sort();
+}
+
+function buildCodexWorkspaceFileInstructions(files: string[], extra?: string): string {
+    if (files.length === 0 && !extra?.trim()) return '';
+    return [
+        'A disposable Codex workspace has been prepared for this request.',
+        files.length > 0
+            ? `Workspace files available in the current directory:\n${files.map(file => `- ${file}`).join('\n')}`
+            : undefined,
+        extra?.trim() || undefined,
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+function shellIdentifier(value: string): string {
+    if (!/^[A-Za-z0-9_.:-]+$/.test(value)) {
+        throw new Error(`Codex filesystem tool name is not shell-safe: ${value}`);
+    }
+    return value;
+}
+
+function buildCodexFilesystemToolInstructions(tools: ToolFunction[], agent: AgentDefinition): string {
+    const terminalToolNames = getAvailableTerminalToolNames(tools, agent);
+    const toolDescriptions = tools
+        .map(tool => {
+            const fn = tool.definition.function;
+            return [
+                `Command: ./tools/${fn.name} <arguments-json-file>`,
+                `Description: ${fn.description}`,
+                `Arguments JSON schema: ${compactJson(fn.parameters)}`,
+            ].join('\n');
+        })
+        .join('\n\n');
+
+    return [
+        'You are using Codex filesystem tool mode.',
+        'Work in the current directory. Read the provided JSON files, write candidate JSON files, and run the executable commands in ./tools.',
+        'Each ./tools command takes one path to a JSON arguments file. The command prints the real tool result to stdout.',
+        'When a layered document argument would otherwise be a large JSON string, you may put candidateLayeredDocumentPath or repairedLayeredDocumentPath in the arguments file; the wrapper will read that file and pass the required JSON string to the real tool.',
+        terminalToolNames.length > 0
+            ? `This request is not complete until you run one of these terminal tool commands: ${terminalToolNames.map(name => `./tools/${name}`).join(', ')}.`
+            : undefined,
+        'After the terminal tool command succeeds, respond with a brief completion note. Do not invent tool outputs; use the command output.',
+        '',
+        'Available filesystem tools:',
+        toolDescriptions,
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+type CodexFilesystemToolBroker = {
+    instructions: string;
+    stop: () => Promise<void>;
+};
+
+async function startCodexFilesystemToolBroker(
+    tempDir: string,
+    tools: ToolFunction[],
+    agent: AgentDefinition
+): Promise<CodexFilesystemToolBroker> {
+    const toolsDir = path.join(tempDir, 'tools');
+    const requestDir = path.join(tempDir, '.codex-tool-requests');
+    const responseDir = path.join(tempDir, '.codex-tool-responses');
+    await Promise.all([
+        mkdir(toolsDir, { recursive: true }),
+        mkdir(requestDir, { recursive: true }),
+        mkdir(responseDir, { recursive: true }),
+    ]);
+
+    for (const tool of tools) {
+        const toolName = shellIdentifier(tool.definition.function.name);
+        const toolPath = path.join(toolsDir, toolName);
+        await writeFile(
+            toolPath,
+            buildCodexFilesystemToolWrapperScript({
+                toolName,
+                workspaceDir: tempDir,
+                requestDir,
+                responseDir,
+            }),
+            'utf8'
+        );
+        await chmod(toolPath, 0o755);
+    }
+
+    const toolByName = new Map(tools.map(tool => [tool.definition.function.name, tool]));
+    const seen = new Set<string>();
+    const inFlight = new Set<Promise<void>>();
+    let stopped = false;
+
+    const serviceRequest = async (fileName: string): Promise<void> => {
+        const requestPath = path.join(requestDir, fileName);
+        let request: Record<string, unknown>;
+        try {
+            request = JSON.parse(await readFile(requestPath, 'utf8')) as Record<string, unknown>;
+        } catch (error) {
+            await writeFile(
+                path.join(responseDir, fileName),
+                JSON.stringify({
+                    ok: false,
+                    error: `Could not read Codex filesystem tool request: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                }),
+                'utf8'
+            );
+            return;
+        }
+
+        const toolName = typeof request.toolName === 'string' ? request.toolName : '';
+        const tool = toolByName.get(toolName);
+        if (!tool) {
+            await writeFile(
+                path.join(responseDir, fileName),
+                JSON.stringify({ ok: false, error: `Unknown Codex filesystem tool: ${toolName || '<missing>'}` }),
+                'utf8'
+            );
+            return;
+        }
+
+        try {
+            const argumentsJson = typeof request.argumentsJson === 'string' ? request.argumentsJson : '{}';
+            const parsedArguments = JSON.parse(argumentsJson);
+            const result = await tool.function(parsedArguments);
+            const output = typeof result === 'string' ? result : JSON.stringify(result);
+            await writeFile(path.join(responseDir, fileName), JSON.stringify({ ok: true, output }), 'utf8');
+        } catch (error) {
+            await writeFile(
+                path.join(responseDir, fileName),
+                JSON.stringify({
+                    ok: false,
+                    error: error instanceof Error ? error.message : String(error),
+                }),
+                'utf8'
+            );
+        }
+    };
+
+    const loop = (async () => {
+        while (!stopped) {
+            const entries = await readdir(requestDir).catch(() => []);
+            for (const fileName of entries) {
+                if (!fileName.endsWith('.json') || seen.has(fileName)) continue;
+                seen.add(fileName);
+                const task = serviceRequest(fileName).finally(() => {
+                    inFlight.delete(task);
+                });
+                inFlight.add(task);
+            }
+            await sleep(50);
+        }
+        await Promise.allSettled([...inFlight]);
+    })();
+
+    return {
+        instructions: buildCodexFilesystemToolInstructions(tools, agent),
+        stop: async () => {
+            stopped = true;
+            await loop;
+        },
+    };
+}
+
+function buildCodexFilesystemToolWrapperScript(args: {
+    toolName: string;
+    workspaceDir: string;
+    requestDir: string;
+    responseDir: string;
+}): string {
+    return `#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+
+const toolName = ${JSON.stringify(args.toolName)};
+const workspaceDir = ${JSON.stringify(args.workspaceDir)};
+const requestDir = ${JSON.stringify(args.requestDir)};
+const responseDir = ${JSON.stringify(args.responseDir)};
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readText(filePath) {
+  return fs.readFileSync(path.resolve(process.cwd(), filePath), 'utf8');
+}
+
+function readArgumentsJson() {
+  const argsPath = process.argv[2];
+  const raw = argsPath ? readText(argsPath) : fs.readFileSync(0, 'utf8');
+  if (!raw.trim()) {
+    throw new Error('Expected a JSON arguments file path or JSON on stdin.');
+  }
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Tool arguments must be a JSON object.');
+  }
+  if (parsed.candidateLayeredDocumentPath && !parsed.candidateLayeredDocumentJson) {
+    parsed.candidateLayeredDocumentJson = readText(parsed.candidateLayeredDocumentPath);
+    delete parsed.candidateLayeredDocumentPath;
+  }
+  if (parsed.repairedLayeredDocumentPath && !parsed.repairedLayeredDocumentJson) {
+    parsed.repairedLayeredDocumentJson = readText(parsed.repairedLayeredDocumentPath);
+    delete parsed.repairedLayeredDocumentPath;
+  }
+  return JSON.stringify(parsed);
+}
+
+async function main() {
+  process.chdir(workspaceDir);
+  fs.mkdirSync(requestDir, { recursive: true });
+  fs.mkdirSync(responseDir, { recursive: true });
+  const id = String(Date.now()) + '-' + String(process.pid) + '-' + Math.random().toString(16).slice(2);
+  const fileName = id + '.json';
+  fs.writeFileSync(
+    path.join(requestDir, fileName),
+    JSON.stringify({ id, toolName, argumentsJson: readArgumentsJson() }),
+    'utf8'
+  );
+
+  const responsePath = path.join(responseDir, fileName);
+  const deadline = Date.now() + 300000;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(responsePath)) {
+      const response = JSON.parse(fs.readFileSync(responsePath, 'utf8'));
+      if (!response.ok) {
+        console.error(response.error || 'Tool failed.');
+        process.exit(1);
+      }
+      process.stdout.write(String(response.output || ''));
+      if (!String(response.output || '').endsWith('\\n')) process.stdout.write('\\n');
+      return;
+    }
+    sleep(50);
+  }
+  console.error('Timed out waiting for tool result.');
+  process.exit(1);
+}
+
+main().catch(error => {
+  console.error(error && error.message ? error.message : String(error));
+  process.exit(1);
+});
+`;
+}
+
+function normalizeCodexToolArguments(value: unknown, toolName: string): string {
+    if (typeof value !== 'string') {
+        throw new Error(`Codex tool call ${toolName} must provide argumentsJson as a JSON string.`);
+    }
+    const parsed = JSON.parse(value);
+    if (!isRecord(parsed)) {
+        throw new Error(`Codex tool call ${toolName} argumentsJson must decode to a JSON object.`);
+    }
+    return JSON.stringify(parsed);
+}
+
+function parseCodexToolAction(
+    content: string,
+    tools: ToolFunction[],
+    settings?: ModelSettings,
+    terminalToolNames: string[] = []
+): CodexToolAction {
+    const parsed = JSON.parse(content);
+    if (!isRecord(parsed)) {
+        throw new Error('Codex tool response must be a JSON object.');
+    }
+
+    const toolChoice = settings?.tool_choice;
+    const toolNames = new Set(getToolNames(tools));
+    const action = parsed.action;
+
+    if (action === 'final_response') {
+        if (terminalToolNames.length > 0) {
+            throw new Error(
+                `Codex returned final_response when terminal tool ${terminalToolNames.join(' or ')} was required.`
+            );
+        }
+        if (toolChoice === 'required') {
+            throw new Error('Codex returned final_response when tool_choice required a tool call.');
+        }
+        if (typeof toolChoice === 'object' && toolChoice?.type === 'function' && toolChoice.function?.name) {
+            throw new Error(`Codex returned final_response when ${toolChoice.function.name} was required.`);
+        }
+        return {
+            action: 'final_response',
+            content: typeof parsed.finalResponse === 'string' ? parsed.finalResponse : '',
+        };
+    }
+
+    if (action !== 'tool_calls') {
+        throw new Error(`Codex tool response action must be tool_calls or final_response; received ${String(action)}.`);
+    }
+    if (toolChoice === 'none') {
+        throw new Error('Codex returned tool_calls when tool_choice forbids tool use.');
+    }
+    if (!Array.isArray(parsed.toolCalls) || parsed.toolCalls.length === 0) {
+        throw new Error('Codex tool response must include at least one tool call.');
+    }
+
+    const requiredToolName =
+        typeof toolChoice === 'object' && toolChoice?.type === 'function' && toolChoice.function?.name
+            ? toolChoice.function.name
+            : undefined;
+
+    const toolCalls: ToolCall[] = parsed.toolCalls.map((rawCall, index) => {
+        if (!isRecord(rawCall)) {
+            throw new Error(`Codex tool call at index ${index} must be an object.`);
+        }
+        const name = rawCall.name;
+        if (typeof name !== 'string' || !toolNames.has(name)) {
+            throw new Error(`Codex requested unknown tool ${String(name)}.`);
+        }
+        if (requiredToolName && name !== requiredToolName) {
+            throw new Error(`Codex requested ${name}, but ${requiredToolName} was required.`);
+        }
+        const id = `codex_tool_${randomUUID()}`;
+        return {
+            id,
+            call_id: id,
+            type: 'function',
+            function: {
+                name,
+                arguments: normalizeCodexToolArguments(rawCall.argumentsJson, name),
+            },
+        };
+    });
+
+    return {
+        action: 'tool_calls',
+        toolCalls,
+    };
+}
+
+async function readOptionalUtf8File(filePath: string): Promise<string | null> {
+    try {
+        return await readFile(filePath, 'utf8');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return null;
+        }
+        throw error;
+    }
 }
 
 function serializeCodexExecError(error: unknown): unknown {
@@ -460,40 +984,67 @@ async function runCodexExec(options: {
     return { stdout, stderr, diagnostics };
 }
 
-function disabledFeatureArgs(allowImageGeneration = false): string[] {
-    return CODEX_DISABLED_FEATURES.filter(feature => !(allowImageGeneration && feature === 'image_generation')).flatMap(
-        feature => ['--disable', feature]
-    );
+function disabledFeatureArgs(options: { allowImageGeneration?: boolean; allowShellTool?: boolean } = {}): string[] {
+    return CODEX_DISABLED_FEATURES.filter(feature => {
+        if (options.allowImageGeneration && feature === 'image_generation') return false;
+        if (options.allowShellTool && feature === 'shell_tool') return false;
+        return true;
+    }).flatMap(feature => ['--disable', feature]);
 }
 
 async function executeCodexRequest(
     messages: ResponseInput,
     model: string,
     agent: AgentDefinition,
-    requestId?: string
+    requestId?: string,
+    options: CodexRequestOptions = {}
 ): Promise<string> {
-    if (agent.tools?.length || agent.getTools || agent.processToolCall || agent.params || agent.processParams) {
-        throw new Error('Codex provider v1 does not support tool requests.');
+    if (agent.params || agent.processParams) {
+        throw new Error('Codex provider v1 does not support params requests.');
     }
 
     const settings = agent.modelSettings;
+    const codexSettings = getCodexProviderSettings(settings);
+    const requestJsonSchema = options.jsonSchema ?? settings?.json_schema;
     const { model: codexModel, effort } = resolveCodexModel(model, settings);
     const codexHome = resolveCodexHome(settings);
-    const cwd = agent.cwd || process.cwd();
     const tempDir = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-'));
+    const cwd = options.useTempCwd ? tempDir : agent.cwd || process.cwd();
     const imageWriter = new CodexImageAttachmentWriter(tempDir, cwd);
-    const { instructions, prompt, images } = await buildCodexInput(messages, agent, imageWriter);
+    let filesystemToolBroker: CodexFilesystemToolBroker | null = null;
+    const workspaceFileNames = await writeCodexWorkspaceFiles(tempDir, codexSettings?.codex_workspace_files);
+    if (options.filesystemTools?.length) {
+        filesystemToolBroker = await startCodexFilesystemToolBroker(tempDir, options.filesystemTools, agent);
+    }
+    const extraInstructions = [
+        buildCodexWorkspaceFileInstructions(workspaceFileNames, codexSettings?.codex_workspace_instructions),
+        filesystemToolBroker?.instructions,
+        options.extraInstructions,
+    ]
+        .map(value => value?.trim() ?? '')
+        .filter(Boolean)
+        .join('\n\n');
+    const requestAgent = extraInstructions
+        ? {
+              ...agent,
+              instructions: [agent.instructions, extraInstructions]
+                  .map(value => value?.trim() ?? '')
+                  .filter(Boolean)
+                  .join('\n\n'),
+          }
+        : agent;
+    const { instructions, prompt, images } = await buildCodexInput(messages, requestAgent, imageWriter);
     const hasInstructions = instructions.trim().length > 0;
     const instructionsPath = path.join(tempDir, 'instructions.md');
     const lastMessagePath = path.join(tempDir, 'last-message.json');
-    const schemaPath = settings?.json_schema?.schema ? path.join(tempDir, 'schema.json') : undefined;
+    const schemaPath = requestJsonSchema?.schema ? path.join(tempDir, 'schema.json') : undefined;
 
     try {
         if (hasInstructions) {
             await writeFile(instructionsPath, instructions, 'utf8');
         }
         if (schemaPath) {
-            await writeFile(schemaPath, JSON.stringify(settings!.json_schema!.schema, null, 2), 'utf8');
+            await writeFile(schemaPath, JSON.stringify(requestJsonSchema!.schema, null, 2), 'utf8');
         }
 
         const commandArgs = [
@@ -503,7 +1054,7 @@ async function executeCodexRequest(
             '--ignore-user-config',
             '--ignore-rules',
             '--skip-git-repo-check',
-            ...disabledFeatureArgs(),
+            ...disabledFeatureArgs({ allowShellTool: options.allowShellTool }),
             '-m',
             codexModel,
             '-c',
@@ -511,6 +1062,7 @@ async function executeCodexRequest(
             ...(hasInstructions ? ['-c', `model_instructions_file=${JSON.stringify(instructionsPath)}`] : []),
             ...(schemaPath ? ['--output-schema', schemaPath] : []),
             ...(images.length > 0 ? ['--image', images.join(',')] : []),
+            ...(options.allowShellTool ? ['--sandbox', 'workspace-write', '--add-dir', tempDir] : []),
             '--output-last-message',
             lastMessagePath,
             '--cd',
@@ -521,14 +1073,15 @@ async function executeCodexRequest(
         const loggedRequestId = log_llm_request(
             agent.agent_id || 'default',
             'codex',
-            codexModel,
+            model,
             {
                 command: 'codex',
                 args: commandArgs,
                 cwd,
                 prompt,
                 images,
-                schema: settings?.json_schema?.schema,
+                codex_model: codexModel,
+                schema: requestJsonSchema?.schema,
             },
             new Date(),
             requestId,
@@ -548,7 +1101,9 @@ async function executeCodexRequest(
                 abortSignal: agent.abortSignal,
             });
             codexExecDiagnostics = codexExecResult.diagnostics;
-            const usage = codexUsageFromJsonl(codexExecResult.stdout, codexModel, loggedRequestId);
+            const usage = codexUsageFromJsonl(codexExecResult.stdout, model, loggedRequestId, {
+                codex_cli_model: codexModel,
+            });
             if (usage) costTracker.addUsage(usage);
         } catch (error) {
             log_llm_error(loggedRequestId, {
@@ -577,8 +1132,78 @@ async function executeCodexRequest(
         log_llm_error(requestId, error);
         throw error;
     } finally {
+        await filesystemToolBroker?.stop();
         await rm(tempDir, { recursive: true, force: true });
     }
+}
+
+async function* executeCodexToolRequest(
+    messages: ResponseInput,
+    model: string,
+    agent: AgentDefinition,
+    tools: ToolFunction[],
+    requestId?: string
+): AsyncGenerator<ProviderStreamEvent> {
+    if (agent.modelSettings?.json_schema?.schema) {
+        throw new Error('Codex provider cannot combine simulated tool calls with a caller-supplied json_schema.');
+    }
+    const content = await executeCodexRequest(messages, model, agent, requestId, {
+        extraInstructions: buildCodexToolInstructions(tools, agent),
+        jsonSchema: createCodexToolOutputSchema(tools, agent),
+    });
+    const action = parseCodexToolAction(
+        content,
+        tools,
+        agent.modelSettings,
+        getAvailableTerminalToolNames(tools, agent)
+    );
+
+    if (action.action === 'final_response') {
+        const messageId = `codex-${Date.now()}`;
+        yield {
+            type: 'message_complete',
+            content: action.content,
+            message_id: messageId,
+        };
+        return;
+    }
+
+    for (const toolCall of action.toolCalls) {
+        yield {
+            type: 'tool_start',
+            tool_call: toolCall,
+        };
+    }
+}
+
+async function* executeCodexFilesystemToolRequest(
+    messages: ResponseInput,
+    model: string,
+    agent: AgentDefinition,
+    tools: ToolFunction[],
+    requestId?: string
+): AsyncGenerator<ProviderStreamEvent> {
+    if (agent.modelSettings?.json_schema?.schema) {
+        throw new Error('Codex provider cannot combine filesystem tool mode with a caller-supplied json_schema.');
+    }
+    const content = await executeCodexRequest(messages, model, agent, requestId, {
+        allowShellTool: true,
+        filesystemTools: tools,
+        useTempCwd: true,
+    });
+    const messageId = `codex-${Date.now()}`;
+    if (content) {
+        yield {
+            type: 'message_delta',
+            content,
+            message_id: messageId,
+        };
+    }
+    yield {
+        type: 'message_complete',
+        content,
+        message_id: messageId,
+    };
 }
 
 function buildCodexImagePrompt(prompt: string, opts: ImageGenerationOpts = {}): string {
@@ -690,7 +1315,7 @@ async function executeCodexImageGeneration(
                     '--skip-git-repo-check',
                     '--enable',
                     'image_generation',
-                    ...disabledFeatureArgs(true),
+                    ...disabledFeatureArgs({ allowImageGeneration: true }),
                     ...(promptModelAttempt
                         ? [
                               '-m',
@@ -750,8 +1375,11 @@ async function executeCodexImageGeneration(
                     throw error;
                 }
 
-                const rawLastMessage = await readFile(lastMessagePath, 'utf8');
-                const responseImagePaths = await extractExistingCodexImagePaths(rawLastMessage, outputDir);
+                const rawLastMessage = await readOptionalUtf8File(lastMessagePath);
+                const lastMessageContent = rawLastMessage ?? '';
+                const responseImagePaths = rawLastMessage
+                    ? await extractExistingCodexImagePaths(rawLastMessage, outputDir)
+                    : [];
                 const outputImagePaths = await newestFirst(await listCodexOutputImages(outputDir));
                 const generatedImagePaths = await newestFirst(await listCodexGeneratedImages(isolatedCodexHome));
                 const selectedImagePaths: string[] = [];
@@ -761,11 +1389,15 @@ async function executeCodexImageGeneration(
                     if (selectedImagePaths.length >= expectedImageCount) break;
                 }
                 if (selectedImagePaths.length < expectedImageCount) {
-                    const lastMessage = rawLastMessage.trim();
+                    const lastMessage = lastMessageContent.trim();
+                    const lastMessageNote =
+                        rawLastMessage === null ? ' Codex CLI did not write --output-last-message.' : '';
                     throw new Error(
                         `Codex image generation resolved ${selectedImagePaths.length} image artifact${
                             selectedImagePaths.length === 1 ? '' : 's'
-                        }, expected ${expectedImageCount}.${lastMessage ? ` Last message: ${lastMessage}` : ''}`
+                        }, expected ${expectedImageCount}.${lastMessageNote}${
+                            lastMessage ? ` Last message: ${lastMessage}` : ''
+                        }`
                     );
                 }
                 const generatedImages = await readCodexImageFiles(selectedImagePaths);
@@ -775,7 +1407,8 @@ async function executeCodexImageGeneration(
                     response_image_paths: responseImagePaths,
                     output_image_paths: outputImagePaths,
                     codex_home_image_paths: generatedImagePaths,
-                    last_message: rawLastMessage.trim(),
+                    last_message: lastMessageContent.trim(),
+                    last_message_missing: rawLastMessage === null,
                     codex_exec: codexExecDiagnostics,
                 });
                 costTracker.addUsage({
@@ -820,6 +1453,17 @@ export class CodexProvider extends BaseModelProvider {
         requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
         try {
+            const { getToolsFromAgent } = await import('../utils/agent.js');
+            const tools = agent ? await getToolsFromAgent(agent) : [];
+            if (tools.length > 0) {
+                if (getCodexProviderSettings(agent.modelSettings)?.codex_tool_transport === 'filesystem') {
+                    yield* executeCodexFilesystemToolRequest(messages, model, agent, tools, requestId);
+                    return;
+                }
+                yield* executeCodexToolRequest(messages, model, agent, tools, requestId);
+                return;
+            }
+
             const content = await executeCodexRequest(messages, model, agent, requestId);
             const messageId = `codex-${Date.now()}`;
             if (content) {

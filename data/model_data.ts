@@ -86,7 +86,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5-pro', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-7', // Anthropic
+            'claude-opus-4-8', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -119,7 +119,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-7', // Anthropic
+            'claude-opus-4-8', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -130,7 +130,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.3-codex', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-7', // Anthropic
+            'claude-opus-4-8', // Anthropic
             'grok-4.3', // X.AI
             'qwen3-coder', // OpenRouter
         ],
@@ -165,7 +165,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-7', // Anthropic
+            'claude-opus-4-8', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -196,7 +196,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-7', // Anthropic
+            'claude-opus-4-8', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -1520,6 +1520,50 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'ChatGPT-optimized GPT-5.1 chat model (128k/16k).',
     },
 
+    // Codex CLI GPT-5.5 model
+    {
+        id: 'codex-gpt-5.5',
+        aliases: ['codex-gpt-5.5-2026-04-23'],
+        provider: 'codex',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 5.0,
+                price_above_threshold_per_million: 10.0,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 1.0,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 30.0,
+                price_above_threshold_per_million: 45.0,
+                tier_basis: 'input_tokens',
+            },
+        },
+        features: {
+            context_length: 1050000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: false,
+            json_output: true,
+        },
+        class: 'code',
+        score: 99,
+        scores: {
+            monologue: 99,
+            code: 99,
+            reasoning: 98,
+        },
+        description: 'Codex CLI GPT-5.5 text model for agentic coding, visual repair, and tool-mediated workflows.',
+    },
+
     // GPT-5 Codex models
     {
         id: 'gpt-5-codex',
@@ -2167,7 +2211,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Opus 4.7
     {
         id: 'claude-opus-4-7',
-        aliases: ['claude-opus-4-7', 'claude-opus-4.7', 'claude-opus', 'claude-opus-latest', 'claude-4.7-opus'],
+        aliases: ['claude-opus-4-7', 'claude-opus-4.7', 'claude-4.7-opus'],
         provider: 'anthropic',
         cost: {
             input_per_million: 5.0,
@@ -2187,6 +2231,39 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         description:
             'Claude Opus 4.7 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
+    },
+
+    // Claude Opus 4.8
+    {
+        id: 'claude-opus-4-8',
+        aliases: [
+            'claude-opus-4-8',
+            'claude-opus-4.8',
+            'claude-opus',
+            'claude-opus-latest',
+            'claude-4.8-opus',
+            'opus-4-8',
+            'opus-4.8',
+        ],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 5.0,
+            output_per_million: 25.0,
+            cached_input_per_million: 0.5,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'reasoning',
+        description:
+            'Claude Opus 4.8 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
     },
 
     //
@@ -3620,6 +3697,58 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         description:
             'DeepSeek V4 Flash via OpenRouter. Efficiency-optimized 284B-parameter MoE model with 13B active parameters and 1M context.',
+    },
+
+    // Xiaomi MiMo V2.5 (via OpenRouter)
+    {
+        id: 'xiaomi/mimo-v2.5',
+        aliases: ['MiMo-V2.5', 'mimo-v2.5', 'mimo-v2-5'],
+        provider: 'openrouter',
+        openrouter_id: 'xiaomi/mimo-v2.5',
+        cost: {
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
+            output_per_million: 0.28,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text', 'audio', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 131072,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Xiaomi MiMo V2.5 via OpenRouter. Native omnimodal 1M-context model for agentic workflows, multimodal perception, and cost-efficient reasoning.',
+    },
+
+    // Xiaomi MiMo V2.5 Pro (via OpenRouter)
+    {
+        id: 'xiaomi/mimo-v2.5-pro',
+        aliases: ['MiMo-V2.5-Pro', 'mimo-v2.5-pro', 'mimo-v2-5-pro'],
+        provider: 'openrouter',
+        openrouter_id: 'xiaomi/mimo-v2.5-pro',
+        cost: {
+            input_per_million: 0.435,
+            cached_input_per_million: 0.0036,
+            output_per_million: 0.87,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 131072,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Xiaomi MiMo V2.5 Pro via OpenRouter. Flagship 1M-context model for agentic coding, complex software engineering, and long-horizon tasks.',
     },
 
     // Tencent Hy3 preview (via OpenRouter)

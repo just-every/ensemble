@@ -85,6 +85,53 @@ describe('latest OpenRouter model support', () => {
         });
     });
 
+    it('registers Xiaomi MiMo V2.5 and MiMo V2.5 Pro as OpenRouter models', async () => {
+        const model = findModel('MiMo-V2.5');
+        const pro = findModel('mimo-v2-5-pro');
+
+        expect(model?.id).toBe('xiaomi/mimo-v2.5');
+        expect(await getModelFromAgent({ agent_id: 'mimo', model: 'mimo-v2-5' } as any)).toBe('xiaomi/mimo-v2.5');
+        expect(getProviderFromModel('xiaomi/mimo-v2.5')).toBe('openrouter');
+        expect(model?.openrouter_id).toBe('xiaomi/mimo-v2.5');
+        expect(model?.cost).toMatchObject({
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
+            output_per_million: 0.28,
+        });
+        expect(model?.features).toMatchObject({
+            context_length: 1048576,
+            max_output_tokens: 131072,
+            input_modality: ['text', 'audio', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        });
+
+        expect(pro?.id).toBe('xiaomi/mimo-v2.5-pro');
+        expect(await getModelFromAgent({ agent_id: 'mimo-pro', model: 'mimo-v2.5-pro' } as any)).toBe(
+            'xiaomi/mimo-v2.5-pro'
+        );
+        expect(getProviderFromModel('xiaomi/mimo-v2.5-pro')).toBe('openrouter');
+        expect(pro?.openrouter_id).toBe('xiaomi/mimo-v2.5-pro');
+        expect(pro?.cost).toMatchObject({
+            input_per_million: 0.435,
+            cached_input_per_million: 0.0036,
+            output_per_million: 0.87,
+        });
+        expect(pro?.features).toMatchObject({
+            context_length: 1048576,
+            max_output_tokens: 131072,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        });
+    });
+
     it('registers Tencent Hy3 Preview with reasoning suffix aliases', async () => {
         const model = findModel('Hy3 Preview');
 

@@ -93,6 +93,15 @@ describe('Codex provider', () => {
         expect(findModel('codex-mini-latest')).toBeUndefined();
         expect(getProviderFromModel('codex-mini-latest')).toBe('codex');
         expect(getProviderFromModel('codex-gpt-5.5')).toBe('codex');
+        expect(findModel('codex-gpt-5.5')).toMatchObject({
+            id: 'codex-gpt-5.5',
+            provider: 'codex',
+            class: 'code',
+            features: {
+                tool_use: true,
+                json_output: true,
+            },
+        });
         expect(findModel('codex-gpt-image-2')).toMatchObject({
             id: 'codex-gpt-image-2',
             provider: 'codex',
@@ -185,12 +194,13 @@ describe('Codex provider', () => {
             );
 
             expect(usageEvents.at(-1)).toMatchObject({
-                model: 'gpt-5.5',
+                model: 'codex-gpt-5.5',
                 input_tokens: 28882,
                 cached_tokens: 20864,
                 output_tokens: 2,
                 total_tokens: 28884,
                 metadata: {
+                    codex_cli_model: 'gpt-5.5',
                     source: 'codex_cli_json',
                     reasoning_output_tokens: 0,
                 },
@@ -423,7 +433,24 @@ describe('Codex provider', () => {
         expect(events.find(event => event.type === 'error')?.error).toContain('Codex CLI request aborted');
     });
 
-    it('rejects tool requests in v1', async () => {
+    it('emits simulated tool calls from Codex structured output', async () => {
+        mockSuccessfulCodex(
+            JSON.stringify({
+                action: 'tool_calls',
+                toolCalls: [
+                    {
+                        name: 'do_thing',
+                        argumentsJson: JSON.stringify({ label: 'ok' }),
+                    },
+                ],
+                finalResponse: '',
+            }),
+            async invocation => {
+                expect(invocation.args).toContain('--output-schema');
+                expect(invocation.stdin).toContain('Call a tool');
+            }
+        );
+
         const provider = new CodexProvider();
         const events = await collect(
             provider.createResponseStream(
@@ -439,7 +466,15 @@ describe('Codex provider', () => {
                                 function: {
                                     name: 'do_thing',
                                     description: 'Do a thing',
-                                    parameters: { type: 'object', properties: {}, required: [] },
+                                    parameters: {
+                                        type: 'object',
+                                        properties: {
+                                            label: {
+                                                type: 'string',
+                                            },
+                                        },
+                                        required: ['label'],
+                                    },
                                 },
                             },
                         },
@@ -448,10 +483,224 @@ describe('Codex provider', () => {
             )
         );
 
-        expect(events.find(event => event.type === 'error')?.error).toBe(
-            'Codex provider v1 does not support tool requests.'
+        expect(events.find(event => event.type === 'tool_start')?.tool_call).toMatchObject({
+            type: 'function',
+            function: {
+                name: 'do_thing',
+                arguments: JSON.stringify({ label: 'ok' }),
+            },
+        });
+        expect(events.find(event => event.type === 'error')).toBeUndefined();
+    });
+
+    it('requires tool calls when Codex simulated tools include a terminal tool', async () => {
+        mockSuccessfulCodex(
+            JSON.stringify({
+                action: 'tool_calls',
+                toolCalls: [
+                    {
+                        name: 'finish_task',
+                        argumentsJson: JSON.stringify({ message: 'done' }),
+                    },
+                ],
+                finalResponse: '',
+            }),
+            async invocation => {
+                const schema = JSON.parse(await readFile(getArg(invocation.args, '--output-schema'), 'utf8'));
+                expect(schema.properties.action.enum).toEqual(['tool_calls']);
+                const instructionsConfig = invocation.args.find(arg => arg.startsWith('model_instructions_file='));
+                expect(instructionsConfig).toBeTruthy();
+                const instructionsPath = JSON.parse(instructionsConfig!.slice('model_instructions_file='.length));
+                const instructions = await readFile(instructionsPath, 'utf8');
+                expect(instructions).toContain(
+                    'This request is not complete until you call one of these terminal tools: finish_task.'
+                );
+                expect(instructions).toContain('Do not use final_response.');
+            }
         );
-        expect(spawnMock).not.toHaveBeenCalled();
+
+        const provider = new CodexProvider();
+        const events = await collect(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Finish with the terminal tool' }] as any,
+                'codex-gpt-5.5',
+                {
+                    agent_id: 'test-codex-terminal-tools',
+                    terminalToolNames: ['finish_task'],
+                    tools: [
+                        {
+                            function: () => 'done',
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'finish_task',
+                                    description: 'Finish the task',
+                                    parameters: {
+                                        type: 'object',
+                                        properties: {
+                                            message: {
+                                                type: 'string',
+                                            },
+                                        },
+                                        required: ['message'],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                } as any
+            )
+        );
+
+        expect(events.find(event => event.type === 'tool_start')?.tool_call).toMatchObject({
+            type: 'function',
+            function: {
+                name: 'finish_task',
+                arguments: JSON.stringify({ message: 'done' }),
+            },
+        });
+        expect(events.find(event => event.type === 'error')).toBeUndefined();
+    });
+
+    it('can expose Codex tools as filesystem command wrappers', async () => {
+        mockSuccessfulCodex('done', async invocation => {
+            expect(invocation.args.filter(arg => arg === '--disable')).toHaveLength(12);
+            expect(
+                invocation.args.some((arg, index) => arg === '--disable' && invocation.args[index + 1] === 'shell_tool')
+            ).toBe(false);
+            expect(getArg(invocation.args, '--sandbox')).toBe('workspace-write');
+            const cwd = getArg(invocation.args, '--cd');
+            expect(cwd).toContain('ensemble-codex-');
+            expect(getArg(invocation.args, '--add-dir')).toBe(cwd);
+            expect(invocation.options.cwd).toBe(cwd);
+            expect(await readFile(path.join(cwd, 'input.json'), 'utf8')).toBe('{"hello":true}');
+            expect(await readFile(path.join(cwd, 'tools', 'do_thing'), 'utf8')).toContain(
+                'const toolName = "do_thing";'
+            );
+            const instructionsConfig = invocation.args.find(arg => arg.startsWith('model_instructions_file='));
+            expect(instructionsConfig).toBeTruthy();
+            const instructionsPath = JSON.parse(instructionsConfig!.slice('model_instructions_file='.length));
+            const instructions = await readFile(instructionsPath, 'utf8');
+            expect(instructions).toContain('Codex filesystem tool mode');
+            expect(instructions).toContain('- input.json');
+            expect(instructions).toContain('./tools/do_thing <arguments-json-file>');
+            expect(invocation.stdin).toContain('USER:\nUse the filesystem tool');
+        });
+
+        const provider = new CodexProvider();
+        const events = await collect(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Use the filesystem tool' }] as any,
+                'codex-gpt-5.5',
+                {
+                    agent_id: 'test-codex-filesystem-tools',
+                    terminalToolNames: ['do_thing'],
+                    modelSettings: {
+                        codex_tool_transport: 'filesystem',
+                        codex_workspace_files: {
+                            'input.json': '{"hello":true}',
+                        },
+                    },
+                    tools: [
+                        {
+                            function: () => 'tool-result',
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'do_thing',
+                                    description: 'Do a thing',
+                                    parameters: {
+                                        type: 'object',
+                                        properties: {
+                                            label: {
+                                                type: 'string',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                } as any
+            )
+        );
+
+        expect(spawnMock).toHaveBeenCalledTimes(1);
+        expect(events.find(event => event.type === 'message_complete')?.content).toBe('done');
+        expect(events.find(event => event.type === 'error')).toBeUndefined();
+    });
+
+    it('lets ensembleRequest execute simulated Codex tool calls and continue', async () => {
+        const responses = [
+            JSON.stringify({
+                action: 'tool_calls',
+                toolCalls: [
+                    {
+                        name: 'do_thing',
+                        argumentsJson: JSON.stringify({ label: 'ok' }),
+                    },
+                ],
+                finalResponse: '',
+            }),
+            JSON.stringify({
+                action: 'final_response',
+                toolCalls: [],
+                finalResponse: 'done',
+            }),
+        ];
+
+        spawnMock.mockImplementation((command: string, args: string[], _options: any) => {
+            const child = createMockChild();
+            child.stdin.on('finish', async () => {
+                try {
+                    expect(command).toBe('codex');
+                    await writeFile(getArg(args, '--output-last-message'), responses.shift() ?? '', 'utf8');
+                    child.emit('close', 0, null);
+                } catch (error) {
+                    child.emit('error', error);
+                }
+            });
+            return child;
+        });
+
+        const events = await collect(
+            ensembleRequest(
+                [{ type: 'message', role: 'user', content: 'Call the tool, then finish.' }] as any,
+                {
+                    agent_id: 'test-codex-ensemble-tools',
+                    model: 'codex-gpt-5.5',
+                    modelSettings: {
+                        tool_choice: 'required',
+                    },
+                    tools: [
+                        {
+                            function: (label: string) => `tool:${label}`,
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'do_thing',
+                                    description: 'Do a thing',
+                                    parameters: {
+                                        type: 'object',
+                                        properties: {
+                                            label: {
+                                                type: 'string',
+                                            },
+                                        },
+                                        required: ['label'],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                } as any
+            )
+        );
+
+        expect(spawnMock).toHaveBeenCalledTimes(2);
+        expect(events.find(event => event.type === 'tool_done')?.result?.output).toBe('tool:ok');
+        expect(events.find(event => event.type === 'message_complete')?.content).toBe('done');
+        expect(events.find(event => event.type === 'error')).toBeUndefined();
     });
 
     it('lets ensembleRequest enforce strict structured-output validation', async () => {
@@ -733,6 +982,48 @@ describe('Codex provider', () => {
         }
     });
 
+    it('recovers images saved to the isolated Codex home when the last message file is missing', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
+        const generatedPng = Buffer.from('generated-codex-home-image-without-last-message');
+
+        try {
+            spawnMock.mockImplementation((_command: string, _args: string[], options: any) => {
+                const child = createMockChild();
+                child.stdin.on('finish', async () => {
+                    try {
+                        const generatedDir = path.join(options.env.CODEX_HOME, 'generated_images', 'test-session');
+                        await mkdir(generatedDir, { recursive: true });
+                        await writeFile(path.join(generatedDir, 'ig_real.png'), generatedPng);
+                        child.emit('close', 0, null);
+                    } catch (error) {
+                        child.emit('error', error);
+                    }
+                });
+                return child;
+            });
+
+            const provider = new CodexProvider();
+            const images = await provider.createImage(
+                'Create one image.',
+                'codex-gpt-image-2',
+                {
+                    agent_id: 'test-codex-image-home-artifact-no-last-message',
+                    cwd,
+                    modelSettings: {
+                        codex_home: codexHome,
+                    },
+                } as any,
+                {}
+            );
+
+            expect(images).toEqual([`data:image/png;base64,${generatedPng.toString('base64')}`]);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
     it('prefers image paths from the Codex last message over isolated output artifacts', async () => {
         const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
         const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
@@ -911,6 +1202,40 @@ describe('Codex provider', () => {
                 ].sort()
             );
             expect(maxActiveExecutions).toBeGreaterThan(1);
+        } finally {
+            await rm(cwd, { recursive: true, force: true });
+            await rm(codexHome, { recursive: true, force: true });
+        }
+    });
+
+    it('fails Codex image generation when the last message and generated artifacts are both missing', async () => {
+        const cwd = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-image-cwd-'));
+        const codexHome = await mkdtemp(path.join(tmpdir(), 'ensemble-codex-home-'));
+
+        try {
+            spawnMock.mockImplementation(() => {
+                const child = createMockChild();
+                child.stdin.on('finish', () => {
+                    child.emit('close', 0, null);
+                });
+                return child;
+            });
+
+            const provider = new CodexProvider();
+            await expect(
+                provider.createImage(
+                    'Create one image.',
+                    'codex-gpt-image-2',
+                    {
+                        agent_id: 'test-codex-image-missing-last-message-and-artifact',
+                        cwd,
+                        modelSettings: {
+                            codex_home: codexHome,
+                        },
+                    } as any,
+                    {}
+                )
+            ).rejects.toThrow('Codex CLI did not write --output-last-message');
         } finally {
             await rm(cwd, { recursive: true, force: true });
             await rm(codexHome, { recursive: true, force: true });

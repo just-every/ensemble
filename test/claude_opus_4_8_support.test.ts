@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { findModel } from '../data/model_data.js';
+import { MODEL_CLASSES, findModel } from '../data/model_data.js';
 import { ClaudeProvider } from '../model_providers/claude.js';
 import { getModelFromAgent } from '../model_providers/model_provider.js';
 
@@ -17,17 +17,21 @@ function emptyStream() {
     };
 }
 
-describe('Claude Opus 4.7 support', () => {
-    it('registers Opus 4.7 with current aliases, pricing, and metadata', () => {
-        const model = findModel('claude-opus-4-7');
-        const dotAlias = findModel('claude-opus-4.7');
-        const previous = findModel('claude-opus-4-6');
-        const next = findModel('claude-opus-4-8');
+describe('Claude Opus 4.8 support', () => {
+    it('registers Opus 4.8 with current aliases, pricing, and metadata', () => {
+        const model = findModel('claude-opus-4-8');
+        const dotAlias = findModel('claude-opus-4.8');
+        const latestAlias = findModel('claude-opus-latest');
+        const shortAlias = findModel('claude-opus');
+        const prefixlessAlias = findModel('opus-4.8');
+        const previous = findModel('claude-opus-4-7');
 
-        expect(model?.id).toBe('claude-opus-4-7');
-        expect(dotAlias?.id).toBe('claude-opus-4-7');
-        expect(previous?.id).toBe('claude-opus-4-6');
-        expect(next?.id).toBe('claude-opus-4-8');
+        expect(model?.id).toBe('claude-opus-4-8');
+        expect(dotAlias?.id).toBe('claude-opus-4-8');
+        expect(latestAlias?.id).toBe('claude-opus-4-8');
+        expect(shortAlias?.id).toBe('claude-opus-4-8');
+        expect(prefixlessAlias?.id).toBe('claude-opus-4-8');
+        expect(previous?.id).toBe('claude-opus-4-7');
 
         expect(model?.cost?.input_per_million).toBe(5.0);
         expect(model?.cost?.cached_input_per_million).toBe(0.5);
@@ -42,21 +46,34 @@ describe('Claude Opus 4.7 support', () => {
         expect(model?.features?.reasoning_output).toBe(true);
     });
 
-    it('normalizes Opus 4.7 aliases while preserving effort suffixes', async () => {
-        const canonical = await getModelFromAgent({
-            agent_id: 'test-claude-opus-4.7-alias',
-            model: 'claude-4.7-opus',
-        } as any);
-        const xhigh = await getModelFromAgent({
-            agent_id: 'test-claude-opus-4.7-xhigh',
-            model: 'claude-opus-4.7-xhigh',
-        } as any);
-
-        expect(canonical).toBe('claude-opus-4-7');
-        expect(xhigh).toBe('claude-opus-4-7-xhigh');
+    it('updates highest-tier Anthropic model classes to Opus 4.8', () => {
+        expect(MODEL_CLASSES.reasoning_high.models).toContain('claude-opus-4-8');
+        expect(MODEL_CLASSES.metacognition.models).toContain('claude-opus-4-8');
+        expect(MODEL_CLASSES.code.models).toContain('claude-opus-4-8');
+        expect(MODEL_CLASSES.vision.models).toContain('claude-opus-4-8');
+        expect(MODEL_CLASSES.long.models).toContain('claude-opus-4-8');
     });
 
-    it('uses adaptive thinking and omits unsupported sampling params for Opus 4.7', async () => {
+    it('normalizes Opus 4.8 aliases while preserving effort suffixes', async () => {
+        const latest = await getModelFromAgent({
+            agent_id: 'test-claude-opus-latest',
+            model: 'claude-opus-latest',
+        } as any);
+        const xhigh = await getModelFromAgent({
+            agent_id: 'test-claude-opus-4.8-xhigh',
+            model: 'claude-opus-4.8-xhigh',
+        } as any);
+        const prefixless = await getModelFromAgent({
+            agent_id: 'test-opus-4.8-alias',
+            model: 'opus-4.8',
+        } as any);
+
+        expect(latest).toBe('claude-opus-4-8');
+        expect(xhigh).toBe('claude-opus-4-8-xhigh');
+        expect(prefixless).toBe('claude-opus-4-8');
+    });
+
+    it('uses adaptive thinking and omits unsupported sampling params for Opus 4.8', async () => {
         const provider = new ClaudeProvider('sk-ant-test');
         const create = vi.fn().mockResolvedValue(emptyStream());
         (provider as any)._client = {
@@ -68,9 +85,9 @@ describe('Claude Opus 4.7 support', () => {
         await drain(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Review this carefully' }] as any,
-                'claude-opus-4-7',
+                'claude-opus-4.8-xhigh',
                 {
-                    agent_id: 'test-claude-opus-4.7-request',
+                    agent_id: 'test-claude-opus-4.8-request',
                     modelSettings: {
                         temperature: 0.3,
                     },
@@ -79,49 +96,18 @@ describe('Claude Opus 4.7 support', () => {
         );
 
         const requestParams = create.mock.calls.at(0)?.[0];
-        expect(requestParams?.model).toBe('claude-opus-4-7');
+        expect(requestParams?.model).toBe('claude-opus-4-8');
         expect(requestParams?.thinking).toEqual({
             type: 'adaptive',
             display: 'summarized',
         });
         expect(requestParams?.output_config).toEqual({
-            effort: 'high',
+            effort: 'xhigh',
         });
         expect(requestParams?.temperature).toBeUndefined();
     });
 
-    it('maps Opus 4.7 effort suffixes without sending removed extended-thinking budgets', async () => {
-        const provider = new ClaudeProvider('sk-ant-test');
-        const create = vi.fn().mockResolvedValue(emptyStream());
-        (provider as any)._client = {
-            messages: {
-                create,
-            },
-        };
-
-        await drain(
-            provider.createResponseStream(
-                [{ type: 'message', role: 'user', content: 'Implement the hard thing' }] as any,
-                'claude-opus-4.7-xhigh',
-                {
-                    agent_id: 'test-claude-opus-4.7-xhigh-request',
-                } as any
-            )
-        );
-
-        const requestParams = create.mock.calls.at(0)?.[0];
-        expect(requestParams?.model).toBe('claude-opus-4-7');
-        expect(requestParams?.thinking).toEqual({
-            type: 'adaptive',
-            display: 'summarized',
-        });
-        expect(requestParams?.thinking?.budget_tokens).toBeUndefined();
-        expect(requestParams?.output_config).toEqual({
-            effort: 'xhigh',
-        });
-    });
-
-    it('allows modelSettings.thinking_budget=0 to disable adaptive thinking for Opus 4.7', async () => {
+    it('allows modelSettings.thinking_budget=0 to disable adaptive thinking for Opus 4.8', async () => {
         const provider = new ClaudeProvider('sk-ant-test');
         const create = vi.fn().mockResolvedValue(emptyStream());
         (provider as any)._client = {
@@ -133,9 +119,9 @@ describe('Claude Opus 4.7 support', () => {
         await drain(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Return a quick answer' }] as any,
-                'claude-opus-4-7',
+                'claude-opus-latest',
                 {
-                    agent_id: 'test-claude-opus-4.7-no-thinking-request',
+                    agent_id: 'test-claude-opus-4.8-no-thinking-request',
                     modelSettings: {
                         thinking_budget: 0,
                     },
@@ -144,7 +130,7 @@ describe('Claude Opus 4.7 support', () => {
         );
 
         const requestParams = create.mock.calls.at(0)?.[0];
-        expect(requestParams?.model).toBe('claude-opus-4-7');
+        expect(requestParams?.model).toBe('claude-opus-4-8');
         expect(requestParams?.thinking).toBeUndefined();
         expect(requestParams?.output_config).toBeUndefined();
     });
