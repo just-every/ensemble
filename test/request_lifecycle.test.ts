@@ -1044,6 +1044,7 @@ describe('request lifecycle', () => {
         const events = await collectEvents(
             ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
                 model: 'test-model',
+                retryOptions: { maxRetries: 0 },
                 modelSettings: {
                     json_schema: {
                         name: 'score_result',
@@ -1076,6 +1077,67 @@ describe('request lifecycle', () => {
         expect(events.some(event => event.type === 'operation_status' && (event as any).status === 'completed')).toBe(
             false
         );
+    });
+
+    it('retries strict structured-output validation failures with corrective context', async () => {
+        const { getModelProvider } = await import('../model_providers/model_provider.js');
+        let attempts = 0;
+        const requestMessages: any[][] = [];
+
+        vi.mocked(getModelProvider).mockReturnValue({
+            provider_id: 'structured-provider',
+            createResponseStream: vi.fn().mockImplementation(async function* (messages: any[]) {
+                attempts += 1;
+                requestMessages.push(messages);
+                yield {
+                    type: 'message_complete',
+                    message_id: `msg-structured-${attempts}`,
+                    content: attempts === 1 ? '{"score":1}' : '{"score":2}',
+                } as ProviderStreamEvent;
+            }),
+        } as any);
+
+        const events = await collectEvents(
+            ensembleRequest([{ type: 'message', role: 'user', content: 'Hello' } as any], {
+                model: 'test-model',
+                retryOptions: { maxRetries: 1, initialDelay: 0 },
+                modelSettings: {
+                    json_schema: {
+                        name: 'score_result',
+                        type: 'json_schema',
+                        strict: true,
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                score: {
+                                    type: 'number',
+                                    exclusiveMinimum: 1,
+                                    exclusiveMaximum: 5,
+                                },
+                            },
+                            required: ['score'],
+                            additionalProperties: false,
+                        },
+                    },
+                },
+            })
+        );
+
+        const messageComplete = events.find(event => event.type === 'message_complete') as any;
+        const retryingStatus = events.find(
+            event => event.type === 'operation_status' && (event as any).status === 'retrying'
+        ) as any;
+        const failedStatus = events.find(
+            event => event.type === 'operation_status' && (event as any).status === 'failed'
+        ) as any;
+        const correctionMessage = requestMessages.at(1)?.find(message => message.role === 'developer');
+
+        expect(attempts).toBe(2);
+        expect(messageComplete?.content).toBe('{"score":2}');
+        expect(retryingStatus?.error).toContain('must be > 1');
+        expect(failedStatus).toBeUndefined();
+        expect(correctionMessage?.content).toContain('failed the required structured-output validation');
+        expect(correctionMessage?.content).toContain('must be > 1');
     });
 
     it('fails instead of completing when maxToolCalls blocks the requested tool', async () => {

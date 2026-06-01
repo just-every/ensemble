@@ -97,7 +97,56 @@ describe('OpenAI chat structured output request formatting', () => {
 
         const requestParams = create.mock.calls.at(0)?.[0];
         expect(requestParams.response_format).toEqual({ type: 'json_object' });
+        expect(requestParams.structured_outputs).toBeUndefined();
         expect(JSON.stringify(requestParams.response_format)).not.toContain('json_schema');
+        expect(requestParams.messages.at(-1).role).toBe('system');
+        expect(requestParams.messages.at(-1).content).toContain('Respond only with valid JSON.');
+        expect(requestParams.messages.at(-1).content).toContain('"answer"');
+    });
+
+    it('requires schema-capable OpenRouter endpoints for MiMo json_schema requests', async () => {
+        const provider = new OpenRouterProvider();
+        const create = attachMockChatClient(provider);
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return JSON' }] as any,
+                'xiaomi/mimo-v2.5-pro',
+                {
+                    agent_id: 'test-openrouter-mimo-structured-output',
+                    modelSettings: {
+                        json_schema: jsonSchema,
+                    },
+                } as any
+            )
+        );
+
+        const requestParams = create.mock.calls.at(0)?.[0];
+        expect(requestParams.response_format.type).toBe('json_schema');
+        expect(requestParams.structured_outputs).toBe(true);
+        expect(requestParams.provider.require_parameters).toBe(true);
+    });
+
+    it('uses portable JSON mode for OpenRouter MiMo without known native structured output', async () => {
+        const provider = new OpenRouterProvider();
+        const create = attachMockChatClient(provider);
+
+        await drain(
+            provider.createResponseStream(
+                [{ type: 'message', role: 'user', content: 'Return JSON' }] as any,
+                'xiaomi/mimo-v2.5',
+                {
+                    agent_id: 'test-openrouter-mimo-portable-json-schema',
+                    modelSettings: {
+                        json_schema: jsonSchema,
+                    },
+                } as any
+            )
+        );
+
+        const requestParams = create.mock.calls.at(0)?.[0];
+        expect(requestParams.response_format).toEqual({ type: 'json_object' });
+        expect(requestParams.structured_outputs).toBeUndefined();
         expect(requestParams.messages.at(-1).role).toBe('system');
         expect(requestParams.messages.at(-1).content).toContain('Respond only with valid JSON.');
         expect(requestParams.messages.at(-1).content).toContain('"answer"');

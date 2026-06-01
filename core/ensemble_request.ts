@@ -160,6 +160,21 @@ const getFailureRetryOverrides = (agent: AgentDefinition) => ({
     retryableStatusCodes: agent.retryOptions?.additionalRetryableStatusCodes,
 });
 
+const isStructuredOutputValidationFailure = (failure?: FailureClassification): boolean =>
+    failure?.reason === 'structured_output_validation_failed';
+
+const createStructuredOutputRetryMessage = (error: string): ResponseInputMessage => ({
+    type: 'message',
+    role: 'developer',
+    content: [
+        'Your previous response failed the required structured-output validation:',
+        error,
+        'Return only valid JSON that satisfies the requested schema.',
+        'Do not include markdown fences, prose, comments, or any text outside the JSON value.',
+    ].join('\n'),
+    id: randomUUID(),
+});
+
 // Set the ensemble request function in verification and image-to-text modules to avoid circular dependency
 setEnsembleRequestFunction(ensembleRequest);
 setImageToTextFunction(ensembleRequest);
@@ -331,6 +346,10 @@ export async function* ensembleRequest(
                 await emitEvent(errorEvent, agent, model);
 
                 if (willRetryForError) {
+                    if (isStructuredOutputValidationFailure(round.failure)) {
+                        await history.add(createStructuredOutputRetryMessage(round.failure.error));
+                    }
+
                     agent.retryOptions?.onRetry?.(
                         {
                             message: round.failure.error,
@@ -832,7 +851,8 @@ async function* executeRound(options: {
                     const validationResult = validateJsonResponseContent(messageEvent.content, structuredOutputSchema);
                     if (!validationResult.ok && 'error' in validationResult) {
                         const failure = normalizeFailure(new Error(validationResult.error), {
-                            recoverable: false,
+                            recoverable: true,
+                            code: 'ESTRUCTUREDOUTPUT',
                             reason: 'structured_output_validation_failed',
                         });
                         roundSummary.failure = selectMoreSevereFailure(roundSummary.failure, failure);

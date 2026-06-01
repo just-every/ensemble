@@ -3686,6 +3686,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
+            structured_output: true,
             max_output_tokens: 131072,
             reasoning_output: true,
         },

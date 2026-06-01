@@ -684,6 +684,7 @@ export interface ModelFeatures {
     simulate_tools?: boolean; // Whether to use simulated tool calls instead of native ones
     streaming?: boolean; // Whether the model supports streaming responses
     json_output?: boolean; // Whether the model reliably outputs JSON
+    structured_output?: boolean; // Whether the model supports schema-enforced structured output
     max_output_tokens?: number; // Maximum output tokens for the model
     reasoning_output?: boolean; // Whether the model outputs reasoning steps
     input_token_limit?: number; // Maximum tokens for a single input (e.g., for embedding models)

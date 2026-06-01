@@ -714,6 +714,7 @@ describe('Codex provider', () => {
                 {
                     agent_id: 'test-codex-strict-schema',
                     model: 'codex-gpt-5.5',
+                    retryOptions: { maxRetries: 0 },
                     modelSettings: {
                         json_schema: {
                             name: 'answer_result',
