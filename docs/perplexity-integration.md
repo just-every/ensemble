@@ -14,7 +14,6 @@ Perplexity models are available through the OpenRouter provider in the ensemble 
 
 - `perplexity/sonar` - Fast, efficient model for general queries
 - `perplexity/sonar-pro` - Enhanced model with better performance
-- `perplexity/sonar-reasoning` - Optimized for reasoning tasks
 - `perplexity/sonar-reasoning-pro` - Advanced reasoning capabilities
 - `perplexity/sonar-deep-research` - Deep research with web search
 
@@ -75,6 +74,7 @@ Perplexity models are priced per million tokens through OpenRouter:
 
 - `perplexity/sonar`: $1.00 input / $1.00 output
 - `perplexity/sonar-pro`: $3.00 input / $15.00 output
-- `perplexity/sonar-reasoning`: $1.00 input / $5.00 output
+- `perplexity/sonar-reasoning-pro`: $2.00 input / $8.00 output
+- `perplexity/sonar-deep-research`: $2.00 input / $8.00 output
 
 Check [OpenRouter pricing](https://openrouter.ai/models) for current rates.

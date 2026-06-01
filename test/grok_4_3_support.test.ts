@@ -57,6 +57,32 @@ describe('Grok 4.3 support', () => {
         );
     });
 
+    it('registers Grok Build 0.1 as an xAI coding model', async () => {
+        const model = findModel('grok-build');
+
+        expect(model).toMatchObject({
+            id: 'grok-build-0.1',
+            provider: 'xai',
+            cost: {
+                input_per_million: 1.0,
+                output_per_million: 2.0,
+            },
+            features: {
+                context_length: 256000,
+                input_modality: ['text', 'image'],
+                output_modality: ['text'],
+                tool_use: true,
+                streaming: true,
+                json_output: true,
+            },
+            class: 'code',
+        });
+        expect(getProviderFromModel('grok-build-0.1')).toBe('xai');
+        expect(await getModelFromAgent({ agent_id: 'test-grok-build', model: 'grok-build-latest' } as any)).toBe(
+            'grok-build-0.1'
+        );
+    });
+
     it('maps Grok 4.3 reasoning suffixes to xAI reasoning_effort', async () => {
         const provider = new GrokProvider();
         const create = vi.fn().mockResolvedValue(emptyStream());

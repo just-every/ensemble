@@ -118,9 +118,10 @@ export interface ModelSettings {
     tool_timeout_behavior?: 'background' | 'error'; // Timeout handling mode for long-running tools
     json_schema?: ResponseJSONSchema; // JSON schema for structured output
     codex_home?: string; // Codex CLI provider home directory override
-    codex_tool_transport?: 'structured' | 'filesystem'; // Codex tool transport: structured output simulation or filesystem command wrappers
+    codex_tool_transport?: 'structured' | 'filesystem' | 'workspace-files'; // Codex tool transport: structured output simulation, filesystem command wrappers, or workspace file output
     codex_workspace_files?: Record<string, string>; // Files to materialize into the disposable Codex request workspace
     codex_workspace_instructions?: string; // Extra instructions describing the disposable Codex request workspace
+    codex_workspace_final_files?: string[]; // Workspace files to append to the provider response before cleanup
 
     // OpenAI-specific settings (will be ignored by other providers)
     verbosity?: 'low' | 'medium' | 'high'; // Controls response verbosity (OpenAI only)

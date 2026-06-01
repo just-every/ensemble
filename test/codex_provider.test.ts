@@ -574,6 +574,7 @@ describe('Codex provider', () => {
             expect(getArg(invocation.args, '--add-dir')).toBe(cwd);
             expect(invocation.options.cwd).toBe(cwd);
             expect(await readFile(path.join(cwd, 'input.json'), 'utf8')).toBe('{"hello":true}');
+            expect(await readFile(path.join(cwd, 'assets', 'tiny.png'))).toEqual(Buffer.from('hello'));
             expect(await readFile(path.join(cwd, 'tools', 'do_thing'), 'utf8')).toContain(
                 'const toolName = "do_thing";'
             );
@@ -599,6 +600,7 @@ describe('Codex provider', () => {
                         codex_tool_transport: 'filesystem',
                         codex_workspace_files: {
                             'input.json': '{"hello":true}',
+                            'assets/tiny.png': 'data:image/png;base64,aGVsbG8=',
                         },
                     },
                     tools: [

@@ -151,13 +151,15 @@ describe('Gemini 3.x model support', () => {
         expect(resolved).toBe('gemini-3.1-pro-preview');
     });
 
-    it('preserves Gemini effort suffixes for provider-level thinking mapping', async () => {
+    it('normalizes Gemini 3.1 Flash Lite preview aliases to the stable model while preserving effort suffixes', async () => {
+        const model = findModel('gemini-3.1-flash-lite-preview');
         const resolved = await getModelFromAgent({
             agent_id: 'test-gemini-3-1-lite-invalid-high',
             model: 'gemini-3.1-flash-lite-preview-high',
         } as any);
 
-        expect(resolved).toBe('gemini-3.1-flash-lite-preview-high');
+        expect(model?.id).toBe('gemini-3.1-flash-lite');
+        expect(resolved).toBe('gemini-3.1-flash-lite-high');
     });
 
     it('keeps registered suffixed variants intact', async () => {
@@ -202,7 +204,7 @@ describe('Gemini 3.x model support', () => {
                     content: 'Return JSON.',
                 },
             ] as any,
-            'gemini-3.1-flash-lite-preview-low',
+            'gemini-3.1-flash-lite-low',
             { agent_id: 'test-gemini-low-thinking-budget' } as any,
             'req-low-thinking'
         );
@@ -212,7 +214,7 @@ describe('Gemini 3.x model support', () => {
         }
 
         const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
-        expect(requestArg?.model).toBe('gemini-3.1-flash-lite-preview');
+        expect(requestArg?.model).toBe('gemini-3.1-flash-lite');
         expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
         expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('LOW');
         expect(requestArg?.config?.thinkingConfig?.thinkingBudget).toBeUndefined();
@@ -440,7 +442,7 @@ describe('Gemini 3.x model support', () => {
             ['gemini-3.5-flash', 2048, 'MEDIUM'],
             ['gemini-3.5-flash', 12288, 'HIGH'],
             ['gemini-3-flash-preview', 0, 'MINIMAL'],
-            ['gemini-3.1-flash-lite-preview', 0, 'MINIMAL'],
+            ['gemini-3.1-flash-lite', 0, 'MINIMAL'],
             ['gemini-3.1-pro-preview', 0, 'LOW'],
             ['gemini-3.1-flash-image-preview', 2048, 'HIGH'],
         ] as const;
@@ -699,7 +701,7 @@ describe('Gemini 3.x model support', () => {
                     content: 'Return JSON.',
                 },
             ] as any,
-            'gemini-3.1-flash-lite-preview',
+            'gemini-3.1-flash-lite',
             {
                 agent_id: 'test-gemini-abort-stream',
                 abortSignal,
@@ -760,7 +762,7 @@ describe('Gemini 3.x model support', () => {
                     ],
                 },
             ] as any,
-            'gemini-3.1-flash-lite-preview',
+            'gemini-3.1-flash-lite',
             {
                 agent_id: 'test-gemini-abort-nonstream',
                 abortSignal,

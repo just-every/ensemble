@@ -38,7 +38,7 @@ import { falProvider } from './fal.js';
 import { runwayProvider } from './runway.js';
 import { bytedanceProvider } from './bytedance.js';
 import { codexProvider } from './codex.js';
-import { MODEL_CLASSES, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
+import { MODEL_CLASSES, MODEL_REGISTRY, ModelClassID, ModelProviderID, findModel } from '../data/model_data.js';
 
 // Provider lookup by ID for explicit model matches
 const PROVIDER_BY_ID: Record<ModelProviderID, ModelProvider> = {
@@ -378,6 +378,19 @@ export async function getModelFromAgent(
     // But preserve suffixes if they were explicitly provided.
     // Provider implementations may interpret these as reasoning or thinking controls.
     const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-disabled', '-max'];
+
+    // Exact registered IDs take precedence over reasoning suffix parsing. Exact aliases do too,
+    // unless the alias is a suffixed alias for an unsuffixed canonical model like o4-mini-high.
+    const directModelEntry = MODEL_REGISTRY.find(entry => {
+        if (entry.id === model) return true;
+        if (!entry.aliases?.includes(model)) return false;
+        const suffix = suffixes.find(s => model.endsWith(s));
+        return !suffix || entry.id.endsWith(suffix);
+    });
+    if (directModelEntry?.id) {
+        return directModelEntry.id;
+    }
+
     let suffix = '';
     let baseModel = model;
 

@@ -10,13 +10,12 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'glm', model: 'glm-5.1' } as any)).toBe('z-ai/glm-5.1');
         expect(getProviderFromModel('z-ai/glm-5.1')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 1.05,
-            cached_input_per_million: 0.525,
-            output_per_million: 3.5,
+            input_per_million: 0.98,
+            cached_input_per_million: 0.182,
+            output_per_million: 3.08,
         });
         expect(model?.features).toMatchObject({
             context_length: 202752,
-            max_output_tokens: 65535,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -33,13 +32,13 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'kimi', model: 'kimi-k2-6' } as any)).toBe('moonshotai/kimi-k2.6');
         expect(getProviderFromModel('moonshotai/kimi-k2.6')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.74,
-            cached_input_per_million: 0.14,
-            output_per_million: 3.49,
+            input_per_million: 0.684,
+            cached_input_per_million: 0.144,
+            output_per_million: 3.42,
         });
         expect(model?.features).toMatchObject({
-            context_length: 262142,
-            max_output_tokens: 262142,
+            context_length: 262144,
+            max_output_tokens: 262144,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -79,10 +78,11 @@ describe('latest OpenRouter model support', () => {
             'deepseek/deepseek-v4-flash'
         );
         expect(flash?.cost).toMatchObject({
-            input_per_million: 0.14,
-            cached_input_per_million: 0.0028,
-            output_per_million: 0.28,
+            input_per_million: 0.0983,
+            cached_input_per_million: 0.0197,
+            output_per_million: 0.1966,
         });
+        expect(flash?.features?.max_output_tokens).toBe(131072);
     });
 
     it('registers Xiaomi MiMo V2.5 and MiMo V2.5 Pro as OpenRouter models', async () => {
@@ -152,18 +152,43 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('tencent/hy3-preview')).toBe('openrouter');
         expect(getProviderFromModel('tencent/hy3-preview-high')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.066,
-            cached_input_per_million: 0.029,
-            output_per_million: 0.26,
+            input_per_million: 0.063,
+            cached_input_per_million: 0.021,
+            output_per_million: 0.21,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
-            max_output_tokens: 262144,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
             streaming: true,
             json_output: false,
+            reasoning_output: true,
+        });
+    });
+
+    it('registers Qwen 3.7 Max as the current OpenRouter Qwen flagship', async () => {
+        const model = findModel('qwen3.7-max');
+
+        expect(model?.id).toBe('qwen/qwen3.7-max');
+        expect(await getModelFromAgent({ agent_id: 'qwen-37-max', model: 'qwen-3.7-max' } as any)).toBe(
+            'qwen/qwen3.7-max'
+        );
+        expect(getProviderFromModel('qwen/qwen3.7-max')).toBe('openrouter');
+        expect(model?.openrouter_id).toBe('qwen/qwen3.7-max');
+        expect(model?.cost).toMatchObject({
+            input_per_million: 1.25,
+            cached_input_per_million: 0.25,
+            output_per_million: 3.75,
+        });
+        expect(model?.features).toMatchObject({
+            context_length: 1000000,
+            max_output_tokens: 65536,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
             reasoning_output: true,
         });
     });
@@ -201,9 +226,8 @@ describe('latest OpenRouter model support', () => {
         );
         expect(getProviderFromModel('qwen/qwen3.6-flash')).toBe('openrouter');
         expect(flash?.cost).toMatchObject({
-            input_per_million: 0.25,
-            cached_input_per_million: 0.3125,
-            output_per_million: 1.5,
+            input_per_million: 0.1875,
+            output_per_million: 1.125,
         });
         expect(flash?.features).toMatchObject({
             context_length: 1000000,
@@ -218,11 +242,10 @@ describe('latest OpenRouter model support', () => {
 
         expect(a3b?.id).toBe('qwen/qwen3.6-35b-a3b');
         expect(a3b?.cost).toMatchObject({
-            input_per_million: 0.1612,
-            cached_input_per_million: 0.1612,
-            output_per_million: 0.96525,
+            input_per_million: 0.14,
+            output_per_million: 1.0,
         });
-        expect(a3b?.features?.max_output_tokens).toBe(65536);
+        expect(a3b?.features?.max_output_tokens).toBe(262140);
 
         expect(maxPreview?.id).toBe('qwen/qwen3.6-max-preview');
         expect(await getModelFromAgent({ agent_id: 'qwen-max-preview', model: 'qwen-3.6-max-preview' } as any)).toBe(
@@ -247,9 +270,9 @@ describe('latest OpenRouter model support', () => {
 
         expect(dense?.id).toBe('qwen/qwen3.6-27b');
         expect(dense?.cost).toMatchObject({
-            input_per_million: 0.32,
+            input_per_million: 0.29,
             output_per_million: 3.2,
         });
-        expect(dense?.features?.max_output_tokens).toBe(81920);
+        expect(dense?.features?.max_output_tokens).toBe(262140);
     });
 });

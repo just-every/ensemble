@@ -50,12 +50,13 @@ const CODEX_DISABLED_FEATURES = [
     'personality',
 ] as const;
 
-type CodexToolTransport = 'structured' | 'filesystem';
+type CodexToolTransport = 'structured' | 'filesystem' | 'workspace-files';
 
 type CodexProviderModelSettings = ModelSettings & {
     codex_tool_transport?: CodexToolTransport;
     codex_workspace_files?: Record<string, string>;
     codex_workspace_instructions?: string;
+    codex_workspace_final_files?: string[];
 };
 
 const REASONING_EFFORT_SUFFIXES: CodexReasoningEffortInput[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
@@ -494,10 +495,40 @@ async function writeCodexWorkspaceFiles(tempDir: string, files?: Record<string, 
         const relativePath = validateCodexWorkspaceRelativePath(rawPath);
         const targetPath = path.join(tempDir, relativePath);
         await mkdir(path.dirname(targetPath), { recursive: true });
-        await writeFile(targetPath, content, 'utf8');
+        const dataUrlMatch = /^data:[^;,]+;base64,([\s\S]*)$/i.exec(content);
+        if (dataUrlMatch) {
+            await writeFile(targetPath, Buffer.from(dataUrlMatch[1] ?? '', 'base64'));
+        } else {
+            await writeFile(targetPath, content, 'utf8');
+        }
         written.push(relativePath);
     }
     return written.sort();
+}
+
+function normalizeCodexWorkspaceFinalFiles(files?: string[]): string[] {
+    return [...new Set((files ?? []).map(validateCodexWorkspaceRelativePath))].sort();
+}
+
+async function readCodexWorkspaceFinalFiles(tempDir: string, files?: string[]): Promise<Record<string, string>> {
+    const output: Record<string, string> = {};
+    for (const relativePath of normalizeCodexWorkspaceFinalFiles(files)) {
+        const filePath = path.join(tempDir, relativePath);
+        output[relativePath] = await readFile(filePath, 'utf8');
+    }
+    return output;
+}
+
+function appendCodexWorkspaceFinalFiles(content: string, files: Record<string, string>): string {
+    const entries = Object.entries(files);
+    if (entries.length === 0) return content;
+    return [
+        content,
+        '',
+        '<codex_workspace_files_json>',
+        JSON.stringify(Object.fromEntries(entries), null, 2),
+        '</codex_workspace_files_json>',
+    ].join('\n');
 }
 
 function buildCodexWorkspaceFileInstructions(files: string[], extra?: string): string {
@@ -541,7 +572,9 @@ function buildCodexFilesystemToolInstructions(tools: ToolFunction[], agent: Agen
         terminalToolNames.length > 0
             ? `This request is not complete until you run one of these terminal tool commands: ${terminalToolNames.map(name => `./tools/${name}`).join(', ')}.`
             : undefined,
-        'After the terminal tool command succeeds, respond with a brief completion note. Do not invent tool outputs; use the command output.',
+        terminalToolNames.length > 0
+            ? 'After the terminal tool command succeeds, respond with a brief completion note. Do not invent tool outputs; use the command output.'
+            : 'Run the commands you need, then respond with a brief completion note. Do not invent command outputs; use stdout from the commands.',
         '',
         'Available filesystem tools:',
         toolDescriptions,
@@ -704,7 +737,38 @@ function readArgumentsJson() {
     parsed.repairedLayeredDocumentJson = readText(parsed.repairedLayeredDocumentPath);
     delete parsed.repairedLayeredDocumentPath;
   }
-  return JSON.stringify(parsed);
+  return { parsedArguments: parsed, argumentsJson: JSON.stringify(parsed) };
+}
+
+function defaultOutputPath(toolName, id, key) {
+  const suffix = key === 'renderPngBase64' ? 'render.png' : key === 'diffPngBase64' ? 'diff.png' : key.replace(/Base64$/, '');
+  return path.join('tool-output', toolName + '-' + id + '-' + suffix);
+}
+
+function writeBase64Image(output, key, targetPath, toolName, id) {
+  if (!output || typeof output !== 'object' || typeof output[key] !== 'string') {
+    return;
+  }
+  const outputPath = typeof targetPath === 'string' && targetPath.trim()
+    ? targetPath
+    : defaultOutputPath(toolName, id, key);
+  const resolved = path.resolve(process.cwd(), outputPath);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  fs.writeFileSync(resolved, Buffer.from(output[key], 'base64'));
+  output[key.replace(/Base64$/, 'Path')] = outputPath;
+  delete output[key];
+}
+
+function materializeOutputFiles(rawOutput, parsedArguments, id) {
+  let output;
+  try {
+    output = JSON.parse(String(rawOutput || ''));
+  } catch {
+    return String(rawOutput || '');
+  }
+  writeBase64Image(output, 'renderPngBase64', parsedArguments.renderPngPath, toolName, id);
+  writeBase64Image(output, 'diffPngBase64', parsedArguments.diffPngPath, toolName, id);
+  return JSON.stringify(output, null, 2);
 }
 
 async function main() {
@@ -713,9 +777,10 @@ async function main() {
   fs.mkdirSync(responseDir, { recursive: true });
   const id = String(Date.now()) + '-' + String(process.pid) + '-' + Math.random().toString(16).slice(2);
   const fileName = id + '.json';
+  const toolArguments = readArgumentsJson();
   fs.writeFileSync(
     path.join(requestDir, fileName),
-    JSON.stringify({ id, toolName, argumentsJson: readArgumentsJson() }),
+    JSON.stringify({ id, toolName, argumentsJson: toolArguments.argumentsJson }),
     'utf8'
   );
 
@@ -728,8 +793,9 @@ async function main() {
         console.error(response.error || 'Tool failed.');
         process.exit(1);
       }
-      process.stdout.write(String(response.output || ''));
-      if (!String(response.output || '').endsWith('\\n')) process.stdout.write('\\n');
+      const output = materializeOutputFiles(response.output, toolArguments.parsedArguments, id);
+      process.stdout.write(output);
+      if (!output.endsWith('\\n')) process.stdout.write('\\n');
       return;
     }
     sleep(50);
@@ -1125,7 +1191,11 @@ async function executeCodexRequest(
             );
         }
 
-        const content = normalizeLastMessageContent(rawLastMessage, Boolean(schemaPath));
+        const finalFiles = await readCodexWorkspaceFinalFiles(tempDir, codexSettings?.codex_workspace_final_files);
+        const content = appendCodexWorkspaceFinalFiles(
+            normalizeLastMessageContent(rawLastMessage, Boolean(schemaPath)),
+            finalFiles
+        );
         log_llm_response(loggedRequestId, { content, codex_exec: codexExecDiagnostics });
         return content;
     } catch (error) {
@@ -1185,6 +1255,36 @@ async function* executeCodexFilesystemToolRequest(
 ): AsyncGenerator<ProviderStreamEvent> {
     if (agent.modelSettings?.json_schema?.schema) {
         throw new Error('Codex provider cannot combine filesystem tool mode with a caller-supplied json_schema.');
+    }
+    const content = await executeCodexRequest(messages, model, agent, requestId, {
+        allowShellTool: true,
+        filesystemTools: tools,
+        useTempCwd: true,
+    });
+    const messageId = `codex-${Date.now()}`;
+    if (content) {
+        yield {
+            type: 'message_delta',
+            content,
+            message_id: messageId,
+        };
+    }
+    yield {
+        type: 'message_complete',
+        content,
+        message_id: messageId,
+    };
+}
+
+async function* executeCodexWorkspaceFileRequest(
+    messages: ResponseInput,
+    model: string,
+    agent: AgentDefinition,
+    tools: ToolFunction[],
+    requestId?: string
+): AsyncGenerator<ProviderStreamEvent> {
+    if (agent.modelSettings?.json_schema?.schema) {
+        throw new Error('Codex provider cannot combine workspace file mode with a caller-supplied json_schema.');
     }
     const content = await executeCodexRequest(messages, model, agent, requestId, {
         allowShellTool: true,
@@ -1456,7 +1556,12 @@ export class CodexProvider extends BaseModelProvider {
             const { getToolsFromAgent } = await import('../utils/agent.js');
             const tools = agent ? await getToolsFromAgent(agent) : [];
             if (tools.length > 0) {
-                if (getCodexProviderSettings(agent.modelSettings)?.codex_tool_transport === 'filesystem') {
+                const codexToolTransport = getCodexProviderSettings(agent.modelSettings)?.codex_tool_transport;
+                if (codexToolTransport === 'workspace-files') {
+                    yield* executeCodexWorkspaceFileRequest(messages, model, agent, tools, requestId);
+                    return;
+                }
+                if (codexToolTransport === 'filesystem') {
                     yield* executeCodexFilesystemToolRequest(messages, model, agent, tools, requestId);
                     return;
                 }
