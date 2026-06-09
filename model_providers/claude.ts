@@ -50,7 +50,8 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
 type ClaudeAdaptiveEffort = 'low' | 'medium' | 'high' | 'xhigh';
 type ClaudeAdaptiveEffortOrOff = ClaudeAdaptiveEffort | 'off';
 
-const CLAUDE_ADAPTIVE_OPUS_MODEL_IDS = new Set(['claude-opus-4-7', 'claude-opus-4-8']);
+const CLAUDE_ADAPTIVE_THINKING_MODEL_IDS = new Set(['claude-opus-4-7', 'claude-opus-4-8', 'claude-fable-5']);
+const CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS = new Set(['claude-fable-5']);
 const CLAUDE_ADAPTIVE_EFFORT_SUFFIXES: Record<string, ClaudeAdaptiveEffortOrOff> = {
     '-none': 'off',
     '-minimal': 'low',
@@ -89,10 +90,14 @@ function getSuffixedBaseModel(model: string): { baseModel: string; suffix: strin
     return { baseModel: model, suffix: '' };
 }
 
-function isClaudeAdaptiveOpusModel(model: string): boolean {
+function getClaudeAdaptiveThinkingModelId(model: string): string | null {
     const { baseModel } = getSuffixedBaseModel(model);
     const canonicalId = findModel(baseModel)?.id ?? baseModel;
-    return CLAUDE_ADAPTIVE_OPUS_MODEL_IDS.has(canonicalId);
+    return CLAUDE_ADAPTIVE_THINKING_MODEL_IDS.has(canonicalId) ? canonicalId : null;
+}
+
+function isClaudeAdaptiveThinkingModel(model: string): boolean {
+    return getClaudeAdaptiveThinkingModelId(model) !== null;
 }
 
 // Content has many forms... here we extract them all!
@@ -647,9 +652,10 @@ export class ClaudeProvider extends BaseModelProvider {
             let outputConfig: any = undefined;
             let thinkingSet = false;
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
-            const isAdaptiveOpus = isClaudeAdaptiveOpusModel(model);
+            const isAdaptiveClaude = isClaudeAdaptiveThinkingModel(model);
+            let implicitAdaptiveThinking = false;
 
-            if (isAdaptiveOpus) {
+            if (isAdaptiveClaude) {
                 let adaptiveEffort: ClaudeAdaptiveEffortOrOff | undefined;
                 for (const [suffix, effort] of Object.entries(CLAUDE_ADAPTIVE_EFFORT_SUFFIXES)) {
                     if (model.endsWith(suffix)) {
@@ -664,16 +670,19 @@ export class ClaudeProvider extends BaseModelProvider {
                 }
 
                 const modelEntry = findModel(model);
-                if (modelEntry && CLAUDE_ADAPTIVE_OPUS_MODEL_IDS.has(modelEntry.id)) {
+                if (modelEntry && CLAUDE_ADAPTIVE_THINKING_MODEL_IDS.has(modelEntry.id)) {
                     model = modelEntry.id;
                 }
+                implicitAdaptiveThinking = CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS.has(model);
 
                 thinkingSet = true;
                 if (adaptiveEffort !== 'off') {
-                    thinking = {
-                        type: 'adaptive',
-                        display: 'summarized',
-                    };
+                    if (!implicitAdaptiveThinking) {
+                        thinking = {
+                            type: 'adaptive',
+                            display: 'summarized',
+                        };
+                    }
                     outputConfig = {
                         effort: adaptiveEffort ?? 'high',
                     };
@@ -746,11 +755,11 @@ export class ClaudeProvider extends BaseModelProvider {
             }
 
             // Determine if thinking is enabled
-            const thinkingEnabled = thinking !== undefined;
+            const thinkingEnabled = thinking !== undefined || implicitAdaptiveThinking;
 
             // Anthropic requires temperature=1 whenever thinking is enabled.
-            // Adaptive Opus requests reject non-default sampling parameters, so omit them.
-            const requestTemperature = isAdaptiveOpus ? undefined : thinkingEnabled ? 1 : settings?.temperature;
+            // Adaptive Claude requests reject non-default sampling parameters, so omit them.
+            const requestTemperature = isAdaptiveClaude ? undefined : thinkingEnabled ? 1 : settings?.temperature;
 
             // Preprocess *and* convert messages for Claude in one pass
             const claudeMessages = await this.prepareClaudeMessages(messages, model, thinkingEnabled);

@@ -86,7 +86,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5-pro', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-8', // Anthropic
+            'claude-fable-5', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -119,7 +119,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-8', // Anthropic
+            'claude-fable-5', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -130,7 +130,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.3-codex', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-8', // Anthropic
+            'claude-fable-5', // Anthropic
             'grok-4.3', // X.AI
             'qwen3-coder', // OpenRouter
         ],
@@ -165,7 +165,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-8', // Anthropic
+            'claude-fable-5', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -196,7 +196,7 @@ export const MODEL_CLASSES = {
         models: [
             'gpt-5.5', // OpenAI
             'gemini-3.1-pro-preview', // Google
-            'claude-opus-4-8', // Anthropic
+            'claude-fable-5', // Anthropic
             'grok-4.3', // X.AI
         ],
         random: true,
@@ -2242,6 +2242,37 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         description:
             'Claude Opus 4.8 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
+    },
+
+    // Claude Fable 5
+    {
+        id: 'claude-fable-5',
+        aliases: ['claude-fable', 'claude-fable-latest', 'fable-5'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 10.0,
+            output_per_million: 50.0,
+            cached_input_per_million: 1.0,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'reasoning',
+        score: 99,
+        scores: {
+            monologue: 98,
+            code: 99,
+            reasoning: 99,
+        },
+        description:
+            "Claude Fable 5 - Anthropic's most capable widely released model for demanding reasoning, long-horizon agentic coding, and high-resolution vision.",
     },
 
     //
