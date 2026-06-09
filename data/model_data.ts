@@ -2248,6 +2248,54 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Google (Gemini) models
     //
 
+    // Gemma 4 models hosted by the Gemini API
+    {
+        id: 'gemma-4-26b-a4b-it',
+        aliases: ['models/gemma-4-26b-a4b-it'],
+        provider: 'google',
+        cost: {
+            input_per_million: 0,
+            output_per_million: 0,
+            cached_input_per_million: 0,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 32768,
+        },
+        class: 'reasoning_mini',
+        score: 80,
+        description:
+            'Gemma 4 26B A4B instruction-tuned model hosted by the Gemini API with 256K context, image input, and high-only thinking support.',
+    },
+    {
+        id: 'gemma-4-31b-it',
+        aliases: ['models/gemma-4-31b-it'],
+        provider: 'google',
+        cost: {
+            input_per_million: 0,
+            output_per_million: 0,
+            cached_input_per_million: 0,
+        },
+        features: {
+            context_length: 262144,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 32768,
+        },
+        class: 'reasoning',
+        score: 82,
+        description:
+            'Gemma 4 31B instruction-tuned model hosted by the Gemini API with 256K context, image input, and high-only thinking support.',
+    },
+
     // Gemini 2.5 Pro
     {
         id: 'gemini-2.5-pro-preview-06-05',

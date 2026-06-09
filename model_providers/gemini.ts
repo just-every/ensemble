@@ -761,7 +761,15 @@ function parseThinkingLevel(value: unknown): GeminiThinkingLevel | null {
     throw new Error('Gemini thinking_level must be one of: minimal, low, medium, high.');
 }
 
+function isGemmaModel(model: string): boolean {
+    const modelId = model.startsWith('models/') ? model.slice('models/'.length) : model;
+    return modelId.startsWith('gemma-4-');
+}
+
 function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | null {
+    if (isGemmaModel(model)) {
+        return new Set(['HIGH']);
+    }
     if (model.includes('gemini-3.1-pro-preview') || model.includes('gemini-3-pro-preview')) {
         return new Set(['LOW', 'MEDIUM', 'HIGH']);
     }
@@ -1118,6 +1126,7 @@ export class GeminiProvider extends BaseModelProvider {
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
             const thinkingLevelFromSettings = parseThinkingLevel(settings?.thinking_level);
 
+            let strippedThinkingSuffix = false;
             for (const [suffix, level] of Object.entries(THINKING_LEVEL_SUFFIX_CONFIGS)) {
                 if (!model.endsWith(suffix)) {
                     continue;
@@ -1128,16 +1137,22 @@ export class GeminiProvider extends BaseModelProvider {
                 if (supportedThinkingLevels?.has(level)) {
                     thinkingLevel = level;
                     model = baseModel;
+                    strippedThinkingSuffix = true;
+                } else if (isGemmaModel(baseModel)) {
+                    model = baseModel;
+                    strippedThinkingSuffix = true;
                 }
                 break;
             }
 
             // Check if model has any of the legacy budget suffixes
-            for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
-                if (model.endsWith(suffix)) {
-                    thinkingBudget = budget;
-                    model = model.slice(0, -suffix.length);
-                    break;
+            if (!strippedThinkingSuffix) {
+                for (const [suffix, budget] of Object.entries(THINKING_BUDGET_CONFIGS)) {
+                    if (model.endsWith(suffix)) {
+                        thinkingBudget = budget;
+                        model = model.slice(0, -suffix.length);
+                        break;
+                    }
                 }
             }
 
@@ -1150,10 +1165,14 @@ export class GeminiProvider extends BaseModelProvider {
 
                 const supportedThinkingLevels = getSupportedThinkingLevels(model);
                 if (supportedThinkingLevels) {
-                    thinkingLevel = mapThinkingBudgetToThinkingLevel(
-                        thinkingBudgetFromSettings,
-                        supportedThinkingLevels
-                    );
+                    if (isGemmaModel(model) && thinkingBudgetFromSettings === 0) {
+                        thinkingLevel = null;
+                    } else {
+                        thinkingLevel = mapThinkingBudgetToThinkingLevel(
+                            thinkingBudgetFromSettings,
+                            supportedThinkingLevels
+                        );
+                    }
                 } else {
                     thinkingBudget = thinkingBudgetFromSettings;
                 }
@@ -1162,6 +1181,11 @@ export class GeminiProvider extends BaseModelProvider {
                 if (thinkingBudget !== null || thinkingLevel !== null) {
                     throw new Error(
                         'Gemini thinking_level cannot be combined with thinking_budget or a model thinking suffix.'
+                    );
+                }
+                if (isGemmaModel(model) && thinkingLevelFromSettings !== 'HIGH') {
+                    throw new Error(
+                        'Gemma thinking_level only supports high; omit thinking_level to disable thinking.'
                     );
                 }
                 thinkingLevel = thinkingLevelFromSettings;
@@ -1173,17 +1197,20 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             // Prepare generation config
-            const config: GenerateContentConfig = {
-                thinkingConfig: {
-                    includeThoughts: true,
-                },
-            };
+            const config: GenerateContentConfig = {};
+            const thinkingConfig: Record<string, unknown> = {};
 
+            if (!isGemmaModel(model)) {
+                thinkingConfig.includeThoughts = true;
+            }
             if (thinkingLevel !== null) {
-                (config as any).thinkingConfig.thinkingLevel = thinkingLevel;
+                thinkingConfig.thinkingLevel = thinkingLevel;
             } else if (thinkingBudget !== null) {
                 // thinkingBudget exists in runtime API but not in TypeScript definitions
-                (config as any).thinkingConfig.thinkingBudget = thinkingBudget;
+                thinkingConfig.thinkingBudget = thinkingBudget;
+            }
+            if (Object.keys(thinkingConfig).length > 0) {
+                (config as any).thinkingConfig = thinkingConfig;
             }
             if (settings?.stop_sequence) {
                 config.stopSequences = [settings.stop_sequence];

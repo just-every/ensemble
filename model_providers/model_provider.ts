@@ -89,6 +89,7 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
 
     // Gemini/Google models
     'gemini-': geminiProvider,
+    'gemma-': geminiProvider,
     'imagen-': geminiProvider, // Image generation models
 
     // Luma Photon models
@@ -232,7 +233,7 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'openai';
     } else if (model.startsWith('claude-')) {
         return 'anthropic';
-    } else if (model.startsWith('gemini-') || model.startsWith('imagen-')) {
+    } else if (model.startsWith('gemini-') || model.startsWith('gemma-') || model.startsWith('imagen-')) {
         return 'google';
     } else if (model.startsWith('firefly-')) {
         // Firefly integration removed; treat as openrouter fallback
