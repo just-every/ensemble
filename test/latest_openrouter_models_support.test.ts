@@ -132,6 +132,32 @@ describe('latest OpenRouter model support', () => {
         });
     });
 
+    it('registers MiniMax M3 with current OpenRouter pricing and multimodal details', async () => {
+        const model = findModel('MiniMax M3');
+
+        expect(model?.id).toBe('minimax/minimax-m3');
+        expect(await getModelFromAgent({ agent_id: 'minimax-m3', model: 'minimax-m3' } as any)).toBe(
+            'minimax/minimax-m3'
+        );
+        expect(getProviderFromModel('minimax/minimax-m3')).toBe('openrouter');
+        expect(model?.openrouter_id).toBe('minimax/minimax-m3');
+        expect(model?.cost).toMatchObject({
+            input_per_million: 0.3,
+            cached_input_per_million: 0.06,
+            output_per_million: 1.2,
+        });
+        expect(model?.features).toMatchObject({
+            context_length: 1048576,
+            max_output_tokens: 512000,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        });
+    });
+
     it('registers Tencent Hy3 Preview with reasoning suffix aliases', async () => {
         const model = findModel('Hy3 Preview');
 

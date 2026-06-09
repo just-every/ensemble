@@ -3743,6 +3743,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             'Xiaomi MiMo V2.5 Pro via OpenRouter. Flagship 1M-context model for agentic coding, complex software engineering, and long-horizon tasks.',
     },
 
+    // MiniMax M3 (via OpenRouter)
+    {
+        id: 'minimax/minimax-m3',
+        aliases: ['MiniMax M3', 'MiniMax-M3', 'minimax-m3'],
+        provider: 'openrouter',
+        openrouter_id: 'minimax/minimax-m3',
+        cost: {
+            input_per_million: 0.3,
+            cached_input_per_million: 0.06,
+            output_per_million: 1.2,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 512000,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'MiniMax M3 via OpenRouter. Multimodal 1M-context foundation model for long-horizon agentic work, coding, and video-aware reasoning.',
+    },
+
     // Tencent Hy3 preview (via OpenRouter)
     {
         id: 'tencent/hy3-preview',
