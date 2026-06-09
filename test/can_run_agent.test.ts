@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { canRunAgent } from '../model_providers/model_provider.js';
 import { overrideModelClass, clearExternalRegistrations } from '../utils/external_models.js';
+import { registerOpenAICompatibleModel } from '../model_providers/openai_compatible.js';
 
 describe('canRunAgent', () => {
     const transientKeys = [
@@ -236,12 +237,28 @@ describe('canRunAgent', () => {
 
     describe('edge cases', () => {
         it('should handle external models', async () => {
-            // External models are always considered valid
+            registerOpenAICompatibleModel({
+                id: 'external-model-123',
+                endpoint: 'http://127.0.0.1:1234',
+            });
+
             const result = await canRunAgent({ model: 'external-model-123' });
 
-            // This might fail if external-model-123 isn't registered
-            // The behavior depends on how getProviderFromModel handles unknown models
-            expect(result).toBeDefined();
+            expect(result.canRun).toBe(true);
+            expect(result.provider).toBe('openai-compatible:external-model-123');
+        });
+
+        it('should allow registered OpenAI-compatible models without provider API keys', async () => {
+            registerOpenAICompatibleModel({
+                id: 'google/gemma-4-12b',
+                endpoint: 'http://127.0.0.1:1234',
+                aliases: ['local-gemma'],
+            });
+
+            const result = await canRunAgent({ model: 'local-gemma' });
+
+            expect(result.canRun).toBe(true);
+            expect(result.provider).toBe('openai-compatible:google/gemma-4-12b');
         });
 
         it('should prefer model over modelClass when both are provided', async () => {

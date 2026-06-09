@@ -72,10 +72,9 @@ export function registerExternalModel(model: ModelEntry, provider: ModelProvider
     // Store the model entry with defaults
     externalModels.set(modelId, modelWithDefaults);
 
-    // Store the provider if not already registered
-    if (!externalProviders.has(model.provider)) {
-        externalProviders.set(model.provider, provider);
-    }
+    // Store the provider. Re-registering a provider ID intentionally updates its implementation,
+    // which is useful for local endpoints that may be restarted or moved during development.
+    externalProviders.set(model.provider, provider);
 
     console.log(`[Ensemble] Registered external model: ${modelId} with provider: ${model.provider}`);
 }
@@ -87,7 +86,16 @@ export function registerExternalModel(model: ModelEntry, provider: ModelProvider
  * @returns The model entry if found, undefined otherwise
  */
 export function getExternalModel(modelId: string): ModelEntry | undefined {
-    return externalModels.get(modelId);
+    const directModel = externalModels.get(modelId);
+    if (directModel) return directModel;
+
+    for (const model of externalModels.values()) {
+        if (model.aliases?.includes(modelId)) {
+            return model;
+        }
+    }
+
+    return undefined;
 }
 
 /**
@@ -101,7 +109,7 @@ export function getExternalProvider(providerId: ModelProviderID): ModelProvider 
  * Check if a model is external
  */
 export function isExternalModel(modelId: string): boolean {
-    return externalModels.has(modelId);
+    return getExternalModel(modelId) !== undefined;
 }
 
 /**

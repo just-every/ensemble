@@ -7,8 +7,11 @@ import { grokProvider } from '../model_providers/grok.js';
 import { deepSeekProvider } from '../model_providers/deepseek.js';
 import { openRouterProvider } from '../model_providers/openrouter.js';
 import { codexProvider } from '../model_providers/codex.js';
+import { OpenAICompatibleProvider, registerOpenAICompatibleModel } from '../model_providers/openai_compatible.js';
+import { clearExternalRegistrations, getExternalModel } from '../utils/external_models.js';
 
 beforeEach(() => {
+    clearExternalRegistrations();
     process.env.OPENAI_API_KEY =
         process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith('sk-')
             ? process.env.OPENAI_API_KEY
@@ -63,5 +66,19 @@ describe('getModelProvider', () => {
 
     it('falls back to OpenRouter provider', () => {
         expect(getModelProvider('unknown-model')).toBe(openRouterProvider);
+    });
+
+    it('routes registered OpenAI-compatible models to their custom endpoint provider', () => {
+        const provider = registerOpenAICompatibleModel({
+            id: 'google/gemma-4-12b',
+            endpoint: 'http://127.0.0.1:1234',
+            aliases: ['local-gemma'],
+        });
+
+        expect(provider).toBeInstanceOf(OpenAICompatibleProvider);
+        expect(provider.endpoint).toBe('http://127.0.0.1:1234/v1');
+        expect(getModelProvider('google/gemma-4-12b')).toBe(provider);
+        expect(getModelProvider('local-gemma')).toBe(provider);
+        expect(getExternalModel('local-gemma')?.id).toBe('google/gemma-4-12b');
     });
 });

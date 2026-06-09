@@ -23,6 +23,13 @@ export {
     isExternalModel,
 } from './utils/external_models.js';
 
+export {
+    OpenAICompatibleProvider,
+    registerOpenAICompatibleModel,
+    normalizeOpenAICompatibleEndpoint,
+    type OpenAICompatibleModelOptions,
+} from './model_providers/openai_compatible.js';
+
 // Export all model data (excluding ModelClassID to avoid conflict)
 export { MODEL_REGISTRY, MODEL_CLASSES, findModel } from './data/model_data.js';
 

@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { costTracker } from '../utils/cost_tracker.js';
 import { setEventHandler, hasEventHandler } from '../utils/event_controller.js';
+import { registerOpenAICompatibleModel } from '../model_providers/openai_compatible.js';
+import { clearExternalRegistrations } from '../utils/external_models.js';
 
 describe('Provider Cost Event Behavior', () => {
     beforeEach(() => {
         costTracker.reset();
+        clearExternalRegistrations();
     });
 
     afterEach(() => {
         setEventHandler(null);
+        clearExternalRegistrations();
     });
 
     it('should track when global event handler is set or not', () => {
@@ -67,5 +71,24 @@ describe('Provider Cost Event Behavior', () => {
         // When global handler is set, providers should NOT yield events
         setEventHandler(() => {});
         expect(shouldYieldCostEvent()).toBe(false);
+    });
+
+    it('calculates cost for registered OpenAI-compatible models when pricing is provided', () => {
+        registerOpenAICompatibleModel({
+            id: 'local-priced-model',
+            endpoint: 'http://127.0.0.1:1234',
+            cost: {
+                input_per_million: 2,
+                output_per_million: 6,
+            },
+        });
+
+        const usage = costTracker.addUsage({
+            model: 'local-priced-model',
+            input_tokens: 1000,
+            output_tokens: 500,
+        });
+
+        expect(usage.cost).toBeCloseTo(0.005);
     });
 });

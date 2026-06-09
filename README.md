@@ -113,6 +113,38 @@ console.log('Validation Result:', {
 });
 ```
 
+### Custom OpenAI-Compatible Endpoints
+
+Register local or self-hosted OpenAI-compatible chat-completions endpoints before making requests. For LM Studio, `http://127.0.0.1:1234` is normalized to `http://127.0.0.1:1234/v1`.
+
+```typescript
+import { ensembleRequest, registerOpenAICompatibleModel } from '@just-every/ensemble';
+
+registerOpenAICompatibleModel({
+    id: 'google/gemma-4-12b',
+    endpoint: 'http://127.0.0.1:1234',
+    cost: {
+        input_per_million: 0,
+        output_per_million: 0,
+    },
+    features: {
+        context_length: 32768,
+        max_output_tokens: 4096,
+        tool_use: false,
+    },
+});
+
+for await (const event of ensembleRequest([{ type: 'message', role: 'user', content: 'Hello from local Gemma.' }], {
+    model: 'google/gemma-4-12b',
+})) {
+    if (event.type === 'message_complete') {
+        console.log(event.content);
+    }
+}
+```
+
+Local endpoints that do not require authentication use a placeholder API key internally because the OpenAI SDK requires a non-empty value. Pass `apiKey` when your endpoint enforces authentication. The optional `cost` field uses the same per-million token pricing shape as built-in models, and defaults to zero-cost tracking when omitted.
+
 ## Documentation
 
 - [Request Lifecycle & Failures](docs/retry-behavior.md) - Outer request status, retries, timeouts, verification, and failure handling
