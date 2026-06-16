@@ -102,7 +102,7 @@
     "@google/genai": "^1.50.1",
     "openai": "^6.34.0",
     "uuid": "^14.0.0",
-    "ws": "^8.20.0"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
