@@ -2,6 +2,7 @@ import { access, readdir, readFile, stat, writeFile } from 'fs/promises';
 import path from 'path';
 import type { ImageGenerationOpts, ResponseContent, ResponseContentImageData } from '../types/types.js';
 import { isValidBase64 } from '../utils/image_validation.js';
+import { fetchCodexImageUrl } from './codex_safe_image_fetch.js';
 
 const DATA_URL_PATTERN = /^data:([^;]+);base64,(.+)$/i;
 const IMAGE_PATH_PATTERN = /\.(png|jpe?g|webp|gif)$/i;
@@ -9,7 +10,7 @@ const IMAGE_PATH_CANDIDATE_PATTERN =
     /(\/[^\s"'`<>]+?\.(?:png|jpe?g|webp|gif)|(?:\.{1,2}\/)?[A-Za-z0-9._~@%+=:,/-]+?\.(?:png|jpe?g|webp|gif))/gi;
 
 function isHttpUrl(value: string): boolean {
-    return value.startsWith('http://') || value.startsWith('https://');
+    return /^https?:\/\//i.test(value);
 }
 
 function mimeExtension(mimeType: string | undefined): string {
@@ -141,14 +142,9 @@ export class CodexImageAttachmentWriter {
         }
 
         if (isHttpUrl(value)) {
-            const response = await fetch(value);
-            if (!response.ok) {
-                throw new Error(
-                    `Codex provider failed to fetch image ${value}: ${response.status} ${response.statusText}`
-                );
-            }
-            const responseMime = response.headers.get('content-type') || mimeType || 'image/png';
-            return this.writeImageBuffer(Buffer.from(await response.arrayBuffer()), responseMime);
+            const response = await fetchCodexImageUrl(value);
+            const responseMime = response.contentType || mimeType || 'image/png';
+            return this.writeImageBuffer(response.buffer, responseMime);
         }
 
         const localPath = await existingLocalPath(value, this.cwd);
