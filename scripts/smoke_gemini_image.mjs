@@ -31,17 +31,17 @@ async function main() {
 
   const agent = {
     name: 'smoke-image',
-    model: 'gemini-2.5-flash-image-preview',
+    model: 'gemini-3.1-flash-image',
     tags: ['smoke', 'image'],
   };
 
-  console.log('Generating image with Gemini 2.5 Flash Image Preview …');
+  console.log('Generating image with Gemini 3.1 Flash Image …');
   const images = await ensembleImage(prompt, agent, { n: 1 });
   if (!images?.length) throw new Error('No images returned');
 
   const outDir = path.resolve(__dirname, '../data');
   await fs.mkdir(outDir, { recursive: true });
-  const saved = await saveDataUrl(images[0], path.join(outDir, 'gemini_flash_image_preview_smoke'));
+  const saved = await saveDataUrl(images[0], path.join(outDir, 'gemini_flash_image_smoke'));
   console.log('Saved:', saved);
 
   const total = costTracker.getTotalCost();

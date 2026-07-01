@@ -416,14 +416,14 @@ import { ensembleImage } from '@just-every/ensemble';
 
 const images = await ensembleImage(
     'A serene lake at dawn',
-    { model: 'gemini-2.5-flash-image-preview' },
+    { model: 'gemini-2.5-flash-image' },
     { size: 'portrait' }
 );
 
 // Gemini 3.1 Flash Image: grounded generation + thinking controls + metadata callback
 const grounded = await ensembleImage(
     'A detailed painting of a Timareta butterfly resting on a flower',
-    { model: 'gemini-3.1-flash-image-preview' },
+    { model: 'gemini-3.1-flash-image' },
     {
         size: '16:9',
         quality: 'high', // 4K

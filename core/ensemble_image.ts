@@ -16,9 +16,9 @@ import { createTraceContext } from '../utils/trace_context.js';
  * const result = await ensembleImage('A beautiful sunset over mountains');
  * console.log(`Generated ${result.images.length} image(s)`);
  *
- * // Using Google Gemini 2.5 Flash Image (Preview)
+ * // Using Google Gemini 2.5 Flash Image
  * const result = await ensembleImage('A serene lake at dawn', {
- *   model: 'gemini-2.5-flash-image-preview',
+ *   model: 'gemini-2.5-flash-image',
  * }, {
  *   size: 'portrait'
  * }});

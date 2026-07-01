@@ -444,7 +444,8 @@ describe('Gemini 3.x model support', () => {
             ['gemini-3-flash-preview', 0, 'MINIMAL'],
             ['gemini-3.1-flash-lite', 0, 'MINIMAL'],
             ['gemini-3.1-pro-preview', 0, 'LOW'],
-            ['gemini-3.1-flash-image-preview', 2048, 'HIGH'],
+            ['gemini-3.1-flash-image', 2048, 'HIGH'],
+            ['gemini-3.1-flash-lite-image', 2048, 'HIGH'],
         ] as const;
 
         for (const [model, thinkingBudget, thinkingLevel] of budgetExpectations) {
@@ -796,13 +797,33 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.abortSignal).toBeUndefined();
     });
 
-    it('registers Gemini 3.1 Flash Image Preview pricing metadata', () => {
-        const imageModel = findModel('gemini-3.1-flash-image-preview');
+    it('registers current Gemini image model metadata and legacy preview aliases', async () => {
+        const imageModel = findModel('gemini-3.1-flash-image');
+        const flashLiteImageModel = findModel('gemini-3.1-flash-lite-image');
+        const proImageModel = findModel('gemini-3-pro-image');
 
-        expect(imageModel?.id).toBe('gemini-3.1-flash-image-preview');
+        expect(imageModel?.id).toBe('gemini-3.1-flash-image');
         expect(imageModel?.class).toBe('image_generation');
         expect(imageModel?.cost?.per_image).toBe(0.067);
+        expect((imageModel?.cost?.input_per_million as any)?.text).toBe(0.5);
         expect((imageModel?.cost?.output_per_million as any)?.image).toBe(60);
+        expect(imageModel?.features?.context_length).toBe(131072);
+
+        expect(flashLiteImageModel?.id).toBe('gemini-3.1-flash-lite-image');
+        expect(flashLiteImageModel?.class).toBe('image_generation');
+        expect(flashLiteImageModel?.cost?.per_image).toBe(0.0336);
+        expect((flashLiteImageModel?.cost?.output_per_million as any)?.image).toBe(30);
+        expect(flashLiteImageModel?.features?.max_output_tokens).toBe(4096);
+
+        expect(proImageModel?.id).toBe('gemini-3-pro-image');
+        expect(proImageModel?.cost?.per_image).toBe(0.134);
+
+        expect(findModel('gemini-3.1-flash-image-preview')?.id).toBe('gemini-3.1-flash-image');
+        expect(findModel('gemini-3-pro-image-preview')?.id).toBe('gemini-3-pro-image');
+        expect(findModel('gemini-2.5-flash-image-preview')?.id).toBe('gemini-2.5-flash-image');
+        expect(
+            await getModelFromAgent({ agent_id: 'legacy-flash-image', model: 'gemini-3.1-flash-image-preview' } as any)
+        ).toBe('gemini-3.1-flash-image');
     });
 
     it('uses 0.5K pricing for Gemini 3.1 Flash Image low-quality requests', async () => {
@@ -818,7 +839,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A minimalist banana icon',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-low' } as any,
             { quality: 'low', n: 1 }
         );
@@ -846,7 +867,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A tiny product sticker',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-512' } as any,
             { size: '512x512', n: 1 }
         );
@@ -870,7 +891,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A tiny landscape scene',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-05k-landscape' } as any,
             { quality: 'low', size: 'landscape', n: 1 }
         );
@@ -891,7 +912,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A tall fashion poster',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-05k-1-4' } as any,
             { quality: 'low', size: '1:4', n: 1 }
         );
@@ -914,7 +935,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A scenic mountain photo',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-2k-pricing' } as any,
             { quality: 'medium', n: 1 }
         );
@@ -940,7 +961,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A detailed city skyline',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-4k-pricing' } as any,
             { quality: 'high', n: 1 }
         );
@@ -966,7 +987,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A cinematic panoramic city at dusk',
-            'gemini-3-pro-image-preview',
+            'gemini-3-pro-image',
             { agent_id: 'test-gemini-3-pro-21-9-4k' } as any,
             { size: '6336x2688', n: 1 }
         );
@@ -991,7 +1012,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A butterfly on a flower',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-grounding' } as any,
             {
                 n: 1,
@@ -1007,6 +1028,69 @@ describe('Gemini 3.x model support', () => {
         expect(requestArg?.config?.tools?.[0]?.googleSearch?.searchTypes?.imageSearch).toEqual({});
     });
 
+    it('uses 1K pricing and omits grounding for Gemini 3.1 Flash Lite Image', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        const usageSpy = vi.spyOn(costTracker, 'addUsage');
+
+        await provider.createImage(
+            'A fast sticker sheet of banana icons',
+            'gemini-3.1-flash-lite-image',
+            { agent_id: 'test-gemini-3.1-lite-image' } as any,
+            {
+                n: 1,
+                quality: 'high',
+                size: '16:9',
+                grounding: {
+                    web_search: true,
+                    image_search: true,
+                },
+                thinking: {
+                    level: 'high',
+                    include_thoughts: true,
+                },
+            }
+        );
+
+        const usageArg = usageSpy.mock.calls.at(-1)?.[0] as any;
+        const requestArg = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(usageArg?.metadata?.cost_per_image).toBe(0.0336);
+        expect(usageArg?.metadata?.image_size).toBe('1K');
+        expect(requestArg?.config?.imageConfig?.aspectRatio).toBe('16:9');
+        expect(requestArg?.config?.imageConfig?.imageSize).toBe('1K');
+        expect(requestArg?.config?.tools).toBeUndefined();
+        expect(requestArg?.config?.thinkingConfig?.thinkingLevel).toBe('High');
+        expect(requestArg?.config?.thinkingConfig?.includeThoughts).toBe(true);
+
+        usageSpy.mockRestore();
+    });
+
+    it('rejects unsupported Gemini 3.1 Flash Lite Image aspect ratios', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
+        (provider as any)._client = {
+            models: {
+                generateContentStream,
+            },
+        };
+
+        await expect(
+            provider.createImage(
+                'A very wide banner',
+                'gemini-3.1-flash-lite-image',
+                { agent_id: 'test-gemini-3.1-lite-image-ratio' } as any,
+                { n: 1, size: '1:4' }
+            )
+        ).rejects.toThrow('gemini-3.1-flash-lite-image does not support aspect ratio 1:4');
+        expect(generateContentStream).not.toHaveBeenCalled();
+    });
+
     it('passes thinking controls for Gemini 3.1 Flash Image', async () => {
         const provider = new GeminiProvider('test-key');
         const generateContentStream = vi.fn().mockResolvedValue(makeGeminiImageStream());
@@ -1018,7 +1102,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A futuristic city in a bottle',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-thinking' } as any,
             {
                 n: 1,
@@ -1045,7 +1129,7 @@ describe('Gemini 3.x model support', () => {
 
         await provider.createImage(
             'A portrait of an astronaut',
-            'gemini-2.5-flash-image-preview',
+            'gemini-2.5-flash-image',
             { agent_id: 'test-gemini-2.5-thinking-ignored' } as any,
             {
                 n: 1,
@@ -1072,7 +1156,7 @@ describe('Gemini 3.x model support', () => {
         await expect(
             provider.createImage(
                 'A robot holding a lantern',
-                'gemini-2.5-flash-image-preview',
+                'gemini-2.5-flash-image',
                 { agent_id: 'test-gemini-2.5-thinking-malformed' } as any,
                 {
                     n: 1,
@@ -1098,7 +1182,7 @@ describe('Gemini 3.x model support', () => {
         const onMetadata = vi.fn();
         const images = await provider.createImage(
             'A detailed painting of a Timareta butterfly resting on a flower',
-            'gemini-3.1-flash-image-preview',
+            'gemini-3.1-flash-image',
             { agent_id: 'test-gemini-3.1-metadata' } as any,
             {
                 n: 1,

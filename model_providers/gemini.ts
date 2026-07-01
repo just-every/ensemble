@@ -766,6 +766,31 @@ function isGemmaModel(model: string): boolean {
     return modelId.startsWith('gemma-4-');
 }
 
+function isGemini25FlashImageModel(model: string): boolean {
+    return model.includes('gemini-2.5-flash-image');
+}
+
+function isGemini31FlashImageModel(model: string): boolean {
+    return model.includes('gemini-3.1-flash-image');
+}
+
+function isGemini31FlashLiteImageModel(model: string): boolean {
+    return model.includes('gemini-3.1-flash-lite-image');
+}
+
+function isGemini3ProImageModel(model: string): boolean {
+    return model.includes('gemini-3-pro-image');
+}
+
+function isGeminiStreamingImageModel(model: string): boolean {
+    return (
+        isGemini25FlashImageModel(model) ||
+        isGemini31FlashImageModel(model) ||
+        isGemini31FlashLiteImageModel(model) ||
+        isGemini3ProImageModel(model)
+    );
+}
+
 function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | null {
     if (isGemmaModel(model)) {
         return new Set(['HIGH']);
@@ -773,18 +798,18 @@ function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | n
     if (model.includes('gemini-3.1-pro-preview') || model.includes('gemini-3-pro-preview')) {
         return new Set(['LOW', 'MEDIUM', 'HIGH']);
     }
+    if (isGemini31FlashImageModel(model) || isGemini31FlashLiteImageModel(model)) {
+        return new Set(['MINIMAL', 'HIGH']);
+    }
+    if (isGemini3ProImageModel(model)) {
+        return new Set(['HIGH']);
+    }
     if (
         model.includes('gemini-3.5-flash') ||
         model.includes('gemini-3.1-flash-lite') ||
         model.includes('gemini-3-flash-preview')
     ) {
         return new Set(['MINIMAL', 'LOW', 'MEDIUM', 'HIGH']);
-    }
-    if (model.includes('gemini-3.1-flash-image-preview')) {
-        return new Set(['MINIMAL', 'HIGH']);
-    }
-    if (model.includes('gemini-3-pro-image-preview')) {
-        return new Set(['HIGH']);
     }
 
     return null;
@@ -1668,8 +1693,8 @@ export class GeminiProvider extends BaseModelProvider {
         let finalRequestId = requestId; // Define in outer scope
         try {
             // Extract options with defaults
-            // Default to Gemini's native image model (preview)
-            model = model || 'gemini-2.5-flash-image-preview';
+            // Default to Gemini's current native image model.
+            model = model || 'gemini-3.1-flash-image';
             const numberOfImages = opts?.n ?? 1;
             if (!Number.isInteger(numberOfImages) || numberOfImages < 1) {
                 throw new Error('[Gemini] ImageGenerationOpts.n must be a positive integer.');
@@ -1685,13 +1710,21 @@ export class GeminiProvider extends BaseModelProvider {
 
             const explicitWebGrounding = opts?.grounding?.web_search;
             const explicitImageGrounding = opts?.grounding?.image_search;
-            const enableWebGrounding = explicitWebGrounding ?? hasGoogleWebSearch ?? false;
 
-            const isGemini31FlashImageModel = model.includes('gemini-3.1-flash-image-preview');
-            const enableImageGrounding = explicitImageGrounding === true && isGemini31FlashImageModel;
-            if (explicitImageGrounding && !isGemini31FlashImageModel) {
+            const isGemini31FlashImage = isGemini31FlashImageModel(model);
+            const isGemini31FlashLiteImage = isGemini31FlashLiteImageModel(model);
+            const isGemini3ProImage = isGemini3ProImageModel(model);
+            const supportsWebGrounding = isGemini31FlashImage || isGemini3ProImage;
+            const enableWebGrounding = supportsWebGrounding && (explicitWebGrounding ?? hasGoogleWebSearch ?? false);
+            const enableImageGrounding = explicitImageGrounding === true && isGemini31FlashImage;
+            if ((explicitWebGrounding || hasGoogleWebSearch) && !supportsWebGrounding) {
                 console.warn(
-                    '[Gemini] Image Search grounding is only available for gemini-3.1-flash-image-preview. Ignoring image_search=true.'
+                    '[Gemini] Google Search grounding is only available for gemini-3.1-flash-image and gemini-3-pro-image. Ignoring web_search=true.'
+                );
+            }
+            if (explicitImageGrounding && !isGemini31FlashImage) {
+                console.warn(
+                    '[Gemini] Image Search grounding is only available for gemini-3.1-flash-image. Ignoring image_search=true.'
                 );
             }
 
@@ -1707,15 +1740,16 @@ export class GeminiProvider extends BaseModelProvider {
                 : undefined;
             const thinkingLevel =
                 requestedThinkingLevel === 'high' ? 'High' : requestedThinkingLevel ? 'Minimal' : undefined;
-            if (requestedThinkingLevel && !isGemini31FlashImageModel) {
+            const supportsImageThinkingControls = isGemini31FlashImage || isGemini31FlashLiteImage;
+            if (requestedThinkingLevel && !supportsImageThinkingControls) {
                 console.warn(
-                    '[Gemini] thinking.level is currently supported for gemini-3.1-flash-image-preview only. Ignoring thinking level.'
+                    '[Gemini] thinking.level is currently supported for gemini-3.1-flash-image and gemini-3.1-flash-lite-image only. Ignoring thinking level.'
                 );
             }
 
-            if (hasThinkingOptionsObject && 'include_thoughts' in thinkingOptions && !isGemini31FlashImageModel) {
+            if (hasThinkingOptionsObject && 'include_thoughts' in thinkingOptions && !supportsImageThinkingControls) {
                 console.warn(
-                    '[Gemini] thinking.include_thoughts is currently supported for gemini-3.1-flash-image-preview only. Ignoring include_thoughts.'
+                    '[Gemini] thinking.include_thoughts is currently supported for gemini-3.1-flash-image and gemini-3.1-flash-lite-image only. Ignoring include_thoughts.'
                 );
             }
 
@@ -1729,11 +1763,7 @@ export class GeminiProvider extends BaseModelProvider {
             );
 
             // If using Gemini image models that expose image parts via generateContentStream
-            if (
-                model.includes('gemini-2.5-flash-image-preview') ||
-                model.includes('gemini-3.1-flash-image-preview') ||
-                model.includes('gemini-3-pro-image-preview')
-            ) {
+            if (isGeminiStreamingImageModel(model)) {
                 let aggregateMetadata: ImageGenerationMetadata = { model };
 
                 // Use imageConfig for aspect ratio / size; do not inject size/aspect instructions into the prompt.
@@ -1766,7 +1796,7 @@ export class GeminiProvider extends BaseModelProvider {
                     '1024x1792': { ar: '9:16' },
                 };
                 const sm = opts?.size ? sizeMap[String(opts.size)] : undefined;
-                const gemini3ProDimensionPreset = model.includes('gemini-3-pro-image-preview')
+                const gemini3ProDimensionPreset = isGemini3ProImage
                     ? GEMINI_3_PRO_IMAGE_DIMENSION_PRESETS[String(opts?.size)]
                     : undefined;
 
@@ -1779,8 +1809,28 @@ export class GeminiProvider extends BaseModelProvider {
                 const qualityKey = typeof opts?.quality === 'string' ? opts.quality.toLowerCase() : '';
                 type GeminiImageSize = '0.5K' | '1K' | '2K' | '4K';
 
-                // Gemini 3.1 Flash Image supports 0.5K billing/output tier; older image models do not.
-                const imageSizeMap: Record<string, GeminiImageSize> = isGemini31FlashImageModel
+                if (isGemini31FlashLiteImage && imageConfig.aspectRatio) {
+                    const liteAspectRatios = new Set([
+                        '1:1',
+                        '2:3',
+                        '3:2',
+                        '3:4',
+                        '4:3',
+                        '4:5',
+                        '5:4',
+                        '9:16',
+                        '16:9',
+                        '21:9',
+                    ]);
+                    if (!liteAspectRatios.has(imageConfig.aspectRatio)) {
+                        throw new Error(
+                            `[Gemini] gemini-3.1-flash-lite-image does not support aspect ratio ${imageConfig.aspectRatio}.`
+                        );
+                    }
+                }
+
+                // Gemini 3.1 Flash Image supports 0.5K billing/output tier; Lite is 1K-only.
+                const imageSizeMap: Record<string, GeminiImageSize> = isGemini31FlashImage
                     ? {
                           low: '0.5K',
                           standard: '1K',
@@ -1788,13 +1838,21 @@ export class GeminiProvider extends BaseModelProvider {
                           hd: '4K',
                           high: '4K',
                       }
-                    : {
-                          low: '1K',
-                          standard: '2K',
-                          medium: '2K',
-                          hd: '4K',
-                          high: '4K',
-                      };
+                    : isGemini31FlashLiteImage
+                      ? {
+                            low: '1K',
+                            standard: '1K',
+                            medium: '1K',
+                            hd: '1K',
+                            high: '1K',
+                        }
+                      : {
+                            low: '1K',
+                            standard: '2K',
+                            medium: '2K',
+                            hd: '4K',
+                            high: '4K',
+                        };
 
                 let imageSize: GeminiImageSize | undefined = imageSizeMap[qualityKey];
 
@@ -1803,8 +1861,15 @@ export class GeminiProvider extends BaseModelProvider {
                 }
 
                 // Explicit 512x512 requests map to the 0.5K tier on Gemini 3.1 Flash Image.
-                if (isGemini31FlashImageModel && opts?.size === '512x512') {
+                if (isGemini31FlashImage && opts?.size === '512x512') {
                     imageSize = '0.5K';
+                }
+
+                if (isGemini31FlashLiteImage) {
+                    imageSize = '1K';
+                    if (opts?.size === '512x512') {
+                        throw new Error('[Gemini] gemini-3.1-flash-lite-image only supports 1K image output.');
+                    }
                 }
 
                 // Gemini's current API docs expose `512` as the 0.5K request size.
@@ -1815,10 +1880,14 @@ export class GeminiProvider extends BaseModelProvider {
                 if (requestImageSize) imageConfig.imageSize = requestImageSize;
 
                 const thinkingConfig: Record<string, unknown> = {};
-                if (hasThinkingOptionsObject && 'include_thoughts' in thinkingOptions && isGemini31FlashImageModel) {
+                if (
+                    hasThinkingOptionsObject &&
+                    'include_thoughts' in thinkingOptions &&
+                    supportsImageThinkingControls
+                ) {
                     thinkingConfig.includeThoughts = includeThoughts;
                 }
-                if (thinkingLevel && isGemini31FlashImageModel) {
+                if (thinkingLevel && supportsImageThinkingControls) {
                     thinkingConfig.thinkingLevel = thinkingLevel;
                 }
 
@@ -2205,18 +2274,21 @@ export class GeminiProvider extends BaseModelProvider {
      */
     private getImageCost(model: string, imageSize?: '0.5K' | '1K' | '2K' | '4K'): number {
         // Pricing (as of latest docs)
-        if (model.includes('gemini-3.1-flash-image-preview')) {
-            // Gemini 3.1 Flash Image Preview token-equivalent image pricing.
+        if (isGemini31FlashImageModel(model)) {
+            // Gemini 3.1 Flash Image token-equivalent image pricing.
             // Tokens per image: 0.5K=747, 1K=1120, 2K=1680, 4K=2520 @ $60 / 1M image tokens.
             if (imageSize === '4K') return 0.151;
             if (imageSize === '2K') return 0.101;
             if (imageSize === '0.5K') return 0.045;
             return 0.067; // 1K (default)
-        } else if (model.includes('gemini-2.5-flash-image-preview')) {
+        } else if (isGemini31FlashLiteImageModel(model)) {
+            // Gemini 3.1 Flash Lite Image is 1K-only: 1120 image tokens @ $30 / 1M.
+            return 0.0336;
+        } else if (isGemini25FlashImageModel(model)) {
             // $0.039 per image (1024x1024 ~1290 tokens @ $30 / 1M)
             return 0.039;
-        } else if (model.includes('gemini-3-pro-image-preview')) {
-            // Gemini 3 Pro Image (preview): 1K/2K = $0.134, 4K = $0.24 (standard generation)
+        } else if (isGemini3ProImageModel(model)) {
+            // Gemini 3 Pro Image: 1K/2K = $0.134, 4K = $0.24 (standard generation)
             if (imageSize === '4K') return 0.24;
             return 0.134;
         }

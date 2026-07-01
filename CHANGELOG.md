@@ -2,6 +2,8 @@
 
 ## Unreleased
 - Added Gemini 3.5 Flash (`gemini-3.5-flash`) provider metadata, pricing, and native Gemini thinking-level suffix handling.
+- Added Gemini 3.1 Flash Lite Image (`gemini-3.1-flash-lite-image`) support and promoted current Gemini image model IDs (`gemini-3.1-flash-image`, `gemini-3-pro-image`, `gemini-2.5-flash-image`) while preserving preview IDs as aliases.
+- Updated Gemini image pricing, provider routing, grounding support, and thinking controls for the current stable Gemini image model family.
 - Mapped Gemini native thinking suffixes `-none`, `-disabled`, `-minimal`, `-low`, `-medium`, `-high`, `-max`, and `-xhigh` to provider `thinkingLevel` values where supported.
 - Translated `modelSettings.thinking_budget` to native Gemini `thinkingLevel` values for Gemini 3/3.5 models while keeping numeric `thinkingBudget` for Gemini 2.5 models.
 

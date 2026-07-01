@@ -208,7 +208,7 @@ export const MODEL_CLASSES = {
             // One top pick per image provider
             'gpt-image-2', // OpenAI
             'codex-gpt-image-2', // Codex CLI
-            'gemini-3-pro-image-preview', // Google
+            'gemini-3.1-flash-image', // Google
             'seedream-4', // ByteDance
             'luma-photon-1', // Luma
             'ideogram-3.0', // Ideogram
@@ -2547,13 +2547,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 3 Pro Preview - multimodal flagship (v1beta, tiered pricing at 200k tokens).',
     },
 
-    // Gemini 3 Pro Image (preview)
+    // Gemini 3 Pro Image
     {
-        id: 'gemini-3-pro-image-preview',
-        aliases: ['gemini-3-pro-image'],
+        id: 'gemini-3-pro-image',
+        aliases: ['gemini-3-pro-image-preview', 'models/gemini-3-pro-image-preview'],
         provider: 'google',
         cost: {
-            per_image: 0.134, // AI Studio preview price per image (1K/2K); 4K is $0.24
+            per_image: 0.134, // Standard price per image (1K/2K); 4K is $0.24
             input_per_million: 2.0,
             output_per_million: 12.0,
         },
@@ -2561,9 +2561,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_modality: ['text', 'image'],
             output_modality: ['image', 'text'],
             streaming: false,
+            context_length: 65536,
+            max_output_tokens: 32768,
         },
         class: 'image_generation',
-        description: 'Gemini 3 Pro Image (preview) for text-to-image generation.',
+        description: 'Gemini 3 Pro Image (Nano Banana Pro) for professional image generation and editing.',
     },
 
     // Gemini 2.0 Flash Lite
@@ -3025,11 +3027,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: "OpenAI's DALL-E 2 model, supports image editing and variations",
     },
     {
-        id: 'gemini-2.5-flash-image-preview',
-        aliases: ['models/gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image'],
+        id: 'gemini-2.5-flash-image',
+        aliases: ['gemini-2.5-flash-image-preview', 'models/gemini-2.5-flash-image-preview'],
         provider: 'google',
         cost: {
-            // Pricing from Google (Preview): $0.039 per image (up to 1024x1024)
+            // Priority pricing from Google: $0.039 per image (up to 1024x1024)
             per_image: 0.039,
             // Input priced at $0.30 per 1M tokens for prompts (text/image)
             input_per_million: 0.3,
@@ -3040,23 +3042,23 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: false,
         },
         class: 'image_generation',
-        description: 'Gemini 2.5 Flash Image Preview: fast, natively multimodal image generation and editing.',
+        description: 'Gemini 2.5 Flash Image (Nano Banana): fast, natively multimodal image generation and editing.',
     },
     {
-        id: 'gemini-3.1-flash-image-preview',
-        aliases: ['models/gemini-3.1-flash-image-preview', 'gemini-3.1-flash-image'],
+        id: 'gemini-3.1-flash-image',
+        aliases: ['gemini-3.1-flash-image-preview', 'models/gemini-3.1-flash-image-preview'],
         provider: 'google',
         cost: {
-            // Preview pricing from Google AI Studio. Image output is priced per token;
+            // Standard pricing from Google AI Studio. Image output is priced per token;
             // representative defaults are captured in per_image and refined in provider-level overrides
             // (0.5K=$0.045, 1K=$0.067, 2K=$0.101, 4K=$0.151).
             per_image: 0.067, // 1K output equivalent
             input_per_million: {
-                text: 0.25,
-                image: 0.25,
+                text: 0.5,
+                image: 0.5,
             },
             output_per_million: {
-                text: 1.5, // Includes thinking tokens
+                text: 3.0, // Includes thinking tokens
                 image: 60.0,
             },
         },
@@ -3064,10 +3066,38 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_modality: ['text', 'image'],
             output_modality: ['image', 'text'],
             streaming: false,
+            context_length: 131072,
+            max_output_tokens: 32768,
         },
         class: 'image_generation',
         description:
-            'Gemini 3.1 Flash Image Preview: fast multimodal image generation for high-throughput, interactive workflows.',
+            'Gemini 3.1 Flash Image (Nano Banana 2): fast multimodal image generation for high-throughput, interactive workflows.',
+    },
+    {
+        id: 'gemini-3.1-flash-lite-image',
+        provider: 'google',
+        cost: {
+            per_image: 0.0336, // 1K output equivalent
+            input_per_million: {
+                text: 0.25,
+                image: 0.25,
+                video: 0.25,
+            },
+            output_per_million: {
+                text: 1.5, // Includes thinking tokens
+                image: 30.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image', 'text'],
+            streaming: false,
+            context_length: 65536,
+            max_output_tokens: 4096,
+        },
+        class: 'image_generation',
+        description:
+            'Gemini 3.1 Flash Lite Image (Nano Banana Lite): ultra-low-latency 1K image generation and editing.',
     },
     {
         id: 'imagen-3.0-generate-002',
