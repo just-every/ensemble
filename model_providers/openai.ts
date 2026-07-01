@@ -47,6 +47,8 @@ import type { WebSocket } from 'ws';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
+const WEBSOCKET_OPEN_STATE = 1;
+const REALTIME_WHISPER_MODEL = 'gpt-realtime-whisper';
 
 /**
  * Helper function to check if a model requires reasoning support
@@ -1682,7 +1684,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
     /**
      * Create transcription from audio stream using OpenAI Realtime API
-     * Supports gpt-4o-transcribe, gpt-4o-mini-transcribe, and whisper-1
+     * Supports gpt-realtime-whisper, gpt-4o-transcribe, gpt-4o-mini-transcribe, and whisper-1
      */
     async *createTranscription(
         audio: TranscriptionAudioSource,
@@ -1692,7 +1694,13 @@ export class OpenAIProvider extends BaseModelProvider {
     ): AsyncGenerator<TranscriptionEvent> {
         const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         let finalRequestId = requestId; // Define in outer scope
-        const transcriptionModels = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
+        const transcriptionModels = [
+            REALTIME_WHISPER_MODEL,
+            'gpt-4o-transcribe',
+            'gpt-4o-mini-transcribe',
+            'whisper-1',
+        ];
+        const isRealtimeWhisper = model === REALTIME_WHISPER_MODEL;
         if (!transcriptionModels.includes(model)) {
             throw new Error(
                 `Model ${model} does not support transcription. Supported models: ${transcriptionModels.join(', ')}`
@@ -1702,6 +1710,8 @@ export class OpenAIProvider extends BaseModelProvider {
         let ws: WebSocket | null = null;
         let isConnected = false;
         let connectionError: any = null;
+        let resolveSessionConfigured: (() => void) | undefined;
+        let rejectSessionConfigured: ((error: Error) => void) | undefined;
 
         try {
             const { WebSocket } = await import('ws');
@@ -1712,18 +1722,23 @@ export class OpenAIProvider extends BaseModelProvider {
                 throw new Error('Failed to initialize OpenAI transcription. Make sure OPENAI_API_KEY is set.');
             }
 
-            // Create WebSocket connection to OpenAI Realtime API
-            // For transcription, use intent=transcription instead of model parameter
             const wsUrl = 'wss://api.openai.com/v1/realtime?intent=transcription';
             ws = new WebSocket(wsUrl, {
                 headers: {
                     Authorization: 'Bearer ' + apiKey,
-                    'OpenAI-Beta': 'realtime=v1',
+                    ...(isRealtimeWhisper ? {} : { 'OpenAI-Beta': 'realtime=v1' }),
                 },
             });
 
             // Store events to yield
             const transcriptEvents: TranscriptionEvent[] = [];
+            let receivedFinalTranscription = false;
+            const sessionConfiguredPromise = isRealtimeWhisper
+                ? new Promise<void>((resolve, reject) => {
+                      resolveSessionConfigured = resolve;
+                      rejectSessionConfigured = reject;
+                  })
+                : Promise.resolve();
 
             // Set up connection promise
             const connectionPromise = new Promise<void>((resolve, reject) => {
@@ -1749,36 +1764,60 @@ export class OpenAIProvider extends BaseModelProvider {
             ws.on('message', (data: any) => {
                 try {
                     const event = JSON.parse(data.toString());
-                    console.dir(event, { depth: null });
 
                     switch (event.type) {
                         case 'transcription_session.created':
                         case 'session.created': {
-                            // Update session for transcription-only mode
-                            const sessionUpdate = {
-                                type: 'transcription_session.update',
-                                session: {
-                                    input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
-                                    input_audio_transcription: {
-                                        model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
-                                        prompt: opts?.prompt || 'You are a helpful assistant.',
-                                        language: opts?.language || 'en',
-                                    },
-                                    turn_detection:
-                                        opts?.vad === false
-                                            ? null
-                                            : {
-                                                  type: 'semantic_vad',
+                            const sessionUpdate = isRealtimeWhisper
+                                ? {
+                                      type: 'session.update',
+                                      session: {
+                                          type: 'transcription',
+                                          audio: {
+                                              input: {
+                                                  format: {
+                                                      type: 'audio/pcm',
+                                                      rate: opts?.audioFormat?.sampleRate || 24000,
+                                                  },
+                                                  transcription: {
+                                                      model,
+                                                      language: opts?.language || 'en',
+                                                      ...(opts?.delay ? { delay: opts.delay } : {}),
+                                                  },
+                                                  turn_detection: null,
                                               },
-                                    input_audio_noise_reduction:
-                                        opts?.noiseReduction === null
-                                            ? null
-                                            : {
-                                                  type: opts?.noiseReduction || 'far_field',
-                                              },
-                                },
-                            };
+                                          },
+                                      },
+                                  }
+                                : {
+                                      type: 'transcription_session.update',
+                                      session: {
+                                          input_audio_format: opts?.audioFormat?.encoding === 'pcm' ? 'pcm16' : 'pcm16',
+                                          input_audio_transcription: {
+                                              model: model, // gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper-1
+                                              prompt: opts?.prompt || 'You are a helpful assistant.',
+                                              language: opts?.language || 'en',
+                                          },
+                                          turn_detection:
+                                              opts?.vad === false
+                                                  ? null
+                                                  : {
+                                                        type: 'semantic_vad',
+                                                    },
+                                          input_audio_noise_reduction:
+                                              opts?.noiseReduction === null
+                                                  ? null
+                                                  : {
+                                                        type: opts?.noiseReduction || 'far_field',
+                                                    },
+                                      },
+                                  };
                             ws!.send(JSON.stringify(sessionUpdate));
+                            break;
+                        }
+
+                        case 'session.updated': {
+                            resolveSessionConfigured?.();
                             break;
                         }
 
@@ -1806,6 +1845,7 @@ export class OpenAIProvider extends BaseModelProvider {
                                 timestamp: new Date().toISOString(),
                                 text: completeText,
                             };
+                            receivedFinalTranscription = true;
                             transcriptEvents.push(turnEvent);
                             break;
                         }
@@ -1826,6 +1866,7 @@ export class OpenAIProvider extends BaseModelProvider {
                         }
 
                         case 'error': {
+                            rejectSessionConfigured?.(new Error(event.error?.message || 'Unknown error'));
                             const errorEvent: TranscriptionEvent = {
                                 type: 'error',
                                 timestamp: new Date().toISOString(),
@@ -1847,6 +1888,12 @@ export class OpenAIProvider extends BaseModelProvider {
 
             // Wait for connection
             await connectionPromise;
+            await Promise.race([
+                sessionConfiguredPromise,
+                new Promise<void>((_, reject) => {
+                    setTimeout(() => reject(new Error('OpenAI realtime transcription session update timeout')), 10000);
+                }),
+            ]);
 
             // Log the request
             const requestParams = {
@@ -1904,12 +1951,30 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
 
                 // If VAD is disabled, manually commit the buffer
-                if (opts?.vad === false && ws && isConnected) {
+                if ((opts?.vad === false || isRealtimeWhisper) && ws && isConnected) {
                     ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
                 }
 
-                // Wait a bit for final responses
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (isRealtimeWhisper) {
+                    const finalDeadline = Date.now() + 5000;
+                    while (!receivedFinalTranscription && Date.now() < finalDeadline) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+
+                        if (transcriptEvents.length > 0) {
+                            const events = transcriptEvents.splice(0, transcriptEvents.length);
+                            for (const event of events) {
+                                yield event;
+                            }
+                        }
+
+                        if (connectionError) {
+                            throw connectionError;
+                        }
+                    }
+                } else {
+                    // Wait a bit for final responses
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
 
                 // Yield any remaining events
                 if (transcriptEvents.length > 0) {
@@ -1933,7 +1998,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 yield completeEvent;
             } finally {
                 reader.releaseLock();
-                if (ws && ws.readyState === ws.OPEN) {
+                if (ws && ws.readyState === WEBSOCKET_OPEN_STATE) {
                     ws.close();
                 }
             }

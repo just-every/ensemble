@@ -28,6 +28,7 @@ import { grokProvider } from './grok.js';
 import { deepSeekProvider } from './deepseek.js';
 import { testProvider } from './test_provider.js';
 import { openRouterProvider } from './openrouter.js';
+import { assemblyAIProvider } from './assemblyai.js';
 import { elevenLabsProvider } from './elevenlabs.js';
 import { lumaProvider } from './luma.js';
 import { ideogramProvider } from './ideogram.js';
@@ -48,6 +49,7 @@ const PROVIDER_BY_ID: Record<ModelProviderID, ModelProvider> = {
     xai: grokProvider,
     deepseek: deepSeekProvider,
     openrouter: openRouterProvider,
+    assemblyai: assemblyAIProvider,
     elevenlabs: elevenLabsProvider,
     luma: lumaProvider,
     ideogram: ideogramProvider,
@@ -136,6 +138,11 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     eleven_: elevenLabsProvider,
     'elevenlabs-': elevenLabsProvider,
 
+    // AssemblyAI streaming transcription models
+    'u3-': assemblyAIProvider,
+    'assemblyai/': assemblyAIProvider,
+    'universal-streaming-': assemblyAIProvider,
+
     // Test provider for testing
     'test-': testProvider,
 };
@@ -158,6 +165,8 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return !!process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.startsWith('sk-');
         case 'openrouter':
             return !!process.env.OPENROUTER_API_KEY;
+        case 'assemblyai':
+            return !!process.env.ASSEMBLYAI_API_KEY;
         case 'elevenlabs':
             return !!process.env.ELEVENLABS_API_KEY;
         case 'luma':
@@ -261,6 +270,8 @@ export function getProviderFromModel(model: string): ModelProviderID {
         return 'deepseek';
     } else if (model.startsWith('eleven_') || model.startsWith('elevenlabs-')) {
         return 'elevenlabs';
+    } else if (model.startsWith('u3-') || model.startsWith('assemblyai/') || model.startsWith('universal-streaming-')) {
+        return 'assemblyai';
     } else if (model.startsWith('test-')) {
         return 'test';
     }

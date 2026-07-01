@@ -621,6 +621,7 @@ export type ModelProviderID =
     | 'xai'
     | 'deepseek'
     | 'openrouter'
+    | 'assemblyai'
     | 'elevenlabs'
     | 'luma'
     | 'ideogram'
@@ -1282,6 +1283,9 @@ export interface TranscriptionOpts {
 
     /** Language code (e.g., 'en', 'fr') for better accuracy (OpenAI) */
     language?: string;
+
+    /** Realtime transcription latency/accuracy tradeoff (OpenAI gpt-realtime-whisper) */
+    delay?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
     /** Voice Activity Detection - false to disable (OpenAI) */
     vad?: boolean;

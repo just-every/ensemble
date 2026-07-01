@@ -7,6 +7,7 @@ import { grokProvider } from '../model_providers/grok.js';
 import { deepSeekProvider } from '../model_providers/deepseek.js';
 import { openRouterProvider } from '../model_providers/openrouter.js';
 import { codexProvider } from '../model_providers/codex.js';
+import { assemblyAIProvider } from '../model_providers/assemblyai.js';
 import { OpenAICompatibleProvider, registerOpenAICompatibleModel } from '../model_providers/openai_compatible.js';
 import { clearExternalRegistrations, getExternalModel } from '../utils/external_models.js';
 
@@ -28,6 +29,7 @@ beforeEach(() => {
             ? process.env.DEEPSEEK_API_KEY
             : 'sk-test';
     process.env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'test';
+    process.env.ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY || 'test';
 });
 
 describe('getModelProvider', () => {
@@ -62,6 +64,10 @@ describe('getModelProvider', () => {
 
     it('returns DeepSeek provider', () => {
         expect(getModelProvider('deepseek-chat')).toBe(deepSeekProvider);
+    });
+
+    it('returns AssemblyAI provider for u3-rt-pro', () => {
+        expect(getModelProvider('u3-rt-pro')).toBe(assemblyAIProvider);
     });
 
     it('falls back to OpenRouter provider', () => {

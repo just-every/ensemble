@@ -240,7 +240,9 @@ export const MODEL_CLASSES = {
     },
     transcription: {
         models: [
+            'gpt-realtime-whisper', // OpenAI
             'gpt-4o-transcribe', // OpenAI
+            'u3-rt-pro', // AssemblyAI
             'gemini-2.5-flash-native-audio-preview-12-2025', // Gemini (replacement for Live)
         ],
         description: 'Speech-to-Text models for audio transcription with real-time streaming',
@@ -3225,6 +3227,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Transcription models
     //
 
+    {
+        id: 'gpt-realtime-whisper',
+        provider: 'openai',
+        features: {
+            context_length: 16000,
+            input_modality: ['audio', 'text'],
+            output_modality: ['text'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'GPT-Realtime-Whisper streaming speech-to-text model for realtime transcript deltas',
+    },
+    {
+        id: 'u3-rt-pro',
+        aliases: ['assemblyai/u3-rt-pro', 'universal-3-pro-streaming'],
+        provider: 'assemblyai',
+        features: {
+            input_modality: ['audio'],
+            output_modality: ['text'],
+            streaming: true,
+        },
+        class: 'transcription',
+        description: 'AssemblyAI Universal-3 Pro Streaming model for real-time speech-to-text',
+    },
     {
         id: 'gemini-live-2.5-flash-preview',
         provider: 'google',
