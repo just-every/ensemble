@@ -6,12 +6,12 @@
  * OpenAI's multipart image edit API.
  */
 
-import type { AgentDefinition, ImageGenerationOpts } from '../types/types.js';
-import { findModel } from '../data/model_data.js';
+import type { AgentDefinition, ImageGenerationOpts, VideoGenerationOpts } from '../types/types.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { OpenAIChat } from './openai_chat.js';
 import OpenAI from 'openai';
+import { getGrokImagePricing, getGrokVideoPricing } from './grok_imagine_pricing.js';
 
 type XAIImageRequestImage = {
     type: 'image_url';
@@ -125,9 +125,27 @@ function extractImages(response: XAIImageResponse): string[] {
         .filter((image): image is string => image !== null);
 }
 
-function getPerImageCost(model: string): number | undefined {
-    const pricing = findModel(model)?.cost?.per_image;
-    return typeof pricing === 'number' ? pricing : undefined;
+type XAIVideoJob = {
+    request_id?: string;
+    status?: 'pending' | 'processing' | 'done' | 'expired' | 'error';
+    video?: { url?: string; duration?: number };
+    error?: { message?: string } | string;
+    usage?: { cost_in_usd_ticks?: number };
+};
+
+function waitForPoll(delayMs: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(signal.reason ?? new Error('Video generation aborted.'));
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(resolve, delayMs);
+        signal?.addEventListener(
+            'abort',
+            () => {
+                clearTimeout(timeout);
+                reject(signal.reason ?? new Error('Video generation aborted.'));
+            },
+            { once: true }
+        );
+    });
 }
 
 /**
@@ -185,8 +203,8 @@ export class GrokProvider extends OpenAIChat {
             throw new Error('xAI image generation masks are not supported in Ensemble yet.');
         }
 
-        if (sourceImages.length > 5) {
-            throw new Error('xAI image editing supports at most 5 source images per request.');
+        if (sourceImages.length > 3) {
+            throw new Error('xAI image editing supports at most 3 source images per request.');
         }
 
         const aspectRatio = normalizeAspectRatio(opts.size);
@@ -240,13 +258,14 @@ export class GrokProvider extends OpenAIChat {
                 throw new Error('xAI image generation returned no images.');
             }
 
-            const perImageCost = getPerImageCost(model);
-            const billableImageCount = usesEditingEndpoint ? sourceImages.length + images.length : images.length;
+            const effectiveResolution = resolution ?? '1k';
+            const pricing = getGrokImagePricing(model, effectiveResolution);
+            const cost = images.length * pricing.outputImage + sourceImages.length * pricing.inputImage;
 
             costTracker.addUsage({
                 model,
                 image_count: images.length,
-                cost: typeof perImageCost === 'number' ? perImageCost * billableImageCount : undefined,
+                cost,
                 request_id: opts.request_id,
                 metadata: {
                     source: 'xai',
@@ -255,8 +274,8 @@ export class GrokProvider extends OpenAIChat {
                     resolution,
                     response_format: opts.response_format || 'url',
                     source_image_count: sourceImages.length,
-                    billable_image_count: billableImageCount,
-                    ...(typeof perImageCost === 'number' ? { cost_per_image: perImageCost } : {}),
+                    input_image_cost: pricing.inputImage,
+                    output_image_cost: pricing.outputImage,
                 },
             });
 
@@ -267,6 +286,80 @@ export class GrokProvider extends OpenAIChat {
             throw error;
         } finally {
             log_llm_response(requestId, success ? responseLogPayload : { ok: false });
+        }
+    }
+
+    async createVideo(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: VideoGenerationOpts = {}
+    ): Promise<string[]> {
+        const duration = opts.duration ?? 6;
+        const resolution = opts.resolution ?? '720p';
+        if (!Number.isInteger(duration) || duration < 1 || duration > 15) {
+            throw new Error('xAI video generation requires duration to be an integer between 1 and 15 seconds.');
+        }
+        if (model === 'grok-imagine-video-1.5' && !opts.source_image) {
+            throw new Error('grok-imagine-video-1.5 requires opts.source_image.');
+        }
+
+        const body: Record<string, unknown> = { model, prompt, duration, resolution };
+        if (opts.aspect_ratio) body.aspect_ratio = opts.aspect_ratio;
+        if (opts.source_image) body.image = { url: opts.source_image };
+        if (opts.source_video) body.video = { url: opts.source_video };
+
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'xai',
+            model,
+            { endpoint: '/videos/generations', ...body },
+            new Date(),
+            opts.request_id,
+            agent.tags
+        );
+        try {
+            let job = await this.client.post<XAIVideoJob>('/videos/generations', { body });
+            const providerRequestId = job.request_id;
+            if (!providerRequestId) throw new Error('xAI video generation returned no request_id.');
+
+            const deadline = Date.now() + (opts.timeout_ms ?? 10 * 60_000);
+            while (job.status !== 'done') {
+                if (job.status === 'error' || job.status === 'expired') {
+                    const message = typeof job.error === 'string' ? job.error : job.error?.message;
+                    throw new Error(message || `xAI video generation ended with status ${job.status}.`);
+                }
+                if (Date.now() >= deadline) throw new Error('xAI video generation timed out.');
+                await waitForPoll(opts.poll_interval_ms ?? 5000, agent.abortSignal);
+                job = await this.client.get<XAIVideoJob>(`/videos/${providerRequestId}`);
+            }
+
+            const url = job.video?.url;
+            if (!url) throw new Error('xAI video generation completed without a video URL.');
+            const pricing = getGrokVideoPricing(model, resolution);
+            const providerCostTicks = job.usage?.cost_in_usd_ticks;
+            const estimatedCost =
+                duration * pricing.outputSecond +
+                (opts.source_image ? pricing.inputImage : 0) +
+                (opts.source_video ? duration * pricing.inputSecond : 0);
+            costTracker.addUsage({
+                model,
+                video_seconds: job.video?.duration ?? duration,
+                cost: typeof providerCostTicks === 'number' ? providerCostTicks / 10_000_000_000 : estimatedCost,
+                request_id: opts.request_id,
+                metadata: {
+                    source: 'xai',
+                    provider_request_id: providerRequestId,
+                    resolution,
+                    cost_per_second: pricing.outputSecond,
+                },
+            });
+            log_llm_response(requestId, job);
+            return [url];
+        } catch (error) {
+            log_llm_error(requestId, error);
+            log_llm_response(requestId, { ok: false });
+            throw error;
         }
     }
 }

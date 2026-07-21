@@ -15,7 +15,7 @@ describe('latest OpenRouter model support', () => {
             output_per_million: 3.036,
         });
         expect(model?.features).toMatchObject({
-            context_length: 202752,
+            context_length: 204800,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -32,13 +32,13 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'glm-latest', model: 'glm-5' } as any)).toBe('z-ai/glm-5.2');
         expect(getProviderFromModel('z-ai/glm-5.2')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.93,
-            cached_input_per_million: 0.18,
-            output_per_million: 3.0,
+            input_per_million: 0.7756,
+            cached_input_per_million: 0.14404,
+            output_per_million: 2.4376,
         });
         expect(model?.features).toMatchObject({
             context_length: 1048576,
-            max_output_tokens: 32768,
+            max_output_tokens: 131072,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -55,9 +55,9 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'kimi', model: 'kimi-k2-6' } as any)).toBe('moonshotai/kimi-k2.6');
         expect(getProviderFromModel('moonshotai/kimi-k2.6')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.66,
-            cached_input_per_million: 0.14,
-            output_per_million: 3.41,
+            input_per_million: 0.684,
+            cached_input_per_million: 0.144,
+            output_per_million: 3.42,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
@@ -80,13 +80,13 @@ describe('latest OpenRouter model support', () => {
         );
         expect(getProviderFromModel('moonshotai/kimi-k2.7-code')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.74,
-            cached_input_per_million: 0.15,
-            output_per_million: 3.5,
+            input_per_million: 0.82,
+            cached_input_per_million: 0.16,
+            output_per_million: 3.75,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
-            max_output_tokens: 16384,
+            max_output_tokens: 262144,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -96,14 +96,15 @@ describe('latest OpenRouter model support', () => {
         });
     });
 
-    it('registers DeepSeek V4 Pro and Flash as OpenRouter models', async () => {
+    it('registers DeepSeek V4 directly while retaining explicit OpenRouter IDs', async () => {
         const pro = findModel('DeepSeek-V4');
         const flash = findModel('DeepSeek-V4-Flash');
 
-        expect(pro?.id).toBe('deepseek/deepseek-v4-pro');
+        expect(pro?.id).toBe('deepseek-v4-pro');
         expect(await getModelFromAgent({ agent_id: 'deepseek-pro', model: 'deepseek-v4-pro' } as any)).toBe(
-            'deepseek/deepseek-v4-pro'
+            'deepseek-v4-pro'
         );
+        expect(getProviderFromModel('deepseek-v4-pro')).toBe('deepseek');
         expect(getProviderFromModel('deepseek/deepseek-v4-pro')).toBe('openrouter');
         expect(pro?.cost).toMatchObject({
             input_per_million: 0.435,
@@ -111,7 +112,7 @@ describe('latest OpenRouter model support', () => {
             output_per_million: 0.87,
         });
         expect(pro?.features).toMatchObject({
-            context_length: 1048576,
+            context_length: 1000000,
             max_output_tokens: 384000,
             input_modality: ['text'],
             output_modality: ['text'],
@@ -121,16 +122,16 @@ describe('latest OpenRouter model support', () => {
             reasoning_output: true,
         });
 
-        expect(flash?.id).toBe('deepseek/deepseek-v4-flash');
+        expect(flash?.id).toBe('deepseek-v4-flash');
         expect(await getModelFromAgent({ agent_id: 'deepseek-flash', model: 'deepseek-v4-flash' } as any)).toBe(
-            'deepseek/deepseek-v4-flash'
+            'deepseek-v4-flash'
         );
         expect(flash?.cost).toMatchObject({
-            input_per_million: 0.09,
-            cached_input_per_million: 0.018,
-            output_per_million: 0.18,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
+            output_per_million: 0.28,
         });
-        expect(flash?.features?.max_output_tokens).toBe(131072);
+        expect(flash?.features?.max_output_tokens).toBe(384000);
     });
 
     it('registers Xiaomi MiMo V2.5 and MiMo V2.5 Pro as OpenRouter models', async () => {
@@ -142,12 +143,12 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('xiaomi/mimo-v2.5')).toBe('openrouter');
         expect(model?.openrouter_id).toBe('xiaomi/mimo-v2.5');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.105,
-            cached_input_per_million: 0.028,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
             output_per_million: 0.28,
         });
         expect(model?.features).toMatchObject({
-            context_length: 1048576,
+            context_length: 1050000,
             max_output_tokens: 131072,
             input_modality: ['text', 'audio', 'image', 'video'],
             output_modality: ['text'],
@@ -169,7 +170,7 @@ describe('latest OpenRouter model support', () => {
             output_per_million: 0.87,
         });
         expect(pro?.features).toMatchObject({
-            context_length: 1048576,
+            context_length: 1050000,
             max_output_tokens: 131072,
             input_modality: ['text'],
             output_modality: ['text'],
@@ -227,13 +228,13 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('tencent/hy3')).toBe('openrouter');
         expect(getProviderFromModel('tencent/hy3-high')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.2,
-            cached_input_per_million: 0.5,
-            output_per_million: 0.8,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.035,
+            output_per_million: 0.58,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
-            max_output_tokens: 131072,
+            max_output_tokens: 262144,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -253,9 +254,9 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('qwen/qwen3.7-max')).toBe('openrouter');
         expect(model?.openrouter_id).toBe('qwen/qwen3.7-max');
         expect(model?.cost).toMatchObject({
-            input_per_million: 1.25,
-            cached_input_per_million: 0.25,
-            output_per_million: 3.75,
+            input_per_million: 1.475,
+            cached_input_per_million: 0.295,
+            output_per_million: 4.425,
         });
         expect(model?.features).toMatchObject({
             context_length: 1000000,
@@ -372,10 +373,10 @@ describe('latest OpenRouter model support', () => {
 
         expect(dense?.id).toBe('qwen/qwen3.6-27b');
         expect(dense?.cost).toMatchObject({
-            input_per_million: 0.285,
+            input_per_million: 0.45,
             cached_input_per_million: 0.15,
-            output_per_million: 2.4,
+            output_per_million: 2.7,
         });
-        expect(dense?.features?.max_output_tokens).toBe(262140);
+        expect(dense?.features?.max_output_tokens).toBe(65536);
     });
 });

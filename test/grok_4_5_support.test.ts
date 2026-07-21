@@ -21,12 +21,24 @@ describe('Grok 4.5 support', () => {
     it('registers Grok 4.5 with current xAI metadata', () => {
         expect(findModel('grok-4.5')).toMatchObject({
             id: 'grok-4.5',
-            aliases: ['grok-4.5-latest', 'grok-build-latest'],
+            aliases: ['grok-4.5-latest'],
             provider: 'xai',
             cost: {
-                input_per_million: 2.0,
-                output_per_million: 6.0,
-                cached_input_per_million: 0.5,
+                input_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 2,
+                    price_above_threshold_per_million: 4,
+                },
+                output_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 6,
+                    price_above_threshold_per_million: 12,
+                },
+                cached_input_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 0.3,
+                    price_above_threshold_per_million: 0.6,
+                },
             },
             features: {
                 context_length: 500_000,
@@ -59,7 +71,7 @@ describe('Grok 4.5 support', () => {
             'grok-4.5'
         );
         expect(await getModelFromAgent({ agent_id: 'test-grok-build-latest', model: 'grok-build-latest' } as any)).toBe(
-            'grok-4.5'
+            'grok-build-0.1'
         );
         expect(await getModelFromAgent({ agent_id: 'test-grok-4.5-high', model: 'grok-4.5-high' } as any)).toBe(
             'grok-4.5-high'

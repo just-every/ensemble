@@ -31,17 +31,18 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 - 📝 **Automatic History Compaction** - Handle unlimited conversation length with intelligent summarization
 - 🤖 **Agent Orientated** - Advanced agent capabilities with verification and tool management
 - 🔌 **Multi-Provider Support** - OpenAI, Anthropic, Google, DeepSeek, xAI, OpenRouter, ElevenLabs
-- 🖼️ **Multi-Modal** - Support for text, images, embeddings, and voice generation
+- 🖼️ **Multi-Modal** - Support for text, images, video, embeddings, and realtime voice
 - 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
 - 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 
 ## Model Highlights
 
-- OpenAI: Added GPT-5.2 (base + chat-latest + pro) and refreshed GPT-5.1/GPT-5/Codex pricing
+- OpenAI: GPT-5 family plus `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, and `gpt-audio-1.5`
 - Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
 - Google: Gemini 3.6 Flash, Gemini 3.5 Flash/Lite, Gemini 3.1 Pro/Image/Live/TTS, and Gemini 2.5
-- xAI: Grok 4.5 with current `grok-build-latest` aliasing and reasoning controls, Grok 4.1 Fast / Grok 4 Fast variants, and Grok Imagine image generation/editing support (`grok-imagine-image`, `grok-imagine-image-pro`)
-- OpenRouter: Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5 with current routing, capability, context, and pricing metadata
+- DeepSeek: Direct V4 Pro/Flash with native tools, JSON output, and thinking controls
+- xAI: Grok 4.5/4.3/4.20, Grok Build 0.1, Grok Imagine image generation/editing, and `ensembleVideo` support
+- OpenRouter: Laguna S 2.1, Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5
 
 \*Codex-Max pricing reflects current published rates and may change if OpenAI updates pricing.
 
@@ -463,7 +464,7 @@ const edited = await ensembleImage(
 );
 ```
 
-- ElevenLabs: `eleven_multilingual_v2`, `eleven_turbo_v2_5`
+- ElevenLabs: `eleven_v3`, `eleven_flash_v2_5`, `eleven_multilingual_v2` (`eleven_turbo_v2_5` aliases Flash)
 
 ## Development
 

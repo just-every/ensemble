@@ -68,7 +68,7 @@ describe('getModelProvider', () => {
     });
 
     it('returns DeepSeek provider', () => {
-        expect(getModelProvider('deepseek-chat')).toBe(deepSeekProvider);
+        expect(getModelProvider('deepseek-v4-flash')).toBe(deepSeekProvider);
     });
 
     it('returns AssemblyAI provider for u3-rt-pro', () => {

@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Added direct DeepSeek V4 Pro/Flash support with native thinking controls and explicit migration errors for retired DeepSeek Chat/Reasoner IDs.
+- Added OpenAI `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, and `gpt-audio-1.5` with GA Realtime WebSocket transport and Chat Completions audio input/output support.
+- Added native xAI video generation through `ensembleVideo`, corrected Grok Imagine Quality image routing and input/output billing, and refreshed Grok 4.3/4.5/4.20/Build aliases, limits, and long-context pricing.
+- Added Eleven v3, made deprecated Eleven Turbo resolve to Flash 2.5, and recorded current input-character limits.
+- Added Poolside Laguna S 2.1 and refreshed current OpenRouter pricing/context/output metadata across Llama, GPT OSS, Qwen, GLM, DeepSeek, MiMo, Hy3, Kimi, LongCat, and Inkling.
 - Added Gemini 3.6 Flash and Gemini 3.5 Flash-Lite with current stable IDs, latest aliases, pricing, limits, native thinking levels, and default model-class promotion.
 - Applied the new Gemini generateContent contract by omitting deprecated sampling parameters and rejecting prefilled model turns before dispatch.
 - Sent OpenAI image idempotency keys as an explicit wire header, added a redacted live image-edit trace, and retained upload filenames, media types, and byte counts in request logs without storing raw image payloads.

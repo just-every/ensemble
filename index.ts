@@ -163,6 +163,7 @@ export const quotaTracker = _quotaTracker;
 export { ensembleRequest } from './core/ensemble_request.js';
 export { ensembleEmbed } from './core/ensemble_embed.js';
 export { ensembleImage } from './core/ensemble_image.js';
+export { ensembleVideo } from './core/ensemble_video.js';
 export { ensembleVoice } from './core/ensemble_voice.js';
 export { ensembleListen, createAudioStreamFromMediaStream } from './core/ensemble_listen.js';
 export { ensembleLive, ensembleLiveAudio, ensembleLiveText } from './core/ensemble_live.js';

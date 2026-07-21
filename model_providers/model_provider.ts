@@ -68,6 +68,10 @@ const DEPRECATED_MODEL_MIGRATIONS: Record<string, string> = {
         'Model text-embedding-004 was shut down by Google. Migrate to gemini-embedding-2 and regenerate stored embeddings before comparing them with new vectors.',
     'gemini-embedding-exp-03-07':
         'Model gemini-embedding-exp-03-07 was shut down by Google. Migrate to gemini-embedding-2 and regenerate stored embeddings before comparing them with new vectors.',
+    'deepseek-chat':
+        'Model deepseek-chat was retired by DeepSeek. Migrate to deepseek-v4-flash and use a disabled reasoning suffix when non-thinking behavior is required.',
+    'deepseek-reasoner':
+        'Model deepseek-reasoner was retired by DeepSeek. Migrate to deepseek-v4-flash or deepseek-v4-pro.',
 };
 
 function getDeprecatedModelMigration(model?: string): string | undefined {

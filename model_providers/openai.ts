@@ -19,6 +19,9 @@ import {
     TranscriptionAudioSource,
     TranscriptionOpts,
     EmbedOpts,
+    LiveConfig,
+    LiveOptions,
+    LiveSession,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
 import OpenAI from 'openai';
@@ -50,6 +53,8 @@ import { findModel } from '../data/model_data.js';
 import { buildEventsFromOpenAIResponse } from './openai_response_events.js';
 import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import type { WebSocket } from 'ws';
+import { createOpenAIRealtimeSession } from './openai_realtime.js';
+import { OpenAIChat } from './openai_chat.js';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
@@ -271,6 +276,15 @@ export class OpenAIProvider extends BaseModelProvider {
             });
         }
         return this._client;
+    }
+
+    async createLiveSession(
+        config: LiveConfig,
+        agent: AgentDefinition,
+        model: string,
+        opts: LiveOptions = {}
+    ): Promise<LiveSession> {
+        return createOpenAIRealtimeSession(config, agent, model, opts, this.apiKey || process.env.OPENAI_API_KEY);
     }
 
     /**
@@ -599,6 +613,26 @@ export class OpenAIProvider extends BaseModelProvider {
                 response_format = 'mp3';
             }
 
+            if (model === 'gpt-audio-1.5') {
+                const response = await this.client.chat.completions.create({
+                    model,
+                    modalities: ['text', 'audio'],
+                    audio: { voice: opts?.voice || 'alloy', format: response_format as 'wav' | 'mp3' },
+                    messages: [{ role: 'user', content: text }],
+                } as any);
+                const audio = (response.choices[0]?.message as any)?.audio?.data;
+                if (typeof audio !== 'string') throw new Error('gpt-audio-1.5 returned no audio data.');
+                costTracker.addUsage({
+                    model,
+                    input_tokens: response.usage?.prompt_tokens || 0,
+                    output_tokens: response.usage?.completion_tokens || 0,
+                    input_modality: 'text',
+                    output_modality: 'audio',
+                });
+                const bytes = Buffer.from(audio, 'base64');
+                return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+            }
+
             //console.log(`[OpenAI] Generating speech with model ${model}, voice: ${voice}, format: ${response_format}`);
 
             // Add in affect
@@ -691,6 +725,11 @@ export class OpenAIProvider extends BaseModelProvider {
         agent: AgentDefinition,
         requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
+        if (model === 'gpt-audio-1.5') {
+            const chatProvider = new OpenAIChat('openai', this.apiKey || process.env.OPENAI_API_KEY);
+            yield* chatProvider.createResponseStream(messages, model, agent, requestId);
+            return;
+        }
         const { getToolsFromAgent } = await import('../utils/agent.js');
         const tools: ToolFunction[] | undefined = agent ? await getToolsFromAgent(agent) : [];
         const settings: ModelSettings | undefined = agent?.modelSettings;

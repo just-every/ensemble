@@ -57,15 +57,15 @@ describe('Token Estimation for Providers', () => {
         const outputText = 'Test output response'; // 20 chars -> 5 tokens
 
         const initialCost = costTracker.getTotalCost();
-        costTracker.addEstimatedUsage('deepseek-chat', inputText, outputText);
+        costTracker.addEstimatedUsage('deepseek-v4-flash', inputText, outputText);
         const finalCost = costTracker.getTotalCost();
 
         // Cost should increase after adding usage
         expect(finalCost).toBeGreaterThan(initialCost);
 
         const costsByModel = costTracker.getCostsByModel();
-        expect(costsByModel['deepseek-chat']).toBeDefined();
-        expect(costsByModel['deepseek-chat'].calls).toBe(1);
-        expect(costsByModel['deepseek-chat'].cost).toBeGreaterThan(0);
+        expect(costsByModel['deepseek-v4-flash']).toBeDefined();
+        expect(costsByModel['deepseek-v4-flash'].calls).toBe(1);
+        expect(costsByModel['deepseek-v4-flash'].cost).toBeGreaterThan(0);
     });
 });

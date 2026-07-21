@@ -16,9 +16,9 @@ describe('Grok imagine image support', () => {
         });
 
         expect(findModel('grok-imagine-image-pro')).toMatchObject({
-            id: 'grok-imagine-image-pro',
+            id: 'grok-imagine-image-quality',
             provider: 'xai',
-            cost: { per_image: 0.07 },
+            cost: { per_input_image: 0.01, per_image_by_resolution: { '1k': 0.05, '2k': 0.07 } },
         });
     });
 
@@ -104,7 +104,7 @@ describe('Grok imagine image support', () => {
         });
 
         const costsByModel = costTracker.getCostsByModel();
-        expect(costsByModel['grok-imagine-image-pro']?.cost).toBeCloseTo(0.21);
+        expect(costsByModel['grok-imagine-image-pro']?.cost).toBeCloseTo(0.07);
         expect(costsByModel['grok-imagine-image-pro']?.calls).toBe(1);
     });
 
@@ -138,7 +138,37 @@ describe('Grok imagine image support', () => {
         });
 
         const costsByModel = costTracker.getCostsByModel();
-        expect(costsByModel['grok-imagine-image']?.cost).toBeCloseTo(0.04);
+        expect(costsByModel['grok-imagine-image']?.cost).toBeCloseTo(0.022);
         expect(costsByModel['grok-imagine-image']?.calls).toBe(1);
+    });
+
+    it('polls the native xAI video endpoint and records resolution pricing', async () => {
+        const provider = new GrokProvider();
+        const post = vi.fn().mockResolvedValue({ request_id: 'video-123', status: 'pending' });
+        const get = vi.fn().mockResolvedValue({
+            request_id: 'video-123',
+            status: 'done',
+            video: { url: 'https://example.com/video.mp4', duration: 6 },
+        });
+        (provider as any)._client = { post, get };
+
+        const videos = await provider.createVideo(
+            'A satellite glides over the ocean',
+            'grok-imagine-video',
+            { agent_id: 'test-grok-video' } as any,
+            { duration: 6, resolution: '720p', poll_interval_ms: 0 }
+        );
+
+        expect(videos).toEqual(['https://example.com/video.mp4']);
+        expect(post).toHaveBeenCalledWith('/videos/generations', {
+            body: {
+                model: 'grok-imagine-video',
+                prompt: 'A satellite glides over the ocean',
+                duration: 6,
+                resolution: '720p',
+            },
+        });
+        expect(get).toHaveBeenCalledWith('/videos/video-123');
+        expect(costTracker.getCostsByModel()['grok-imagine-video']?.cost).toBeCloseTo(0.42);
     });
 });

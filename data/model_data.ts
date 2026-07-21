@@ -213,12 +213,17 @@ export const MODEL_CLASSES = {
             'luma-photon-1', // Luma
             'ideogram-3.0', // Ideogram
             'midjourney-v7', // Midjourney
-            'grok-imagine-image-pro', // X.AI
+            'grok-imagine-image-quality', // X.AI
             'flux-kontext-pro', // Fireworks
             'stability-ultra', // Stability
             'runway-gen4-image', // Runway
             'recraft-v3', // FAL
         ],
+    },
+
+    video_generation: {
+        models: ['grok-imagine-video', 'grok-imagine-video-1.5'],
+        description: 'Video generation and image-to-video models',
     },
 
     embedding: {
@@ -233,7 +238,7 @@ export const MODEL_CLASSES = {
         models: [
             // One top pick per TTS provider
             'tts-1-hd', // OpenAI
-            'eleven_multilingual_v2', // ElevenLabs
+            'eleven_v3', // ElevenLabs
             'gemini-3.1-flash-tts-preview', // Gemini
         ],
         description: 'Text-to-Speech models for voice generation',
@@ -547,8 +552,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'meta-llama/llama-4-maverick',
         provider: 'openrouter',
         cost: {
-            input_per_million: 0.15,
-            output_per_million: 0.6,
+            input_per_million: 0.2,
+            output_per_million: 0.8,
         },
         features: {
             context_length: 1048576,
@@ -573,11 +578,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'meta-llama/llama-4-scout',
         provider: 'openrouter',
         cost: {
-            input_per_million: 0.08,
+            input_per_million: 0.1,
             output_per_million: 0.3,
         },
         features: {
-            context_length: 10000000,
+            context_length: 1310720,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -650,12 +655,27 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'grok-4.5',
-        aliases: ['grok-4.5-latest', 'grok-build-latest'],
+        aliases: ['grok-4.5-latest'],
         provider: 'xai',
         cost: {
-            input_per_million: 2.0,
-            output_per_million: 6.0,
-            cached_input_per_million: 0.5,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2,
+                price_above_threshold_per_million: 4,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.3,
+                price_above_threshold_per_million: 0.6,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 6,
+                price_above_threshold_per_million: 12,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
             context_length: 500_000,
@@ -673,10 +693,27 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'grok-4.3',
+        aliases: ['grok-4.3-latest', 'grok-latest'],
         provider: 'xai',
         cost: {
-            input_per_million: 1.25,
-            output_per_million: 2.5,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 1.25,
+                price_above_threshold_per_million: 2.5,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
             context_length: 1_000_000,
@@ -693,11 +730,27 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'grok-build-0.1',
-        aliases: ['grok-build'],
+        aliases: ['grok-build', 'grok-build-latest', 'grok-code-fast-1', 'grok-code-fast'],
         provider: 'xai',
         cost: {
-            input_per_million: 1.0,
-            output_per_million: 2.0,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 1,
+                price_above_threshold_per_million: 2,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2,
+                price_above_threshold_per_million: 4,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
             context_length: 256000,
@@ -767,18 +820,33 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Grok 4.1 Fast without reasoning. 2M context, flat pricing, text/image input.',
     },
 
-    // Grok-4 stable alias (currently Grok 4.20 reasoning)
+    // Grok 4.20 reasoning
     {
-        id: 'grok-4',
-        aliases: ['grok-4-2025-09-01', 'grok-4.20-0309-reasoning'],
+        id: 'grok-4.20-0309-reasoning',
+        aliases: ['grok-4', 'grok-4.20', 'grok-4.20-reasoning', 'grok-4.20-reasoning-latest'],
         provider: 'xai',
         cost: {
-            input_per_million: 2.0,
-            output_per_million: 6.0,
-            cached_input_per_million: 0.2,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 1.25,
+                price_above_threshold_per_million: 2.5,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
-            context_length: 2_000_000,
+            context_length: 1_000_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -792,19 +860,35 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             code: 88,
             reasoning: 85,
         },
-        description: 'Grok-4 stable alias, currently resolving to the Grok 4.20 reasoning model with 2M context.',
+        description: 'Grok 4.20 reasoning model with 1M context and long-context pricing above 200k input tokens.',
     },
 
     {
         id: 'grok-4.20-0309-non-reasoning',
+        aliases: ['grok-4.20-non-reasoning', 'grok-4.20-non-reasoning-latest'],
         provider: 'xai',
         cost: {
-            input_per_million: 2.0,
-            output_per_million: 6.0,
-            cached_input_per_million: 0.2,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 1.25,
+                price_above_threshold_per_million: 2.5,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
-            context_length: 2_000_000,
+            context_length: 1_000_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -823,14 +907,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'grok-4.20-multi-agent-0309',
+        aliases: ['grok-4.20-multi-agent', 'grok-4.20-multi-agent-latest'],
         provider: 'xai',
         cost: {
-            input_per_million: 2.0,
-            output_per_million: 6.0,
-            cached_input_per_million: 0.2,
+            input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 1.25,
+                price_above_threshold_per_million: 2.5,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200_000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
-            context_length: 2_000_000,
+            context_length: 1_000_000,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -3022,6 +3122,63 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             "OpenAI's advanced text-to-speech model with natural-sounding output. Supports customizable tone, style, and emotion through instructions. 85% cheaper than ElevenLabs with estimated $0.015/minute of audio.",
     },
     {
+        id: 'gpt-realtime-2.1',
+        provider: 'openai',
+        cost: {
+            input_per_million: { text: 4, audio: 32, image: 5 },
+            cached_input_per_million: { text: 0.4 },
+            output_per_million: { text: 24, audio: 64 },
+        },
+        features: {
+            context_length: 128000,
+            max_output_tokens: 32000,
+            input_modality: ['text', 'audio', 'image'],
+            output_modality: ['text', 'audio'],
+            tool_use: true,
+            streaming: true,
+            reasoning_output: true,
+        },
+        class: 'voice',
+        description: 'OpenAI flagship GA Realtime model for low-latency text and audio conversations with tools.',
+    },
+    {
+        id: 'gpt-realtime-2.1-mini',
+        provider: 'openai',
+        cost: {
+            input_per_million: { text: 0.6, audio: 10, image: 0.8 },
+            cached_input_per_million: { text: 0.06 },
+            output_per_million: { text: 2.4, audio: 20 },
+        },
+        features: {
+            context_length: 128000,
+            max_output_tokens: 32000,
+            input_modality: ['text', 'audio', 'image'],
+            output_modality: ['text', 'audio'],
+            tool_use: true,
+            streaming: true,
+        },
+        class: 'voice',
+        description: 'OpenAI cost-efficient GA Realtime model for low-latency text and audio conversations.',
+    },
+    {
+        id: 'gpt-audio-1.5',
+        provider: 'openai',
+        cost: {
+            input_per_million: { text: 2.5, audio: 32 },
+            output_per_million: { text: 10, audio: 64 },
+        },
+        features: {
+            context_length: 128000,
+            max_output_tokens: 16384,
+            input_modality: ['text', 'audio'],
+            output_modality: ['text', 'audio'],
+            tool_use: true,
+            streaming: true,
+        },
+        class: 'voice',
+        description: 'OpenAI Chat Completions audio model supporting audio input/output, streaming, and tools.',
+    },
+    {
         id: 'tts-1',
         provider: 'openai',
         cost: {
@@ -3064,28 +3221,32 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_modality: ['text'],
             output_modality: ['audio'],
             streaming: true,
+            max_input_characters: 10000,
         },
         class: 'voice',
         description:
             "ElevenLabs' multilingual high quality text-to-speech model supporting 29 languages with natural voice capabilities.",
     },
     {
-        id: 'eleven_turbo_v2_5',
+        id: 'eleven_v3',
         provider: 'elevenlabs',
         cost: {
-            input_per_million: 27.5, // Average $0.11 per 1000 characters = $110 per million characters = $27.5 per million tokens
+            input_per_million: 55,
             output_per_million: 0, // No output tokens for TTS
         },
         features: {
             input_modality: ['text'],
             output_modality: ['audio'],
             streaming: true,
+            max_input_characters: 5000,
         },
         class: 'voice',
-        description: "ElevenLabs' turbo model optimized for low-latency text-to-speech with high quality output.",
+        description:
+            "ElevenLabs' most expressive multilingual text-to-speech model with audio tags and dialogue support.",
     },
     {
         id: 'eleven_flash_v2_5',
+        aliases: ['eleven_turbo_v2_5'],
         provider: 'elevenlabs',
         cost: {
             input_per_million: 27.5, // Average $0.11 per 1000 characters = $110 per million characters = $27.5 per million tokens
@@ -3095,6 +3256,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_modality: ['text'],
             output_modality: ['audio'],
             streaming: true,
+            max_input_characters: 40000,
         },
         class: 'voice',
         description: "ElevenLabs' fastest model optimized for ultra low-latency text-to-speech.",
@@ -3468,23 +3630,26 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Midjourney v7 text-to-image (via KIE API; requires third-party API key).',
     },
     {
-        id: 'grok-imagine-image-pro',
+        id: 'grok-imagine-image-quality',
+        aliases: ['grok-imagine-image-pro'],
         provider: 'xai',
         cost: {
-            per_image: 0.07,
+            per_input_image: 0.01,
+            per_image_by_resolution: { '1k': 0.05, '2k': 0.07 },
         },
         features: {
             input_modality: ['text', 'image'],
             output_modality: ['image'],
         },
         class: 'image_generation',
-        description: 'xAI Grok Imagine Image Pro for premium text-to-image and image-guided image generation.',
+        description: 'xAI Grok Imagine Image Quality for premium 1K/2K image generation and editing.',
     },
     {
         id: 'grok-imagine-image',
         provider: 'xai',
         cost: {
             per_image: 0.02,
+            per_input_image: 0.002,
         },
         features: {
             input_modality: ['text', 'image'],
@@ -3492,6 +3657,36 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: 'xAI Grok Imagine Image for lower-cost text-to-image and image-guided image generation.',
+    },
+    {
+        id: 'grok-imagine-video',
+        provider: 'xai',
+        cost: {
+            per_input_image: 0.002,
+            per_input_second: 0.01,
+            per_second_by_resolution: { '480p': 0.05, '720p': 0.07 },
+        },
+        features: {
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'xAI Grok Imagine Video for text-to-video, image-to-video, and video editing up to 15 seconds.',
+    },
+    {
+        id: 'grok-imagine-video-1.5',
+        aliases: ['grok-imagine-video-1.5-preview'],
+        provider: 'xai',
+        cost: {
+            per_input_image: 0.01,
+            per_second_by_resolution: { '480p': 0.08, '720p': 0.14, '1080p': 0.25 },
+        },
+        features: {
+            input_modality: ['image'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'xAI Grok Imagine Video 1.5 for premium image-to-video generation up to 1080p.',
     },
     {
         id: 'imagen-2',
@@ -3671,92 +3866,48 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     //
 
     {
-        id: 'deepseek-chat',
-        aliases: ['deepseek-v3-0324'],
+        id: 'deepseek-v4-pro',
+        aliases: ['DeepSeek-V4', 'DeepSeek-V4-Pro', 'deepseek-v4'],
         provider: 'deepseek',
         cost: {
-            input_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 0.27, // Cache miss during peak hours
-                off_peak_price_per_million: 0.135, // 50% off during off-peak
-            },
-            cached_input_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 0.07, // Cache hit during peak hours
-                off_peak_price_per_million: 0.035, // 50% off during off-peak
-            },
-            output_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 1.1,
-                off_peak_price_per_million: 0.55, // 50% off during off-peak
-            },
+            input_per_million: 0.435,
+            cached_input_per_million: 0.003625,
+            output_per_million: 0.87,
         },
         features: {
-            context_length: 64000,
-            max_output_tokens: 8192, // Default 4K, max 8K
+            context_length: 1_000_000,
+            max_output_tokens: 384_000,
             input_modality: ['text'],
             output_modality: ['text'],
-            tool_use: true, // Supports function calling
+            tool_use: true,
             streaming: true,
-            json_output: true, // Supports JSON output
-        },
-        class: 'standard',
-        score: 75, // Estimated score for a capable chat model
-        description: 'DeepSeek-V3 chat model with FIM completion support and time-based pricing',
-    },
-    {
-        id: 'deepseek-reasoner',
-        aliases: ['deepseek-r1-0528'],
-        provider: 'deepseek',
-        cost: {
-            input_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 0.55, // Cache miss during peak hours
-                off_peak_price_per_million: 0.1375, // 75% off during off-peak
-            },
-            cached_input_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 0.14, // Cache hit during peak hours
-                off_peak_price_per_million: 0.035, // 75% off during off-peak
-            },
-            output_per_million: {
-                peak_utc_start_hour: 0,
-                peak_utc_start_minute: 30,
-                peak_utc_end_hour: 16,
-                peak_utc_end_minute: 30,
-                peak_price_per_million: 2.19,
-                off_peak_price_per_million: 0.5475, // 75% off during off-peak
-            },
-        },
-        features: {
-            context_length: 64000,
-            max_output_tokens: 64000, // Default 32K, max 64K
-            input_modality: ['text'],
-            output_modality: ['text'],
-            tool_use: true, // Supports function calling via simulation
-            simulate_tools: true, // Uses simulated tool calls instead of native ones
-            streaming: true,
-            json_output: true, // Supports JSON output
-            reasoning_output: true, // Advanced reasoning capabilities
+            json_output: true,
+            reasoning_output: true,
         },
         class: 'reasoning',
-        score: 85, // Higher score for reasoning model
-        description: 'DeepSeek-R1 advanced reasoning model with extended output and time-based pricing',
+        description: 'DeepSeek V4 Pro direct API model with native tools, JSON output, and high/max reasoning.',
+    },
+    {
+        id: 'deepseek-v4-flash',
+        aliases: ['DeepSeek-V4-Flash'],
+        provider: 'deepseek',
+        cost: {
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
+            output_per_million: 0.28,
+        },
+        features: {
+            context_length: 1_000_000,
+            max_output_tokens: 384_000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description: 'DeepSeek V4 Flash direct API model with native tools and switchable thinking.',
     },
 
     // GPT OSS 120B - Open source model via OpenRouter
@@ -3766,8 +3917,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'openai/gpt-oss-120b',
         cost: {
-            input_per_million: 0.03,
-            output_per_million: 0.15,
+            input_per_million: 0.037,
+            output_per_million: 0.17,
         },
         features: {
             context_length: 131072,
@@ -3790,8 +3941,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'openai/gpt-oss-20b',
         cost: {
-            input_per_million: 0.029,
-            output_per_million: 0.14,
+            input_per_million: 0.03,
+            output_per_million: 0.13,
         },
         features: {
             context_length: 131072,
@@ -3813,9 +3964,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.7-max',
         cost: {
-            input_per_million: 1.25,
-            cached_input_per_million: 0.25,
-            output_per_million: 3.75,
+            input_per_million: 1.475,
+            cached_input_per_million: 0.295,
+            output_per_million: 4.425,
         },
         features: {
             context_length: 1000000,
@@ -3966,9 +4117,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.6-27b',
         cost: {
-            input_per_million: 0.285,
+            input_per_million: 0.45,
             cached_input_per_million: 0.15,
-            output_per_million: 2.4,
+            output_per_million: 2.7,
         },
         features: {
             context_length: 262144,
@@ -3977,7 +4128,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 262140,
+            max_output_tokens: 65536,
             reasoning_output: true,
         },
         class: 'reasoning',
@@ -3992,9 +4143,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3-235b-a22b-thinking-2507',
         cost: {
-            input_per_million: 0.1,
-            cached_input_per_million: 0.1,
-            output_per_million: 0.1,
+            input_per_million: 0.3,
+            output_per_million: 3,
         },
         features: {
             context_length: 262144,
@@ -4003,7 +4153,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 262144,
+            max_output_tokens: 32768,
             reasoning_output: true,
         },
         class: 'reasoning',
@@ -4018,11 +4168,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3-coder',
         cost: {
-            input_per_million: 0.22,
-            output_per_million: 1.8,
+            input_per_million: 0.3,
+            output_per_million: 1,
         },
         features: {
-            context_length: 1048576,
+            context_length: 262144,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -4047,7 +4197,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             cached_input_per_million: 0.1794,
         },
         features: {
-            context_length: 202752,
+            context_length: 204800,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -4067,9 +4217,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'z-ai/glm-5.2',
         cost: {
-            input_per_million: 0.93,
-            output_per_million: 3.0,
-            cached_input_per_million: 0.18,
+            input_per_million: 0.7756,
+            output_per_million: 2.4376,
+            cached_input_per_million: 0.14404,
         },
         features: {
             context_length: 1048576,
@@ -4078,7 +4228,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 32768,
+            max_output_tokens: 131072,
             reasoning_output: true,
         },
         class: 'reasoning',
@@ -4089,7 +4239,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // DeepSeek V4 Pro (via OpenRouter)
     {
         id: 'deepseek/deepseek-v4-pro',
-        aliases: ['DeepSeek-V4', 'DeepSeek-V4-Pro', 'deepseek-v4', 'deepseek-v4-pro'],
         provider: 'openrouter',
         openrouter_id: 'deepseek/deepseek-v4-pro',
         cost: {
@@ -4115,13 +4264,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // DeepSeek V4 Flash (via OpenRouter)
     {
         id: 'deepseek/deepseek-v4-flash',
-        aliases: ['DeepSeek-V4-Flash', 'deepseek-v4-flash'],
         provider: 'openrouter',
         openrouter_id: 'deepseek/deepseek-v4-flash',
         cost: {
-            input_per_million: 0.09,
-            cached_input_per_million: 0.018,
-            output_per_million: 0.18,
+            input_per_million: 0.0938,
+            cached_input_per_million: 0.01876,
+            output_per_million: 0.1876,
         },
         features: {
             context_length: 1048576,
@@ -4130,7 +4278,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 131072,
+            max_output_tokens: 384000,
             reasoning_output: true,
         },
         class: 'reasoning',
@@ -4145,12 +4293,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'xiaomi/mimo-v2.5',
         cost: {
-            input_per_million: 0.105,
-            cached_input_per_million: 0.028,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.0028,
             output_per_million: 0.28,
         },
         features: {
-            context_length: 1048576,
+            context_length: 1050000,
             input_modality: ['text', 'audio', 'image', 'video'],
             output_modality: ['text'],
             tool_use: true,
@@ -4176,7 +4324,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_per_million: 0.87,
         },
         features: {
-            context_length: 1048576,
+            context_length: 1050000,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -4224,9 +4372,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'tencent/hy3',
         cost: {
-            input_per_million: 0.2,
-            cached_input_per_million: 0.5,
-            output_per_million: 0.8,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.035,
+            output_per_million: 0.58,
         },
         features: {
             context_length: 262144,
@@ -4235,7 +4383,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: false,
-            max_output_tokens: 131072,
+            max_output_tokens: 262144,
             reasoning_output: true,
         },
         class: 'reasoning',
@@ -4249,9 +4397,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['kimi-k2.5', 'kimi-k2-5'],
         provider: 'openrouter',
         cost: {
-            input_per_million: 0.375,
-            output_per_million: 2.025,
-            cached_input_per_million: 0.203,
+            input_per_million: 0.57,
+            output_per_million: 2.85,
+            cached_input_per_million: 0.095,
         },
         features: {
             context_length: 262144,
@@ -4273,9 +4421,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'moonshotai/kimi-k2.6',
         cost: {
-            input_per_million: 0.66,
-            output_per_million: 3.41,
-            cached_input_per_million: 0.14,
+            input_per_million: 0.684,
+            output_per_million: 3.42,
+            cached_input_per_million: 0.144,
         },
         features: {
             context_length: 262144,
@@ -4298,9 +4446,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'moonshotai/kimi-k2.7-code',
         cost: {
-            input_per_million: 0.74,
-            output_per_million: 3.5,
-            cached_input_per_million: 0.15,
+            input_per_million: 0.82,
+            output_per_million: 3.75,
+            cached_input_per_million: 0.16,
         },
         features: {
             context_length: 262144,
@@ -4309,7 +4457,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 16384,
+            max_output_tokens: 262144,
             reasoning_output: true,
         },
         class: 'code',
@@ -4354,7 +4502,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_per_million: 1.2,
         },
         features: {
-            context_length: 1_048_576,
+            context_length: 1_048_756,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -4380,7 +4528,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             output_per_million: 4.05,
         },
         features: {
-            context_length: 1_048_576,
+            context_length: 524_288,
             input_modality: ['text', 'image', 'audio'],
             output_modality: ['text'],
             tool_use: true,
@@ -4469,6 +4617,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'code',
         description:
             'Kwaipilot KAT-Coder Air V2.5 via OpenRouter. Cost-efficient agentic coding model for autonomous repository changes and tool-driven workflows.',
+    },
+    {
+        id: 'poolside/laguna-s-2.1',
+        aliases: ['Laguna S 2.1', 'laguna-s-2.1', 'laguna-2.1'],
+        provider: 'openrouter',
+        openrouter_id: 'poolside/laguna-s-2.1',
+        cost: {
+            input_per_million: 0.1,
+            cached_input_per_million: 0.01,
+            output_per_million: 0.2,
+        },
+        features: {
+            context_length: 1_048_576,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 131_072,
+        },
+        class: 'code',
+        description: 'Poolside Laguna S 2.1 via OpenRouter, optimized for long-context agentic coding workflows.',
     },
 ];
 

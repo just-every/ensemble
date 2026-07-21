@@ -186,6 +186,12 @@ export interface ResponseContentImageData {
     detail?: ImageInputDetail;
 }
 
+export interface ResponseContentAudioInput {
+    type: 'input_audio';
+    data: string | ArrayBuffer | Uint8Array;
+    format: 'wav' | 'mp3';
+}
+
 export interface ResponseContentFileInput {
     type: 'input_file';
     file_data?: string;
@@ -198,7 +204,13 @@ export interface ResponseContentFileInput {
  */
 export type ResponseContent =
     | string
-    | Array<ResponseContentText | ResponseContentImage | ResponseContentImageData | ResponseContentFileInput>;
+    | Array<
+          | ResponseContentText
+          | ResponseContentImage
+          | ResponseContentImageData
+          | ResponseContentFileInput
+          | ResponseContentAudioInput
+      >;
 
 /**
  * ResponseInput
@@ -530,6 +542,9 @@ export interface ModelProvider {
      */
     createImage?(prompt: string, model: string, agent: AgentDefinition, opts?: ImageGenerationOpts): Promise<string[]>;
 
+    /** Generates video clips from text and/or image input. */
+    createVideo?(prompt: string, model: string, agent: AgentDefinition, opts?: VideoGenerationOpts): Promise<string[]>;
+
     /**
      * Generates speech audio from text (Text-to-Speech)
      * @param text Text to convert to speech
@@ -583,6 +598,9 @@ export interface LiveSession {
     /** Send audio input to the session */
     sendAudio(audio: LiveAudioBlob): Promise<void>;
 
+    /** Commit buffered audio and request a response when the provider requires it. */
+    commitAudio?(): Promise<void>;
+
     /** Send text content to the session */
     sendText(text: string, role?: 'user' | 'assistant'): Promise<void>;
 
@@ -617,6 +635,7 @@ export type ModelClassID =
     | 'vision_mini'
     | 'long'
     | 'image_generation'
+    | 'video_generation'
     | 'embedding'
     | 'voice'
     | 'transcription';
@@ -682,13 +701,18 @@ export interface ModelCost {
 
     // Cost per image (for image generation models like Imagen)
     per_image?: number;
+    per_input_image?: number;
+    per_image_by_resolution?: Partial<Record<'1k' | '2k', number>>;
+    per_second?: number;
+    per_second_by_resolution?: Partial<Record<'480p' | '720p' | '1080p', number>>;
+    per_input_second?: number;
 }
 
 // Represents the feature set of a model
 export interface ModelFeatures {
     context_length?: number; // Maximum context length in tokens
     input_modality?: ('text' | 'image' | 'audio' | 'video')[]; // Supported input types
-    output_modality?: ('text' | 'image' | 'audio' | 'embedding')[]; // Supported output types
+    output_modality?: ('text' | 'image' | 'audio' | 'video' | 'embedding')[]; // Supported output types
     tool_use?: boolean; // Whether the model supports tool/function calling
     simulate_tools?: boolean; // Whether to use simulated tool calls instead of native ones
     streaming?: boolean; // Whether the model supports streaming responses
@@ -697,6 +721,7 @@ export interface ModelFeatures {
     max_output_tokens?: number; // Maximum output tokens for the model
     reasoning_output?: boolean; // Whether the model outputs reasoning steps
     input_token_limit?: number; // Maximum tokens for a single input (e.g., for embedding models)
+    max_input_characters?: number; // Maximum text characters for voice models
 }
 
 // Represents a single model entry in the registry
@@ -731,6 +756,7 @@ export interface ModelUsage {
     total_tokens?: number; // Total number of tokens (input + output)
     cached_tokens?: number; // Number of cached input tokens
     image_count?: number; // Number of images generated (for models like Imagen)
+    video_seconds?: number; // Number of generated video seconds
     metadata?: Record<string, unknown>; // Additional metadata for usage tracking
     timestamp?: Date; // Timestamp of the usage, crucial for time-based pricing
     isFreeTierUsage?: boolean; // Flag for free tier usage override
@@ -1079,6 +1105,26 @@ export interface ImageGenerationMetadata {
     thoughts?: ImageThoughtPart[];
     thought_signatures?: string[];
     citations?: ImageGroundingChunk[];
+}
+
+// ================================================================
+// Video Generation Types
+// ================================================================
+
+export interface VideoGenerationOpts {
+    /** Length of the generated clip in seconds. */
+    duration?: number;
+    resolution?: '480p' | '720p' | '1080p';
+    aspect_ratio?: '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
+    /** Public URL or data URI used for image-to-video generation. */
+    source_image?: string;
+    /** Public video URL used for video editing where supported. */
+    source_video?: string;
+    /** Poll interval for asynchronous provider jobs. */
+    poll_interval_ms?: number;
+    /** Overall generation timeout. */
+    timeout_ms?: number;
+    request_id?: string;
 }
 
 // ================================================================
@@ -1494,6 +1540,8 @@ export interface LiveOptions {
     maxToolCallRoundsPerTurn?: number;
     /** API version (e.g., 'v1alpha' for experimental features) */
     apiVersion?: string;
+    /** PCM input sample rate. OpenAI Realtime defaults to 24 kHz. */
+    inputAudioSampleRate?: number;
 }
 
 /**

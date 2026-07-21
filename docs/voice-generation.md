@@ -48,7 +48,8 @@ const audio = await ensembleVoice(text, {
 ### ElevenLabs Models
 
 - **eleven_multilingual_v2**: Multilingual model supporting 29 languages ($300 per million characters)
-- **eleven_turbo_v2_5**: Turbo model optimized for low-latency streaming ($180 per million characters)
+- **eleven_v3**: Expressive multilingual model with audio tags and dialogue support
+- **eleven_flash_v2_5**: Current low-latency model (`eleven_turbo_v2_5` is a compatibility alias)
 
 ```typescript
 // Multilingual support
@@ -58,7 +59,7 @@ const audio = await ensembleVoice(text, {
 
 // Low-latency streaming
 const audio = await ensembleVoice(text, {
-    model: 'eleven_turbo_v2_5'
+    model: 'eleven_flash_v2_5'
 });
 ```
 
@@ -303,7 +304,8 @@ console.log(`Total cost: $${usage.totalCost}`);
 1. **Choose the Right Model**
    - Use `tts-1` for real-time applications with OpenAI
    - Use `tts-1-hd` when audio quality is paramount
-   - Use `eleven_turbo_v2_5` for low-latency ElevenLabs streaming
+   - Use `eleven_flash_v2_5` for low-latency ElevenLabs streaming
+   - Use `eleven_v3` for expressive dialogue and audio tags
    - Use `eleven_multilingual_v2` for multi-language support
 
 2. **Select Appropriate Voice**
@@ -366,7 +368,7 @@ async function streamElevenLabsAudio() {
     let totalChunks = 0;
     
     for await (const event of ensembleVoice(text, {
-        model: 'eleven_turbo_v2_5'
+        model: 'eleven_flash_v2_5'
     }, {
         voice: 'rachel',
         response_format: 'mp3_high',

@@ -213,7 +213,7 @@ describe('OpenAI chat structured output request formatting', () => {
         await drain(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Return the result' }] as any,
-                'deepseek-chat',
+                'deepseek-v4-flash',
                 {
                     agent_id: 'test-deepseek-json-object',
                     modelSettings: {
@@ -231,14 +231,14 @@ describe('OpenAI chat structured output request formatting', () => {
         expect(requestParams.messages.at(-1).content).toContain('"answer"');
     });
 
-    it('keeps DeepSeek reasoner off provider JSON mode while still adding explicit JSON instructions', async () => {
+    it('uses DeepSeek V4 Pro JSON mode with explicit schema instructions', async () => {
         const provider = new DeepSeekProvider();
         const create = attachMockChatClient(provider);
 
         await drain(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Return the result' }] as any,
-                'deepseek-reasoner',
+                'deepseek-v4-pro',
                 {
                     agent_id: 'test-deepseek-reasoner-json-prompt',
                     modelSettings: {
@@ -249,7 +249,7 @@ describe('OpenAI chat structured output request formatting', () => {
         );
 
         const requestParams = create.mock.calls.at(0)?.[0];
-        expect(requestParams.response_format).toBeUndefined();
+        expect(requestParams.response_format).toEqual({ type: 'json_object' });
         expect(requestParams.messages.at(-1).role).toBe('system');
         expect(requestParams.messages.at(-1).content).toContain('Respond only with valid JSON.');
     });

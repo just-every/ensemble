@@ -65,7 +65,7 @@ describe('Model Scoring and Disabling', () => {
     it('should combine disabled models and scores', async () => {
         const agent: AgentDefinition = {
             modelClass: 'standard',
-            disabledModels: ['deepseek-chat', 'grok-4'],
+            disabledModels: ['deepseek-v4-flash', 'grok-4'],
             modelScores: {
                 'gpt-5.5': 80,
                 'gemini-3.6-flash': 20,
@@ -77,7 +77,7 @@ describe('Model Scoring and Disabling', () => {
         for (let i = 0; i < 20; i++) {
             const model = await getModelFromAgent(agent);
             // Should never select disabled models
-            expect(model).not.toBe('deepseek-chat');
+            expect(model).not.toBe('deepseek-v4-flash');
             expect(model).not.toBe('grok-4');
             // Should only select from scored models that aren't disabled
             expect(['gemini-3.6-flash', 'gpt-5.5', 'claude-sonnet-5']).toContain(model);
@@ -104,8 +104,8 @@ describe('Model Scoring and Disabling', () => {
         // Run multiple times
         let zeroWeightSelected = false;
         for (let i = 0; i < 20; i++) {
-            const model = await getModelFromClass('standard', [], ['deepseek-chat'], modelScores);
-            expect(model).not.toBe('deepseek-chat'); // Should never select disabled
+            const model = await getModelFromClass('standard', [], ['deepseek-v4-flash'], modelScores);
+            expect(model).not.toBe('deepseek-v4-flash'); // Should never select disabled
 
             // With a score of 0, the zero-weight model should never be selected when other models have positive weights
             if (model === 'gemini-3.6-flash') {

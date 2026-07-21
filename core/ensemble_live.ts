@@ -530,7 +530,9 @@ export async function* ensembleLiveAudio(
 
         // Create the live session directly
         console.log('[ensembleLiveAudio] Creating live session...');
-        session = await provider.createLiveSession(config, agent, model, options);
+        const inputAudioSampleRate =
+            options?.inputAudioSampleRate ?? (provider.provider_id === 'openai' ? 24000 : 16000);
+        session = await provider.createLiveSession(config, agent, model, { ...options, inputAudioSampleRate });
         console.log('[ensembleLiveAudio] Session created:', session.sessionId);
 
         // Start audio processing task
@@ -553,9 +555,10 @@ export async function* ensembleLiveAudio(
                     );
                     await session.sendAudio({
                         data: base64Data,
-                        mimeType: 'audio/pcm;rate=16000',
+                        mimeType: `audio/pcm;rate=${inputAudioSampleRate}`,
                     });
                 }
+                await session?.commitAudio?.();
                 console.log(
                     `[ensembleLiveAudio] Audio processing completed. Total chunks: ${audioChunkCount}, Total bytes: ${totalAudioBytes}`
                 );

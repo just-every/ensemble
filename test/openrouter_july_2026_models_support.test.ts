@@ -37,7 +37,7 @@ const MODEL_CASES = [
             output_per_million: 1.2,
         },
         features: {
-            context_length: 1_048_576,
+            context_length: 1_048_756,
             max_output_tokens: 262144,
             input_modality: ['text'],
             output_modality: ['text'],
@@ -59,7 +59,7 @@ const MODEL_CASES = [
             output_per_million: 4.05,
         },
         features: {
-            context_length: 1_048_576,
+            context_length: 524_288,
             input_modality: ['text', 'image', 'audio'],
             output_modality: ['text'],
             tool_use: true,

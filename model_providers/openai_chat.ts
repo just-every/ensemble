@@ -225,6 +225,17 @@ async function convertContentPartsToOpenAI(
                     },
                 });
             }
+        } else if (item.type === 'input_audio') {
+            const data =
+                typeof item.data === 'string'
+                    ? item.data.replace(/^data:audio\/[^;]+;base64,/, '')
+                    : Buffer.from(item.data instanceof ArrayBuffer ? new Uint8Array(item.data) : item.data).toString(
+                          'base64'
+                      );
+            parts.push({
+                type: 'input_audio',
+                input_audio: { data, format: item.format },
+            } as OpenAI.Chat.Completions.ChatCompletionContentPart);
         }
     }
 

@@ -32,7 +32,7 @@ const agent: AgentDefinition = {
         'gpt-5.2-chat-latest': 80,              // High probability
         'claude-haiku-4-5-20251001': 60,        // Medium probability
         'gemini-2.5-flash': 20,                 // Low probability
-        'deepseek-chat': 0,              // Never selected
+        'deepseek-v4-flash': 0,          // Never selected
         // Other models in the class get default score of 50
     },
 };
@@ -75,7 +75,7 @@ const agent: AgentDefinition = {
         'gemini-2.5-flash': 10,                // Rarely used
     },
     disabledModels: [
-        'deepseek-chat',    // Completely disabled
+        'deepseek-v4-flash', // Completely disabled
         'grok-4',           // Completely disabled
     ],
 };

@@ -71,6 +71,7 @@ class CostTracker {
         const output_tokens = usage.output_tokens || 0;
         const cached_tokens = usage.cached_tokens || 0;
         const image_count = usage.image_count || 0;
+        const video_seconds = usage.video_seconds || 0;
 
         // Use provided timestamp, or current time if needed for time-based pricing
         const calculationTime = usage.timestamp || new Date();
@@ -216,6 +217,20 @@ class CostTracker {
                   : undefined;
         if (image_count > 0 && typeof perImageCost === 'number') {
             usage.cost += image_count * perImageCost;
+        }
+
+        const perSecondOverride =
+            usage.metadata && typeof (usage.metadata as Record<string, unknown>).cost_per_second === 'number'
+                ? (usage.metadata as Record<string, unknown>).cost_per_second
+                : undefined;
+        const perSecondCost =
+            typeof perSecondOverride === 'number'
+                ? perSecondOverride
+                : typeof model.cost?.per_second === 'number'
+                  ? model.cost.per_second
+                  : undefined;
+        if (video_seconds > 0 && typeof perSecondCost === 'number') {
+            usage.cost += video_seconds * perSecondCost;
         }
 
         // Ensure cost is not negative

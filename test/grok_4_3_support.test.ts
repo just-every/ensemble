@@ -23,8 +23,16 @@ describe('Grok 4.3 support', () => {
             id: 'grok-4.3',
             provider: 'xai',
             cost: {
-                input_per_million: 1.25,
-                output_per_million: 2.5,
+                input_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 1.25,
+                    price_above_threshold_per_million: 2.5,
+                },
+                output_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 2.5,
+                    price_above_threshold_per_million: 5,
+                },
             },
             features: {
                 context_length: 1_000_000,
@@ -52,8 +60,16 @@ describe('Grok 4.3 support', () => {
             id: 'grok-build-0.1',
             provider: 'xai',
             cost: {
-                input_per_million: 1.0,
-                output_per_million: 2.0,
+                input_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 1,
+                    price_above_threshold_per_million: 2,
+                },
+                output_per_million: {
+                    threshold_tokens: 200_000,
+                    price_below_threshold_per_million: 2,
+                    price_above_threshold_per_million: 4,
+                },
             },
             features: {
                 context_length: 256000,
