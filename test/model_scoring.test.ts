@@ -38,7 +38,7 @@ describe('Model Scoring and Disabling', () => {
             modelClass: 'standard',
             modelScores: {
                 'gpt-5.5': 90, // Should be selected most often
-                'gemini-3-flash-preview': 10, // Should be selected rarely
+                'gemini-3.6-flash': 10, // Should be selected rarely
             },
         };
 
@@ -54,7 +54,7 @@ describe('Model Scoring and Disabling', () => {
         // With 90:10 weighting, the high-weight model should be selected significantly more often
         // We'll allow some variance but expect at least 70% for the high-weight model
         const gptCount = selectionCounts['gpt-5.5'] || 0;
-        const geminiCount = selectionCounts['gemini-3-flash-preview'] || 0;
+        const geminiCount = selectionCounts['gemini-3.6-flash'] || 0;
 
         // Only check if both models were available
         if (gptCount > 0 && geminiCount > 0) {
@@ -68,7 +68,7 @@ describe('Model Scoring and Disabling', () => {
             disabledModels: ['deepseek-chat', 'grok-4'],
             modelScores: {
                 'gpt-5.5': 80,
-                'gemini-3-flash-preview': 20,
+                'gemini-3.6-flash': 20,
                 'claude-sonnet-5': 50,
             },
         };
@@ -80,14 +80,14 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat');
             expect(model).not.toBe('grok-4');
             // Should only select from scored models that aren't disabled
-            expect(['gemini-3-flash-preview', 'gpt-5.5', 'claude-sonnet-5']).toContain(model);
+            expect(['gemini-3.6-flash', 'gpt-5.5', 'claude-sonnet-5']).toContain(model);
         }
     });
 
     it('should handle all models being disabled gracefully', async () => {
         const agent: AgentDefinition = {
             modelClass: 'mini',
-            disabledModels: ['gpt-5.4-nano', 'claude-haiku-4-5-20251001', 'gemini-2.5-flash-lite', 'grok-3-mini'],
+            disabledModels: ['gpt-5.4-nano', 'claude-haiku-4-5-20251001', 'gemini-3.5-flash-lite', 'grok-3-mini'],
         };
 
         // Should still return a model (fallback behavior)
@@ -98,7 +98,7 @@ describe('Model Scoring and Disabling', () => {
     it('should work with getModelFromClass directly', async () => {
         const modelScores = {
             'gpt-5.5': 100,
-            'gemini-3-flash-preview': 0, // Zero weight, should never be selected
+            'gemini-3.6-flash': 0, // Zero weight, should never be selected
         };
 
         // Run multiple times
@@ -108,7 +108,7 @@ describe('Model Scoring and Disabling', () => {
             expect(model).not.toBe('deepseek-chat'); // Should never select disabled
 
             // With a score of 0, the zero-weight model should never be selected when other models have positive weights
-            if (model === 'gemini-3-flash-preview') {
+            if (model === 'gemini-3.6-flash') {
                 zeroWeightSelected = true;
             }
         }

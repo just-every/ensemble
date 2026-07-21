@@ -58,6 +58,7 @@ import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_l
 import { isPaused } from '../utils/pause_controller.js';
 import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
 import { chooseImageDetailFromInput, mapGeminiMediaResolution } from '../utils/image_detail.js';
+import { usesCurrentGeminiGenerateContentContract } from './gemini_model_contract.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 
@@ -805,6 +806,7 @@ function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | n
         return new Set(['HIGH']);
     }
     if (
+        model.includes('gemini-3.6-flash') ||
         model.includes('gemini-3.5-flash') ||
         model.includes('gemini-3.1-flash-lite') ||
         model.includes('gemini-3-flash-preview')
@@ -1151,6 +1153,11 @@ export class GeminiProvider extends BaseModelProvider {
             // Check if the last message is from the user
             const lastContent = contents[contents.length - 1];
             if (lastContent.role !== 'user') {
+                if (usesCurrentGeminiGenerateContentContract(model)) {
+                    throw new Error(
+                        `${model} does not support a prefilled model turn; the final non-empty message must be from the user.`
+                    );
+                }
                 console.warn("Last message in history is not from 'user'. Gemini might not respond as expected.");
             }
 
@@ -1249,16 +1256,17 @@ export class GeminiProvider extends BaseModelProvider {
             if (settings?.stop_sequence) {
                 config.stopSequences = [settings.stop_sequence];
             }
-            if (settings?.temperature) {
+            const supportsSamplingParameters = !usesCurrentGeminiGenerateContentContract(model);
+            if (supportsSamplingParameters && settings?.temperature !== undefined) {
                 config.temperature = settings.temperature;
             }
             if (settings?.max_tokens) {
                 config.maxOutputTokens = settings.max_tokens;
             }
-            if (settings?.top_p) {
+            if (supportsSamplingParameters && settings?.top_p !== undefined) {
                 config.topP = settings.top_p;
             }
-            if (settings?.top_k) {
+            if (supportsSamplingParameters && settings?.top_k !== undefined) {
                 config.topK = settings.top_k;
             }
             if (settings?.json_schema) {

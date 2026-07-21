@@ -51,7 +51,7 @@ export const MODEL_CLASSES = {
         models: [
             // One top pick per provider (prefer stable IDs over dated previews when possible)
             'gpt-5.5', // OpenAI
-            'gemini-3-flash-preview', // Google
+            'gemini-3.6-flash', // Google
             'claude-sonnet-5', // Anthropic
             'grok-4.5', // X.AI
         ],
@@ -62,7 +62,7 @@ export const MODEL_CLASSES = {
     mini: {
         models: [
             'gpt-5.4-nano', // OpenAI
-            'gemini-2.5-flash-lite', // Google
+            'gemini-3.5-flash-lite', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -96,7 +96,7 @@ export const MODEL_CLASSES = {
     reasoning_mini: {
         models: [
             'gpt-5.4-mini', // OpenAI
-            'gemini-3-flash-preview', // Google
+            'gemini-3.5-flash-lite', // Google
             'claude-sonnet-5', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -141,7 +141,7 @@ export const MODEL_CLASSES = {
     writing: {
         models: [
             'gpt-5.5', // OpenAI
-            'gemini-3-flash-preview', // Google
+            'gemini-3.6-flash', // Google
             'claude-sonnet-5', // Anthropic
             'grok-4.5', // X.AI
         ],
@@ -153,7 +153,7 @@ export const MODEL_CLASSES = {
     summary: {
         models: [
             'gpt-5-nano', // OpenAI
-            'gemini-2.5-flash-lite', // Google
+            'gemini-3.5-flash-lite', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -175,7 +175,7 @@ export const MODEL_CLASSES = {
     vision_mini: {
         models: [
             'gpt-5.4-mini', // OpenAI
-            'gemini-3-flash-preview', // Google
+            'gemini-3.5-flash-lite', // Google
             'claude-haiku-4-5-20251001', // Anthropic
             'grok-3-mini', // X.AI
         ],
@@ -2586,6 +2586,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 3 Flash Preview - fast multimodal model with 1M context window.',
     },
     {
+        id: 'gemini-3.6-flash',
+        aliases: ['gemini-flash-latest', 'models/gemini-3.6-flash', 'models/gemini-flash-latest'],
+        provider: 'google',
+        cost: {
+            input_per_million: 1.5,
+            output_per_million: 7.5,
+            cached_input_per_million: 0.15,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+        },
+        class: 'standard',
+        description:
+            'Gemini 3.6 Flash - stable frontier multimodal model optimized for agentic execution, coding, spatial reasoning, and efficient tool use.',
+    },
+    {
         id: 'gemini-3.5-flash',
         provider: 'google',
         cost: {
@@ -2605,6 +2627,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'standard',
         score: 88,
         description: 'Gemini 3.5 Flash - fast multimodal reasoning model with 1M context and native thinking levels.',
+    },
+    {
+        id: 'gemini-3.5-flash-lite',
+        aliases: ['gemini-flash-lite-latest', 'models/gemini-3.5-flash-lite', 'models/gemini-flash-lite-latest'],
+        provider: 'google',
+        cost: {
+            input_per_million: 0.3,
+            output_per_million: 2.5,
+            cached_input_per_million: 0.03,
+        },
+        features: {
+            context_length: 1048576,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            max_output_tokens: 65536,
+        },
+        class: 'reasoning_mini',
+        description:
+            'Gemini 3.5 Flash-Lite - stable low-latency multimodal model for high-throughput subagents, document parsing, extraction, and structured data tasks.',
     },
     {
         id: 'gemini-3.1-flash-lite',

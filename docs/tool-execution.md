@@ -74,7 +74,7 @@ configuration.
 
 ```typescript
 const agent = {
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.6-flash',
     tools: [
         {
             definition: {

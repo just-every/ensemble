@@ -39,7 +39,7 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 
 - OpenAI: Added GPT-5.2 (base + chat-latest + pro) and refreshed GPT-5.1/GPT-5/Codex pricing
 - Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
-- Google: Gemini 3 (Pro/Flash/Ultra) and refreshed Gemini 2.5 pricing incl. image/TTS/native-audio
+- Google: Gemini 3.6 Flash, Gemini 3.5 Flash/Lite, Gemini 3.1 Pro/Image/Live/TTS, and Gemini 2.5
 - xAI: Grok 4.5 with current `grok-build-latest` aliasing and reasoning controls, Grok 4.1 Fast / Grok 4 Fast variants, and Grok Imagine image generation/editing support (`grok-imagine-image`, `grok-imagine-image-pro`)
 - OpenRouter: Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5 with current routing, capability, context, and pricing metadata
 
@@ -229,7 +229,7 @@ Gemini 3 native thinking levels can be requested directly:
 ```ts
 const result = await ensembleResult(
     ensembleRequest([{ type: 'message', role: 'user', content: 'Solve this carefully.' }], {
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.6-flash',
         modelSettings: {
             thinking_level: 'high',
         },
@@ -241,6 +241,7 @@ For Gemini, `thinking_level` is mutually exclusive with numeric `thinking_budget
 When a Gemini model supports native thinking levels, suffixes like `-none`, `-minimal`, `-low`, `-medium`, `-high`, and `-max` are sent as `thinkingLevel` values instead of numeric budgets.
 For native Gemini thinking-level models, numeric `thinking_budget` values are also translated to the closest supported `thinkingLevel`; Gemini 2.5 models still receive `thinkingBudget`.
 For Gemini 3 Flash-family models, `-none` maps to the provider-native `minimal` level because Gemini does not support full thinking-off.
+Gemini 3.6 Flash and Gemini 3.5 Flash-Lite ignore deprecated sampling settings (`temperature`, `top_p`, and `top_k`), so Ensemble omits them from those requests. Their message histories must end with a user turn rather than a prefilled model response.
 
 ### Multimodal Input (Images)
 
@@ -272,7 +273,7 @@ const messages = [
     },
 ];
 
-for await (const event of ensembleRequest(messages, { model: 'gemini-3-flash-preview' })) {
+for await (const event of ensembleRequest(messages, { model: 'gemini-3.6-flash' })) {
     if (event.type === 'message_complete' && 'content' in event) {
         console.log(event.content);
     }
@@ -291,9 +292,8 @@ The example below combines **image input** with **JSON output**:
 import { ensembleRequest, ensembleResult } from '@just-every/ensemble';
 
 const agent = {
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.6-flash',
     modelSettings: {
-        temperature: 0.2,
         json_schema: {
             name: 'image_analysis',
             type: 'json_schema',
