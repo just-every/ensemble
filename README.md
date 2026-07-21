@@ -35,12 +35,13 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 - 📊 **Cost & Quota Tracking** - Built-in usage monitoring and cost calculation
 - 🎯 **Smart Result Processing** - Automatic summarization and truncation for long outputs
 
-## Model Updates (Dec 2025)
+## Model Highlights
 
 - OpenAI: Added GPT-5.2 (base + chat-latest + pro) and refreshed GPT-5.1/GPT-5/Codex pricing
 - Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
 - Google: Gemini 3 (Pro/Flash/Ultra) and refreshed Gemini 2.5 pricing incl. image/TTS/native-audio
 - xAI: Grok 4.5 with current `grok-build-latest` aliasing and reasoning controls, Grok 4.1 Fast / Grok 4 Fast variants, and Grok Imagine image generation/editing support (`grok-imagine-image`, `grok-imagine-image-pro`)
+- OpenRouter: Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5 with current routing, capability, context, and pricing metadata
 
 \*Codex-Max pricing reflects current published rates and may change if OpenAI updates pricing.
 

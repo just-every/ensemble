@@ -4272,6 +4272,160 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description:
             'MoonshotAI Kimi K2.7 Code via OpenRouter. Coding-focused long-context model for software engineering and agentic coding workflows.',
     },
+    // Kimi K3 (via OpenRouter)
+    {
+        id: 'moonshotai/kimi-k3',
+        aliases: ['Kimi K3', 'kimi-k3'],
+        provider: 'openrouter',
+        openrouter_id: 'moonshotai/kimi-k3',
+        cost: {
+            input_per_million: 3.0,
+            cached_input_per_million: 0.3,
+            output_per_million: 15.0,
+        },
+        features: {
+            context_length: 1_048_576,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'MoonshotAI Kimi K3 via OpenRouter. Open-weight multimodal model for complex coding, knowledge work, and long-horizon agentic workflows with 1M context.',
+    },
+
+    // LongCat 2.0 (via OpenRouter)
+    {
+        id: 'meituan/longcat-2.0',
+        aliases: ['LongCat 2.0', 'LongCat-2.0', 'longcat-2.0', 'longcat-2'],
+        provider: 'openrouter',
+        openrouter_id: 'meituan/longcat-2.0',
+        cost: {
+            input_per_million: 0.3,
+            cached_input_per_million: 0.006,
+            output_per_million: 1.2,
+        },
+        features: {
+            context_length: 1_048_576,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: false,
+            max_output_tokens: 262144,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Meituan LongCat 2.0 via OpenRouter. Sparse MoE model for repository-level coding, long-horizon problem solving, and agentic workflows with 1M context.',
+    },
+
+    // Inkling (via OpenRouter)
+    {
+        id: 'thinkingmachines/inkling',
+        aliases: ['Inkling', 'inkling'],
+        provider: 'openrouter',
+        openrouter_id: 'thinkingmachines/inkling',
+        cost: {
+            input_per_million: 1.0,
+            cached_input_per_million: 0.17,
+            output_per_million: 4.05,
+        },
+        features: {
+            context_length: 1_048_576,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: false,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Thinking Machines Inkling via OpenRouter. Open-weight multimodal model for general reasoning, coding, tool use, and agentic applications with 1M context.',
+    },
+
+    // Muse Spark 1.1 (via OpenRouter)
+    {
+        id: 'meta/muse-spark-1.1',
+        aliases: ['Muse Spark 1.1', 'Muse-Spark-1.1', 'muse-spark-1.1'],
+        provider: 'openrouter',
+        openrouter_id: 'meta/muse-spark-1.1',
+        cost: {
+            input_per_million: 1.25,
+            cached_input_per_million: 0.15,
+            output_per_million: 4.25,
+        },
+        features: {
+            context_length: 1_048_576,
+            input_modality: ['text', 'image', 'audio', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description:
+            'Meta Muse Spark 1.1 via OpenRouter. Multimodal reasoning model for agentic workflows, coding, tool use, and visual-to-code generation with 1M context.',
+    },
+
+    // KAT-Coder Pro V2.5 (via OpenRouter)
+    {
+        id: 'kwaipilot/kat-coder-pro-v2.5',
+        aliases: ['KAT-Coder-Pro V2.5', 'KAT-Coder-Pro-V2.5', 'kat-coder-pro-v2.5', 'kat-coder-pro-v2-5'],
+        provider: 'openrouter',
+        openrouter_id: 'kwaipilot/kat-coder-pro-v2.5',
+        cost: {
+            input_per_million: 0.74,
+            cached_input_per_million: 0.15,
+            output_per_million: 2.96,
+        },
+        features: {
+            context_length: 256000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            max_output_tokens: 80000,
+        },
+        class: 'code',
+        description:
+            'Kwaipilot KAT-Coder Pro V2.5 via OpenRouter. Agentic coding model for autonomous repository-level software engineering and tool-driven workflows.',
+    },
+
+    // KAT-Coder Air V2.5 (via OpenRouter)
+    {
+        id: 'kwaipilot/kat-coder-air-v2.5',
+        aliases: ['KAT-Coder-Air V2.5', 'KAT-Coder-Air-V2.5', 'kat-coder-air-v2.5', 'kat-coder-air-v2-5'],
+        provider: 'openrouter',
+        openrouter_id: 'kwaipilot/kat-coder-air-v2.5',
+        cost: {
+            input_per_million: 0.15,
+            cached_input_per_million: 0.03,
+            output_per_million: 0.6,
+        },
+        features: {
+            context_length: 256000,
+            input_modality: ['text'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            max_output_tokens: 80000,
+        },
+        class: 'code',
+        description:
+            'Kwaipilot KAT-Coder Air V2.5 via OpenRouter. Cost-efficient agentic coding model for autonomous repository changes and tool-driven workflows.',
+    },
 ];
 
 /**
