@@ -43,7 +43,7 @@ const ListenDemo: React.FC = () => {
     const analyserRef = useRef<AnalyserNode | null>(null);
     const visualizerBarsRef = useRef<HTMLDivElement[]>([]);
     const startTimeRef = useRef<number | null>(null);
-    const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const transcriptContainerRef = useRef<HTMLDivElement>(null);
     const animationFrameRef = useRef<number | null>(null);
     const shouldVisualizeRef = useRef<boolean>(false);

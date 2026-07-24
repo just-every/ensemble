@@ -99,8 +99,8 @@ export default function RequestDemo() {
     const [taskStatus, setTaskStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle');
     const [, setTaskError] = useState<string | undefined>();
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const connectionWarningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const connectionWarningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reconnectAttemptsRef = useRef(0);
     const maxReconnectAttempts = 10;
     const baseReconnectDelay = 1000; // Start with 1 second
