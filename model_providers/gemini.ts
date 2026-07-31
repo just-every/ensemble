@@ -37,6 +37,7 @@ import {
     ImageGenerationMetadata,
     ImageGroundingChunk,
     ImageThoughtPart,
+    VideoGenerationOpts,
     VoiceGenerationOpts,
     type MessageEvent,
     TranscriptionOpts,
@@ -61,6 +62,7 @@ import { chooseImageDetailFromInput, mapGeminiMediaResolution } from '../utils/i
 import { usesCurrentGeminiGenerateContentContract } from './gemini_model_contract.js';
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
+import { findModel } from '../data/model_data.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -311,6 +313,104 @@ function inferImageMimeTypeFromUrl(src: string): string {
     if (lower.includes('.svg')) return 'image/svg+xml';
 
     return 'image/jpeg';
+}
+
+function parseImageDataUri(source: string): { data: string; mimeType: string } | null {
+    const match = /^data:(image\/[^;,]+);base64,([\s\S]+)$/i.exec(source);
+    if (!match) return null;
+    return { mimeType: match[1].toLowerCase(), data: match[2] };
+}
+
+async function loadVideoSourceImage(
+    source: string,
+    signal?: AbortSignal
+): Promise<{
+    imageBytes: string;
+    mimeType: string;
+}> {
+    const inline = parseImageDataUri(source);
+    if (inline) {
+        return { imageBytes: inline.data, mimeType: inline.mimeType };
+    }
+    if (!source.startsWith('http://') && !source.startsWith('https://')) {
+        throw new Error('Gemini video generation expects source_image to be an http(s) URL or data:image base64 URI.');
+    }
+
+    const response = await fetch(source, { signal });
+    if (!response.ok) {
+        throw new Error(`Failed to download Gemini video source image: ${response.status} ${response.statusText}`);
+    }
+    const mimeType = response.headers.get('content-type')?.split(';')[0] || inferImageMimeTypeFromUrl(source);
+    const imageBytes = Buffer.from(await response.arrayBuffer()).toString('base64');
+    return { imageBytes, mimeType };
+}
+
+function waitForGeminiVideoPoll(milliseconds: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+        return Promise.reject(signal.reason || new Error('Gemini video generation aborted.'));
+    }
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, milliseconds);
+        const onAbort = () => {
+            clearTimeout(timeout);
+            reject(signal?.reason || new Error('Gemini video generation aborted.'));
+        };
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
+}
+
+function findInteractionVideo(response: any): { data?: string; uri?: string; mimeType: string } | null {
+    const normalize = (candidate: any): { data?: string; uri?: string; mimeType: string } | null => {
+        if (!candidate || typeof candidate !== 'object') return null;
+        const data = typeof candidate.data === 'string' ? candidate.data : undefined;
+        const uri = typeof candidate.uri === 'string' ? candidate.uri : undefined;
+        const mimeType = candidate.mime_type || candidate.mimeType || 'video/mp4';
+        if ((candidate.type === 'video' || data || uri) && (data || uri)) {
+            return { data, uri, mimeType };
+        }
+        return null;
+    };
+
+    const direct = normalize(response?.output_video) || normalize(response?.outputVideo);
+    if (direct) return direct;
+
+    for (const output of response?.outputs || []) {
+        const found = normalize(output);
+        if (found) return found;
+    }
+    for (const step of response?.steps || []) {
+        if (step?.type !== 'model_output') continue;
+        for (const content of step?.content || []) {
+            const found = normalize(content);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function interactionTokenCountByModality(
+    values: unknown,
+    modality: 'text' | 'image' | 'audio' | 'video' | 'document'
+): number {
+    if (!Array.isArray(values)) return 0;
+    return values.reduce((total, item: any) => {
+        if (item?.modality !== modality) return total;
+        const count = item?.tokens ?? item?.token_count ?? item?.tokenCount ?? 0;
+        return total + (typeof count === 'number' ? count : 0);
+    }, 0);
+}
+
+function veoVideoRate(model: string, resolution: VideoGenerationOpts['resolution']): number {
+    const modelEntry = findModel(model);
+    const rates = modelEntry?.cost?.per_second_by_resolution;
+    const rate = resolution ? rates?.[resolution] : undefined;
+    if (typeof rate !== 'number') {
+        throw new Error(`No Veo pricing is registered for ${model} at ${resolution || 'the requested resolution'}.`);
+    }
+    return rate;
 }
 
 /**
@@ -871,19 +971,24 @@ export class GeminiProvider extends BaseModelProvider {
         this.apiKey = apiKey;
     }
 
+    private getApiKey(): string {
+        const apiKey = this.apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error(
+                'Failed to initialize Gemini client. GOOGLE_API_KEY or GEMINI_API_KEY is missing or not provided.'
+            );
+        }
+        return apiKey;
+    }
+
     /**
      * Lazily initialize the Google GenAI client when first accessed
      */
     private get client(): GoogleGenAI {
         if (!this._client) {
-            // Check for API key at runtime, not construction time
-            const apiKey = this.apiKey || process.env.GOOGLE_API_KEY;
-            if (!apiKey) {
-                throw new Error('Failed to initialize Gemini client. GOOGLE_API_KEY is missing or not provided.');
-            }
             // Use v1beta to access the latest Gemini 3 preview endpoints
             this._client = new GoogleGenAI({
-                apiKey: apiKey,
+                apiKey: this.getApiKey(),
                 vertexai: false,
                 httpOptions: { apiVersion: 'v1beta' },
             });
@@ -1692,6 +1797,315 @@ export class GeminiProvider extends BaseModelProvider {
         } finally {
             log_llm_response(requestId, chunks);
         }
+    }
+
+    private async createOmniVideo(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: VideoGenerationOpts
+    ): Promise<string[]> {
+        const actualModel = 'gemini-omni-flash-preview';
+        const aspectRatio = opts.aspect_ratio || '16:9';
+        if (aspectRatio !== '16:9' && aspectRatio !== '9:16') {
+            throw new Error('Gemini Omni Flash video supports only 16:9 and 9:16 aspect ratios.');
+        }
+        if (opts.source_video || opts.end_image) {
+            throw new Error(
+                'Gemini Omni Flash does not support source_video or first/last-frame interpolation in ensembleVideo.'
+            );
+        }
+
+        const input: any[] = [];
+        if (opts.source_image) {
+            const inline = parseImageDataUri(opts.source_image);
+            input.push(
+                inline
+                    ? { type: 'image', data: inline.data, mime_type: inline.mimeType }
+                    : {
+                          type: 'image',
+                          uri: opts.source_image,
+                          mime_type: inferImageMimeTypeFromUrl(opts.source_image),
+                      }
+            );
+        }
+        input.push({ type: 'text', text: prompt });
+
+        const body = {
+            model: actualModel,
+            input,
+            response_format: {
+                type: 'video',
+                aspect_ratio: aspectRatio,
+            },
+            generation_config: {
+                video_config: {
+                    task: opts.source_image ? 'image_to_video' : 'text_to_video',
+                },
+            },
+            background: false,
+            store: false,
+            stream: false,
+        };
+        const loggedRequestId = log_llm_request(
+            agent.agent_id || 'default',
+            'google',
+            actualModel,
+            {
+                prompt,
+                aspect_ratio: aspectRatio,
+                task: opts.source_image ? 'image_to_video' : 'text_to_video',
+                has_source_image: Boolean(opts.source_image),
+            },
+            new Date(),
+            opts.request_id,
+            agent.tags
+        );
+
+        const controller = new AbortController();
+        const timeout = setTimeout(
+            () => controller.abort(new Error('Gemini Omni Flash video generation timed out.')),
+            opts.timeout_ms ?? 10 * 60_000
+        );
+        const onAbort = () => controller.abort(agent.abortSignal?.reason);
+        agent.abortSignal?.addEventListener('abort', onAbort, { once: true });
+
+        try {
+            const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': this.getApiKey(),
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+            const data: any = await response.json();
+            if (!response.ok) {
+                const message = data?.error?.message || data?.message || JSON.stringify(data);
+                throw new Error(`Gemini Omni Flash request failed: ${response.status} ${message}`);
+            }
+
+            const video = findInteractionVideo(data);
+            if (!video) {
+                throw new Error('Gemini Omni Flash completed without a video output.');
+            }
+
+            const usage = data?.usage || {};
+            const inputTokens = typeof usage.total_input_tokens === 'number' ? usage.total_input_tokens : 0;
+            let videoOutputTokens = interactionTokenCountByModality(usage.output_tokens_by_modality, 'video');
+            const textOutputTokens = interactionTokenCountByModality(usage.output_tokens_by_modality, 'text');
+            if (videoOutputTokens === 0 && typeof usage.total_output_tokens === 'number') {
+                videoOutputTokens = Math.max(0, usage.total_output_tokens - textOutputTokens);
+            }
+            const measuredSeconds = videoOutputTokens > 0 ? videoOutputTokens / 5792 : undefined;
+            const estimatedSeconds = opts.duration || 4;
+            const cost =
+                videoOutputTokens > 0 || inputTokens > 0
+                    ? (inputTokens / 1_000_000) * 1.5 +
+                      (videoOutputTokens / 1_000_000) * 17.5 +
+                      (textOutputTokens / 1_000_000) * 9
+                    : estimatedSeconds * 0.10136;
+
+            costTracker.addUsage({
+                model: actualModel,
+                input_tokens: inputTokens,
+                output_tokens: videoOutputTokens + textOutputTokens,
+                video_seconds: measuredSeconds || estimatedSeconds,
+                cost,
+                request_id: opts.request_id,
+                metadata: {
+                    source: 'google-interactions',
+                    provider_request_id: data?.id,
+                    aspect_ratio: aspectRatio,
+                    output_video_tokens: videoOutputTokens,
+                    output_text_tokens: textOutputTokens,
+                    estimated_cost: videoOutputTokens === 0 && inputTokens === 0,
+                },
+            });
+
+            log_llm_response(loggedRequestId, {
+                ok: true,
+                interaction_id: data?.id,
+                status: data?.status,
+                video_seconds: measuredSeconds,
+                has_inline_video: Boolean(video.data),
+            });
+            if (video.data) {
+                return [`data:${video.mimeType};base64,${video.data}`];
+            }
+            return [video.uri!];
+        } catch (error) {
+            log_llm_error(loggedRequestId, error);
+            log_llm_response(loggedRequestId, { ok: false });
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+            agent.abortSignal?.removeEventListener('abort', onAbort);
+        }
+    }
+
+    private async createVeoVideo(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: VideoGenerationOpts
+    ): Promise<string[]> {
+        const duration = opts.duration ?? 8;
+        const resolution = opts.resolution ?? '720p';
+        const aspectRatio = opts.aspect_ratio ?? '16:9';
+        if (![4, 6, 8].includes(duration)) {
+            throw new Error('Veo 3.1 video duration must be 4, 6, or 8 seconds.');
+        }
+        if (!['720p', '1080p', '4k'].includes(resolution)) {
+            throw new Error('Veo 3.1 video resolution must be 720p, 1080p, or 4k.');
+        }
+        if (model === 'veo-3.1-lite-generate-preview' && resolution === '4k') {
+            throw new Error('Veo 3.1 Lite does not support 4k output.');
+        }
+        if (opts.end_image && duration !== 8) {
+            throw new Error(
+                'Veo 3.1 end_image interpolation requires an 8-second duration in the Gemini Developer API.'
+            );
+        }
+        if (resolution !== '720p' && duration !== 8) {
+            throw new Error('Veo 3.1 requires an 8-second duration for 1080p and 4k output.');
+        }
+        if (aspectRatio !== '16:9' && aspectRatio !== '9:16') {
+            throw new Error('Veo 3.1 supports only 16:9 and 9:16 aspect ratios.');
+        }
+        if (opts.source_video) {
+            throw new Error('Veo source_video extension is not yet supported by ensembleVideo.');
+        }
+
+        const image = opts.source_image ? await loadVideoSourceImage(opts.source_image, agent.abortSignal) : undefined;
+        const lastFrame = opts.end_image ? await loadVideoSourceImage(opts.end_image, agent.abortSignal) : undefined;
+        const loggedRequestId = log_llm_request(
+            agent.agent_id || 'default',
+            'google',
+            model,
+            {
+                prompt,
+                duration,
+                resolution,
+                aspect_ratio: aspectRatio,
+                has_source_image: Boolean(image),
+                has_end_image: Boolean(lastFrame),
+            },
+            new Date(),
+            opts.request_id,
+            agent.tags
+        );
+
+        try {
+            let operation = await this.client.models.generateVideos({
+                model,
+                prompt,
+                ...(image ? { image } : {}),
+                config: {
+                    numberOfVideos: 1,
+                    durationSeconds: duration,
+                    aspectRatio,
+                    resolution,
+                    personGeneration: image ? 'allow_adult' : 'allow_all',
+                    ...(lastFrame ? { lastFrame } : {}),
+                    ...(typeof opts.seed === 'number' ? { seed: opts.seed } : {}),
+                    ...(opts.negative_prompt ? { negativePrompt: opts.negative_prompt } : {}),
+                    ...(agent.abortSignal ? { abortSignal: agent.abortSignal } : {}),
+                },
+            });
+
+            const deadline = Date.now() + (opts.timeout_ms ?? 10 * 60_000);
+            while (!operation.done) {
+                if (Date.now() >= deadline) {
+                    throw new Error('Veo 3.1 video generation timed out.');
+                }
+                await waitForGeminiVideoPoll(opts.poll_interval_ms ?? 5000, agent.abortSignal);
+                operation = await this.client.operations.getVideosOperation({ operation });
+            }
+            if (operation.error) {
+                throw new Error(`Veo 3.1 generation failed: ${JSON.stringify(operation.error)}`);
+            }
+
+            const generatedVideos = operation.response?.generatedVideos || [];
+            const videos: string[] = [];
+            for (const generated of generatedVideos) {
+                const video = generated.video;
+                if (!video) continue;
+                const mimeType = video.mimeType || 'video/mp4';
+                if (video.videoBytes) {
+                    videos.push(`data:${mimeType};base64,${video.videoBytes}`);
+                    continue;
+                }
+                if (video.uri) {
+                    const response = await fetch(video.uri, {
+                        headers: { 'x-goog-api-key': this.getApiKey() },
+                        signal: agent.abortSignal,
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Failed to download Veo video: ${response.status} ${response.statusText}`);
+                    }
+                    const bytes = Buffer.from(await response.arrayBuffer()).toString('base64');
+                    videos.push(`data:${mimeType};base64,${bytes}`);
+                }
+            }
+            if (videos.length === 0) {
+                const reasons = operation.response?.raiMediaFilteredReasons;
+                throw new Error(
+                    reasons?.length
+                        ? `Veo 3.1 returned no video: ${reasons.join('; ')}`
+                        : 'Veo 3.1 completed without a video output.'
+                );
+            }
+
+            const rate = veoVideoRate(model, resolution);
+            costTracker.addUsage({
+                model,
+                video_seconds: duration * videos.length,
+                cost: rate * duration * videos.length,
+                request_id: opts.request_id,
+                metadata: {
+                    source: 'google-veo',
+                    provider_request_id: operation.name,
+                    resolution,
+                    aspect_ratio: aspectRatio,
+                    cost_per_second: rate,
+                    audio: 'always-on',
+                    estimated_cost: true,
+                },
+            });
+            log_llm_response(loggedRequestId, {
+                ok: true,
+                operation_name: operation.name,
+                video_count: videos.length,
+                duration,
+                resolution,
+            });
+            return videos;
+        } catch (error) {
+            log_llm_error(loggedRequestId, error);
+            log_llm_response(loggedRequestId, { ok: false });
+            throw error;
+        }
+    }
+
+    async createVideo(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: VideoGenerationOpts = {}
+    ): Promise<string[]> {
+        if (model === 'gemini-omni-flash' || model === 'gemini-omni-flash-preview') {
+            return this.createOmniVideo(prompt, model, agent, opts);
+        }
+        if (
+            model === 'veo-3.1-generate-preview' ||
+            model === 'veo-3.1-fast-generate-preview' ||
+            model === 'veo-3.1-lite-generate-preview'
+        ) {
+            return this.createVeoVideo(prompt, model, agent, opts);
+        }
+        throw new Error(`Gemini provider does not support video generation for model ${model}.`);
     }
 
     /**

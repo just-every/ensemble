@@ -704,7 +704,9 @@ export interface ModelCost {
     per_input_image?: number;
     per_image_by_resolution?: Partial<Record<'1k' | '2k', number>>;
     per_second?: number;
-    per_second_by_resolution?: Partial<Record<'480p' | '720p' | '1080p', number>>;
+    per_second_by_resolution?: Partial<
+        Record<'360p' | '480p' | '540p' | '720p' | '1080p' | '1440p' | '2160p' | '4k', number>
+    >;
     per_input_second?: number;
 }
 
@@ -1114,12 +1116,20 @@ export interface ImageGenerationMetadata {
 export interface VideoGenerationOpts {
     /** Length of the generated clip in seconds. */
     duration?: number;
-    resolution?: '480p' | '720p' | '1080p';
+    resolution?: '360p' | '480p' | '540p' | '720p' | '1080p' | '1440p' | '2160p' | '4k';
     aspect_ratio?: '1:1' | '4:3' | '3:4' | '16:9' | '9:16';
     /** Public URL or data URI used for image-to-video generation. */
     source_image?: string;
+    /** Public URL or data URI used as the requested final frame where supported. */
+    end_image?: string;
     /** Public video URL used for video editing where supported. */
     source_video?: string;
+    /** Request native audio where the provider makes audio optional. */
+    generate_audio?: boolean;
+    /** Provider seed where supported. Video generation is not guaranteed deterministic. */
+    seed?: number;
+    /** Content to exclude where the provider exposes a native negative prompt. */
+    negative_prompt?: string;
     /** Poll interval for asynchronous provider jobs. */
     poll_interval_ms?: number;
     /** Overall generation timeout. */

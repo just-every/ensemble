@@ -20,7 +20,7 @@ describe('Gemini 3.1 audio model support', () => {
 
         expect(tts?.id).toBe('gemini-3.1-flash-tts-preview');
         expect(live?.id).toBe('gemini-3.1-flash-live-preview');
-        expect(omni?.id).toBe('gemini-omni-flash');
+        expect(omni?.id).toBe('gemini-omni-flash-preview');
         expect(MODEL_CLASSES.voice.models).toContain('gemini-3.1-flash-tts-preview');
         expect(MODEL_CLASSES.transcription.models).toContain('gemini-3.1-flash-live-preview');
         expect(await getModelFromAgent({ agent_id: 'gemini-tts', model: 'gemini-3.1-flash-tts-preview' } as any)).toBe(

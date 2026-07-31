@@ -39,9 +39,10 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 
 - OpenAI: GPT-5 family plus `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, and `gpt-audio-1.5`
 - Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
-- Google: Gemini 3.6 Flash, Gemini 3.5 Flash/Lite, Gemini 3.1 Pro/Image/Live/TTS, and Gemini 2.5
+- Google: Gemini 3.6 Flash, Gemini 3.5 Flash/Lite, Gemini 3.1 Pro/Image/Live/TTS, Gemini Omni Flash, Veo 3.1, and Gemini 2.5
 - DeepSeek: Direct V4 Pro/Flash with native tools, JSON output, and thinking controls
 - xAI: Grok 4.5/4.3/4.20, Grok Build 0.1, Grok Imagine image generation/editing, and `ensembleVideo` support
+- Fal: current image generation/editing plus PixVerse V6 image-to-video
 - OpenRouter: Laguna S 2.1, Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5
 
 \*Codex-Max pricing reflects current published rates and may change if OpenAI updates pricing.
@@ -67,7 +68,9 @@ Available API keys (add only the ones you need):
 OPENAI_API_KEY=your-openai-key
 ANTHROPIC_API_KEY=your-anthropic-key
 GOOGLE_API_KEY=your-google-key
+# GEMINI_API_KEY is also accepted as an alternative to GOOGLE_API_KEY
 XAI_API_KEY=your-xai-key
+FAL_KEY=your-fal-key
 DEEPSEEK_API_KEY=your-deepseek-key
 OPENROUTER_API_KEY=your-openrouter-key
 
@@ -462,6 +465,59 @@ const edited = await ensembleImage(
         },
     }
 );
+```
+
+### Video generation
+
+`ensembleVideo` provides one image-to-video contract across Gemini Omni Flash,
+Veo 3.1, xAI Grok Imagine Video, and registered Fal video endpoints:
+
+```ts
+import { ensembleVideo } from '@just-every/ensemble';
+
+const videos = await ensembleVideo(
+    'One continuous locked-camera shot. The character breathes subtly.',
+    { model: 'veo-3.1-lite-generate-preview' },
+    {
+        source_image: 'data:image/png;base64,...',
+        duration: 4,
+        resolution: '720p',
+        aspect_ratio: '9:16',
+        generate_audio: false,
+        timeout_ms: 10 * 60_000,
+    }
+);
+```
+
+Current model IDs:
+
+- `gemini-omni-flash-preview`
+- `veo-3.1-lite-generate-preview`
+- `veo-3.1-fast-generate-preview`
+- `veo-3.1-generate-preview`
+- `grok-imagine-video` and `grok-imagine-video-1.5`
+- `fal-ai/pixverse/v6/image-to-video`
+
+Provider capabilities differ. Veo 3.1 generates audio unconditionally and
+supports 4/6/8-second clips; `end_image` interpolation requires an 8-second
+clip in the Gemini Developer API. Gemini Omni chooses its output duration and
+does not support first/last-frame interpolation.
+PixVerse honors `generate_audio`, while Grok and Fal return expiring URLs that
+callers should download promptly.
+
+For a sequential same-input benchmark with request-correlated cost, latency,
+hash, and FFprobe evidence:
+
+```bash
+npm run benchmark:video -- \
+  --models veo-3.1-lite-generate-preview,grok-imagine-video \
+  --image ./first-frame.png \
+  --prompt-file ./prompt.txt \
+  --out ./.artifacts/video-benchmark \
+  --duration 4 \
+  --resolution 720p \
+  --aspect-ratio 9:16 \
+  --generate-audio false
 ```
 
 - ElevenLabs: `eleven_v3`, `eleven_flash_v2_5`, `eleven_multilingual_v2` (`eleven_turbo_v2_5` aliases Flash)

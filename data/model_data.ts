@@ -222,7 +222,15 @@ export const MODEL_CLASSES = {
     },
 
     video_generation: {
-        models: ['grok-imagine-video', 'grok-imagine-video-1.5'],
+        models: [
+            'gemini-omni-flash-preview',
+            'veo-3.1-lite-generate-preview',
+            'veo-3.1-fast-generate-preview',
+            'veo-3.1-generate-preview',
+            'grok-imagine-video',
+            'grok-imagine-video-1.5',
+            'fal-ai/pixverse/v6/image-to-video',
+        ],
         description: 'Video generation and image-to-video models',
     },
 
@@ -1290,20 +1298,20 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: {
             input_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 2.5,
-                price_above_threshold_per_million: 5.0,
+                price_below_threshold_per_million: 2.0,
+                price_above_threshold_per_million: 4.0,
                 tier_basis: 'input_tokens',
             },
             cached_input_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 0.25,
-                price_above_threshold_per_million: 0.5,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
                 tier_basis: 'input_tokens',
             },
             output_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 15.0,
-                price_above_threshold_per_million: 22.5,
+                price_below_threshold_per_million: 12.0,
+                price_above_threshold_per_million: 18.0,
                 tier_basis: 'input_tokens',
             },
         },
@@ -1325,20 +1333,20 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: {
             input_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 1.0,
-                price_above_threshold_per_million: 2.0,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
                 tier_basis: 'input_tokens',
             },
             cached_input_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 0.1,
-                price_above_threshold_per_million: 0.2,
+                price_below_threshold_per_million: 0.02,
+                price_above_threshold_per_million: 0.04,
                 tier_basis: 'input_tokens',
             },
             output_per_million: {
                 threshold_tokens: 272000,
-                price_below_threshold_per_million: 6.0,
-                price_above_threshold_per_million: 9.0,
+                price_below_threshold_per_million: 1.2,
+                price_above_threshold_per_million: 1.8,
                 tier_basis: 'input_tokens',
             },
         },
@@ -2446,9 +2454,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['claude-opus-4-5', 'claude-opus-4.5', 'claude-4.5-opus'],
         provider: 'anthropic',
         cost: {
-            input_per_million: 15.0,
-            output_per_million: 75.0,
-            cached_input_per_million: 1.5,
+            input_per_million: 5.0,
+            output_per_million: 25.0,
+            cached_input_per_million: 0.5,
         },
         features: {
             context_length: 200000,
@@ -2642,9 +2650,24 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-pro', 'gemini-2.5-pro-exp-03-25', 'gemini-2.5-pro-preview-05-06'],
         provider: 'google',
         cost: {
-            input_per_million: 1.25,
-            output_per_million: 10.0,
-            cached_input_per_million: 0.13,
+            input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 1.25,
+                price_above_threshold_per_million: 2.5,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 10.0,
+                price_above_threshold_per_million: 15.0,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 0.125,
+                price_above_threshold_per_million: 0.25,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
             context_length: 1048576, // Confirmed
@@ -2672,6 +2695,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 audio: 1.0,
             },
             output_per_million: 3.0,
+            cached_input_per_million: {
+                text: 0.05,
+                image: 0.05,
+                video: 0.05,
+                audio: 0.1,
+            },
         },
         features: {
             context_length: 1048576,
@@ -2761,7 +2790,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 video: 0.25,
                 audio: 0.5,
             },
-            cached_input_per_million: 0.025,
+            cached_input_per_million: {
+                text: 0.025,
+                image: 0.025,
+                video: 0.025,
+                audio: 0.05,
+            },
             output_per_million: 1.5,
         },
         features: {
@@ -2784,10 +2818,18 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'google',
         cost: {
             input_per_million: {
-                text: 1.0,
-                audio: 0.0375,
+                text: 0.3,
+                image: 0.3,
+                video: 0.3,
+                audio: 1.0,
             },
-            output_per_million: 0.6,
+            cached_input_per_million: {
+                text: 0.03,
+                image: 0.03,
+                video: 0.03,
+                audio: 0.1,
+            },
+            output_per_million: 2.5,
         },
         features: {
             context_length: 1048576,
@@ -2812,8 +2854,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-flash-lite-preview-06-17'],
         provider: 'google',
         cost: {
-            input_per_million: 0.05,
-            output_per_million: 0.2,
+            input_per_million: {
+                text: 0.1,
+                image: 0.1,
+                video: 0.1,
+                audio: 0.3,
+            },
+            cached_input_per_million: {
+                text: 0.01,
+                image: 0.01,
+                video: 0.01,
+                audio: 0.03,
+            },
+            output_per_million: 0.4,
         },
         features: {
             context_length: 1000000,
@@ -3126,7 +3179,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openai',
         cost: {
             input_per_million: { text: 4, audio: 32, image: 5 },
-            cached_input_per_million: { text: 0.4 },
+            cached_input_per_million: { text: 0.4, audio: 0.4, image: 0.5 },
             output_per_million: { text: 24, audio: 64 },
         },
         features: {
@@ -3146,7 +3199,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openai',
         cost: {
             input_per_million: { text: 0.6, audio: 10, image: 0.8 },
-            cached_input_per_million: { text: 0.06 },
+            cached_input_per_million: { text: 0.06, audio: 0.3, image: 0.08 },
             output_per_million: { text: 2.4, audio: 20 },
         },
         features: {
@@ -3265,8 +3318,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'gemini-2.5-flash-preview-tts',
         provider: 'google',
         cost: {
-            input_per_million: 10.0, // Estimated at $10 per million characters
-            output_per_million: 0, // No output tokens for TTS
+            input_per_million: { text: 0.5 },
+            output_per_million: { audio: 10.0 },
         },
         features: {
             input_modality: ['text'],
@@ -3282,8 +3335,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'gemini-2.5-pro-preview-tts',
         provider: 'google',
         cost: {
-            input_per_million: 20.0, // Estimated at $20 per million characters
-            output_per_million: 0, // No output tokens for TTS
+            input_per_million: { text: 1.0 },
+            output_per_million: { audio: 20.0 },
         },
         features: {
             input_modality: ['text'],
@@ -3299,8 +3352,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'gemini-3.1-flash-tts-preview',
         provider: 'google',
         cost: {
-            input_per_million: 10.0,
-            output_per_million: 0,
+            input_per_million: { text: 1.0 },
+            output_per_million: { audio: 20.0 },
         },
         features: {
             input_modality: ['text'],
@@ -3318,12 +3371,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['gemini-2.5-flash-native-audio-preview-12-2025'],
         provider: 'google',
         cost: {
-            input_per_million: 5.0, // Estimated pricing for native audio
-            output_per_million: 0,
+            input_per_million: {
+                text: 0.5,
+                audio: 3.0,
+                video: 3.0,
+            },
+            output_per_million: {
+                text: 2.0,
+                audio: 12.0,
+            },
         },
         features: {
-            input_modality: ['text'],
-            output_modality: ['audio'],
+            input_modality: ['text', 'audio', 'video'],
+            output_modality: ['text', 'audio'],
             streaming: true,
             context_length: 32000,
         },
@@ -3332,20 +3392,75 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             "Gemini's native audio preview model providing low-latency text-to-speech with built-in audio processing.",
     },
     {
-        id: 'gemini-omni-flash',
+        id: 'gemini-omni-flash-preview',
+        aliases: ['gemini-omni-flash'],
         provider: 'google',
         cost: {
-            input_per_million: 0,
-            output_per_million: 0,
+            input_per_million: 1.5,
+            output_per_million: {
+                text: 9,
+                video: 17.5,
+            },
+            // 5,792 video tokens/second at $17.50 per million output tokens.
+            per_second: 0.10136,
         },
         features: {
-            input_modality: ['text', 'image', 'audio', 'video'],
-            output_modality: ['text', 'image', 'audio'],
-            streaming: true,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text', 'video'],
         },
-        class: 'standard',
+        class: 'video_generation',
         description:
-            'Gemini Omni Flash preview for multimodal, conversational generation and editing across text, image, audio, and video inputs.',
+            'Gemini Omni Flash Preview for fast image-to-video generation and conversational video editing at 720p.',
+    },
+    {
+        id: 'veo-3.1-generate-preview',
+        provider: 'google',
+        cost: {
+            per_second_by_resolution: {
+                '720p': 0.4,
+                '1080p': 0.4,
+                '4k': 0.6,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'Veo 3.1 Preview for image-to-video generation with native audio at up to 4K.',
+    },
+    {
+        id: 'veo-3.1-fast-generate-preview',
+        provider: 'google',
+        cost: {
+            per_second_by_resolution: {
+                '720p': 0.1,
+                '1080p': 0.12,
+                '4k': 0.3,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'Speed-optimized Veo 3.1 Preview for image-to-video generation with native audio.',
+    },
+    {
+        id: 'veo-3.1-lite-generate-preview',
+        provider: 'google',
+        cost: {
+            per_second_by_resolution: {
+                '720p': 0.05,
+                '1080p': 0.08,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'Cost-efficient Veo 3.1 Lite Preview for 720p and 1080p image-to-video generation.',
     },
 
     // Perplexity Sonar models
@@ -3689,6 +3804,27 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'xAI Grok Imagine Video 1.5 for premium image-to-video generation up to 1080p.',
     },
     {
+        id: 'fal-ai/pixverse/v6/image-to-video',
+        aliases: ['pixverse-v6-image-to-video'],
+        provider: 'fal',
+        cost: {
+            // Base rates are silent output; the provider applies audio-inclusive
+            // rates when generate_audio is explicitly enabled.
+            per_second_by_resolution: {
+                '360p': 0.025,
+                '540p': 0.035,
+                '720p': 0.045,
+                '1080p': 0.09,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['video'],
+        },
+        class: 'video_generation',
+        description: 'PixVerse V6 image-to-video through fal.ai with optional native audio.',
+    },
+    {
         id: 'imagen-2',
         provider: 'google',
         cost: {
@@ -3758,18 +3894,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'google',
         cost: {
             input_per_million: {
-                text: 0.5,
+                text: 0.75,
                 audio: 3.0,
-                video: 3.0,
+                image: 1.0,
+                video: 1.0,
             },
             output_per_million: {
-                text: 2.0,
+                text: 4.5,
                 audio: 12.0,
             },
         },
         features: {
             context_length: 32000,
-            input_modality: ['text', 'audio', 'video'],
+            input_modality: ['text', 'audio', 'image', 'video'],
             output_modality: ['text', 'audio'],
             streaming: true,
         },
@@ -4091,9 +4228,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.6-max-preview',
         cost: {
-            input_per_million: 1.04,
+            input_per_million: 1.027,
             cached_input_per_million: 1.3,
-            output_per_million: 6.24,
+            output_per_million: 6.162,
         },
         features: {
             context_length: 262144,
@@ -4117,9 +4254,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.6-27b',
         cost: {
-            input_per_million: 0.45,
+            input_per_million: 0.3,
             cached_input_per_million: 0.15,
-            output_per_million: 2.7,
+            output_per_million: 2.0,
         },
         features: {
             context_length: 262144,
@@ -4217,9 +4354,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'z-ai/glm-5.2',
         cost: {
-            input_per_million: 0.7756,
-            output_per_million: 2.4376,
-            cached_input_per_million: 0.14404,
+            input_per_million: 0.966,
+            output_per_million: 3.036,
+            cached_input_per_million: 0.1794,
         },
         features: {
             context_length: 1048576,
@@ -4267,9 +4404,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'deepseek/deepseek-v4-flash',
         cost: {
-            input_per_million: 0.0938,
-            cached_input_per_million: 0.01876,
-            output_per_million: 0.1876,
+            input_per_million: 0.14,
+            cached_input_per_million: 0.028,
+            output_per_million: 0.28,
         },
         features: {
             context_length: 1048576,
@@ -4372,9 +4509,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'tencent/hy3',
         cost: {
-            input_per_million: 0.14,
-            cached_input_per_million: 0.035,
-            output_per_million: 0.58,
+            input_per_million: 0.132,
+            cached_input_per_million: 0.033,
+            output_per_million: 0.528,
         },
         features: {
             context_length: 262144,
@@ -4421,9 +4558,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'moonshotai/kimi-k2.6',
         cost: {
-            input_per_million: 0.684,
-            output_per_million: 3.42,
-            cached_input_per_million: 0.144,
+            input_per_million: 0.95,
+            output_per_million: 4.0,
+            cached_input_per_million: 0.16,
         },
         features: {
             context_length: 262144,
@@ -4446,9 +4583,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'moonshotai/kimi-k2.7-code',
         cost: {
-            input_per_million: 0.82,
-            output_per_million: 3.75,
-            cached_input_per_million: 0.16,
+            input_per_million: 0.73,
+            output_per_million: 3.5,
+            cached_input_per_million: 0.15,
         },
         features: {
             context_length: 262144,
@@ -4624,9 +4761,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'poolside/laguna-s-2.1',
         cost: {
-            input_per_million: 0.1,
-            cached_input_per_million: 0.01,
-            output_per_million: 0.2,
+            input_per_million: 0.09,
+            cached_input_per_million: 0.009,
+            output_per_million: 0.18,
         },
         features: {
             context_length: 1_048_576,

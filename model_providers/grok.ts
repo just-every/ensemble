@@ -300,6 +300,9 @@ export class GrokProvider extends OpenAIChat {
         if (!Number.isInteger(duration) || duration < 1 || duration > 15) {
             throw new Error('xAI video generation requires duration to be an integer between 1 and 15 seconds.');
         }
+        if (resolution !== '480p' && resolution !== '720p' && resolution !== '1080p') {
+            throw new Error('xAI video generation supports only 480p, 720p, or 1080p output.');
+        }
         if (model === 'grok-imagine-video-1.5' && !opts.source_image) {
             throw new Error('grok-imagine-video-1.5 requires opts.source_image.');
         }
@@ -313,7 +316,15 @@ export class GrokProvider extends OpenAIChat {
             agent.agent_id || 'default',
             'xai',
             model,
-            { endpoint: '/videos/generations', ...body },
+            {
+                endpoint: '/videos/generations',
+                prompt,
+                duration,
+                resolution,
+                aspect_ratio: opts.aspect_ratio,
+                has_source_image: Boolean(opts.source_image),
+                has_source_video: Boolean(opts.source_video),
+            },
             new Date(),
             opts.request_id,
             agent.tags
@@ -352,6 +363,7 @@ export class GrokProvider extends OpenAIChat {
                     provider_request_id: providerRequestId,
                     resolution,
                     cost_per_second: pricing.outputSecond,
+                    estimated_cost: typeof providerCostTicks !== 'number',
                 },
             });
             log_llm_response(requestId, job);

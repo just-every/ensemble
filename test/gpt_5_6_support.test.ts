@@ -46,12 +46,28 @@ describe('GPT-5.6 support', () => {
             price_above_threshold_per_million: 10,
         });
         expect(terra?.cost?.input_per_million).toMatchObject({
-            price_below_threshold_per_million: 2.5,
-            price_above_threshold_per_million: 5,
+            price_below_threshold_per_million: 2,
+            price_above_threshold_per_million: 4,
         });
         expect(luna?.cost?.input_per_million).toMatchObject({
-            price_below_threshold_per_million: 1,
-            price_above_threshold_per_million: 2,
+            price_below_threshold_per_million: 0.2,
+            price_above_threshold_per_million: 0.4,
+        });
+        expect(terra?.cost?.cached_input_per_million).toMatchObject({
+            price_below_threshold_per_million: 0.2,
+            price_above_threshold_per_million: 0.4,
+        });
+        expect(terra?.cost?.output_per_million).toMatchObject({
+            price_below_threshold_per_million: 12,
+            price_above_threshold_per_million: 18,
+        });
+        expect(luna?.cost?.cached_input_per_million).toMatchObject({
+            price_below_threshold_per_million: 0.02,
+            price_above_threshold_per_million: 0.04,
+        });
+        expect(luna?.cost?.output_per_million).toMatchObject({
+            price_below_threshold_per_million: 1.2,
+            price_above_threshold_per_million: 1.8,
         });
     });
 

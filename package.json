@@ -59,7 +59,8 @@
     "smoke:ideogram:image": "npm run build && node scripts/smoke_ideogram_image.mjs",
     "smoke:runway:image": "npm run build && node scripts/smoke_runway_image.mjs",
     "smoke:mj:image": "npm run build && node scripts/smoke_midjourney_image.mjs",
-    "smoke:images": "npm run smoke:gemini:image && npm run smoke:stability:image && npm run smoke:luma:image && npm run smoke:ideogram:image && npm run smoke:runway:image && npm run smoke:mj:image"
+    "smoke:images": "npm run smoke:gemini:image && npm run smoke:stability:image && npm run smoke:luma:image && npm run smoke:ideogram:image && npm run smoke:runway:image && npm run smoke:mj:image",
+    "benchmark:video": "npm run build && node scripts/benchmark_video.mjs"
   },
   "exports": {
     ".": {

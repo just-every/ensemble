@@ -1,5 +1,5 @@
 import { BaseModelProvider } from './base_provider.js';
-import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent } from '../types/types.js';
+import type { AgentDefinition, ImageGenerationOpts, ProviderStreamEvent, VideoGenerationOpts } from '../types/types.js';
 import { findModel } from '../data/model_data.js';
 import { costTracker } from '../utils/cost_tracker.js';
 import { calculateFalFlux2ProOutpaintCostFromImages } from '../utils/fal_flux_outpaint_pricing.js';
@@ -147,6 +147,36 @@ function mapSeedreamV5ImageSize(
 
 function seedreamV5ProCostForMegapixels(megapixels: number): number {
     return megapixels <= (1536 * 1536) / (1024 * 1024) ? 0.0675 : 0.135;
+}
+
+function normalizeFalVideoSource(source: string | undefined, model: string): string {
+    if (!source) {
+        throw new Error(`${model} requires opts.source_image.`);
+    }
+    if (!source.startsWith('http://') && !source.startsWith('https://') && !source.startsWith('data:image/')) {
+        throw new Error(`${model} expects source_image to be an http(s) URL or data:image base64 URI.`);
+    }
+    return source;
+}
+
+function pixverseVideoRate(resolution: VideoGenerationOpts['resolution'], generateAudio: boolean): number {
+    const silentRates: Partial<Record<NonNullable<VideoGenerationOpts['resolution']>, number>> = {
+        '360p': 0.025,
+        '540p': 0.035,
+        '720p': 0.045,
+        '1080p': 0.09,
+    };
+    const audioRates: Partial<Record<NonNullable<VideoGenerationOpts['resolution']>, number>> = {
+        '360p': 0.035,
+        '540p': 0.045,
+        '720p': 0.06,
+        '1080p': 0.115,
+    };
+    const rate = (generateAudio ? audioRates : silentRates)[resolution || '720p'];
+    if (typeof rate !== 'number') {
+        throw new Error(`PixVerse V6 does not support ${resolution || 'the requested resolution'}.`);
+    }
+    return rate;
 }
 
 export class FALProvider extends BaseModelProvider {
@@ -742,6 +772,119 @@ export class FALProvider extends BaseModelProvider {
             throw err;
         } finally {
             log_llm_response(requestId, { ok: true });
+        }
+    }
+
+    async createVideo(
+        prompt: string,
+        model: string,
+        agent: AgentDefinition,
+        opts: VideoGenerationOpts = {}
+    ): Promise<string[]> {
+        if (model !== 'fal-ai/pixverse/v6/image-to-video') {
+            throw new Error(`FAL provider does not support video generation for unregistered model ${model}.`);
+        }
+
+        const falKey = process.env.FAL_KEY;
+        if (!falKey) throw new Error('FAL_KEY is not set');
+        const sourceImage = normalizeFalVideoSource(opts.source_image, model);
+        const duration = opts.duration ?? 5;
+        const resolution = opts.resolution ?? '720p';
+        const generateAudio = opts.generate_audio ?? false;
+        if (!Number.isInteger(duration) || duration < 1 || duration > 15) {
+            throw new Error('PixVerse V6 video duration must be an integer from 1 to 15 seconds.');
+        }
+        if (!['360p', '540p', '720p', '1080p'].includes(resolution)) {
+            throw new Error('PixVerse V6 video resolution must be 360p, 540p, 720p, or 1080p.');
+        }
+
+        const body: Record<string, unknown> = {
+            prompt,
+            image_url: sourceImage,
+            duration,
+            resolution,
+            generate_audio_switch: generateAudio,
+            generate_multi_clip_switch: false,
+            thinking_type: 'disabled',
+        };
+        if (typeof opts.seed === 'number') body.seed = Math.floor(opts.seed);
+        if (opts.negative_prompt) body.negative_prompt = opts.negative_prompt;
+
+        const requestId = log_llm_request(
+            agent.agent_id || 'default',
+            'fal',
+            model,
+            {
+                prompt,
+                duration,
+                resolution,
+                generate_audio: generateAudio,
+                has_source_image: true,
+            },
+            new Date(),
+            opts.request_id,
+            agent.tags
+        );
+        const controller = new AbortController();
+        const timeout = setTimeout(
+            () => controller.abort(new Error('FAL video generation timed out.')),
+            opts.timeout_ms ?? 10 * 60_000
+        );
+        const onAbort = () => controller.abort(agent.abortSignal?.reason);
+        agent.abortSignal?.addEventListener('abort', onAbort, { once: true });
+
+        try {
+            const response = await fetch(`https://fal.run/${model}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Key ${falKey}`,
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+            if (!response.ok) {
+                throw new Error(`FAL video request failed: ${response.status} ${await response.text()}`);
+            }
+            const data: any = await response.json();
+            const videoUrl = data?.video?.url || data?.output?.video?.url;
+            if (typeof videoUrl !== 'string' || videoUrl.length === 0) {
+                throw new Error('FAL video generation completed without a video URL.');
+            }
+
+            const actualDuration =
+                typeof data?.video?.duration === 'number' && data.video.duration > 0 ? data.video.duration : duration;
+            const rate = pixverseVideoRate(resolution, generateAudio);
+            costTracker.addUsage({
+                model,
+                video_seconds: actualDuration,
+                cost: actualDuration * rate,
+                request_id: opts.request_id,
+                metadata: {
+                    source: 'fal',
+                    provider_request_id: data?.request_id,
+                    duration: actualDuration,
+                    resolution,
+                    cost_per_second: rate,
+                    generate_audio: generateAudio,
+                    estimated_cost: true,
+                },
+            });
+            log_llm_response(requestId, {
+                ok: true,
+                provider_request_id: data?.request_id,
+                duration: actualDuration,
+                resolution,
+                video_url: videoUrl,
+            });
+            return [videoUrl];
+        } catch (error) {
+            log_llm_error(requestId, error);
+            log_llm_response(requestId, { ok: false });
+            throw error;
+        } finally {
+            clearTimeout(timeout);
+            agent.abortSignal?.removeEventListener('abort', onAbort);
         }
     }
 }

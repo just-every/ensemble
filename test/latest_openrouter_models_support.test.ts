@@ -32,9 +32,9 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'glm-latest', model: 'glm-5' } as any)).toBe('z-ai/glm-5.2');
         expect(getProviderFromModel('z-ai/glm-5.2')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.7756,
-            cached_input_per_million: 0.14404,
-            output_per_million: 2.4376,
+            input_per_million: 0.966,
+            cached_input_per_million: 0.1794,
+            output_per_million: 3.036,
         });
         expect(model?.features).toMatchObject({
             context_length: 1048576,
@@ -55,9 +55,9 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'kimi', model: 'kimi-k2-6' } as any)).toBe('moonshotai/kimi-k2.6');
         expect(getProviderFromModel('moonshotai/kimi-k2.6')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.684,
-            cached_input_per_million: 0.144,
-            output_per_million: 3.42,
+            input_per_million: 0.95,
+            cached_input_per_million: 0.16,
+            output_per_million: 4,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
@@ -80,9 +80,9 @@ describe('latest OpenRouter model support', () => {
         );
         expect(getProviderFromModel('moonshotai/kimi-k2.7-code')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.82,
-            cached_input_per_million: 0.16,
-            output_per_million: 3.75,
+            input_per_million: 0.73,
+            cached_input_per_million: 0.15,
+            output_per_million: 3.5,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
@@ -228,9 +228,9 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('tencent/hy3')).toBe('openrouter');
         expect(getProviderFromModel('tencent/hy3-high')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.14,
-            cached_input_per_million: 0.035,
-            output_per_million: 0.58,
+            input_per_million: 0.132,
+            cached_input_per_million: 0.033,
+            output_per_million: 0.528,
         });
         expect(model?.features).toMatchObject({
             context_length: 262144,
@@ -356,9 +356,9 @@ describe('latest OpenRouter model support', () => {
         );
         expect(getProviderFromModel('qwen/qwen3.6-max-preview')).toBe('openrouter');
         expect(maxPreview?.cost).toMatchObject({
-            input_per_million: 1.04,
+            input_per_million: 1.027,
             cached_input_per_million: 1.3,
-            output_per_million: 6.24,
+            output_per_million: 6.162,
         });
         expect(maxPreview?.features).toMatchObject({
             context_length: 262144,
@@ -373,9 +373,9 @@ describe('latest OpenRouter model support', () => {
 
         expect(dense?.id).toBe('qwen/qwen3.6-27b');
         expect(dense?.cost).toMatchObject({
-            input_per_million: 0.45,
+            input_per_million: 0.3,
             cached_input_per_million: 0.15,
-            output_per_million: 2.7,
+            output_per_million: 2,
         });
         expect(dense?.features?.max_output_tokens).toBe(65536);
     });

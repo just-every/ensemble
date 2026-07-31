@@ -49,7 +49,7 @@ describe('July 2026 provider model refresh', () => {
         expect(findModel('Laguna S 2.1')).toMatchObject({
             id: 'poolside/laguna-s-2.1',
             provider: 'openrouter',
-            cost: { input_per_million: 0.1, cached_input_per_million: 0.01, output_per_million: 0.2 },
+            cost: { input_per_million: 0.09, cached_input_per_million: 0.009, output_per_million: 0.18 },
         });
     });
 

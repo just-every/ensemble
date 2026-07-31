@@ -3,6 +3,24 @@ import type { AgentDefinition, VideoGenerationOpts } from '../types/types.js';
 import { getModelFromAgent, getModelProvider } from '../model_providers/model_provider.js';
 import { createTraceContext } from '../utils/trace_context.js';
 
+function summarizeMediaInput(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    if (value.startsWith('data:')) {
+        const mediaType = /^data:([^;,]+)/.exec(value)?.[1] || 'application/octet-stream';
+        return `[inline ${mediaType}; ${value.length} characters]`;
+    }
+    return value;
+}
+
+function traceableVideoOptions(options: VideoGenerationOpts): VideoGenerationOpts {
+    return {
+        ...options,
+        source_image: summarizeMediaInput(options.source_image),
+        end_image: summarizeMediaInput(options.end_image),
+        source_video: summarizeMediaInput(options.source_video),
+    };
+}
+
 /** Generate video through a provider's native asynchronous video API. */
 export async function ensembleVideo(
     prompt: string,
@@ -11,7 +29,8 @@ export async function ensembleVideo(
 ): Promise<string[]> {
     const trace = createTraceContext(agent, 'video_generation');
     const requestId = options.request_id ?? randomUUID();
-    await trace.emitTurnStart({ prompt, options });
+    const traceOptions = traceableVideoOptions(options);
+    await trace.emitTurnStart({ prompt, options: traceOptions });
     let requestStarted = false;
     try {
         const model = await getModelFromAgent(agent, 'video_generation');
@@ -21,7 +40,7 @@ export async function ensembleVideo(
             agent_id: agent.agent_id,
             provider: provider.provider_id,
             model,
-            payload: { prompt, options },
+            payload: { prompt, options: traceOptions },
         });
         requestStarted = true;
         const videos = await provider.createVideo(prompt, model, agent, { ...options, request_id: requestId });

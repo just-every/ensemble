@@ -105,6 +105,7 @@ const MODEL_PROVIDER_MAP: Record<string, ModelProvider> = {
     'gemini-': geminiProvider,
     'gemma-': geminiProvider,
     'imagen-': geminiProvider, // Image generation models
+    'veo-': geminiProvider, // Video generation models
 
     // Luma Photon models
     'luma-': lumaProvider,
@@ -170,7 +171,7 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
         case 'anthropic':
             return !!process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-');
         case 'google':
-            return !!process.env.GOOGLE_API_KEY;
+            return !!(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY);
         case 'xai':
             return !!process.env.XAI_API_KEY && process.env.XAI_API_KEY.startsWith('xai-');
         case 'deepseek':
@@ -211,6 +212,12 @@ export function isProviderKeyValid(provider: ModelProviderID): boolean {
             return false;
         }
     }
+}
+
+function providerApiKeyName(provider: ModelProviderID): string {
+    if (provider === 'fal') return 'FAL_KEY';
+    if (provider === 'google') return 'GOOGLE_API_KEY or GEMINI_API_KEY';
+    return `${provider.toUpperCase()}_API_KEY`;
 }
 
 /**
@@ -601,7 +608,7 @@ export function getModelProvider(model?: string): ModelProvider {
             }
             if (!isProviderKeyValid(providerName)) {
                 throw new Error(
-                    `API key for ${providerName} provider is missing or invalid. Please set ${providerName.toUpperCase()}_API_KEY environment variable.`
+                    `API key for ${providerName} provider is missing or invalid. Please set ${providerApiKeyName(providerName)} environment variable.`
                 );
             }
             return provider;
@@ -612,7 +619,7 @@ export function getModelProvider(model?: string): ModelProvider {
                 const providerName = getProviderFromModel(model);
                 if (!isProviderKeyValid(providerName)) {
                     throw new Error(
-                        `API key for ${providerName} provider is missing or invalid. Please set ${providerName.toUpperCase()}_API_KEY environment variable.`
+                        `API key for ${providerName} provider is missing or invalid. Please set ${providerApiKeyName(providerName)} environment variable.`
                     );
                 }
                 return provider;
