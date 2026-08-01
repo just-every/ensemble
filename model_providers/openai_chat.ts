@@ -31,6 +31,7 @@ import { hasEventHandler } from '../utils/event_controller.js';
 import { createProviderErrorEvent } from '../utils/failure_detection.js';
 import { findModel } from '../data/model_data.js';
 import { createChatJsonSchemaResponseFormat } from '../utils/structured_output.js';
+import { normalizeOpenAIChatUsage } from '../utils/provider_usage.js';
 
 // Extended types for Perplexity/OpenRouter response formats
 interface ExtendedDelta extends OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta {
@@ -961,27 +962,14 @@ export class OpenAIChat extends BaseModelProvider {
 
                 // --- Post-Stream Processing ---
                 if (usage) {
-                    const calculatedUsage = costTracker.addUsage({
-                        model: model,
-                        input_tokens: usage.prompt_tokens || 0,
-                        output_tokens: usage.completion_tokens || 0,
-                        cached_tokens: usage.prompt_tokens_details?.cached_tokens || 0,
-                        metadata: {
-                            total_tokens: usage.total_tokens || 0,
-                            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens || 0,
-                        },
-                    });
+                    const calculatedUsage = costTracker.addUsage(normalizeOpenAIChatUsage(model, usage));
 
                     // Only yield cost_update event if no global event handler is set
                     // This prevents duplicate events when using the global EventController
                     if (!hasEventHandler()) {
                         yield {
                             type: 'cost_update',
-                            usage: {
-                                ...calculatedUsage,
-                                total_tokens:
-                                    usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
-                            },
+                            usage: calculatedUsage,
                         };
                     }
                 } else {

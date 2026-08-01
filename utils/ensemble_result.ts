@@ -32,6 +32,9 @@ export interface EnsembleResult {
         output_tokens: number;
         total_tokens?: number;
         cached_tokens?: number;
+        cache_write_tokens?: number;
+        cache_write_1h_tokens?: number;
+        reasoning_tokens?: number;
         thought_delay?: number;
     };
 
@@ -217,6 +220,9 @@ export async function ensembleResult(
                         output_tokens: costEvent.usage.output_tokens,
                         total_tokens: costEvent.usage.total_tokens,
                         cached_tokens: costEvent.usage.cached_tokens,
+                        cache_write_tokens: costEvent.usage.cache_write_tokens,
+                        cache_write_1h_tokens: costEvent.usage.cache_write_1h_tokens,
+                        reasoning_tokens: costEvent.usage.reasoning_tokens,
                         thought_delay: costEvent.thought_delay,
                     };
                     break;

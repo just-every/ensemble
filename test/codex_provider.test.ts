@@ -179,7 +179,7 @@ describe('Codex provider', () => {
                 undefined,
                 [
                     '{"type":"thread.started","thread_id":"thread-test"}',
-                    '{"type":"turn.completed","usage":{"input_tokens":28882,"cached_input_tokens":20864,"output_tokens":2,"reasoning_output_tokens":0}}',
+                    '{"type":"turn.completed","usage":{"input_tokens":28882,"cached_input_tokens":20864,"output_tokens":2,"reasoning_output_tokens":1}}',
                     '',
                 ].join('\n')
             );
@@ -198,11 +198,12 @@ describe('Codex provider', () => {
                 input_tokens: 28882,
                 cached_tokens: 20864,
                 output_tokens: 2,
+                reasoning_tokens: 1,
                 total_tokens: 28884,
                 metadata: {
                     codex_cli_model: 'gpt-5.5',
                     source: 'codex_cli_json',
-                    reasoning_output_tokens: 0,
+                    reasoning_output_tokens: 1,
                 },
             });
             expect(typeof usageEvents.at(-1)?.cost).toBe('number');

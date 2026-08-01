@@ -698,6 +698,8 @@ export interface ModelCost {
     input_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
     output_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
     cached_input_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
+    cache_write_input_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
+    cache_write_1h_input_per_million?: number | TieredPrice | TimeBasedPrice | ModalityPrice;
 
     // Cost per image (for image generation models like Imagen)
     per_image?: number;
@@ -753,10 +755,13 @@ export interface ModelEntry {
 export interface ModelUsage {
     model?: string; // The ID of the model used (e.g., 'gemini-2.0-flash')
     cost?: number; // Calculated cost (optional, will be calculated if missing)
-    input_tokens?: number; // Number of input tokens
-    output_tokens?: number; // Number of output tokens
+    input_tokens?: number; // Total input tokens, including cache reads and writes
+    output_tokens?: number; // Total billed output tokens, including reasoning/thinking tokens where applicable
     total_tokens?: number; // Total number of tokens (input + output)
-    cached_tokens?: number; // Number of cached input tokens
+    cached_tokens?: number; // Cache-read input tokens (a subset of input_tokens)
+    cache_write_tokens?: number; // Default/5-minute cache-write input tokens (a subset of input_tokens)
+    cache_write_1h_tokens?: number; // 1-hour cache-write input tokens (a subset of input_tokens)
+    reasoning_tokens?: number; // Reasoning/thinking tokens (telemetry only; already included in output_tokens)
     image_count?: number; // Number of images generated (for models like Imagen)
     video_seconds?: number; // Number of generated video seconds
     metadata?: Record<string, unknown>; // Additional metadata for usage tracking

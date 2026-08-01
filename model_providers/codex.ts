@@ -341,6 +341,7 @@ function codexUsageFromJsonl(
         output_tokens: outputTokens,
         total_tokens: latestUsage.total_tokens ?? inputTokens + outputTokens,
         cached_tokens: latestUsage.cached_input_tokens,
+        reasoning_tokens: latestUsage.reasoning_output_tokens,
         request_id: requestId,
         metadata: {
             ...metadata,

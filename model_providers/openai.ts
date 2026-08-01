@@ -55,6 +55,7 @@ import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/r
 import type { WebSocket } from 'ws';
 import { createOpenAIRealtimeSession } from './openai_realtime.js';
 import { OpenAIChat } from './openai_chat.js';
+import { normalizeOpenAIResponsesUsage } from '../utils/provider_usage.js';
 
 const BROWSER_WIDTH = 1024;
 const BROWSER_HEIGHT = 1536;
@@ -1243,23 +1244,12 @@ export class OpenAIProvider extends BaseModelProvider {
 
                 if ((response as any).usage) {
                     const usage = (response as any).usage;
-                    const calculatedUsage = costTracker.addUsage({
-                        model,
-                        input_tokens: usage.input_tokens || 0,
-                        output_tokens: usage.output_tokens || 0,
-                        cached_tokens: usage.input_tokens_details?.cached_tokens || 0,
-                        metadata: {
-                            reasoning_tokens: usage.output_tokens_details?.reasoning_tokens || 0,
-                        },
-                    });
+                    const calculatedUsage = costTracker.addUsage(normalizeOpenAIResponsesUsage(model, usage));
 
                     if (!hasEventHandler()) {
                         yield {
                             type: 'cost_update',
-                            usage: {
-                                ...calculatedUsage,
-                                total_tokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
-                            },
+                            usage: calculatedUsage,
                         };
                     }
                 }
@@ -1323,34 +1313,31 @@ export class OpenAIProvider extends BaseModelProvider {
                         //console.log(`[OpenAI] System resumed, continuing stream for model ${model}`);
                     }
 
+                    // Usage is terminal-state independent: failed and incomplete responses
+                    // can still consume billable input and output tokens.
+                    if (
+                        (event.type === 'response.completed' ||
+                            event.type === 'response.failed' ||
+                            event.type === 'response.incomplete') &&
+                        event.response?.usage
+                    ) {
+                        const calculatedUsage = costTracker.addUsage(
+                            normalizeOpenAIResponsesUsage(model, event.response.usage)
+                        );
+
+                        if (!hasEventHandler()) {
+                            yield {
+                                type: 'cost_update',
+                                usage: calculatedUsage,
+                            };
+                        }
+                    }
+
                     // --- Response Lifecycle Events ---
                     if (event.type === 'response.in_progress') {
                         // Optional: Log or update UI to indicate the response is starting/in progress
                         // console.log(`Response ${event.response.id} is in progress...`);
-                    } else if (event.type === 'response.completed' && event.response?.usage) {
-                        // Final usage information
-                        const calculatedUsage = costTracker.addUsage({
-                            model, // Ensure 'model' variable is accessible here
-                            input_tokens: event.response.usage.input_tokens || 0,
-                            output_tokens: event.response.usage.output_tokens || 0,
-                            cached_tokens: event.response.usage.input_tokens_details?.cached_tokens || 0,
-                            metadata: {
-                                reasoning_tokens: event.response.usage.output_tokens_details?.reasoning_tokens || 0,
-                            },
-                        });
-
-                        // Only yield cost_update event if no global event handler is set
-                        // This prevents duplicate events when using the global EventController
-                        if (!hasEventHandler()) {
-                            yield {
-                                type: 'cost_update',
-                                usage: {
-                                    ...calculatedUsage,
-                                    total_tokens:
-                                        event.response.usage.input_tokens + event.response.usage.output_tokens,
-                                },
-                            };
-                        }
+                    } else if (event.type === 'response.completed') {
                         // console.log(`Response ${event.response.id} completed.`);
                     } else if (event.type === 'response.failed' && event.response?.error) {
                         // Response failed entirely

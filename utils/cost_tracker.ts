@@ -70,8 +70,17 @@ class CostTracker {
         const original_input_tokens = usage.input_tokens || 0;
         const output_tokens = usage.output_tokens || 0;
         const cached_tokens = usage.cached_tokens || 0;
+        const cache_write_tokens = usage.cache_write_tokens || 0;
+        const cache_write_1h_tokens = usage.cache_write_1h_tokens || 0;
         const image_count = usage.image_count || 0;
         const video_seconds = usage.video_seconds || 0;
+
+        const inputComponentTokens = cached_tokens + cache_write_tokens + cache_write_1h_tokens;
+        if (inputComponentTokens > original_input_tokens) {
+            throw new Error(
+                `Input token components (${inputComponentTokens}) exceed total input tokens (${original_input_tokens}) for ${usage.model}`
+            );
+        }
 
         // Use provided timestamp, or current time if needed for time-based pricing
         const calculationTime = usage.timestamp || new Date();
@@ -99,7 +108,9 @@ class CostTracker {
         const usesTimeBasedPricing =
             hasTimeBasedPricing(model.cost?.input_per_million) ||
             hasTimeBasedPricing(model.cost?.output_per_million) ||
-            hasTimeBasedPricing(model.cost?.cached_input_per_million);
+            hasTimeBasedPricing(model.cost?.cached_input_per_million) ||
+            hasTimeBasedPricing(model.cost?.cache_write_input_per_million) ||
+            hasTimeBasedPricing(model.cost?.cache_write_1h_input_per_million);
 
         if (!usage.timestamp && usesTimeBasedPricing) {
             // Silently default to current time for calculation
@@ -172,11 +183,22 @@ class CostTracker {
             return 0;
         };
 
-        // Determine how many input tokens are non-cached vs cached
+        // Cache reads and writes are disjoint subsets of the canonical input total.
         const actualCachedTokens =
             cached_tokens > 0 && model.cost?.cached_input_per_million !== undefined ? cached_tokens : 0;
+        const usesOpenAICacheWriteRate = model.provider === 'openai' && model.cost?.input_per_million !== undefined;
+        if (
+            cache_write_tokens > 0 &&
+            model.cost?.cache_write_input_per_million === undefined &&
+            !usesOpenAICacheWriteRate
+        ) {
+            throw new Error(`Cache-write pricing is missing for ${usage.model}`);
+        }
+        if (cache_write_1h_tokens > 0 && model.cost?.cache_write_1h_input_per_million === undefined) {
+            throw new Error(`1-hour cache-write pricing is missing for ${usage.model}`);
+        }
         const nonCachedInputTokens =
-            actualCachedTokens > 0 ? Math.max(0, original_input_tokens - actualCachedTokens) : original_input_tokens;
+            original_input_tokens - actualCachedTokens - cache_write_tokens - cache_write_1h_tokens;
 
         // Calculate Input Token Cost (Non-Cached Part)
         if (nonCachedInputTokens > 0 && model.cost?.input_per_million !== undefined) {
@@ -196,6 +218,26 @@ class CostTracker {
                 usage.input_modality
             );
             usage.cost += (actualCachedTokens / 1000000) * cachedPricePerMillion;
+        }
+
+        // Calculate default/5-minute cache-write cost. OpenAI reports cache-write
+        // tokens across model families and bills them at 1.25x the model's input rate.
+        if (cache_write_tokens > 0) {
+            const cacheWritePricePerMillion =
+                model.cost?.cache_write_input_per_million !== undefined
+                    ? getPrice(cache_write_tokens, model.cost.cache_write_input_per_million, usage.input_modality)
+                    : getPrice(original_input_tokens, model.cost?.input_per_million, usage.input_modality) * 1.25;
+            usage.cost += (cache_write_tokens / 1000000) * cacheWritePricePerMillion;
+        }
+
+        // Calculate 1-hour cache-write cost when the provider reports that TTL separately.
+        if (cache_write_1h_tokens > 0 && model.cost?.cache_write_1h_input_per_million !== undefined) {
+            const cacheWrite1hPricePerMillion = getPrice(
+                cache_write_1h_tokens,
+                model.cost.cache_write_1h_input_per_million,
+                usage.input_modality
+            );
+            usage.cost += (cache_write_1h_tokens / 1000000) * cacheWrite1hPricePerMillion;
         }
 
         // Calculate Output Token Cost
@@ -479,6 +521,10 @@ export interface UsageEntry {
     model: string;
     input_tokens?: number;
     output_tokens?: number;
+    cached_tokens?: number;
+    cache_write_tokens?: number;
+    cache_write_1h_tokens?: number;
+    reasoning_tokens?: number;
     image_count?: number;
     timestamp?: Date;
 }

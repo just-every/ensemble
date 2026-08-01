@@ -38,6 +38,11 @@ import { findModel } from '../data/model_data.js';
 import { appendMessageWithImage, normalizeImageDataUrl } from '../utils/image_utils.js';
 import { DeltaBuffer, bufferDelta, flushBufferedDeltas } from '../utils/delta_buffer.js';
 import { hasEventHandler } from '../utils/event_controller.js';
+import {
+    createAnthropicUsageAccumulator,
+    mergeAnthropicUsage,
+    normalizeAnthropicUsage,
+} from '../utils/anthropic_usage.js';
 
 // Define mappings for thinking budget configurations
 const THINKING_BUDGET_CONFIGS: Record<string, number> = {
@@ -631,11 +636,7 @@ export class ClaudeProvider extends BaseModelProvider {
         agent: AgentDefinition,
         requestId?: string
     ): AsyncGenerator<ProviderStreamEvent> {
-        // --- Usage Accumulators ---
-        let totalInputTokens = 0;
-        let totalOutputTokens = 0;
-        let totalCacheCreationInputTokens = 0;
-        let totalCacheReadInputTokens = 0;
+        const usageAccumulator = createAnthropicUsageAccumulator();
         let streamCompletedSuccessfully = false; // Flag to track successful stream completion
         let messageCompleteYielded = false; // Flag to track if message_complete was yielded
 
@@ -874,20 +875,11 @@ export class ClaudeProvider extends BaseModelProvider {
                     // --- Accumulate Usage ---
                     // Check message_start for initial usage (often includes input tokens)
                     if (event.type === 'message_start' && event.message?.usage) {
-                        const usage = event.message.usage;
-                        totalInputTokens += usage.input_tokens || 0;
-                        totalOutputTokens += usage.output_tokens || 0; // Sometimes initial output tokens are here
-                        totalCacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
-                        totalCacheReadInputTokens += usage.cache_read_input_tokens || 0;
+                        mergeAnthropicUsage(usageAccumulator, event.message.usage);
                     }
                     // Check message_delta for incremental usage (often includes output tokens)
                     else if (event.type === 'message_delta' && event.usage) {
-                        const usage = event.usage;
-                        // Input tokens shouldn't change mid-stream, but check just in case
-                        totalInputTokens += usage.input_tokens || 0;
-                        totalOutputTokens += usage.output_tokens || 0;
-                        totalCacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
-                        totalCacheReadInputTokens += usage.cache_read_input_tokens || 0;
+                        mergeAnthropicUsage(usageAccumulator, event.usage);
                     }
 
                     // Capture terminal stop metadata from message_delta (independent of
@@ -1079,16 +1071,14 @@ export class ClaudeProvider extends BaseModelProvider {
                         if (event['amazon-bedrock-invocationMetrics']) {
                             // Check for Bedrock specific metrics if applicable
                             const metrics = event['amazon-bedrock-invocationMetrics'];
-                            totalInputTokens += metrics.inputTokenCount || 0;
-                            totalOutputTokens += metrics.outputTokenCount || 0;
+                            mergeAnthropicUsage(usageAccumulator, {
+                                input_tokens: metrics.inputTokenCount,
+                                output_tokens: metrics.outputTokenCount,
+                            });
                             // Add other Bedrock metrics if needed
                         } else if (event.usage) {
                             // Check standard usage object as a fallback
-                            const usage = event.usage;
-                            totalInputTokens += usage.input_tokens || 0;
-                            totalOutputTokens += usage.output_tokens || 0;
-                            totalCacheCreationInputTokens += usage.cache_creation_input_tokens || 0;
-                            totalCacheReadInputTokens += usage.cache_read_input_tokens || 0;
+                            mergeAnthropicUsage(usageAccumulator, event.usage);
                         }
 
                         // Complete any pending tool call (should ideally be handled by content_block_stop)
@@ -1270,32 +1260,27 @@ export class ClaudeProvider extends BaseModelProvider {
                 retryableStatusCodes: agent.retryOptions?.additionalRetryableStatusCodes,
             });
         } finally {
-            // Track cost if we have token usage data
-            if (totalInputTokens > 0 || totalOutputTokens > 0) {
-                const cachedTokens = totalCacheCreationInputTokens + totalCacheReadInputTokens;
-                const calculatedUsage = costTracker.addUsage({
-                    model,
-                    input_tokens: totalInputTokens,
-                    output_tokens: totalOutputTokens,
-                    cached_tokens: cachedTokens,
-                    metadata: {
-                        cache_creation_input_tokens: totalCacheCreationInputTokens,
-                        cache_read_input_tokens: totalCacheReadInputTokens,
-                        total_tokens: totalInputTokens + totalOutputTokens,
-                    },
-                });
+            try {
+                const normalizedUsage = normalizeAnthropicUsage(model, usageAccumulator);
+                if (normalizedUsage) {
+                    const calculatedUsage = costTracker.addUsage(normalizedUsage);
 
-                // Only yield cost_update event if no global event handler is set
-                // This prevents duplicate events when using the global EventController
-                if (!hasEventHandler()) {
-                    yield {
-                        type: 'cost_update',
-                        usage: {
-                            ...calculatedUsage,
-                            total_tokens: totalInputTokens + totalOutputTokens,
-                        },
-                    };
+                    // Only yield cost_update event if no global event handler is set
+                    // This prevents duplicate events when using the global EventController
+                    if (!hasEventHandler()) {
+                        yield {
+                            type: 'cost_update',
+                            usage: calculatedUsage,
+                        };
+                    }
                 }
+            } catch (usageError) {
+                log_llm_error(requestId, usageError);
+                yield {
+                    type: 'error',
+                    error: `Claude usage accounting error (${model}): ${usageError instanceof Error ? usageError.message : String(usageError)}`,
+                    recoverable: false,
+                };
             }
         }
     }

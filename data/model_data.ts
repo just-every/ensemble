@@ -1273,6 +1273,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 price_above_threshold_per_million: 1.0,
                 tier_basis: 'input_tokens',
             },
+            cache_write_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 6.25,
+                price_above_threshold_per_million: 12.5,
+                tier_basis: 'input_tokens',
+            },
             output_per_million: {
                 threshold_tokens: 272000,
                 price_below_threshold_per_million: 30.0,
@@ -1308,6 +1314,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 price_above_threshold_per_million: 0.4,
                 tier_basis: 'input_tokens',
             },
+            cache_write_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5.0,
+                tier_basis: 'input_tokens',
+            },
             output_per_million: {
                 threshold_tokens: 272000,
                 price_below_threshold_per_million: 12.0,
@@ -1341,6 +1353,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 threshold_tokens: 272000,
                 price_below_threshold_per_million: 0.02,
                 price_above_threshold_per_million: 0.04,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.25,
+                price_above_threshold_per_million: 0.5,
                 tier_basis: 'input_tokens',
             },
             output_per_million: {
@@ -2193,6 +2211,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 3.0,
             output_per_million: 15.0,
             cached_input_per_million: 0.3, // 10% of input cost
+            cache_write_input_per_million: 3.75,
+            cache_write_1h_input_per_million: 6.0,
         },
         features: {
             context_length: 200000, // Standard context
@@ -2229,16 +2249,31 @@ export const MODEL_REGISTRY: ModelEntry[] = [
                 threshold_tokens: 200000,
                 price_below_threshold_per_million: 3.0,
                 price_above_threshold_per_million: 6.0,
+                tier_basis: 'input_tokens',
             },
             output_per_million: {
                 threshold_tokens: 200000,
                 price_below_threshold_per_million: 15.0,
                 price_above_threshold_per_million: 22.5,
+                tier_basis: 'input_tokens',
             },
             cached_input_per_million: {
                 threshold_tokens: 200000,
                 price_below_threshold_per_million: 0.3,
                 price_above_threshold_per_million: 0.6,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 3.75,
+                price_above_threshold_per_million: 7.5,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_1h_input_per_million: {
+                threshold_tokens: 200000,
+                price_below_threshold_per_million: 6.0,
+                price_above_threshold_per_million: 12.0,
+                tier_basis: 'input_tokens',
             },
         },
         features: {
@@ -2265,6 +2300,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 3.0,
             output_per_million: 15.0,
             cached_input_per_million: 0.3, // 10% of input cost
+            cache_write_input_per_million: 3.75,
+            cache_write_1h_input_per_million: 6.0,
         },
         features: {
             context_length: 200000,
@@ -2290,6 +2327,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 2.0,
             output_per_million: 10.0,
             cached_input_per_million: 0.2,
+            cache_write_input_per_million: 2.5,
+            cache_write_1h_input_per_million: 4.0,
         },
         features: {
             context_length: 1_000_000,
@@ -2320,6 +2359,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 6.0,
             output_per_million: 22.5,
             cached_input_per_million: 0.6, // 10% of input cost
+            cache_write_input_per_million: 7.5,
+            cache_write_1h_input_per_million: 12.0,
         },
         features: {
             context_length: 1_000_000, // 1M token context
@@ -2345,6 +2386,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 1.0,
             output_per_million: 5.0,
             cached_input_per_million: 0.1, // 10% of input cost
+            cache_write_input_per_million: 1.25,
+            cache_write_1h_input_per_million: 2.0,
         },
         features: {
             context_length: 200000,
@@ -2380,6 +2423,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 1.0,
             output_per_million: 5.0,
             cached_input_per_million: 0.1,
+            cache_write_input_per_million: 1.25,
+            cache_write_1h_input_per_million: 2.0,
         },
         features: {
             context_length: 200000,
@@ -2404,6 +2449,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 3.0,
             output_per_million: 15.0,
             cached_input_per_million: 0.3,
+            cache_write_input_per_million: 3.75,
+            cache_write_1h_input_per_million: 6.0,
         },
         features: {
             // Assumes use of Claude 3.7 Sonnet
@@ -2427,6 +2474,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 15.0,
             output_per_million: 75.0,
             cached_input_per_million: 1.5, // 10% of input cost
+            cache_write_input_per_million: 18.75,
+            cache_write_1h_input_per_million: 30.0,
         },
         features: {
             context_length: 200000,
@@ -2457,6 +2506,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 5.0,
             output_per_million: 25.0,
             cached_input_per_million: 0.5,
+            cache_write_input_per_million: 6.25,
+            cache_write_1h_input_per_million: 10.0,
         },
         features: {
             context_length: 200000,
@@ -2482,6 +2533,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 5.0,
             output_per_million: 25.0,
             cached_input_per_million: 0.5, // 10% of input cost
+            cache_write_input_per_million: 6.25,
+            cache_write_1h_input_per_million: 10.0,
         },
         features: {
             context_length: 1_000_000,
@@ -2512,6 +2565,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 5.0,
             output_per_million: 25.0,
             cached_input_per_million: 0.5,
+            cache_write_input_per_million: 6.25,
+            cache_write_1h_input_per_million: 10.0,
         },
         features: {
             context_length: 1_000_000,
@@ -2545,6 +2600,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 5.0,
             output_per_million: 25.0,
             cached_input_per_million: 0.5,
+            cache_write_input_per_million: 6.25,
+            cache_write_1h_input_per_million: 10.0,
         },
         features: {
             context_length: 1_000_000,
@@ -2570,6 +2627,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             input_per_million: 10.0,
             output_per_million: 50.0,
             cached_input_per_million: 1.0,
+            cache_write_input_per_million: 12.5,
+            cache_write_1h_input_per_million: 20.0,
         },
         features: {
             context_length: 1_000_000,

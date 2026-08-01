@@ -63,6 +63,7 @@ import { usesCurrentGeminiGenerateContentContract } from './gemini_model_contrac
 import { hasEventHandler } from '../utils/event_controller.js';
 import { truncateLargeValues } from '../utils/truncate_utils.js';
 import { findModel } from '../data/model_data.js';
+import { normalizeGeminiUsage } from '../utils/provider_usage.js';
 
 // Convert our tool definition to Gemini's updated FunctionDeclaration format
 /**
@@ -1687,27 +1688,14 @@ export class GeminiProvider extends BaseModelProvider {
             }
 
             if (usageMetadata) {
-                const calculatedUsage = costTracker.addUsage({
-                    model,
-                    input_tokens: usageMetadata.promptTokenCount || 0,
-                    output_tokens: usageMetadata.candidatesTokenCount || 0,
-                    cached_tokens: usageMetadata.cachedContentTokenCount || 0,
-                    metadata: {
-                        total_tokens: usageMetadata.totalTokenCount || 0,
-                        reasoning_tokens: usageMetadata.thoughtsTokenCount || 0,
-                        tool_tokens: usageMetadata.toolUsePromptTokenCount || 0,
-                    },
-                });
+                const calculatedUsage = costTracker.addUsage(normalizeGeminiUsage(model, usageMetadata));
 
                 // Only yield cost_update event if no global event handler is set
                 // This prevents duplicate events when using the global EventController
                 if (!hasEventHandler()) {
                     yield withRequestId({
                         type: 'cost_update',
-                        usage: {
-                            ...calculatedUsage,
-                            total_tokens: usageMetadata.totalTokenCount || 0,
-                        },
+                        usage: calculatedUsage,
                     });
                 }
             } else {
@@ -2568,6 +2556,7 @@ export class GeminiProvider extends BaseModelProvider {
                                 input_tokens: inputTokens,
                                 output_tokens: outputTokens,
                                 cached_tokens: usageMetadata.cachedContentTokenCount || 0,
+                                reasoning_tokens: thoughtTokens,
                                 // Pass through request correlation id so streaming consumers receive cost_update
                                 request_id: opts?.request_id,
                                 metadata: {
@@ -3704,18 +3693,13 @@ class GeminiLiveSession implements LiveSession {
         // Usage metadata (cost tracking)
         if (msg.usageMetadata) {
             const usage = msg.usageMetadata;
-            const inputTokens = usage.promptTokenCount || 0;
-            const outputTokens = usage.candidatesTokenCount || 0;
-            const totalTokens = usage.totalTokenCount || 0;
+            const normalizedUsage = normalizeGeminiUsage(this.model, usage);
 
             // Track with cost tracker
             costTracker.addUsage({
-                model: this.model,
-                input_tokens: inputTokens,
-                output_tokens: outputTokens,
-                cached_tokens: usage.cachedContentTokenCount || 0,
+                ...normalizedUsage,
                 metadata: {
-                    total_tokens: totalTokens,
+                    ...normalizedUsage.metadata,
                     source: 'gemini-live',
                 },
             });

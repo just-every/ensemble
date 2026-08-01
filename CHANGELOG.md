@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Corrected provider token accounting: retained OpenAI terminal usage, exposed Codex reasoning telemetry, included Gemini tool/thinking tokens in their billed components, and separated Anthropic cache reads from 5-minute and 1-hour cache writes.
 - Added direct DeepSeek V4 Pro/Flash support with native thinking controls and explicit migration errors for retired DeepSeek Chat/Reasoner IDs.
 - Added OpenAI `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, and `gpt-audio-1.5` with GA Realtime WebSocket transport and Chat Completions audio input/output support.
 - Added native xAI video generation through `ensembleVideo`, corrected Grok Imagine Quality image routing and input/output billing, and refreshed Grok 4.3/4.5/4.20/Build aliases, limits, and long-context pricing.
