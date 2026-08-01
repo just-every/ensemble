@@ -1,4 +1,5 @@
 import type { ModelUsage } from '../types/types.js';
+import { assertTokenSubset, optionalTokenCount } from './token_usage_validation.js';
 
 export interface AnthropicUsageAccumulator {
     inputTokens: number;
@@ -24,10 +25,6 @@ export interface AnthropicUsageSample {
     } | null;
 }
 
-function tokenCount(value: number | null | undefined): number {
-    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
-}
-
 export function createAnthropicUsageAccumulator(): AnthropicUsageAccumulator {
     return {
         inputTokens: 0,
@@ -42,20 +39,35 @@ export function createAnthropicUsageAccumulator(): AnthropicUsageAccumulator {
 
 /** Anthropic streaming usage fields are cumulative, so retain maxima instead of summing events. */
 export function mergeAnthropicUsage(accumulator: AnthropicUsageAccumulator, usage: AnthropicUsageSample): void {
-    accumulator.inputTokens = Math.max(accumulator.inputTokens, tokenCount(usage.input_tokens));
-    accumulator.outputTokens = Math.max(accumulator.outputTokens, tokenCount(usage.output_tokens));
+    accumulator.inputTokens = Math.max(
+        accumulator.inputTokens,
+        optionalTokenCount(usage.input_tokens, 'Anthropic usage.input_tokens')
+    );
+    accumulator.outputTokens = Math.max(
+        accumulator.outputTokens,
+        optionalTokenCount(usage.output_tokens, 'Anthropic usage.output_tokens')
+    );
     accumulator.cacheCreationTokens = Math.max(
         accumulator.cacheCreationTokens,
-        tokenCount(usage.cache_creation_input_tokens)
+        optionalTokenCount(usage.cache_creation_input_tokens, 'Anthropic usage.cache_creation_input_tokens')
     );
-    accumulator.cacheReadTokens = Math.max(accumulator.cacheReadTokens, tokenCount(usage.cache_read_input_tokens));
+    accumulator.cacheReadTokens = Math.max(
+        accumulator.cacheReadTokens,
+        optionalTokenCount(usage.cache_read_input_tokens, 'Anthropic usage.cache_read_input_tokens')
+    );
     accumulator.cacheWrite5mTokens = Math.max(
         accumulator.cacheWrite5mTokens,
-        tokenCount(usage.cache_creation?.ephemeral_5m_input_tokens)
+        optionalTokenCount(
+            usage.cache_creation?.ephemeral_5m_input_tokens,
+            'Anthropic usage.cache_creation.ephemeral_5m_input_tokens'
+        )
     );
     accumulator.cacheWrite1hTokens = Math.max(
         accumulator.cacheWrite1hTokens,
-        tokenCount(usage.cache_creation?.ephemeral_1h_input_tokens)
+        optionalTokenCount(
+            usage.cache_creation?.ephemeral_1h_input_tokens,
+            'Anthropic usage.cache_creation.ephemeral_1h_input_tokens'
+        )
     );
     accumulator.cacheCreationTokens = Math.max(
         accumulator.cacheCreationTokens,
@@ -63,7 +75,10 @@ export function mergeAnthropicUsage(accumulator: AnthropicUsageAccumulator, usag
     );
     accumulator.reasoningTokens = Math.max(
         accumulator.reasoningTokens,
-        tokenCount(usage.output_tokens_details?.thinking_tokens)
+        optionalTokenCount(
+            usage.output_tokens_details?.thinking_tokens,
+            'Anthropic usage.output_tokens_details.thinking_tokens'
+        )
     );
 }
 
@@ -80,6 +95,13 @@ export function normalizeAnthropicUsage(model: string, accumulator: AnthropicUsa
     if (inputTokens === 0 && accumulator.outputTokens === 0) {
         return undefined;
     }
+
+    assertTokenSubset(
+        'Anthropic reasoning tokens',
+        accumulator.reasoningTokens,
+        'usage.output_tokens',
+        accumulator.outputTokens
+    );
 
     return {
         model,

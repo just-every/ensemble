@@ -9,7 +9,11 @@ import {
 } from '../utils/anthropic_usage.js';
 import { CostTracker, costTracker } from '../utils/cost_tracker.js';
 import { setEventHandler } from '../utils/event_controller.js';
-import { normalizeGeminiUsage, normalizeOpenAIResponsesUsage } from '../utils/provider_usage.js';
+import {
+    normalizeGeminiUsage,
+    normalizeOpenAIChatUsage,
+    normalizeOpenAIResponsesUsage,
+} from '../utils/provider_usage.js';
 
 function streamOf(events: unknown[]) {
     return {
@@ -39,6 +43,7 @@ describe('provider token accounting', () => {
         const normalized = normalizeOpenAIResponsesUsage('gpt-5.6-terra', {
             input_tokens: 1000,
             output_tokens: 200,
+            total_tokens: 1200,
             input_tokens_details: {
                 cached_tokens: 200,
                 cache_write_tokens: 100,
@@ -68,7 +73,8 @@ describe('provider token accounting', () => {
             normalizeOpenAIResponsesUsage('gpt-5.5', {
                 input_tokens: 1000,
                 output_tokens: 0,
-                input_tokens_details: { cache_write_tokens: 100 },
+                total_tokens: 1000,
+                input_tokens_details: { cached_tokens: 0, cache_write_tokens: 100 },
             })
         );
         expect(genericOpenAIWrite.cost).toBeCloseTo(0.005125, 10);
@@ -83,6 +89,7 @@ describe('provider token accounting', () => {
                 usage: {
                     input_tokens: 1000,
                     output_tokens: 200,
+                    total_tokens: 1200,
                     input_tokens_details: { cached_tokens: 200, cache_write_tokens: 100 },
                     output_tokens_details: { reasoning_tokens: 80 },
                 },
@@ -298,5 +305,73 @@ describe('provider token accounting', () => {
         });
 
         expect(() => normalizeAnthropicUsage('claude-sonnet-5', accumulator)).toThrow('lacks an exact TTL breakdown');
+    });
+
+    it('rejects malformed or internally inconsistent OpenAI usage', () => {
+        expect(() =>
+            normalizeOpenAIResponsesUsage('gpt-5.6-terra', {
+                input_tokens: 10,
+                output_tokens: 2,
+                total_tokens: 11,
+                input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+            })
+        ).toThrow('does not equal its billed components');
+
+        expect(() =>
+            normalizeOpenAIResponsesUsage('gpt-5.6-terra', {
+                input_tokens: -1,
+                output_tokens: 0,
+                total_tokens: 0,
+                input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+            })
+        ).toThrow('must be a non-negative safe integer');
+
+        expect(() =>
+            normalizeOpenAIResponsesUsage('gpt-5.6-terra', {
+                input_tokens: 10,
+                output_tokens: 2,
+                total_tokens: 12,
+                input_tokens_details: { cached_tokens: 8, cache_write_tokens: 3 },
+            })
+        ).toThrow('exceeds usage.input_tokens');
+
+        expect(() =>
+            normalizeOpenAIChatUsage('gpt-5.5', {
+                prompt_tokens: 10,
+                completion_tokens: 2,
+                total_tokens: 13,
+            })
+        ).toThrow('does not equal its billed components');
+    });
+
+    it('rejects malformed or internally inconsistent Gemini and Anthropic usage', () => {
+        expect(() =>
+            normalizeGeminiUsage('gemini-3.6-flash', {
+                promptTokenCount: 10,
+                candidatesTokenCount: 2,
+                thoughtsTokenCount: 1,
+                totalTokenCount: 12,
+            })
+        ).toThrow('does not equal its billed components');
+
+        expect(() =>
+            normalizeGeminiUsage('gemini-3.6-flash', {
+                promptTokenCount: 10,
+                candidatesTokenCount: Number.NaN,
+            })
+        ).toThrow('must be a non-negative safe integer');
+
+        expect(() =>
+            normalizeGeminiUsage('gemini-3.6-flash', {
+                promptTokenCount: 10,
+                toolUsePromptTokenCount: 10,
+                cachedContentTokenCount: 11,
+            })
+        ).toThrow('exceeds usage.promptTokenCount');
+
+        const accumulator = createAnthropicUsageAccumulator();
+        expect(() => mergeAnthropicUsage(accumulator, { input_tokens: -1 })).toThrow(
+            'must be a non-negative safe integer'
+        );
     });
 });

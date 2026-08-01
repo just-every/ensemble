@@ -28,6 +28,7 @@ import {
     readCodexImageFiles,
 } from './codex_assets.js';
 import { prepareIsolatedCodexHome } from './codex_home.js';
+import { assertTokenSubset, assertTokenTotal, optionalTokenCount } from '../utils/token_usage_validation.js';
 
 type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 type CodexReasoningEffortInput = 'none' | 'minimal' | CodexReasoningEffort;
@@ -323,11 +324,14 @@ function codexUsageFromJsonl(
         if (!isRecord(parsed) || parsed.type !== 'turn.completed' || !isRecord(parsed.usage)) continue;
         const usage = parsed.usage;
         latestUsage = {
-            input_tokens: finiteNumber(usage.input_tokens),
-            cached_input_tokens: finiteNumber(usage.cached_input_tokens),
-            output_tokens: finiteNumber(usage.output_tokens),
-            reasoning_output_tokens: finiteNumber(usage.reasoning_output_tokens),
-            total_tokens: finiteNumber(usage.total_tokens),
+            input_tokens: optionalCodexTokenCount(usage.input_tokens, 'Codex usage.input_tokens'),
+            cached_input_tokens: optionalCodexTokenCount(usage.cached_input_tokens, 'Codex usage.cached_input_tokens'),
+            output_tokens: optionalCodexTokenCount(usage.output_tokens, 'Codex usage.output_tokens'),
+            reasoning_output_tokens: optionalCodexTokenCount(
+                usage.reasoning_output_tokens,
+                'Codex usage.reasoning_output_tokens'
+            ),
+            total_tokens: optionalCodexTokenCount(usage.total_tokens, 'Codex usage.total_tokens'),
         };
     }
 
@@ -335,6 +339,13 @@ function codexUsageFromJsonl(
     const inputTokens = latestUsage.input_tokens ?? 0;
     const outputTokens = latestUsage.output_tokens ?? 0;
     if (inputTokens === 0 && outputTokens === 0) return undefined;
+    const cachedTokens = latestUsage.cached_input_tokens ?? 0;
+    const reasoningTokens = latestUsage.reasoning_output_tokens ?? 0;
+    if (latestUsage.total_tokens !== undefined) {
+        assertTokenTotal('Codex usage.total_tokens', latestUsage.total_tokens, [inputTokens, outputTokens]);
+    }
+    assertTokenSubset('Codex cached input tokens', cachedTokens, 'usage.input_tokens', inputTokens);
+    assertTokenSubset('Codex reasoning output tokens', reasoningTokens, 'usage.output_tokens', outputTokens);
     return {
         model,
         input_tokens: inputTokens,
@@ -351,8 +362,9 @@ function codexUsageFromJsonl(
     };
 }
 
-function finiteNumber(value: unknown): number | undefined {
-    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+function optionalCodexTokenCount(value: unknown, field: string): number | undefined {
+    if (value === undefined || value === null) return undefined;
+    return optionalTokenCount(value, field);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

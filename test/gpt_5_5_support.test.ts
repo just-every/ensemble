@@ -180,7 +180,8 @@ describe('GPT-5.5 support', () => {
             usage: {
                 input_tokens: 1000,
                 output_tokens: 50,
-                input_tokens_details: { cached_tokens: 0 },
+                total_tokens: 1050,
+                input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
                 output_tokens_details: { reasoning_tokens: 10 },
             },
         });

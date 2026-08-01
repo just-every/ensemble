@@ -1,4 +1,10 @@
 import type { ModelUsage } from '../types/types.js';
+import {
+    assertTokenSubset,
+    assertTokenTotal,
+    optionalTokenCount,
+    requiredTokenCount,
+} from './token_usage_validation.js';
 
 interface OpenAIResponsesUsage {
     input_tokens?: number | null;
@@ -35,67 +41,120 @@ interface GeminiUsageMetadata {
     toolUsePromptTokenCount?: number | null;
 }
 
-function tokenCount(value: number | null | undefined): number {
-    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
-}
-
 export function normalizeOpenAIResponsesUsage(model: string, usage: OpenAIResponsesUsage): ModelUsage {
-    const inputTokens = tokenCount(usage.input_tokens);
-    const outputTokens = tokenCount(usage.output_tokens);
-    const reasoningTokens = tokenCount(usage.output_tokens_details?.reasoning_tokens);
+    const inputTokens = requiredTokenCount(usage.input_tokens, 'OpenAI usage.input_tokens');
+    const outputTokens = requiredTokenCount(usage.output_tokens, 'OpenAI usage.output_tokens');
+    const providerTotalTokens = requiredTokenCount(usage.total_tokens, 'OpenAI usage.total_tokens');
+    const cachedTokens = requiredTokenCount(
+        usage.input_tokens_details?.cached_tokens,
+        'OpenAI usage.input_tokens_details.cached_tokens'
+    );
+    const cacheWriteTokens = requiredTokenCount(
+        usage.input_tokens_details?.cache_write_tokens,
+        'OpenAI usage.input_tokens_details.cache_write_tokens'
+    );
+    const reasoningTokens = optionalTokenCount(
+        usage.output_tokens_details?.reasoning_tokens,
+        'OpenAI usage.output_tokens_details.reasoning_tokens'
+    );
+
+    assertTokenTotal('OpenAI usage.total_tokens', providerTotalTokens, [inputTokens, outputTokens]);
+    assertTokenSubset(
+        'OpenAI cached and cache-write input tokens',
+        cachedTokens + cacheWriteTokens,
+        'usage.input_tokens',
+        inputTokens
+    );
+    assertTokenSubset('OpenAI reasoning tokens', reasoningTokens, 'usage.output_tokens', outputTokens);
 
     return {
         model,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: inputTokens + outputTokens,
-        cached_tokens: tokenCount(usage.input_tokens_details?.cached_tokens),
-        cache_write_tokens: tokenCount(usage.input_tokens_details?.cache_write_tokens),
+        cached_tokens: cachedTokens,
+        cache_write_tokens: cacheWriteTokens,
         reasoning_tokens: reasoningTokens,
         metadata: {
-            provider_total_tokens: tokenCount(usage.total_tokens),
+            provider_total_tokens: providerTotalTokens,
             reasoning_tokens: reasoningTokens,
         },
     };
 }
 
 export function normalizeOpenAIChatUsage(model: string, usage: OpenAIChatUsage): ModelUsage {
-    const inputTokens = tokenCount(usage.prompt_tokens);
-    const outputTokens = tokenCount(usage.completion_tokens);
-    const reasoningTokens = tokenCount(usage.completion_tokens_details?.reasoning_tokens);
+    const inputTokens = requiredTokenCount(usage.prompt_tokens, 'OpenAI Chat usage.prompt_tokens');
+    const outputTokens = requiredTokenCount(usage.completion_tokens, 'OpenAI Chat usage.completion_tokens');
+    const providerTotalTokens = requiredTokenCount(usage.total_tokens, 'OpenAI Chat usage.total_tokens');
+    const cachedTokens = optionalTokenCount(
+        usage.prompt_tokens_details?.cached_tokens,
+        'OpenAI Chat usage.prompt_tokens_details.cached_tokens'
+    );
+    const cacheWriteTokens = optionalTokenCount(
+        usage.prompt_tokens_details?.cache_write_tokens,
+        'OpenAI Chat usage.prompt_tokens_details.cache_write_tokens'
+    );
+    const reasoningTokens = optionalTokenCount(
+        usage.completion_tokens_details?.reasoning_tokens,
+        'OpenAI Chat usage.completion_tokens_details.reasoning_tokens'
+    );
+
+    assertTokenTotal('OpenAI Chat usage.total_tokens', providerTotalTokens, [inputTokens, outputTokens]);
+    assertTokenSubset(
+        'OpenAI Chat cached and cache-write input tokens',
+        cachedTokens + cacheWriteTokens,
+        'usage.prompt_tokens',
+        inputTokens
+    );
+    assertTokenSubset('OpenAI Chat reasoning tokens', reasoningTokens, 'usage.completion_tokens', outputTokens);
 
     return {
         model,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: inputTokens + outputTokens,
-        cached_tokens: tokenCount(usage.prompt_tokens_details?.cached_tokens),
-        cache_write_tokens: tokenCount(usage.prompt_tokens_details?.cache_write_tokens),
+        cached_tokens: cachedTokens,
+        cache_write_tokens: cacheWriteTokens,
         reasoning_tokens: reasoningTokens,
         metadata: {
-            provider_total_tokens: tokenCount(usage.total_tokens),
+            provider_total_tokens: providerTotalTokens,
             reasoning_tokens: reasoningTokens,
         },
     };
 }
 
 export function normalizeGeminiUsage(model: string, usage: GeminiUsageMetadata): ModelUsage {
-    const promptTokens = tokenCount(usage.promptTokenCount);
-    const toolTokens = tokenCount(usage.toolUsePromptTokenCount);
-    const candidateTokens = tokenCount(usage.candidatesTokenCount);
-    const reasoningTokens = tokenCount(usage.thoughtsTokenCount);
+    const promptTokens = optionalTokenCount(usage.promptTokenCount, 'Gemini usage.promptTokenCount');
+    const toolTokens = optionalTokenCount(usage.toolUsePromptTokenCount, 'Gemini usage.toolUsePromptTokenCount');
+    const candidateTokens = optionalTokenCount(usage.candidatesTokenCount, 'Gemini usage.candidatesTokenCount');
+    const reasoningTokens = optionalTokenCount(usage.thoughtsTokenCount, 'Gemini usage.thoughtsTokenCount');
+    const cachedTokens = optionalTokenCount(usage.cachedContentTokenCount, 'Gemini usage.cachedContentTokenCount');
     const inputTokens = promptTokens + toolTokens;
     const outputTokens = candidateTokens + reasoningTokens;
+    const providerTotalTokens =
+        usage.totalTokenCount === undefined || usage.totalTokenCount === null
+            ? undefined
+            : optionalTokenCount(usage.totalTokenCount, 'Gemini usage.totalTokenCount');
+
+    if (providerTotalTokens !== undefined) {
+        assertTokenTotal('Gemini usage.totalTokenCount', providerTotalTokens, [
+            promptTokens,
+            toolTokens,
+            candidateTokens,
+            reasoningTokens,
+        ]);
+    }
+    assertTokenSubset('Gemini cached content tokens', cachedTokens, 'usage.promptTokenCount', promptTokens);
 
     return {
         model,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
         total_tokens: inputTokens + outputTokens,
-        cached_tokens: tokenCount(usage.cachedContentTokenCount),
+        cached_tokens: cachedTokens,
         reasoning_tokens: reasoningTokens,
         metadata: {
-            provider_total_tokens: tokenCount(usage.totalTokenCount),
+            ...(providerTotalTokens === undefined ? {} : { provider_total_tokens: providerTotalTokens }),
             reasoning_tokens: reasoningTokens,
             tool_tokens: toolTokens,
         },
