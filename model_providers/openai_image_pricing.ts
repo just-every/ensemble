@@ -15,12 +15,11 @@ export interface OpenAIImageUsage {
 }
 
 const GPT_IMAGE_2_COSTS: Record<Exclude<OpenAIImageQuality, 'auto'>, { square: number; large: number }> = {
-    low: { square: 0.006, large: 0.005 },
-    medium: { square: 0.053, large: 0.041 },
-    high: { square: 0.211, large: 0.165 },
+    low: { square: 0.00588, large: 0.00474 },
+    medium: { square: 0.05268, large: 0.04116 },
+    high: { square: 0.21072, large: 0.16464 },
 };
 const GPT_IMAGE_2_OUTPUT_PRICE_PER_MILLION = 30;
-const GPT_IMAGE_2_SQUARE_PIXELS = 1024 * 1024;
 const GPT_IMAGE_2_LARGE_PIXELS = 1536 * 1024;
 const GPT_IMAGE_2_MIN_PIXELS = 655_360;
 const GPT_IMAGE_2_MAX_PIXELS = 8_294_400;
@@ -99,7 +98,7 @@ export function getOpenAIImageCostMetadata(
     const outputTokens = Math.round((cost / GPT_IMAGE_2_OUTPUT_PRICE_PER_MILLION) * 1_000_000);
 
     return {
-        pricing_source: hasPublishedGptImage2Estimate(size) ? 'openai_published_estimate' : 'ensemble_size_estimate',
+        pricing_source: hasPublishedGptImage2Estimate(size) ? 'openai_pricing_calculator' : 'ensemble_size_estimate',
         estimated_output_tokens: outputTokens,
         output_price_per_million: GPT_IMAGE_2_OUTPUT_PRICE_PER_MILLION,
     };
@@ -186,17 +185,13 @@ function estimateGptImage2Cost(quality: Exclude<OpenAIImageQuality, 'auto'>, siz
     if (size === '1536x1024' || size === '1024x1536') return GPT_IMAGE_2_COSTS[quality].large;
 
     const [width, height] = size.split('x').map(Number);
-    const pixels = width * height;
-    const aspectRatio = Math.max(width, height) / Math.min(width, height);
-    const squareCost = GPT_IMAGE_2_COSTS[quality].square;
-    const largeCost = GPT_IMAGE_2_COSTS[quality].large;
+    const longEdge = Math.max(width, height);
+    const shortEdge = Math.min(width, height);
+    const longCells = { low: 16, medium: 48, high: 96 }[quality];
+    const shortCells = Math.round((longCells * shortEdge) / longEdge);
+    const outputTokens = Math.ceil((longCells * shortCells * (2_000_000 + width * height)) / 4_000_000);
 
-    const ratioProgress = Math.min(1, Math.max(0, (aspectRatio - 1) / 0.5));
-    const anchorCost = squareCost + (largeCost - squareCost) * ratioProgress;
-    const anchorPixels =
-        GPT_IMAGE_2_SQUARE_PIXELS + (GPT_IMAGE_2_LARGE_PIXELS - GPT_IMAGE_2_SQUARE_PIXELS) * ratioProgress;
-
-    return roundCost(anchorCost * (pixels / anchorPixels));
+    return roundCost((outputTokens / 1_000_000) * GPT_IMAGE_2_OUTPUT_PRICE_PER_MILLION);
 }
 
 function hasPublishedGptImage2Estimate(size: OpenAIImageSize): boolean {

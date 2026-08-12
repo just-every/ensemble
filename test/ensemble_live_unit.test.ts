@@ -47,7 +47,7 @@ describe('ensembleLive unit tests', () => {
 
         // Setup default mocks
         mockGetModelProvider.mockReturnValue(mockProvider);
-        mockGetModelFromAgent.mockResolvedValue('gemini-2.0-flash-exp');
+        mockGetModelFromAgent.mockResolvedValue('gemini-3.1-flash-live-preview');
     });
 
     afterEach(() => {
@@ -62,7 +62,7 @@ describe('ensembleLive unit tests', () => {
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
             name: 'Test Agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         // Add a ready event to the session
@@ -89,7 +89,12 @@ describe('ensembleLive unit tests', () => {
         expect(events[1].type).toBe('live_ready');
 
         // Should have created session with correct parameters
-        expect(mockProvider.createLiveSession).toHaveBeenCalledWith(config, agent, 'gemini-2.0-flash-exp', undefined);
+        expect(mockProvider.createLiveSession).toHaveBeenCalledWith(
+            config,
+            agent,
+            'gemini-3.1-flash-live-preview',
+            undefined
+        );
 
         // Should have emitted agent events
         expect(mockEmitEvent).toHaveBeenCalledWith(
@@ -107,7 +112,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         const messageHistory = [
@@ -162,7 +167,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
             tools: [testTool],
         };
 
@@ -237,7 +242,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
             tools: [testTool],
             maxToolCalls: 2,
         };
@@ -288,7 +293,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         // Simulate cost update events
@@ -333,7 +338,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         // Simulate turn complete event
@@ -373,7 +378,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         // Make provider throw error
@@ -411,7 +416,7 @@ describe('ensembleLive unit tests', () => {
 
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         const events: LiveEvent[] = [];
@@ -501,13 +506,13 @@ describe('ensembleLiveAudio', () => {
         };
 
         mockGetModelProvider.mockReturnValue(mockProvider);
-        mockGetModelFromAgent.mockResolvedValue('gemini-2.0-flash-exp');
+        mockGetModelFromAgent.mockResolvedValue('gemini-3.1-flash-live-preview');
     });
 
     it('should configure audio session correctly', async () => {
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         // Create audio source
@@ -538,7 +543,7 @@ describe('ensembleLiveAudio', () => {
                 outputAudioTranscription: {},
             }),
             agent,
-            'gemini-2.0-flash-exp',
+            'gemini-3.1-flash-live-preview',
             expect.objectContaining({
                 voice: 'Kore',
                 language: 'en-US',
@@ -579,13 +584,13 @@ describe('ensembleLiveText', () => {
         };
 
         mockGetModelProvider.mockReturnValue(mockProvider);
-        mockGetModelFromAgent.mockResolvedValue('gemini-2.0-flash-exp');
+        mockGetModelFromAgent.mockResolvedValue('gemini-3.1-flash-live-preview');
     });
 
     it('should create text session with control methods', async () => {
         const agent: AgentDefinition = {
             agent_id: 'test-agent',
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-3.1-flash-live-preview',
         };
 
         const session = await ensembleLiveText(agent);
@@ -601,7 +606,7 @@ describe('ensembleLiveText', () => {
                 responseModalities: ['TEXT'],
             }),
             agent,
-            'gemini-2.0-flash-exp',
+            'gemini-3.1-flash-live-preview',
             undefined
         );
 

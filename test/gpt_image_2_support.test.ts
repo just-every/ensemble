@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { findModel, MODEL_CLASSES } from '../data/model_data.js';
 import { OpenAIProvider } from '../model_providers/openai.js';
-import { normalizeOpenAIImageSize } from '../model_providers/openai_image_pricing.js';
+import { getOpenAIImageCostEstimate, normalizeOpenAIImageSize } from '../model_providers/openai_image_pricing.js';
 import { costTracker } from '../utils/cost_tracker.js';
 
 const resolvedImageRequest = (data: unknown, requestId = 'req_openai_image_test') => ({
@@ -150,16 +150,16 @@ describe('gpt-image-2 support', () => {
                 maxRetries: 0,
             })
         );
-        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.050668);
+        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.04647);
         expect(addUsageSpy.mock.calls[0]?.[0]).toMatchObject({
             model: 'gpt-image-2',
             image_count: 1,
-            cost: 0.050668,
+            cost: 0.04647,
             metadata: {
                 quality: 'medium',
                 size: '1088x1456',
                 pricing_source: 'ensemble_size_estimate',
-                cost_per_image: 0.050668,
+                cost_per_image: 0.04647,
                 estimated: true,
             },
         });
@@ -189,7 +189,7 @@ describe('gpt-image-2 support', () => {
             }
         );
 
-        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.041);
+        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.04116);
     });
 
     it('estimates gpt-image-2 pricing for custom sizes when OpenAI does not return usage', async () => {
@@ -217,20 +217,29 @@ describe('gpt-image-2 support', () => {
             }
         );
 
-        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.0615);
+        expect(costTracker.getCostsByModel()['gpt-image-2']?.cost).toBeCloseTo(0.04239);
         expect(addUsageSpy.mock.calls[0]?.[0]).toMatchObject({
             model: 'gpt-image-2',
             image_count: 1,
-            cost: 0.0615,
+            cost: 0.04239,
             metadata: {
                 quality: 'medium',
                 size: '2048x1152',
                 pricing_source: 'ensemble_size_estimate',
-                estimated_output_tokens: 2050,
+                estimated_output_tokens: 1413,
                 output_price_per_million: 30,
-                cost_per_image: 0.0615,
+                cost_per_image: 0.04239,
                 estimated: true,
             },
         });
+    });
+
+    it('uses the official GPT Image 2 calculator for 2K square pricing', () => {
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'low', '1024x1024')).toBeCloseTo(0.00588);
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'medium', '1024x1024')).toBeCloseTo(0.05268);
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'high', '1024x1024')).toBeCloseTo(0.21072);
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'low', '2048x2048')).toBeCloseTo(0.01191);
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'medium', '2048x2048')).toBeCloseTo(0.10704);
+        expect(getOpenAIImageCostEstimate('gpt-image-2', 'high', '2048x2048')).toBeCloseTo(0.42816);
     });
 });

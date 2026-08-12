@@ -8,7 +8,20 @@ describe('Grok imagine image support', () => {
         costTracker.reset();
     });
 
-    it('registers both Grok imagine image models with xAI pricing metadata', () => {
+    it('registers Grok imagine image models with xAI pricing metadata', () => {
+        expect(findModel('grok-imagine-image-2.0')).toMatchObject({
+            id: 'grok-imagine-image-2.0',
+            provider: 'xai',
+            cost: {
+                per_image: 0.06,
+                per_input_image: 0.01,
+                per_image_by_quality_and_resolution: {
+                    low: { '1k': 0.04, '2k': 0.06 },
+                    medium: { '1k': 0.06, '2k': 0.08 },
+                },
+            },
+        });
+
         expect(findModel('grok-imagine-image')).toMatchObject({
             id: 'grok-imagine-image',
             provider: 'xai',
@@ -20,6 +33,85 @@ describe('Grok imagine image support', () => {
             provider: 'xai',
             cost: { per_input_image: 0.01, per_image_by_resolution: { '1k': 0.05, '2k': 0.07 } },
         });
+    });
+
+    it.each([
+        { quality: 'low' as const, resolution: '1k' as const, expectedCost: 0.04 },
+        { quality: 'low' as const, resolution: '2k' as const, expectedCost: 0.06 },
+        { quality: 'medium' as const, resolution: '1k' as const, expectedCost: 0.06 },
+        { quality: 'medium' as const, resolution: '2k' as const, expectedCost: 0.08 },
+    ])('sends and bills Imagine 2.0 $quality quality at $resolution', async ({ quality, resolution, expectedCost }) => {
+        const provider = new GrokProvider();
+        const post = vi.fn().mockResolvedValue({ data: [{ url: 'https://example.com/imagine-2.png' }] });
+        (provider as any)._client = { post };
+
+        await provider.createImage(
+            'A typographic travel poster',
+            'grok-imagine-image-2.0',
+            { agent_id: 'test-grok-imagine-2' } as any,
+            { quality, resolution }
+        );
+
+        expect(post).toHaveBeenCalledWith('/images/generations', {
+            body: {
+                model: 'grok-imagine-image-2.0',
+                prompt: 'A typographic travel poster',
+                n: 1,
+                quality,
+                resolution,
+            },
+        });
+        expect(costTracker.getCostsByModel()['grok-imagine-image-2.0']?.cost).toBeCloseTo(expectedCost);
+    });
+
+    it('uses Imagine 2.0 medium 1K defaults and includes image-input pricing', async () => {
+        const provider = new GrokProvider();
+        const post = vi.fn().mockResolvedValue({ data: [{ url: 'https://example.com/imagine-2-edit.png' }] });
+        (provider as any)._client = { post };
+
+        await provider.createImage(
+            'Refine this product photo',
+            'grok-imagine-image-2.0',
+            { agent_id: 'test-grok-imagine-2-defaults' } as any,
+            { source_images: ['https://example.com/source.png'] }
+        );
+
+        expect(post).toHaveBeenCalledWith('/images/edits', {
+            body: {
+                model: 'grok-imagine-image-2.0',
+                prompt: 'Refine this product photo',
+                n: 1,
+                image: { url: 'https://example.com/source.png' },
+            },
+        });
+        expect(costTracker.getCostsByModel()['grok-imagine-image-2.0']?.cost).toBeCloseTo(0.07);
+    });
+
+    it('prefers the exact xAI response cost when available', async () => {
+        const provider = new GrokProvider();
+        const post = vi.fn().mockResolvedValue({
+            data: [{ url: 'https://example.com/imagine-2.png' }],
+            usage: { cost_in_usd_ticks: 800_000_000 },
+        });
+        (provider as any)._client = { post };
+
+        await provider.createImage(
+            'A cinematic landscape',
+            'grok-imagine-image-2.0',
+            { agent_id: 'test-grok-imagine-2-provider-cost' } as any,
+            { quality: 'low', resolution: '1k' }
+        );
+
+        expect(costTracker.getCostsByModel()['grok-imagine-image-2.0']?.cost).toBeCloseTo(0.08);
+    });
+
+    it('rejects unsupported Imagine 2.0 quality values', async () => {
+        const provider = new GrokProvider();
+        (provider as any)._client = { post: vi.fn() };
+
+        await expect(
+            provider.createImage('A detailed illustration', 'grok-imagine-image-2.0', {} as any, { quality: 'high' })
+        ).rejects.toThrow('supports only low or medium quality');
     });
 
     it('uses xAI image generation endpoint with aspect ratio and explicit resolution', async () => {

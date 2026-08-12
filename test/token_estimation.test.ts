@@ -23,13 +23,13 @@ describe('Token Estimation for Providers', () => {
         const inputText = 'What is the weather today?'; // 26 chars -> 7 tokens
         const outputText = 'The weather today is sunny with a high of 75°F.'; // 48 chars -> 12 tokens
 
-        costTracker.addEstimatedUsage('grok-3', inputText, outputText, { test: true });
+        costTracker.addEstimatedUsage('grok-4.3', inputText, outputText, { test: true });
 
         const costsByModel = costTracker.getCostsByModel();
         expect(Object.keys(costsByModel)).toHaveLength(1);
-        expect(costsByModel['grok-3']).toBeDefined();
-        expect(costsByModel['grok-3'].calls).toBe(1);
-        expect(costsByModel['grok-3'].cost).toBeGreaterThan(0);
+        expect(costsByModel['grok-4.3']).toBeDefined();
+        expect(costsByModel['grok-4.3'].calls).toBe(1);
+        expect(costsByModel['grok-4.3'].cost).toBeGreaterThan(0);
     });
 
     // Mock test to verify the OpenAIChat base class behavior

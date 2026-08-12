@@ -38,12 +38,12 @@ See the [demo README](demo/README.md) for detailed information about each demo.
 ## Model Highlights
 
 - OpenAI: GPT-5 family plus `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, and `gpt-audio-1.5`
-- Anthropic: Claude 4.5 (Sonnet/Haiku, incl. 1M context) and Claude Opus 4.1
+- Anthropic: Claude Opus 5, Sonnet 5, Fable 5, and current Claude 4.x models
 - Google: Gemini 3.6 Flash, Gemini 3.5 Flash/Lite, Gemini 3.1 Pro/Image/Live/TTS, Gemini Omni Flash, Veo 3.1, and Gemini 2.5
 - DeepSeek: Direct V4 Pro/Flash with native tools, JSON output, and thinking controls
-- xAI: Grok 4.5/4.3/4.20, Grok Build 0.1, Grok Imagine image generation/editing, and `ensembleVideo` support
+- xAI: Grok 4.5/4.3/4.20, Grok Build 0.1, Grok Imagine Image 2.0, and `ensembleVideo` support
 - Fal: current image generation/editing plus PixVerse V6 image-to-video
-- OpenRouter: Laguna S 2.1, Kimi K3, LongCat 2.0, Inkling, Muse Spark 1.1, and KAT-Coder Pro/Air V2.5
+- OpenRouter: Qwen 3.8 Max, Muse Spark 1.2, Inkling/Inkling Small, Kimi K3, LongCat 2.0, and KAT-Coder Pro/Air V2.5
 
 \*Codex-Max pricing reflects current published rates and may change if OpenAI updates pricing.
 

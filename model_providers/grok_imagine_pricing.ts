@@ -1,10 +1,20 @@
 import { findModel } from '../data/model_data.js';
 
-export function getGrokImagePricing(model: string, resolution: '1k' | '2k' = '1k') {
+export type GrokImagineQuality = 'low' | 'medium';
+
+export function getGrokImagePricing(
+    model: string,
+    resolution: '1k' | '2k' = '1k',
+    quality: GrokImagineQuality = 'medium'
+) {
     const cost = findModel(model)?.cost;
     return {
         inputImage: cost?.per_input_image ?? 0,
-        outputImage: cost?.per_image_by_resolution?.[resolution] ?? cost?.per_image ?? 0,
+        outputImage:
+            cost?.per_image_by_quality_and_resolution?.[quality]?.[resolution] ??
+            cost?.per_image_by_resolution?.[resolution] ??
+            cost?.per_image ??
+            0,
     };
 }
 

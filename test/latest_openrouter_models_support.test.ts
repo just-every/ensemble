@@ -10,9 +10,9 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'glm', model: 'glm-5.1' } as any)).toBe('z-ai/glm-5.1');
         expect(getProviderFromModel('z-ai/glm-5.1')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.966,
-            cached_input_per_million: 0.1794,
-            output_per_million: 3.036,
+            input_per_million: 1.4,
+            cached_input_per_million: 0.26,
+            output_per_million: 4.4,
         });
         expect(model?.features).toMatchObject({
             context_length: 204800,
@@ -22,6 +22,7 @@ describe('latest OpenRouter model support', () => {
             streaming: true,
             json_output: true,
             reasoning_output: true,
+            max_output_tokens: 131072,
         });
     });
 
@@ -32,13 +33,13 @@ describe('latest OpenRouter model support', () => {
         expect(await getModelFromAgent({ agent_id: 'glm-latest', model: 'glm-5' } as any)).toBe('z-ai/glm-5.2');
         expect(getProviderFromModel('z-ai/glm-5.2')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.966,
-            cached_input_per_million: 0.1794,
-            output_per_million: 3.036,
+            input_per_million: 0.42,
+            cached_input_per_million: 0.07,
+            output_per_million: 1.4,
         });
         expect(model?.features).toMatchObject({
             context_length: 1048576,
-            max_output_tokens: 131072,
+            max_output_tokens: 1048576,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -80,7 +81,7 @@ describe('latest OpenRouter model support', () => {
         );
         expect(getProviderFromModel('moonshotai/kimi-k2.7-code')).toBe('openrouter');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.73,
+            input_per_million: 0.7,
             cached_input_per_million: 0.15,
             output_per_million: 3.5,
         });
@@ -260,7 +261,7 @@ describe('latest OpenRouter model support', () => {
         });
         expect(model?.features).toMatchObject({
             context_length: 1000000,
-            max_output_tokens: 65536,
+            max_output_tokens: 131072,
             input_modality: ['text'],
             output_modality: ['text'],
             tool_use: true,
@@ -280,13 +281,25 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('qwen/qwen3.7-plus')).toBe('openrouter');
         expect(model?.openrouter_id).toBe('qwen/qwen3.7-plus');
         expect(model?.cost).toMatchObject({
-            input_per_million: 0.32,
-            cached_input_per_million: 0.064,
-            output_per_million: 1.28,
+            input_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 0.32,
+                price_above_threshold_per_million: 0.96,
+            },
+            cached_input_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 0.064,
+                price_above_threshold_per_million: 0.192,
+            },
+            output_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 1.28,
+                price_above_threshold_per_million: 3.84,
+            },
         });
         expect(model?.features).toMatchObject({
             context_length: 1000000,
-            max_output_tokens: 65536,
+            max_output_tokens: 131072,
             input_modality: ['text', 'image'],
             output_modality: ['text'],
             tool_use: true,
@@ -345,7 +358,8 @@ describe('latest OpenRouter model support', () => {
 
         expect(a3b?.id).toBe('qwen/qwen3.6-35b-a3b');
         expect(a3b?.cost).toMatchObject({
-            input_per_million: 0.14,
+            input_per_million: 0.15,
+            cached_input_per_million: 0.05,
             output_per_million: 1.0,
         });
         expect(a3b?.features?.max_output_tokens).toBe(262144);
@@ -373,10 +387,10 @@ describe('latest OpenRouter model support', () => {
 
         expect(dense?.id).toBe('qwen/qwen3.6-27b');
         expect(dense?.cost).toMatchObject({
-            input_per_million: 0.3,
-            cached_input_per_million: 0.15,
-            output_per_million: 2,
+            input_per_million: 0.6,
+            cached_input_per_million: 0.12,
+            output_per_million: 3.6,
         });
-        expect(dense?.features?.max_output_tokens).toBe(65536);
+        expect(dense?.features?.max_output_tokens).toBe(262144);
     });
 });

@@ -57,7 +57,7 @@ describe('provider chat failure paths', () => {
         const events = await collectEvents(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Call the tools' }] as any,
-                'grok-4-fast-reasoning',
+                'grok-4.3',
                 {
                     agent_id: 'test-openai-chat-malformed-multi-tool',
                 } as any

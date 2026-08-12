@@ -562,7 +562,7 @@ export interface ModelProvider {
     /**
      * Transcribes audio to text (Speech-to-Text)
      * @param audio Audio input to transcribe
-     * @param model Model ID for STT (e.g., 'gemini-live-2.5-flash-preview')
+     * @param model Model ID for STT (e.g., 'gemini-3.1-flash-live-preview')
      * @param opts Optional parameters for transcription
      * @returns AsyncGenerator that yields transcription events
      */
@@ -705,6 +705,7 @@ export interface ModelCost {
     per_image?: number;
     per_input_image?: number;
     per_image_by_resolution?: Partial<Record<'1k' | '2k', number>>;
+    per_image_by_quality_and_resolution?: Partial<Record<'low' | 'medium', Partial<Record<'1k' | '2k', number>>>>;
     per_second?: number;
     per_second_by_resolution?: Partial<
         Record<'360p' | '480p' | '540p' | '720p' | '1080p' | '1440p' | '2160p' | '4k', number>
@@ -753,7 +754,7 @@ export interface ModelEntry {
 
 // Represents usage data for cost calculation
 export interface ModelUsage {
-    model?: string; // The ID of the model used (e.g., 'gemini-2.0-flash')
+    model?: string; // The ID of the model used (e.g., 'gemini-3.6-flash')
     cost?: number; // Calculated cost (optional, will be calculated if missing)
     input_tokens?: number; // Total input tokens, including cache reads and writes
     output_tokens?: number; // Total billed output tokens, including reasoning/thinking tokens where applicable

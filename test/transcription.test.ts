@@ -95,7 +95,7 @@ vi.mock('../model_providers/model_provider.js', () => ({
         }
     }),
     getModelFromAgent: vi.fn((agent: any) => {
-        const model = agent.model || 'gemini-live-2.5-flash-preview';
+        const model = agent.model || 'gemini-3.1-flash-live-preview';
         return Promise.resolve(model);
     }),
 }));
@@ -110,7 +110,7 @@ describe('ensembleListen', () => {
         const events: TranscriptionEvent[] = [];
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
         }
@@ -144,7 +144,7 @@ describe('ensembleListen', () => {
         const events: TranscriptionEvent[] = [];
 
         for await (const event of ensembleListen(stream, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
         }
@@ -163,7 +163,7 @@ describe('ensembleListen', () => {
         const events: TranscriptionEvent[] = [];
 
         for await (const event of ensembleListen(audioGenerator(), {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
         }
@@ -178,7 +178,7 @@ describe('ensembleListen', () => {
         for await (const event of ensembleListen(
             audioData,
             {
-                model: 'gemini-live-2.5-flash-preview',
+                model: 'gemini-3.1-flash-live-preview',
             },
             {
                 audioFormat: {
@@ -225,7 +225,7 @@ describe('ensembleListen', () => {
         let fullTranscript = '';
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             if (event.type === 'transcription_turn_delta' && event.delta) {
                 fullTranscript += event.delta;
@@ -240,7 +240,7 @@ describe('ensembleListen', () => {
         const audioData = new Uint8Array(100);
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             if (event.type === 'transcription_complete') {
                 expect(event.duration).toBeDefined();
@@ -256,7 +256,7 @@ describe('ensembleListen', () => {
         const events: TranscriptionEvent[] = [];
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
         }
@@ -273,7 +273,7 @@ describe('ensembleListen', () => {
         let turnCount = 0;
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
             if (event.type === 'transcription_turn_complete') {
@@ -304,7 +304,7 @@ describe('ensembleListen', () => {
         const events: TranscriptionEvent[] = [];
 
         for await (const event of ensembleListen(audioData, {
-            model: 'gemini-live-2.5-flash-preview',
+            model: 'gemini-3.1-flash-live-preview',
         })) {
             events.push(event);
         }

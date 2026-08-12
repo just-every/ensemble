@@ -21,7 +21,7 @@ import {
 const ListenDemo: React.FC = () => {
     // State management
     const [isRecording, setIsRecording] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gemini-live-2.5-flash-preview');
+    const [selectedModel, setSelectedModel] = useState('gemini-3.1-flash-live-preview');
     const [, setTranscript] = useState('');
     const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>(
         'disconnected'
@@ -588,10 +588,7 @@ const ListenDemo: React.FC = () => {
         },
         {
             label: 'Gemini Models',
-            options: [
-                { value: 'gemini-live-2.5-flash-preview', label: 'Gemini Live 2.5 Flash Preview' },
-                { value: 'gemini-2.0-flash-live-001', label: 'Gemini 2.0 Flash Live' },
-            ],
+            options: [{ value: 'gemini-3.1-flash-live-preview', label: 'Gemini 3.1 Flash Live Preview' }],
         },
     ];
 
@@ -678,7 +675,7 @@ server.listen(3003, () => {
     <h1>Live Transcription Demo</h1>
 
     <select id="modelSelect">
-        <option value="gemini-live-2.5-flash-preview">Gemini 2.0 Flash</option>
+        <option value="gemini-3.1-flash-live-preview">Gemini 3.1 Flash Live</option>
         <option value="deepseek-r1-voice-preview">DeepSeek r1-voice</option>
     </select>
 

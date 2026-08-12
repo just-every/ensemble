@@ -52,16 +52,17 @@ const THINKING_BUDGET_CONFIGS: Record<string, number> = {
     '-max': 30000,
 };
 
-type ClaudeAdaptiveEffort = 'low' | 'medium' | 'high' | 'xhigh';
+type ClaudeAdaptiveEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type ClaudeAdaptiveEffortOrOff = ClaudeAdaptiveEffort | 'off';
 
 const CLAUDE_ADAPTIVE_THINKING_MODEL_IDS = new Set([
     'claude-opus-4-7',
     'claude-opus-4-8',
+    'claude-opus-5',
     'claude-sonnet-5',
     'claude-fable-5',
 ]);
-const CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS = new Set(['claude-sonnet-5', 'claude-fable-5']);
+const CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS = new Set(['claude-opus-5', 'claude-sonnet-5', 'claude-fable-5']);
 const CLAUDE_ADAPTIVE_EFFORT_SUFFIXES: Record<string, ClaudeAdaptiveEffortOrOff> = {
     '-none': 'off',
     '-minimal': 'low',
@@ -69,7 +70,7 @@ const CLAUDE_ADAPTIVE_EFFORT_SUFFIXES: Record<string, ClaudeAdaptiveEffortOrOff>
     '-medium': 'medium',
     '-high': 'high',
     '-xhigh': 'xhigh',
-    '-max': 'xhigh',
+    '-max': 'max',
 };
 
 function parseThinkingBudget(value: unknown): number | null {
@@ -681,8 +682,15 @@ export class ClaudeProvider extends BaseModelProvider {
                 }
                 implicitAdaptiveThinking = CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS.has(model);
 
+                if (adaptiveEffort === 'max' && model !== 'claude-opus-5') {
+                    adaptiveEffort = 'xhigh';
+                }
+
                 thinkingSet = true;
-                if (adaptiveEffort !== 'off') {
+                if (adaptiveEffort === 'off' && model === 'claude-opus-5') {
+                    thinking = { type: 'disabled' };
+                    implicitAdaptiveThinking = false;
+                } else if (adaptiveEffort !== 'off') {
                     if (!implicitAdaptiveThinking) {
                         thinking = {
                             type: 'adaptive',
@@ -761,7 +769,8 @@ export class ClaudeProvider extends BaseModelProvider {
             }
 
             // Determine if thinking is enabled
-            const thinkingEnabled = thinking !== undefined || implicitAdaptiveThinking;
+            const thinkingEnabled =
+                (thinking !== undefined && thinking.type !== 'disabled') || implicitAdaptiveThinking;
 
             // Anthropic requires temperature=1 whenever thinking is enabled.
             // Adaptive Claude requests reject non-default sampling parameters, so omit them.

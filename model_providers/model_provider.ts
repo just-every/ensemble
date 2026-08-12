@@ -72,10 +72,45 @@ const DEPRECATED_MODEL_MIGRATIONS: Record<string, string> = {
         'Model deepseek-chat was retired by DeepSeek. Migrate to deepseek-v4-flash and use a disabled reasoning suffix when non-thinking behavior is required.',
     'deepseek-reasoner':
         'Model deepseek-reasoner was retired by DeepSeek. Migrate to deepseek-v4-flash or deepseek-v4-pro.',
+    'claude-opus-4-1-20250805': 'Model claude-opus-4-1-20250805 was retired by Anthropic. Migrate to claude-opus-5.',
+    'claude-opus-4-1': 'Model claude-opus-4-1 was retired by Anthropic. Migrate to claude-opus-5.',
+    'claude-opus-4.1': 'Model claude-opus-4.1 was retired by Anthropic. Migrate to claude-opus-5.',
+    'claude-4-opus': 'Model claude-4-opus was retired by Anthropic. Migrate to claude-opus-5.',
+    'grok-4-1-fast-reasoning': 'Model grok-4-1-fast-reasoning was retired by xAI. Migrate to grok-4.3-low.',
+    'grok-4.1-fast-reasoning': 'Model grok-4.1-fast-reasoning was retired by xAI. Migrate to grok-4.3-low.',
+    'grok-4-1-fast-non-reasoning': 'Model grok-4-1-fast-non-reasoning was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-4.1-fast-non-reasoning': 'Model grok-4.1-fast-non-reasoning was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-4-fast-reasoning': 'Model grok-4-fast-reasoning was retired by xAI. Migrate to grok-4.3-low.',
+    'grok-4-fast-reasoning-2025-09-01':
+        'Model grok-4-fast-reasoning-2025-09-01 was retired by xAI. Migrate to grok-4.3-low.',
+    'grok-4-fast-non-reasoning': 'Model grok-4-fast-non-reasoning was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-4-fast-non-reasoning-2025-09-01':
+        'Model grok-4-fast-non-reasoning-2025-09-01 was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-4-0709': 'Model grok-4-0709 was retired by xAI. Migrate to grok-4.3-low.',
+    'grok-3': 'Model grok-3 was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-3-2025-02-11': 'Model grok-3-2025-02-11 was retired by xAI. Migrate to grok-4.3-none.',
+    'grok-code-fast-1': 'Model grok-code-fast-1 was retired by xAI. Migrate to grok-build-0.1.',
+    'gemini-2.0-flash': 'Model gemini-2.0-flash was shut down by Google. Migrate to gemini-3.6-flash.',
+    'gemini-2.0-flash-001': 'Model gemini-2.0-flash-001 was shut down by Google. Migrate to gemini-3.6-flash.',
+    'gemini-2.0-flash-exp': 'Model gemini-2.0-flash-exp was shut down by Google. Migrate to gemini-3.6-flash.',
+    'gemini-2.0-flash-experimental':
+        'Model gemini-2.0-flash-experimental was shut down by Google. Migrate to gemini-3.6-flash.',
+    'gemini-2.0-flash-lite': 'Model gemini-2.0-flash-lite was shut down by Google. Migrate to gemini-3.1-flash-lite.',
+    'gemini-2.0-flash-lite-001':
+        'Model gemini-2.0-flash-lite-001 was shut down by Google. Migrate to gemini-3.1-flash-lite.',
+    'gemini-live-2.5-flash-preview':
+        'Model gemini-live-2.5-flash-preview was shut down by Google. Migrate to gemini-3.1-flash-live-preview.',
+    'gemini-2.0-flash-live-001':
+        'Model gemini-2.0-flash-live-001 was shut down by Google. Migrate to gemini-3.1-flash-live-preview.',
 };
 
 function getDeprecatedModelMigration(model?: string): string | undefined {
-    return model ? DEPRECATED_MODEL_MIGRATIONS[model] : undefined;
+    if (!model) return undefined;
+    if (DEPRECATED_MODEL_MIGRATIONS[model]) return DEPRECATED_MODEL_MIGRATIONS[model];
+
+    const suffixes = ['-xhigh', '-minimal', '-low', '-medium', '-high', '-none', '-disabled', '-max'];
+    const suffix = suffixes.find(candidate => model.endsWith(candidate));
+    return suffix ? DEPRECATED_MODEL_MIGRATIONS[model.slice(0, -suffix.length)] : undefined;
 }
 
 // Provider mapping by model prefix

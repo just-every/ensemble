@@ -74,7 +74,7 @@ wss.on('connection', ws => {
             try {
                 const message = JSON.parse(data.toString());
                 if (message.type === 'start') {
-                    const model = message.model || process.env.LIVE_MODEL || 'gemini-live-2.5-flash-preview';
+                    const model = message.model || process.env.LIVE_MODEL || 'gemini-3.1-flash-live-preview';
                     console.log(`📢 Starting transcription for ${connectionId} with model: ${model}`);
                     startTranscription(connectionId, ws, model);
                 }

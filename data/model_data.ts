@@ -213,7 +213,7 @@ export const MODEL_CLASSES = {
             'luma-photon-1', // Luma
             'ideogram-3.0', // Ideogram
             'midjourney-v7', // Midjourney
-            'grok-imagine-image-quality', // X.AI
+            'grok-imagine-image-2.0', // X.AI
             'flux-kontext-pro', // Fireworks
             'stability-ultra', // Stability
             'runway-gen4-image', // Runway
@@ -561,7 +561,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         cost: {
             input_per_million: 0.2,
-            output_per_million: 0.8,
+            output_per_million: 0.696,
         },
         features: {
             context_length: 1048576,
@@ -570,7 +570,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 16384,
+            structured_output: true,
         },
         class: 'standard',
         score: 78, // Legacy overall score
@@ -633,9 +633,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'qwen/qwen3.5-397b-a17b',
         aliases: ['qwen3.5-397b-a17b'],
         provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3.5-397b-a17b',
         cost: {
-            input_per_million: 0.39,
-            output_per_million: 2.34,
+            input_per_million: 0.5,
+            output_per_million: 3.6,
+            cached_input_per_million: 0.3,
         },
         features: {
             context_length: 262144,
@@ -644,8 +646,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 65536,
+            max_output_tokens: 262144,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         score: 92,
@@ -738,7 +741,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
     {
         id: 'grok-build-0.1',
-        aliases: ['grok-build', 'grok-build-latest', 'grok-code-fast-1', 'grok-code-fast'],
+        aliases: ['grok-build', 'grok-build-latest', 'grok-code-fast'],
         provider: 'xai',
         cost: {
             input_per_million: {
@@ -771,61 +774,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'code',
         description:
             "Grok Build 0.1, xAI's fast coding model trained for agentic coding workflows with 256k context and text/image input.",
-    },
-
-    // Grok-4.1 Fast models with tiered pricing
-    {
-        id: 'grok-4-1-fast-reasoning',
-        aliases: ['grok-4.1-fast-reasoning'],
-        provider: 'xai',
-        cost: {
-            input_per_million: 0.2,
-            output_per_million: 0.5,
-            cached_input_per_million: 0.05,
-        },
-        features: {
-            context_length: 2_000_000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'reasoning',
-        score: 88,
-        scores: {
-            monologue: 90,
-            code: 85,
-            reasoning: 88,
-        },
-        description: 'Grok 4.1 Fast with extended reasoning. 2M context, flat pricing, text/image input.',
-    },
-
-    {
-        id: 'grok-4-1-fast-non-reasoning',
-        aliases: ['grok-4.1-fast-non-reasoning'],
-        provider: 'xai',
-        cost: {
-            input_per_million: 0.2,
-            output_per_million: 0.5,
-            cached_input_per_million: 0.05,
-        },
-        features: {
-            context_length: 2_000_000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'standard',
-        score: 85,
-        scores: {
-            monologue: 87,
-            code: 82,
-            reasoning: 80,
-        },
-        description: 'Grok 4.1 Fast without reasoning. 2M context, flat pricing, text/image input.',
     },
 
     // Grok 4.20 reasoning
@@ -953,104 +901,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning: 90,
         },
         description: 'Grok 4.20 multi-agent model with reasoning, structured output, and 2M context.',
-    },
-
-    // Grok-4 Fast models (September 2025) with tiered pricing
-    {
-        id: 'grok-4-fast-reasoning',
-        aliases: ['grok-4-fast-reasoning-2025-09-01'],
-        provider: 'xai',
-        cost: {
-            input_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.2,
-                price_above_threshold_per_million: 0.5,
-            },
-            output_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.5,
-                price_above_threshold_per_million: 1.0,
-            },
-            cached_input_per_million: 0.05,
-        },
-        features: {
-            context_length: 2_000_000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'reasoning',
-        score: 87,
-        scores: {
-            monologue: 89,
-            code: 84,
-            reasoning: 86,
-        },
-        description: 'Grok-4 Fast with reasoning (Sep 2025). 2M context, tiered pricing at 128k threshold.',
-    },
-
-    {
-        id: 'grok-4-fast-non-reasoning',
-        aliases: ['grok-4-fast-non-reasoning-2025-09-01'],
-        provider: 'xai',
-        cost: {
-            input_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.2,
-                price_above_threshold_per_million: 0.5,
-            },
-            output_per_million: {
-                threshold_tokens: 128_000,
-                price_below_threshold_per_million: 0.5,
-                price_above_threshold_per_million: 1.0,
-            },
-            cached_input_per_million: 0.05,
-        },
-        features: {
-            context_length: 2_000_000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'standard',
-        score: 84,
-        scores: {
-            monologue: 86,
-            code: 81,
-            reasoning: 79,
-        },
-        description: 'Grok-4 Fast without reasoning (Sep 2025). 2M context, tiered pricing at 128k threshold.',
-    },
-
-    // Grok-3 models
-    {
-        id: 'grok-3',
-        aliases: ['grok-3-2025-02-11'],
-        provider: 'xai',
-        cost: {
-            input_per_million: 3.0,
-            output_per_million: 15.0,
-        },
-        features: {
-            context_length: 131_072,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-        },
-        class: 'standard',
-        score: 78,
-        scores: {
-            monologue: 80,
-            code: 70,
-            reasoning: 65,
-        },
-        description: 'Grok-3 model with 131k context.',
     },
 
     // Grok-3 Mini models
@@ -2465,38 +2315,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Claude accessed via CLI (likely uses latest Sonnet or Haiku model)',
     },
 
-    // Claude Opus 4.1
-    {
-        id: 'claude-opus-4-1-20250805',
-        aliases: ['claude-opus-4-1', 'claude-opus-4.1', 'claude-4-opus'],
-        provider: 'anthropic',
-        cost: {
-            input_per_million: 15.0,
-            output_per_million: 75.0,
-            cached_input_per_million: 1.5, // 10% of input cost
-            cache_write_input_per_million: 18.75,
-            cache_write_1h_input_per_million: 30.0,
-        },
-        features: {
-            context_length: 200000,
-            input_modality: ['text', 'image'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-            reasoning_output: true,
-            max_output_tokens: 32000,
-        },
-        class: 'reasoning',
-        score: 95, // Highest tier model
-        scores: {
-            monologue: 94,
-            code: 94,
-            reasoning: 93,
-        },
-        description: 'Claude Opus 4.1 - Highest intelligence and capability with reasoning support',
-    },
-
     // Claude Opus 4.5 (November 2025)
     {
         id: 'claude-opus-4-5-20251101',
@@ -2586,15 +2404,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Claude Opus 4.8
     {
         id: 'claude-opus-4-8',
-        aliases: [
-            'claude-opus-4-8',
-            'claude-opus-4.8',
-            'claude-opus',
-            'claude-opus-latest',
-            'claude-4.8-opus',
-            'opus-4-8',
-            'opus-4.8',
-        ],
+        aliases: ['claude-opus-4-8', 'claude-opus-4.8', 'claude-4.8-opus', 'opus-4-8', 'opus-4.8'],
         provider: 'anthropic',
         cost: {
             input_per_million: 5.0,
@@ -2616,6 +2426,34 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'reasoning',
         description:
             'Claude Opus 4.8 - Frontier Opus model for complex reasoning, agentic coding, and high-resolution vision.',
+    },
+
+    // Claude Opus 5
+    {
+        id: 'claude-opus-5',
+        aliases: ['claude-opus-latest', 'claude-opus', 'claude-5-opus', 'opus-5', 'opus-5-latest'],
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 5.0,
+            output_per_million: 25.0,
+            cached_input_per_million: 0.5,
+            cache_write_input_per_million: 6.25,
+            cache_write_1h_input_per_million: 10.0,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'reasoning',
+        score: 98,
+        description:
+            'Claude Opus 5 - frontier Anthropic model with 1M context, 128K output, vision, tools, and implicit adaptive thinking.',
     },
 
     // Claude Fable 5
@@ -2946,30 +2784,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Gemini 2.5 Flash Lite - cost-efficient multimodal model with 1M context.',
     },
 
-    // Gemini 2.0 Flash Experimental
-    {
-        id: 'gemini-2.0-flash-exp',
-        aliases: ['gemini-2.0-flash-experimental'],
-        provider: 'google',
-        cost: {
-            input_per_million: 0.1,
-            output_per_million: 0.4,
-            cached_input_per_million: 0.025,
-        },
-        features: {
-            context_length: 1_000_000,
-            input_modality: ['text', 'image', 'video', 'audio'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-            max_output_tokens: 8192,
-        },
-        class: 'standard',
-        score: 78,
-        description: 'Gemini 2.0 Flash Experimental (v1beta) - experimental multimodal model.',
-    },
-
     // Gemini 3.1 Pro (preview)
     {
         id: 'gemini-3.1-pro-preview',
@@ -3031,61 +2845,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'image_generation',
         description: 'Gemini 3 Pro Image (Nano Banana Pro) for professional image generation and editing.',
-    },
-
-    // Gemini 2.0 Flash Lite
-    {
-        id: 'gemini-2.0-flash-lite',
-        provider: 'google',
-        cost: {
-            input_per_million: 0.075,
-            output_per_million: 0.3,
-        },
-        features: {
-            context_length: 1048576,
-            input_modality: ['text', 'image', 'video', 'audio'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-            max_output_tokens: 8192,
-        },
-        class: 'standard',
-        score: 75, // Legacy overall score
-        scores: {
-            monologue: 70, // Humanity's Last Exam
-            code: 55, // HumanEval
-            reasoning: 56, // GPQA Diamond
-        },
-        description: 'Lite multimodal model with large context, built for Agents.',
-    },
-
-    // Gemini 2.0 Flash
-    {
-        id: 'gemini-2.0-flash',
-        provider: 'google',
-        cost: {
-            input_per_million: 0.1,
-            output_per_million: 0.4,
-            cached_input_per_million: 0.025,
-        },
-        features: {
-            context_length: 1048576,
-            input_modality: ['text', 'image', 'video', 'audio'],
-            output_modality: ['text'],
-            tool_use: true,
-            streaming: true,
-            json_output: true,
-            max_output_tokens: 8192,
-        },
-        class: 'standard',
-        score: 75, // Legacy overall score
-        scores: {
-            monologue: 70, // Humanity's Last Exam
-            code: 55, // HumanEval
-            reasoning: 56, // GPQA Diamond
-        },
-        description: 'Balanced multimodal model with large context, built for Agents.',
     },
 
     // Image generation models
@@ -3804,6 +3563,26 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'Midjourney v7 text-to-image (via KIE API; requires third-party API key).',
     },
     {
+        id: 'grok-imagine-image-2.0',
+        provider: 'xai',
+        cost: {
+            // xAI defaults to medium quality; its published default image price is the 1K medium rate.
+            per_image: 0.06,
+            per_input_image: 0.01,
+            per_image_by_quality_and_resolution: {
+                low: { '1k': 0.04, '2k': 0.06 },
+                medium: { '1k': 0.06, '2k': 0.08 },
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+        },
+        class: 'image_generation',
+        description:
+            'xAI Grok Imagine Image 2.0 for high-fidelity image generation and editing at low or medium quality in 1K or 2K.',
+    },
+    {
         id: 'grok-imagine-image-quality',
         aliases: ['grok-imagine-image-pro'],
         provider: 'xai',
@@ -3926,29 +3705,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'AssemblyAI Universal-3 Pro Streaming model for real-time speech-to-text',
     },
     {
-        id: 'gemini-live-2.5-flash-preview',
-        provider: 'google',
-        cost: {
-            input_per_million: {
-                text: 0.5, // $0.50 per 1M input text tokens
-                audio: 3.0, // $3.00 per 1M input audio tokens
-                video: 3.0, // $3.00 per 1M input video tokens
-            },
-            output_per_million: {
-                text: 2.0, // $2.00 per 1M output text tokens
-                audio: 12.0, // $12.00 per 1M output audio tokens
-            },
-        },
-        features: {
-            context_length: 32000,
-            input_modality: ['text', 'audio', 'video'],
-            output_modality: ['text', 'audio'],
-            streaming: true,
-        },
-        class: 'transcription',
-        description: 'Gemini Live API for real-time multimodal interaction with modality-specific pricing',
-    },
-    {
         id: 'gemini-3.1-flash-live-preview',
         provider: 'google',
         cost: {
@@ -3972,29 +3728,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'transcription',
         description:
             'Gemini 3.1 Flash Live preview for high-quality, low-latency audio-to-audio realtime dialogue and voice-first applications.',
-    },
-    {
-        id: 'gemini-2.0-flash-live-001',
-        provider: 'google',
-        cost: {
-            input_per_million: {
-                text: 0.35,
-                audio: 2.1,
-                video: 2.1,
-            },
-            output_per_million: {
-                text: 1.5,
-                audio: 8.5,
-            },
-        },
-        features: {
-            context_length: 32000,
-            input_modality: ['text', 'audio', 'video'],
-            output_modality: ['text', 'audio'],
-            streaming: true,
-        },
-        class: 'transcription',
-        description: 'Gemini 2.0 Flash Live API for real-time multimodal interaction',
     },
     {
         id: 'gpt-4o-transcribe',
@@ -4113,7 +3846,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'openai/gpt-oss-120b',
         cost: {
-            input_per_million: 0.037,
+            input_per_million: 0.03,
+            cached_input_per_million: 0.03,
             output_per_million: 0.17,
         },
         features: {
@@ -4124,6 +3858,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
             reasoning_output: true,
+            structured_output: true,
+            max_output_tokens: 131072,
         },
         class: 'reasoning',
         score: 88,
@@ -4153,6 +3889,34 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'GPT OSS 20B - MoE model with 3.6B active params, optimized for consumer hardware',
     },
 
+    // Qwen3.8 Max (via OpenRouter)
+    {
+        id: 'qwen/qwen3.8-max',
+        aliases: ['Qwen3.8 Max', 'qwen3.8-max', 'qwen-3.8-max'],
+        provider: 'openrouter',
+        openrouter_id: 'qwen/qwen3.8-max',
+        cost: {
+            input_per_million: 2.0,
+            cached_input_per_million: 0.25,
+            cache_write_input_per_million: 2.5,
+            output_per_million: 6.0,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image', 'video'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            max_output_tokens: 131072,
+            reasoning_output: true,
+        },
+        class: 'code',
+        description:
+            'Qwen3.8 Max via OpenRouter. Flagship multimodal Qwen model for agentic coding and long-horizon reasoning with 1M context.',
+    },
+
     // Qwen3.7 Max (via OpenRouter)
     {
         id: 'qwen/qwen3.7-max',
@@ -4162,6 +3926,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         cost: {
             input_per_million: 1.475,
             cached_input_per_million: 0.295,
+            cache_write_input_per_million: 1.84375,
             output_per_million: 4.425,
         },
         features: {
@@ -4171,8 +3936,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 65536,
+            max_output_tokens: 131072,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'code',
         description:
@@ -4186,9 +3952,30 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.7-plus',
         cost: {
-            input_per_million: 0.32,
-            cached_input_per_million: 0.064,
-            output_per_million: 1.28,
+            input_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 0.32,
+                price_above_threshold_per_million: 0.96,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 0.064,
+                price_above_threshold_per_million: 0.192,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_input_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 0.4,
+                price_above_threshold_per_million: 1.2,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 256000,
+                price_below_threshold_per_million: 1.28,
+                price_above_threshold_per_million: 3.84,
+                tier_basis: 'input_tokens',
+            },
         },
         features: {
             context_length: 1000000,
@@ -4197,8 +3984,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 65536,
+            max_output_tokens: 131072,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         description:
@@ -4262,7 +4050,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.6-35b-a3b',
         cost: {
-            input_per_million: 0.14,
+            input_per_million: 0.15,
+            cached_input_per_million: 0.05,
             output_per_million: 1.0,
         },
         features: {
@@ -4274,6 +4063,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
             max_output_tokens: 262144,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         description:
@@ -4313,9 +4103,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3.6-27b',
         cost: {
-            input_per_million: 0.3,
-            cached_input_per_million: 0.15,
-            output_per_million: 2.0,
+            input_per_million: 0.6,
+            cached_input_per_million: 0.12,
+            output_per_million: 3.6,
         },
         features: {
             context_length: 262144,
@@ -4324,8 +4114,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 65536,
+            max_output_tokens: 262144,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         description:
@@ -4339,8 +4130,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'qwen/qwen3-235b-a22b-thinking-2507',
         cost: {
-            input_per_million: 0.3,
-            output_per_million: 3,
+            input_per_million: 0.23,
+            output_per_million: 2.3,
         },
         features: {
             context_length: 262144,
@@ -4388,9 +4179,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'z-ai/glm-5.1',
         cost: {
-            input_per_million: 0.966,
-            output_per_million: 3.036,
-            cached_input_per_million: 0.1794,
+            input_per_million: 1.4,
+            output_per_million: 4.4,
+            cached_input_per_million: 0.26,
         },
         features: {
             context_length: 204800,
@@ -4400,6 +4191,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: true,
             reasoning_output: true,
+            structured_output: true,
+            max_output_tokens: 131072,
         },
         class: 'reasoning',
         description:
@@ -4413,9 +4206,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'z-ai/glm-5.2',
         cost: {
-            input_per_million: 0.966,
-            output_per_million: 3.036,
-            cached_input_per_million: 0.1794,
+            input_per_million: 0.42,
+            output_per_million: 1.4,
+            cached_input_per_million: 0.07,
         },
         features: {
             context_length: 1048576,
@@ -4424,8 +4217,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 131072,
+            max_output_tokens: 1048576,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         description:
@@ -4438,9 +4232,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'deepseek/deepseek-v4-pro',
         cost: {
-            input_per_million: 0.435,
-            cached_input_per_million: 0.003625,
-            output_per_million: 0.87,
+            input_per_million: 0.63168,
+            cached_input_per_million: 0.053298,
+            output_per_million: 1.26336,
         },
         features: {
             context_length: 1048576,
@@ -4449,8 +4243,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             tool_use: true,
             streaming: true,
             json_output: true,
-            max_output_tokens: 384000,
+            max_output_tokens: 393216,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'reasoning',
         description:
@@ -4642,7 +4437,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'moonshotai/kimi-k2.7-code',
         cost: {
-            input_per_million: 0.73,
+            input_per_million: 0.7,
             output_per_million: 3.5,
             cached_input_per_million: 0.15,
         },
@@ -4655,6 +4450,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             json_output: true,
             max_output_tokens: 262144,
             reasoning_output: true,
+            structured_output: true,
         },
         class: 'code',
         description:
@@ -4719,8 +4515,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         provider: 'openrouter',
         openrouter_id: 'thinkingmachines/inkling',
         cost: {
-            input_per_million: 1.0,
-            cached_input_per_million: 0.17,
+            input_per_million: 0.95,
+            cached_input_per_million: 0.16,
             output_per_million: 4.05,
         },
         features: {
@@ -4731,18 +4527,46 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             streaming: true,
             json_output: false,
             reasoning_output: true,
+            max_output_tokens: 262144,
         },
         class: 'reasoning',
         description:
             'Thinking Machines Inkling via OpenRouter. Open-weight multimodal model for general reasoning, coding, tool use, and agentic applications with 1M context.',
     },
 
-    // Muse Spark 1.1 (via OpenRouter)
+    // Inkling Small (via OpenRouter)
     {
-        id: 'meta/muse-spark-1.1',
-        aliases: ['Muse Spark 1.1', 'Muse-Spark-1.1', 'muse-spark-1.1'],
+        id: 'thinkingmachines/inkling-small',
+        aliases: ['Inkling Small', 'inkling-small'],
         provider: 'openrouter',
-        openrouter_id: 'meta/muse-spark-1.1',
+        openrouter_id: 'thinkingmachines/inkling-small',
+        cost: {
+            input_per_million: 0.45,
+            cached_input_per_million: 0.1,
+            output_per_million: 1.2,
+        },
+        features: {
+            context_length: 524288,
+            input_modality: ['text', 'image', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: false,
+            structured_output: true,
+            reasoning_output: true,
+            max_output_tokens: 262144,
+        },
+        class: 'reasoning',
+        description:
+            'Thinking Machines Inkling Small via OpenRouter. Cost-efficient multimodal reasoning model with tools and structured output.',
+    },
+
+    // Muse Spark 1.2 (via OpenRouter)
+    {
+        id: 'meta/muse-spark-1.2',
+        aliases: ['Muse Spark 1.2', 'Muse-Spark-1.2', 'muse-spark-1.2'],
+        provider: 'openrouter',
+        openrouter_id: 'meta/muse-spark-1.2',
         cost: {
             input_per_million: 1.25,
             cached_input_per_million: 0.15,
@@ -4760,7 +4584,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         description:
-            'Meta Muse Spark 1.1 via OpenRouter. Multimodal reasoning model for agentic workflows, coding, tool use, and visual-to-code generation with 1M context.',
+            'Meta Muse Spark 1.2 via OpenRouter. Multimodal reasoning model for agentic workflows, coding, tool use, and visual-to-code generation with 1M context.',
     },
 
     // KAT-Coder Pro V2.5 (via OpenRouter)

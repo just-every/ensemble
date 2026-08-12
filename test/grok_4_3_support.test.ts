@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { findModel } from '../data/model_data.js';
 import { GrokProvider } from '../model_providers/grok.js';
-import { getModelFromAgent, getProviderFromModel } from '../model_providers/model_provider.js';
+import { getModelFromAgent, getModelProvider, getProviderFromModel } from '../model_providers/model_provider.js';
 
 async function drain(stream: AsyncIterable<unknown>): Promise<void> {
     for await (const _event of stream) {
@@ -144,30 +144,10 @@ describe('Grok 4.3 support', () => {
         expect(requestParams.reasoning_effort).toBe('low');
     });
 
-    it('keeps legacy Grok reasoning request shape unchanged', async () => {
-        const provider = new GrokProvider();
-        const create = vi.fn().mockResolvedValue(emptyStream());
-        (provider as any)._client = {
-            chat: {
-                completions: {
-                    create,
-                },
-            },
-        };
-
-        await drain(
-            provider.createResponseStream(
-                [{ type: 'message', role: 'user', content: 'Return concise answer' }] as any,
-                'grok-4-fast-reasoning-high',
-                {
-                    agent_id: 'test-grok-legacy-reasoning-suffix',
-                } as any
-            )
-        );
-
-        const requestParams = create.mock.calls.at(0)?.[0];
-        expect(requestParams.model).toBe('grok-4-fast-reasoning');
-        expect(requestParams.reasoning).toEqual({ effort: 'high' });
-        expect(requestParams.reasoning_effort).toBeUndefined();
+    it('rejects retired Grok models and suffix variants with migration guidance', () => {
+        expect(() => getModelProvider('grok-4-fast-reasoning-high')).toThrow('Migrate to grok-4.3-low');
+        expect(() => getModelProvider('grok-4-fast-non-reasoning')).toThrow('Migrate to grok-4.3-none');
+        expect(() => getModelProvider('grok-3')).toThrow('Migrate to grok-4.3-none');
+        expect(findModel('grok-4-fast-reasoning')).toBeUndefined();
     });
 });

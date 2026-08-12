@@ -54,8 +54,8 @@ const MODEL_CASES = [
         id: 'thinkingmachines/inkling',
         modelClass: 'reasoning',
         cost: {
-            input_per_million: 1.0,
-            cached_input_per_million: 0.17,
+            input_per_million: 0.95,
+            cached_input_per_million: 0.16,
             output_per_million: 4.05,
         },
         features: {
@@ -66,13 +66,14 @@ const MODEL_CASES = [
             streaming: true,
             json_output: false,
             reasoning_output: true,
+            max_output_tokens: 262144,
         },
     },
     {
-        name: 'Muse Spark 1.1',
-        lookup: 'Muse Spark 1.1',
-        alias: 'muse-spark-1.1',
-        id: 'meta/muse-spark-1.1',
+        name: 'Muse Spark 1.2',
+        lookup: 'Muse Spark 1.2',
+        alias: 'muse-spark-1.2',
+        id: 'meta/muse-spark-1.2',
         modelClass: 'reasoning',
         cost: {
             input_per_million: 1.25,

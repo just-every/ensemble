@@ -71,7 +71,7 @@ function normalizeAudioSource(source: TranscriptionAudioSource): ReadableStream<
  * ws.on('message', data => audioStream.push(data));
  *
  * for await (const event of ensembleListen(audioStream, {
- *   model: 'gemini-live-2.5-flash-preview'
+ *   model: 'gemini-3.1-flash-live-preview'
  * })) {
  *   if (event.type === 'transcription_turn_delta') {
  *     console.log('New text:', event.delta);

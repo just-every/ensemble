@@ -11,7 +11,7 @@ import { costTracker } from '../utils/cost_tracker.js';
 import { log_llm_error, log_llm_request, log_llm_response } from '../utils/llm_logger.js';
 import { OpenAIChat } from './openai_chat.js';
 import OpenAI from 'openai';
-import { getGrokImagePricing, getGrokVideoPricing } from './grok_imagine_pricing.js';
+import { getGrokImagePricing, getGrokVideoPricing, type GrokImagineQuality } from './grok_imagine_pricing.js';
 
 type XAIImageRequestImage = {
     type: 'image_url';
@@ -25,6 +25,7 @@ type XAIImageResponse = {
         b64_json?: string;
     }>;
     model?: string;
+    usage?: { cost_in_usd_ticks?: number };
 };
 
 type SourceImageInput = NonNullable<ImageGenerationOpts['source_images']>;
@@ -79,6 +80,17 @@ function normalizeResolution(opts: ImageGenerationOpts): '1k' | '2k' | undefined
     }
 
     return undefined;
+}
+
+function normalizeImagine2Quality(
+    model: string,
+    quality: ImageGenerationOpts['quality']
+): GrokImagineQuality | undefined {
+    if (model !== 'grok-imagine-image-2.0') return undefined;
+    if (quality === 'low') return 'low';
+    if (quality === undefined || quality === 'medium' || quality === 'standard' || quality === 'auto') return 'medium';
+
+    throw new Error('grok-imagine-image-2.0 supports only low or medium quality.');
 }
 
 function normalizeSourceImages(sourceImages?: SourceImageInput): XAIImageRequestImage[] {
@@ -209,6 +221,7 @@ export class GrokProvider extends OpenAIChat {
 
         const aspectRatio = normalizeAspectRatio(opts.size);
         const resolution = normalizeResolution(opts);
+        const quality = normalizeImagine2Quality(model, opts.quality);
         const usesEditingEndpoint = sourceImages.length > 0;
 
         if (opts.response_format === 'b64_json') {
@@ -221,6 +234,10 @@ export class GrokProvider extends OpenAIChat {
 
         if (resolution) {
             requestBody.resolution = resolution;
+        }
+
+        if (model === 'grok-imagine-image-2.0' && (opts.quality === 'low' || opts.quality === 'medium')) {
+            requestBody.quality = opts.quality;
         }
 
         if (usesEditingEndpoint) {
@@ -259,23 +276,26 @@ export class GrokProvider extends OpenAIChat {
             }
 
             const effectiveResolution = resolution ?? '1k';
-            const pricing = getGrokImagePricing(model, effectiveResolution);
-            const cost = images.length * pricing.outputImage + sourceImages.length * pricing.inputImage;
+            const pricing = getGrokImagePricing(model, effectiveResolution, quality);
+            const providerCostTicks = response.usage?.cost_in_usd_ticks;
+            const estimatedCost = images.length * pricing.outputImage + sourceImages.length * pricing.inputImage;
 
             costTracker.addUsage({
                 model,
                 image_count: images.length,
-                cost,
+                cost: typeof providerCostTicks === 'number' ? providerCostTicks / 10_000_000_000 : estimatedCost,
                 request_id: opts.request_id,
                 metadata: {
                     source: 'xai',
                     endpoint,
                     aspect_ratio: aspectRatio,
                     resolution,
+                    quality,
                     response_format: opts.response_format || 'url',
                     source_image_count: sourceImages.length,
                     input_image_cost: pricing.inputImage,
                     output_image_cost: pricing.outputImage,
+                    provider_cost_ticks: providerCostTicks,
                 },
             });
 

@@ -112,32 +112,6 @@ export class QuotaTracker {
                     },
                     lastResetDate: new Date(),
                 },
-                // Gemini 2.0 Flash
-                'gemini-2.0-flash': {
-                    model: 'gemini-2.0-flash',
-                    dailyTokenLimit: 0, // No explicit TPD limit, relying on RPD
-                    dailyTokensUsed: 0,
-                    dailyRequestLimit: 1500, // 1,500 requests per day
-                    dailyRequestsUsed: 0,
-                    rateLimit: {
-                        requestsPerMinute: 15,
-                        tokensPerMinute: 1000000,
-                    },
-                    lastResetDate: new Date(),
-                },
-                // Gemini 2.0 Flash
-                'gemini-2.0-flash-lite': {
-                    model: 'gemini-2.0-flash-lite',
-                    dailyTokenLimit: 0, // No explicit TPD limit, relying on RPD
-                    dailyTokensUsed: 0,
-                    dailyRequestLimit: 1500, // 1,500 requests per day
-                    dailyRequestsUsed: 0,
-                    rateLimit: {
-                        requestsPerMinute: 30,
-                        tokensPerMinute: 1000000,
-                    },
-                    lastResetDate: new Date(),
-                },
             },
         };
 

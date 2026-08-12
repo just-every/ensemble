@@ -28,8 +28,8 @@ describe('Claude Opus 4.8 support', () => {
 
         expect(model?.id).toBe('claude-opus-4-8');
         expect(dotAlias?.id).toBe('claude-opus-4-8');
-        expect(latestAlias?.id).toBe('claude-opus-4-8');
-        expect(shortAlias?.id).toBe('claude-opus-4-8');
+        expect(latestAlias?.id).toBe('claude-opus-5');
+        expect(shortAlias?.id).toBe('claude-opus-5');
         expect(prefixlessAlias?.id).toBe('claude-opus-4-8');
         expect(previous?.id).toBe('claude-opus-4-7');
 
@@ -58,7 +58,7 @@ describe('Claude Opus 4.8 support', () => {
     it('normalizes Opus 4.8 aliases while preserving effort suffixes', async () => {
         const latest = await getModelFromAgent({
             agent_id: 'test-claude-opus-latest',
-            model: 'claude-opus-latest',
+            model: 'claude-4.8-opus',
         } as any);
         const xhigh = await getModelFromAgent({
             agent_id: 'test-claude-opus-4.8-xhigh',
@@ -120,7 +120,7 @@ describe('Claude Opus 4.8 support', () => {
         await drain(
             provider.createResponseStream(
                 [{ type: 'message', role: 'user', content: 'Return a quick answer' }] as any,
-                'claude-opus-latest',
+                'claude-opus-4.8',
                 {
                     agent_id: 'test-claude-opus-4.8-no-thinking-request',
                     modelSettings: {
