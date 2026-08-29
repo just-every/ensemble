@@ -151,21 +151,17 @@ class CostTracker {
                 if ('peak_price_per_million' in costStructure) {
                     // Time-Based Pricing
                     const timeBasedCost = costStructure as TimeBasedPrice;
-                    const utcHour = calculationTime.getUTCHours();
-                    const utcMinute = calculationTime.getUTCMinutes();
-                    const currentTimeInMinutes = utcHour * 60 + utcMinute;
-                    const peakStartInMinutes =
-                        timeBasedCost.peak_utc_start_hour * 60 + timeBasedCost.peak_utc_start_minute;
-                    const peakEndInMinutes = timeBasedCost.peak_utc_end_hour * 60 + timeBasedCost.peak_utc_end_minute;
-
-                    let isPeakTime: boolean;
-                    if (peakStartInMinutes <= peakEndInMinutes) {
-                        isPeakTime =
-                            currentTimeInMinutes >= peakStartInMinutes && currentTimeInMinutes < peakEndInMinutes;
-                    } else {
-                        isPeakTime =
-                            currentTimeInMinutes >= peakStartInMinutes || currentTimeInMinutes < peakEndInMinutes;
-                    }
+                    const currentTimeInMinutes = calculationTime.getUTCHours() * 60 + calculationTime.getUTCMinutes();
+                    const utcDay = calculationTime.getUTCDay();
+                    const isoWeekday = utcDay === 0 ? 7 : utcDay;
+                    const isPeakDay = !timeBasedCost.peak_days || timeBasedCost.peak_days.includes(isoWeekday);
+                    const isPeakWindow = timeBasedCost.peak_windows_utc.some(
+                        ([peakStartInMinutes, peakEndInMinutes]) =>
+                            peakStartInMinutes <= peakEndInMinutes
+                                ? currentTimeInMinutes >= peakStartInMinutes && currentTimeInMinutes < peakEndInMinutes
+                                : currentTimeInMinutes >= peakStartInMinutes || currentTimeInMinutes < peakEndInMinutes
+                    );
+                    const isPeakTime = isPeakDay && isPeakWindow;
 
                     return isPeakTime ? timeBasedCost.peak_price_per_million : timeBasedCost.off_peak_price_per_million;
                 } else if ('threshold_tokens' in costStructure) {

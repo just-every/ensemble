@@ -40,6 +40,21 @@ export type {
     ModelClass,
 };
 
+const DEEPSEEK_V4_PEAK_WINDOWS_UTC = [
+    [60, 240],
+    [360, 600],
+] as const;
+const DEEPSEEK_V4_PEAK_WEEKDAYS = [1, 2, 3, 4, 5] as const;
+
+function deepSeekV4TimeBasedPrice(offPeak: number, peak: number): TimeBasedPrice {
+    return {
+        off_peak_price_per_million: offPeak,
+        peak_price_per_million: peak,
+        peak_windows_utc: DEEPSEEK_V4_PEAK_WINDOWS_UTC,
+        peak_days: DEEPSEEK_V4_PEAK_WEEKDAYS,
+    };
+}
+
 // --- MODEL_CLASSES remains largely the same, but ensure model IDs match the registry ---
 // (Keep your existing MODEL_CLASSES definition here, just ensure IDs are consistent
 //  with the updated MODEL_REGISTRY below)
@@ -3799,9 +3814,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['DeepSeek-V4', 'DeepSeek-V4-Pro', 'deepseek-v4'],
         provider: 'deepseek',
         cost: {
-            input_per_million: 0.435,
-            cached_input_per_million: 0.003625,
-            output_per_million: 0.87,
+            input_per_million: deepSeekV4TimeBasedPrice(0.66, 1.32),
+            cached_input_per_million: deepSeekV4TimeBasedPrice(0.022, 0.044),
+            output_per_million: deepSeekV4TimeBasedPrice(1.98, 3.96),
         },
         features: {
             context_length: 1_000_000,
@@ -3821,9 +3836,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         aliases: ['DeepSeek-V4-Flash'],
         provider: 'deepseek',
         cost: {
-            input_per_million: 0.14,
-            cached_input_per_million: 0.0028,
-            output_per_million: 0.28,
+            input_per_million: deepSeekV4TimeBasedPrice(0.22, 0.44),
+            cached_input_per_million: deepSeekV4TimeBasedPrice(0.007, 0.014),
+            output_per_million: deepSeekV4TimeBasedPrice(0.66, 1.32),
         },
         features: {
             context_length: 1_000_000,
@@ -3837,6 +3852,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         },
         class: 'reasoning',
         description: 'DeepSeek V4 Flash direct API model with native tools and switchable thinking.',
+    },
+    {
+        id: 'deepseek-v4-flash-vision-exp',
+        aliases: ['DeepSeek-V4-Flash-Vision-Exp'],
+        provider: 'deepseek',
+        cost: {
+            input_per_million: deepSeekV4TimeBasedPrice(0.22, 0.44),
+            cached_input_per_million: deepSeekV4TimeBasedPrice(0.007, 0.014),
+            output_per_million: deepSeekV4TimeBasedPrice(0.66, 1.32),
+        },
+        features: {
+            context_length: 1_000_000,
+            max_output_tokens: 384_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            reasoning_output: true,
+        },
+        class: 'vision',
+        description: 'DeepSeek V4 Flash Vision experimental direct API model with image inputs and V4 text pricing.',
     },
 
     // GPT OSS 120B - Open source model via OpenRouter

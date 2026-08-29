@@ -677,11 +677,10 @@ export interface TieredPrice {
 export interface TimeBasedPrice {
     peak_price_per_million: number;
     off_peak_price_per_million: number;
-    // Define UTC time boundaries for peak hours (inclusive start, exclusive end)
-    peak_utc_start_hour: number; // e.g., 0 for 00:30
-    peak_utc_start_minute: number; // e.g., 30 for 00:30
-    peak_utc_end_hour: number; // e.g., 16 for 16:30
-    peak_utc_end_minute: number; // e.g., 30 for 16:30
+    /** [startMinute, endMinute) since UTC midnight; a window crossing midnight is split in two. */
+    peak_windows_utc: ReadonlyArray<readonly [number, number]>;
+    /** ISO weekday numbers, Mon = 1 through Sun = 7. Omitted means every day. */
+    peak_days?: readonly number[];
 }
 
 // Represents modality-specific pricing (e.g., for models that charge differently for text vs audio)

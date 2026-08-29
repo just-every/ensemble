@@ -108,9 +108,23 @@ describe('latest OpenRouter model support', () => {
         expect(getProviderFromModel('deepseek-v4-pro')).toBe('deepseek');
         expect(getProviderFromModel('deepseek/deepseek-v4-pro')).toBe('openrouter');
         expect(pro?.cost).toMatchObject({
-            input_per_million: 0.435,
-            cached_input_per_million: 0.003625,
-            output_per_million: 0.87,
+            input_per_million: {
+                off_peak_price_per_million: 0.66,
+                peak_price_per_million: 1.32,
+                peak_windows_utc: [
+                    [60, 240],
+                    [360, 600],
+                ],
+                peak_days: [1, 2, 3, 4, 5],
+            },
+            cached_input_per_million: {
+                off_peak_price_per_million: 0.022,
+                peak_price_per_million: 0.044,
+            },
+            output_per_million: {
+                off_peak_price_per_million: 1.98,
+                peak_price_per_million: 3.96,
+            },
         });
         expect(pro?.features).toMatchObject({
             context_length: 1000000,
@@ -128,9 +142,18 @@ describe('latest OpenRouter model support', () => {
             'deepseek-v4-flash'
         );
         expect(flash?.cost).toMatchObject({
-            input_per_million: 0.14,
-            cached_input_per_million: 0.0028,
-            output_per_million: 0.28,
+            input_per_million: {
+                off_peak_price_per_million: 0.22,
+                peak_price_per_million: 0.44,
+            },
+            cached_input_per_million: {
+                off_peak_price_per_million: 0.007,
+                peak_price_per_million: 0.014,
+            },
+            output_per_million: {
+                off_peak_price_per_million: 0.66,
+                peak_price_per_million: 1.32,
+            },
         });
         expect(flash?.features?.max_output_tokens).toBe(384000);
     });
