@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DeepSeekProvider } from '../model_providers/deepseek.js';
 import { OpenAIChat } from '../model_providers/openai_chat.js';
 import { OpenRouterProvider } from '../model_providers/openrouter.js';
+import { convertToFunctionCall, convertToFunctionCallOutput } from '../utils/message_converter.js';
 
 async function drain(stream: AsyncIterable<unknown>): Promise<void> {
     for await (const _event of stream) {
@@ -19,6 +20,43 @@ function completionStream(content = '{}') {
                             content,
                         },
                         finish_reason: 'stop',
+                    },
+                ],
+            };
+        },
+    };
+}
+
+function reasoningToolCallStream() {
+    return {
+        async *[Symbol.asyncIterator]() {
+            yield {
+                choices: [
+                    {
+                        delta: { reasoning_content: 'I need the scoped knowledge before answering.' },
+                    },
+                ],
+            };
+            yield {
+                choices: [
+                    {
+                        delta: {
+                            tool_calls: [
+                                {
+                                    index: 0,
+                                    id: 'call_knowledge',
+                                    type: 'function',
+                                    function: { name: 'search_knowledge', arguments: '{"query":"refund"}' },
+                                },
+                                {
+                                    index: 1,
+                                    id: 'call_history',
+                                    type: 'function',
+                                    function: { name: 'read_conversation_history', arguments: '{"limit":10}' },
+                                },
+                            ],
+                        },
+                        finish_reason: 'tool_calls',
                     },
                 ],
             };
@@ -252,5 +290,68 @@ describe('OpenAI chat structured output request formatting', () => {
         expect(requestParams.response_format).toEqual({ type: 'json_object' });
         expect(requestParams.messages.at(-1).role).toBe('system');
         expect(requestParams.messages.at(-1).content).toContain('Respond only with valid JSON.');
+    });
+
+    it('replays DeepSeek reasoning with a grouped native tool turn', async () => {
+        const provider = new DeepSeekProvider();
+        const create = vi
+            .fn()
+            .mockResolvedValueOnce(reasoningToolCallStream())
+            .mockResolvedValueOnce(completionStream('Done.'));
+        (provider as any)._client = { chat: { completions: { create } } };
+
+        const firstRoundEvents: any[] = [];
+        for await (const event of provider.createResponseStream(
+            [{ type: 'message', role: 'user', content: 'Check the refund status.' }] as any,
+            'deepseek-v4-flash',
+            { agent_id: 'test-deepseek-reasoning-tool-replay' } as any
+        )) {
+            firstRoundEvents.push(event);
+        }
+
+        const toolCalls = firstRoundEvents.filter(event => event.type === 'tool_start').map(event => event.tool_call);
+        expect(toolCalls).toHaveLength(2);
+        expect(toolCalls.map(call => call.reasoning_content)).toEqual([
+            'I need the scoped knowledge before answering.',
+            'I need the scoped knowledge before answering.',
+        ]);
+
+        const resumedHistory: any[] = [{ type: 'message', role: 'user', content: 'Check the refund status.' }];
+        for (const toolCall of toolCalls) {
+            resumedHistory.push(convertToFunctionCall(toolCall, 'deepseek-v4-flash'));
+            resumedHistory.push(
+                convertToFunctionCallOutput(
+                    {
+                        id: toolCall.id,
+                        call_id: toolCall.id,
+                        toolCall,
+                        output: JSON.stringify({ source: toolCall.function.name }),
+                    },
+                    'deepseek-v4-flash'
+                )
+            );
+        }
+
+        await drain(
+            provider.createResponseStream(resumedHistory as any, 'deepseek-v4-flash', {
+                agent_id: 'test-deepseek-reasoning-tool-replay',
+            } as any)
+        );
+
+        const resumedRequest = create.mock.calls.at(1)?.[0];
+        expect(resumedRequest.messages).toHaveLength(4);
+        expect(resumedRequest.messages[1]).toMatchObject({
+            role: 'assistant',
+            content: null,
+            reasoning_content: 'I need the scoped knowledge before answering.',
+            tool_calls: [
+                { id: 'call_knowledge', function: { name: 'search_knowledge', arguments: '{"query":"refund"}' } },
+                { id: 'call_history', function: { name: 'read_conversation_history', arguments: '{"limit":10}' } },
+            ],
+        });
+        expect(resumedRequest.messages.slice(2)).toEqual([
+            { role: 'tool', tool_call_id: 'call_knowledge', content: '{"source":"search_knowledge"}' },
+            { role: 'tool', tool_call_id: 'call_history', content: '{"source":"read_conversation_history"}' },
+        ]);
     });
 });

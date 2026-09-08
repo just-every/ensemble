@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 
 type DeepSeekV4Params = OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming & {
     reasoning?: { effort?: string };
-    reasoning_effort?: 'high' | 'max';
+    reasoning_effort?: 'low' | 'high' | 'max';
     thinking?: { type: 'enabled' | 'disabled' };
 };
 
@@ -23,6 +23,6 @@ export function applyDeepSeekV4Contract(
     }
 
     params.thinking = { type: 'enabled' };
-    params.reasoning_effort = effort === 'xhigh' || effort === 'max' ? 'max' : 'high';
+    params.reasoning_effort = effort === 'max' ? 'max' : effort === 'low' || effort === 'minimal' ? 'low' : 'high';
     return params;
 }

@@ -44,23 +44,23 @@ describe('Gemini July 2026 model support', () => {
     });
 
     it('resolves current latest aliases and promotes stable class defaults', async () => {
-        expect(findModel('gemini-flash-latest')?.id).toBe('gemini-3.6-flash');
-        expect(findModel('models/gemini-3.6-flash')?.id).toBe('gemini-3.6-flash');
+        expect(findModel('gemini-flash-latest')?.id).toBe('gemini-3.8-flash');
+        expect(findModel('models/gemini-3.8-flash')?.id).toBe('gemini-3.8-flash');
         expect(findModel('gemini-flash-lite-latest')?.id).toBe('gemini-3.5-flash-lite');
         expect(findModel('models/gemini-3.5-flash-lite')?.id).toBe('gemini-3.5-flash-lite');
         expect(await getModelFromAgent({ agent_id: 'flash-latest', model: 'gemini-flash-latest' } as any)).toBe(
-            'gemini-3.6-flash'
+            'gemini-3.8-flash'
         );
         expect(
             await getModelFromAgent({ agent_id: 'flash-lite-latest', model: 'gemini-flash-lite-latest' } as any)
         ).toBe('gemini-3.5-flash-lite');
 
-        expect(MODEL_CLASSES.standard.models).toContain('gemini-3.6-flash');
+        expect(MODEL_CLASSES.standard.models).toContain('gemini-3.8-flash');
         expect(MODEL_CLASSES.mini.models).toContain('gemini-3.5-flash-lite');
         expect(MODEL_CLASSES.reasoning_mini.models).toContain('gemini-3.5-flash-lite');
     });
 
-    it.each(['gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
+    it.each(['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'])(
         'uses native thinking levels and omits deprecated sampling parameters for %s',
         async modelId => {
             const provider = new GeminiProvider('test-key');
@@ -95,6 +95,39 @@ describe('Gemini July 2026 model support', () => {
             expect(request.config.topK).toBeUndefined();
         }
     );
+
+    it('keeps integer retrieval limits as integer tool parameters', async () => {
+        const provider = new GeminiProvider('test-key');
+        const generateContentStream = vi.fn().mockResolvedValue(makeSingleChunkStream());
+        (provider as any)._client = { models: { generateContentStream } };
+        const tools = [
+            {
+                definition: {
+                    type: 'function',
+                    function: {
+                        name: 'read_history',
+                        description: 'Read a page of history',
+                        parameters: {
+                            type: 'object',
+                            properties: { limit: { type: 'integer', description: 'Entry limit' } },
+                            required: ['limit'],
+                        },
+                    },
+                },
+                function: async () => 'History',
+            },
+        ];
+        for await (const _event of provider.createResponseStream(
+            [{ type: 'message', role: 'user', content: 'Read history' }] as any,
+            'gemini-3.8-flash',
+            { agent_id: 'integer-tool', tools } as any,
+            'integer-tool-request'
+        )) {
+            /* Drain stream. */
+        }
+        const request = generateContentStream.mock.calls.at(0)?.[0] as any;
+        expect(request.config.tools[0].functionDeclarations[0].parameters.properties.limit.type).toBe('INTEGER');
+    });
 
     it('rejects a prefilled model turn before dispatching a Gemini 3.6 request', async () => {
         const provider = new GeminiProvider('test-key');

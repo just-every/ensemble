@@ -61,6 +61,7 @@ export function convertToFunctionCall(
         name: toolCall.function.name,
         arguments: toolCall.function.arguments,
         ...(toolCall.thought_signature ? { thought_signature: toolCall.thought_signature } : {}),
+        ...(toolCall.reasoning_content ? { reasoning_content: toolCall.reasoning_content } : {}),
         model,
         status,
         timestamp: Date.now(),
