@@ -76,6 +76,9 @@ function convertParameterToGeminiFormat(param: any): any {
         case 'string':
             type = Type.STRING;
             break;
+        case 'integer':
+            type = Type.INTEGER;
+            break;
         case 'number':
             type = Type.NUMBER;
             break;
@@ -896,6 +899,9 @@ function isGeminiStreamingImageModel(model: string): boolean {
 function getSupportedThinkingLevels(model: string): Set<GeminiThinkingLevel> | null {
     if (isGemmaModel(model)) {
         return new Set(['HIGH']);
+    }
+    if (model.includes('gemini-3.8-flash') || model.includes('gemini-3.7-flash')) {
+        return new Set(['LOW', 'MEDIUM', 'HIGH']);
     }
     if (model.includes('gemini-3.1-pro-preview') || model.includes('gemini-3-pro-preview')) {
         return new Set(['LOW', 'MEDIUM', 'HIGH']);

@@ -13,5 +13,9 @@ function normalizeModelId(model: string): string {
 export function usesCurrentGeminiGenerateContentContract(model: string): boolean {
     const modelId = normalizeModelId(model);
 
-    return modelId === 'gemini-3.6-flash' || modelId === 'gemini-3.5-flash-lite' || CURRENT_FLASH_ALIASES.has(modelId);
+    return (
+        ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'].includes(modelId) ||
+        modelId === 'gemini-3.5-flash-lite' ||
+        CURRENT_FLASH_ALIASES.has(modelId)
+    );
 }

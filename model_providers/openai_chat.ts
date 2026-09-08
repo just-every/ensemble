@@ -13,6 +13,8 @@ import {
     ToolCall,
     ResponseInput,
     ResponseContent,
+    ResponseInputFunctionCall,
+    ResponseInputFunctionCallOutput,
     AgentDefinition,
 } from '../types/types.js';
 import { BaseModelProvider } from './base_provider.js';
@@ -253,10 +255,72 @@ async function mapMessagesToOpenAI(
 
     // Check if this is a Mistral model via OpenRouter (which doesn't support tool roles)
     const isMistralViaOpenRouter = model.includes('mistral') || model.includes('magistral');
+    // DeepSeek V4's thinking mode requires the exact reasoning content from an
+    // assistant tool-call turn on the continuation request. MessageHistory
+    // stores calls and results individually so it can schedule tools safely;
+    // reconstruct the provider's one assistant turn here.
+    const replaysReasoningContent = /(?:^|\/)deepseek-v4-/.test(model);
 
-    for (const msg of messages) {
+    for (let index = 0; index < messages.length; ++index) {
+        const msg = messages[index];
         // Create a clean copy without non-standard properties
         const message = { ...msg };
+
+        if (replaysReasoningContent && msg.type === 'function_call') {
+            const reasoningContent = (msg as ResponseInputFunctionCall & { reasoning_content?: unknown })
+                .reasoning_content;
+            if (typeof reasoningContent === 'string' && reasoningContent.length > 0) {
+                const functionCalls: ResponseInputFunctionCall[] = [];
+                const functionOutputs: ResponseInputFunctionCallOutput[] = [];
+                let cursor = index;
+
+                // Calls from one streamed assistant turn can be interleaved
+                // with their completed outputs in MessageHistory. Group only
+                // calls that carry the same reasoning record; a new record
+                // starts the next provider turn.
+                while (cursor < messages.length) {
+                    const candidate = messages[cursor];
+                    if (candidate.type === 'function_call') {
+                        const candidateReasoning = (
+                            candidate as ResponseInputFunctionCall & { reasoning_content?: unknown }
+                        ).reasoning_content;
+                        if (candidateReasoning !== reasoningContent) break;
+                        functionCalls.push(candidate);
+                    } else if (candidate.type === 'function_call_output') {
+                        functionOutputs.push(candidate);
+                    } else {
+                        break;
+                    }
+                    ++cursor;
+                }
+
+                result.push({
+                    role: 'assistant',
+                    content: null,
+                    reasoning_content: reasoningContent,
+                    tool_calls: functionCalls.map(functionCall => ({
+                        id: functionCall.call_id,
+                        type: 'function' as const,
+                        function: {
+                            name: functionCall.name,
+                            arguments: functionCall.arguments,
+                        },
+                    })),
+                } as OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam);
+
+                for (const functionOutput of functionOutputs) {
+                    const toolMessage = {
+                        role: 'tool',
+                        tool_call_id: functionOutput.call_id,
+                        content: functionOutput.output || '',
+                    } as OpenAI.Chat.Completions.ChatCompletionToolMessageParam;
+                    result = await appendMessageWithImage(model, result, toolMessage, 'content', addImagesToInput);
+                }
+
+                index = cursor - 1;
+                continue;
+            }
+        }
 
         // Handle function call output messages
         if (msg.type === 'function_call_output') {
@@ -1104,6 +1168,13 @@ export class OpenAIChat extends BaseModelProvider {
                             };
                         } else {
                             for (const completedToolCall of validatedToolCalls) {
+                                // DeepSeek V4 requires this verbatim reasoning record
+                                // on the assistant tool-call message that precedes the
+                                // corresponding tool results. Keep it with each call
+                                // so MessageHistory can preserve a multi-call turn.
+                                if (aggregatedThinking) {
+                                    completedToolCall.reasoning_content = aggregatedThinking;
+                                }
                                 yield {
                                     type: 'tool_start',
                                     tool_call: completedToolCall,

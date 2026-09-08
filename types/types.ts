@@ -137,6 +137,12 @@ export interface ToolCall {
     type: 'function';
     call_id?: string;
     thought_signature?: string;
+    /**
+     * Provider reasoning that accompanied this native tool-call turn. Some
+     * OpenAI-compatible reasoning APIs require it to be replayed verbatim
+     * with the assistant tool-call message before they accept tool results.
+     */
+    reasoning_content?: string;
     function: {
         name: string;
         arguments: string;
@@ -273,6 +279,8 @@ export interface ResponseInputFunctionCall extends ResponseBaseMessage {
     name: string;
     arguments: string;
     thought_signature?: string;
+    /** Provider reasoning retained from the assistant tool-call turn. */
+    reasoning_content?: string;
     id?: string;
     status?: 'in_progress' | 'completed' | 'incomplete';
 }

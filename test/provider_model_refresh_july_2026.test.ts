@@ -26,7 +26,7 @@ describe('July 2026 provider model refresh', () => {
         } as any) as any;
         expect(max.reasoning).toBeUndefined();
         expect(max.thinking).toEqual({ type: 'enabled' });
-        expect(max.reasoning_effort).toBe('max');
+        expect(max.reasoning_effort).toBe('high');
 
         const disabled = provider.prepareParameters({
             model: 'deepseek-v4-flash',

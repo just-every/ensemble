@@ -66,7 +66,7 @@ export const MODEL_CLASSES = {
         models: [
             // One top pick per provider (prefer stable IDs over dated previews when possible)
             'gpt-5.5', // OpenAI
-            'gemini-3.6-flash', // Google
+            'gemini-3.8-flash', // Google
             'claude-sonnet-5', // Anthropic
             'grok-4.5', // X.AI
         ],
@@ -156,7 +156,7 @@ export const MODEL_CLASSES = {
     writing: {
         models: [
             'gpt-5.5', // OpenAI
-            'gemini-3.6-flash', // Google
+            'gemini-3.8-flash', // Google
             'claude-sonnet-5', // Anthropic
             'grok-4.5', // X.AI
         ],
@@ -2626,9 +2626,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         class: 'standard',
         description: 'Gemini 3 Flash Preview - fast multimodal model with 1M context window.',
     },
+    // Verified 2026-09-08: https://ai.google.dev/gemini-api/docs/pricing
+    // Introductory pricing ends 2026-12-31; review before January 2027 billing.
+    {
+        id: 'gemini-3.8-flash',
+        aliases: ['gemini-flash-latest', 'models/gemini-3.8-flash', 'models/gemini-flash-latest'],
+        provider: 'google',
+        cost: { input_per_million: 0.75, cached_input_per_million: 0.075, output_per_million: 3.75 },
+        features: {
+            context_length: 1048576,
+            max_output_tokens: 65536,
+            input_modality: ['text', 'image', 'video', 'audio'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+        },
+        class: 'standard',
+        description: 'Gemini 3.8 Flash GA. Low/medium/high thinking. Introductory prices through 2026-12-31.',
+    },
     {
         id: 'gemini-3.6-flash',
-        aliases: ['gemini-flash-latest', 'models/gemini-3.6-flash', 'models/gemini-flash-latest'],
+        aliases: ['models/gemini-3.6-flash'],
         provider: 'google',
         cost: {
             input_per_million: 1.5,
@@ -3813,6 +3832,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         id: 'deepseek-v4-pro',
         aliases: ['DeepSeek-V4', 'DeepSeek-V4-Pro', 'deepseek-v4'],
         provider: 'deepseek',
+        // https://api-docs.deepseek.com/quick_start/pricing/ (2026-08-16 schedule)
         cost: {
             input_per_million: deepSeekV4TimeBasedPrice(0.66, 1.32),
             cached_input_per_million: deepSeekV4TimeBasedPrice(0.022, 0.044),
@@ -3829,12 +3849,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             reasoning_output: true,
         },
         class: 'reasoning',
-        description: 'DeepSeek V4 Pro direct API model with native tools, JSON output, and high/max reasoning.',
+        description: 'DeepSeek V4 Pro direct API model with native tools, JSON output, and low/high/max reasoning.',
     },
     {
         id: 'deepseek-v4-flash',
         aliases: ['DeepSeek-V4-Flash'],
         provider: 'deepseek',
+        // https://api-docs.deepseek.com/quick_start/pricing/ (2026-08-16 schedule)
         cost: {
             input_per_million: deepSeekV4TimeBasedPrice(0.22, 0.44),
             cached_input_per_million: deepSeekV4TimeBasedPrice(0.007, 0.014),
