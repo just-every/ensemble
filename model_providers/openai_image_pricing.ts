@@ -1,8 +1,9 @@
 import type { ImageGenerationOpts, ModelCost, ModelUsage, ModalityPrice } from '../types/types.js';
 import { findModel } from '../data/model_data.js';
 
-export type OpenAIImageQuality = 'low' | 'medium' | 'high' | 'auto';
+export type OpenAIImageQuality = 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 export type OpenAIImageSize = 'auto' | `${number}x${number}`;
+type OpenAIImageLegacyQuality = Exclude<OpenAIImageQuality, 'auto' | 'xhigh' | 'max'>;
 
 export interface OpenAIImageUsage {
     input_tokens?: number;
@@ -14,7 +15,7 @@ export interface OpenAIImageUsage {
     total_tokens?: number;
 }
 
-const GPT_IMAGE_2_COSTS: Record<Exclude<OpenAIImageQuality, 'auto'>, { square: number; large: number }> = {
+const GPT_IMAGE_2_COSTS: Record<OpenAIImageLegacyQuality, { square: number; large: number }> = {
     low: { square: 0.00588, large: 0.00474 },
     medium: { square: 0.05268, large: 0.04116 },
     high: { square: 0.21072, large: 0.16464 },
@@ -25,29 +26,41 @@ const GPT_IMAGE_2_MIN_PIXELS = 655_360;
 const GPT_IMAGE_2_MAX_PIXELS = 8_294_400;
 const GPT_IMAGE_2_MAX_ASPECT_RATIO = 3;
 const GPT_IMAGE_2_SIZE_MULTIPLE = 16;
+const GPT_IMAGE_2_MAX_DIMENSION = 3840;
 
-const GPT_IMAGE_15_COSTS: Record<Exclude<OpenAIImageQuality, 'auto'>, { square: number; large: number }> = {
+const GPT_IMAGE_15_COSTS: Record<OpenAIImageLegacyQuality, { square: number; large: number }> = {
     low: { square: 0.009, large: 0.013 },
     medium: { square: 0.034, large: 0.05 },
     high: { square: 0.133, large: 0.2 },
 };
 
-const GPT_IMAGE_1_COSTS: Record<Exclude<OpenAIImageQuality, 'auto'>, { square: number; large: number }> = {
+const GPT_IMAGE_1_COSTS: Record<OpenAIImageLegacyQuality, { square: number; large: number }> = {
     low: { square: 0.007, large: 0.011 },
     medium: { square: 0.026, large: 0.042 },
     high: { square: 0.103, large: 0.167 },
 };
 
-const GPT_IMAGE_1_MINI_COSTS: Record<Exclude<OpenAIImageQuality, 'auto'>, { square: number; large: number }> = {
+const GPT_IMAGE_1_MINI_COSTS: Record<OpenAIImageLegacyQuality, { square: number; large: number }> = {
     low: { square: 0.005, large: 0.006 },
     medium: { square: 0.011, large: 0.015 },
     high: { square: 0.015, large: 0.02 },
 };
 
-export function normalizeOpenAIImageQuality(quality?: ImageGenerationOpts['quality']): OpenAIImageQuality {
+export function normalizeOpenAIImageQuality(quality?: ImageGenerationOpts['quality']): OpenAIImageQuality;
+export function normalizeOpenAIImageQuality(
+    model: string,
+    quality?: ImageGenerationOpts['quality']
+): OpenAIImageQuality;
+export function normalizeOpenAIImageQuality(
+    modelOrQuality?: string | ImageGenerationOpts['quality'],
+    qualityOverride?: ImageGenerationOpts['quality']
+): OpenAIImageQuality {
+    const model = qualityOverride === undefined ? undefined : modelOrQuality;
+    const quality = qualityOverride === undefined ? modelOrQuality : qualityOverride;
     if (quality === 'standard') return 'medium';
     if (quality === 'hd') return 'high';
     if (quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'auto') return quality;
+    if (quality === 'xhigh' || quality === 'max') return model && isGptImage25(model) ? quality : 'auto';
     return 'auto';
 }
 
@@ -58,21 +71,28 @@ export function normalizeOpenAIImageSize(model: string, size?: ImageGenerationOp
     if (size === 'portrait') return '1024x1536';
     if (size === '1024x1024' || size === '1536x1024' || size === '1024x1536') return size;
 
-    if (isGptImage2(model)) {
+    if (isGptImage2(model) || isGptImage25(model)) {
         if (isPixelSize(size)) {
-            assertValidGptImage2Size(size);
+            assertValidGptImage2FamilySize(size);
             return size;
         }
 
-        const aspectSize = mapGptImage2AspectSize(size);
+        const aspectSize = mapGptImage2FamilyAspectSize(size);
         if (aspectSize) return aspectSize;
     }
 
     return 'auto';
 }
 
-export function getOpenAIImageCostEstimate(model: string, quality: OpenAIImageQuality, size: OpenAIImageSize): number {
-    const normalizedQuality = quality === 'auto' ? 'medium' : quality;
+export function getOpenAIImageCostEstimate(
+    model: string,
+    quality: OpenAIImageQuality,
+    size: OpenAIImageSize
+): number | undefined {
+    if (isGptImage25(model)) return undefined;
+
+    const normalizedQuality: OpenAIImageLegacyQuality =
+        quality === 'auto' || quality === 'xhigh' || quality === 'max' ? 'medium' : quality;
     const sizeClass = size === '1536x1024' || size === '1024x1536' ? 'large' : 'square';
 
     if (isGptImage2(model)) {
@@ -94,7 +114,9 @@ export function getOpenAIImageCostMetadata(
 ): Record<string, unknown> {
     if (!isGptImage2(model)) return {};
 
-    const cost = estimateGptImage2Cost(quality === 'auto' ? 'medium' : quality, size);
+    const normalizedQuality: OpenAIImageLegacyQuality =
+        quality === 'auto' || quality === 'xhigh' || quality === 'max' ? 'medium' : quality;
+    const cost = estimateGptImage2Cost(normalizedQuality, size);
     const outputTokens = Math.round((cost / GPT_IMAGE_2_OUTPUT_PRICE_PER_MILLION) * 1_000_000);
 
     return {
@@ -180,7 +202,16 @@ function isGptImage2(model: string): boolean {
     return model === 'gpt-image-2' || model.startsWith('gpt-image-2-');
 }
 
-function estimateGptImage2Cost(quality: Exclude<OpenAIImageQuality, 'auto'>, size: OpenAIImageSize): number {
+export function isGptImage25(model: string): boolean {
+    return (
+        model === 'gpt-image-2.5-flare' ||
+        model.startsWith('gpt-image-2.5-flare-') ||
+        model === 'gpt-image-2.5-sunburst' ||
+        model.startsWith('gpt-image-2.5-sunburst-')
+    );
+}
+
+function estimateGptImage2Cost(quality: OpenAIImageLegacyQuality, size: OpenAIImageSize): number {
     if (size === 'auto' || size === '1024x1024') return GPT_IMAGE_2_COSTS[quality].square;
     if (size === '1536x1024' || size === '1024x1536') return GPT_IMAGE_2_COSTS[quality].large;
 
@@ -206,7 +237,7 @@ function isPixelSize(size: string): size is `${number}x${number}` {
     return /^\d+x\d+$/.test(size);
 }
 
-function mapGptImage2AspectSize(size: string): OpenAIImageSize | undefined {
+function mapGptImage2FamilyAspectSize(size: string): OpenAIImageSize | undefined {
     const ratio = parseAspectRatioSize(size);
     if (!ratio) return undefined;
 
@@ -219,7 +250,7 @@ function mapGptImage2AspectSize(size: string): OpenAIImageSize | undefined {
     const height = roundToMultiple(Math.sqrt(GPT_IMAGE_2_LARGE_PIXELS / ratioWidth), GPT_IMAGE_2_SIZE_MULTIPLE);
     const sizeValue = `${width}x${height}` as `${number}x${number}`;
 
-    assertValidGptImage2Size(sizeValue);
+    assertValidGptImage2FamilySize(sizeValue);
     return sizeValue;
 }
 
@@ -238,23 +269,28 @@ function roundToMultiple(value: number, multiple: number): number {
     return Math.max(multiple, Math.round(value / multiple) * multiple);
 }
 
-function assertValidGptImage2Size(size: `${number}x${number}`): void {
+function assertValidGptImage2FamilySize(size: `${number}x${number}`): void {
     const [width, height] = size.split('x').map(Number);
     const shortEdge = Math.min(width, height);
     const longEdge = Math.max(width, height);
     const pixels = width * height;
 
     if (width % 16 !== 0 || height % 16 !== 0) {
-        throw new Error(`gpt-image-2 size ${size} is invalid: both edges must be multiples of 16px.`);
+        throw new Error(`GPT Image 2 family size ${size} is invalid: both edges must be multiples of 16px.`);
+    }
+    if (longEdge > GPT_IMAGE_2_MAX_DIMENSION) {
+        throw new Error(
+            `GPT Image 2 family size ${size} is invalid: neither edge can exceed ${GPT_IMAGE_2_MAX_DIMENSION}px.`
+        );
     }
     if (longEdge / shortEdge > GPT_IMAGE_2_MAX_ASPECT_RATIO) {
         throw new Error(
-            `gpt-image-2 size ${size} is invalid: long edge to short edge ratio must not exceed ${GPT_IMAGE_2_MAX_ASPECT_RATIO}:1.`
+            `GPT Image 2 family size ${size} is invalid: long edge to short edge ratio must not exceed ${GPT_IMAGE_2_MAX_ASPECT_RATIO}:1.`
         );
     }
     if (pixels < GPT_IMAGE_2_MIN_PIXELS || pixels > GPT_IMAGE_2_MAX_PIXELS) {
         throw new Error(
-            `gpt-image-2 size ${size} is invalid: total pixels must be between ${GPT_IMAGE_2_MIN_PIXELS.toLocaleString(
+            `GPT Image 2 family size ${size} is invalid: total pixels must be between ${GPT_IMAGE_2_MIN_PIXELS.toLocaleString(
                 'en-US'
             )} and ${GPT_IMAGE_2_MAX_PIXELS.toLocaleString('en-US')}.`
         );

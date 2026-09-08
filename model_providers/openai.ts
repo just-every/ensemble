@@ -40,6 +40,7 @@ import {
     getOpenAIImageCostMetadata,
     buildOpenAIImageUsageRecord,
     getOpenAIImageCostEstimate,
+    isGptImage25,
     normalizeOpenAIImageQuality,
     normalizeOpenAIImageSize,
 } from './openai_image_pricing.js';
@@ -386,15 +387,16 @@ export class OpenAIProvider extends BaseModelProvider {
             model = model || 'gpt-image-1.5';
             const number_of_images = opts?.n || 1;
 
-            const quality = normalizeOpenAIImageQuality(opts?.quality);
+            const quality = normalizeOpenAIImageQuality(model, opts?.quality);
             const size = normalizeOpenAIImageSize(model, opts?.size);
 
             // Default background to 'auto'
             const background: 'transparent' | 'opaque' | 'auto' = opts?.background || 'auto';
 
             // Extract input_fidelity if provided
-            const input_fidelity: 'low' | 'medium' | 'high' | undefined =
-                opts?.input_fidelity ?? mapOpenAIImageInputFidelity(opts?.detail);
+            const input_fidelity: 'low' | 'medium' | 'high' | undefined = isGptImage25(model)
+                ? undefined
+                : (opts?.input_fidelity ?? mapOpenAIImageInputFidelity(opts?.detail));
 
             // Get source images if provided
             const source_images = opts?.source_images;
@@ -503,8 +505,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 ...(opts.request_id ? { request_id: opts.request_id } : {}),
             });
 
-            // Track usage for cost calculation. Prefer token usage returned by OpenAI;
-            // otherwise use published or size-derived estimates.
+            // Track usage for cost calculation. GPT Image 2.5 has no published
+            // output-token formula, so cost it only from the provider usage.
             if (response.data && response.data.length > 0) {
                 const usageMetadata = {
                     quality,
@@ -525,20 +527,22 @@ export class OpenAIProvider extends BaseModelProvider {
                     costTracker.addUsage(tokenUsageRecord);
                 } else {
                     const perImageCost = this.getImageCost(model, quality, size);
-                    const totalCost = perImageCost * response.data.length;
+                    if (typeof perImageCost === 'number') {
+                        const totalCost = perImageCost * response.data.length;
 
-                    costTracker.addUsage({
-                        model,
-                        image_count: response.data.length,
-                        cost: totalCost, // explicit cost to avoid registry fallback
-                        request_id: opts?.request_id,
-                        metadata: {
-                            ...usageMetadata,
-                            ...getOpenAIImageCostMetadata(model, quality, size),
-                            cost_per_image: perImageCost,
-                            estimated: true,
-                        },
-                    });
+                        costTracker.addUsage({
+                            model,
+                            image_count: response.data.length,
+                            cost: totalCost, // explicit cost to avoid registry fallback
+                            request_id: opts?.request_id,
+                            metadata: {
+                                ...usageMetadata,
+                                ...getOpenAIImageCostMetadata(model, quality, size),
+                                cost_per_image: perImageCost,
+                                estimated: true,
+                            },
+                        });
+                    }
                 }
             }
 
@@ -578,10 +582,10 @@ export class OpenAIProvider extends BaseModelProvider {
     /**
      * Get the cost of generating an image based on model and parameters
      */
-    private getImageCost(model: string, quality: string, size: string): number {
+    private getImageCost(model: string, quality: string, size: string): number | undefined {
         return getOpenAIImageCostEstimate(
             model,
-            quality as 'low' | 'medium' | 'high' | 'auto',
+            quality as 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto',
             size as '1024x1024' | '1536x1024' | '1024x1536' | 'auto'
         );
     }

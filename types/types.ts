@@ -943,7 +943,7 @@ export interface ImageGenerationOpts {
     resolution?: '1k' | '2k';
 
     /** Quality of the generated image */
-    quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'auto';
+    quality?: 'standard' | 'hd' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'auto';
 
     /**
      * Text/prompt model used by providers that route image generation through a prompting agent.

@@ -2909,6 +2909,60 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             "OpenAI's GPT Image 2 model for high-quality text-to-image generation and editing. Supports flexible sizes that satisfy the GPT Image 2 resolution constraints.",
     },
     {
+        id: 'gpt-image-2.5-flare',
+        aliases: ['gpt-image-2.5-flare-2026-09-08'],
+        provider: 'openai',
+        cost: {
+            // OpenAI publishes token rates, but not a per-image token formula for GPT Image 2.5.
+            input_per_million: {
+                text: 5.0,
+                image: 8.0,
+            },
+            cached_input_per_million: {
+                text: 1.25,
+                image: 2.0,
+            },
+            output_per_million: {
+                image: 30.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT Image 2.5 Flare model for fast high-quality image generation and editing. Ensemble records cost from returned provider usage rather than a static per-image estimate.",
+    },
+    {
+        id: 'gpt-image-2.5-sunburst',
+        aliases: ['gpt-image-2.5-sunburst-2026-09-08'],
+        provider: 'openai',
+        cost: {
+            // OpenAI publishes token rates, but not a per-image token formula for GPT Image 2.5.
+            input_per_million: {
+                text: 5.0,
+                image: 8.0,
+            },
+            cached_input_per_million: {
+                text: 1.25,
+                image: 2.0,
+            },
+            output_per_million: {
+                image: 30.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT Image 2.5 Sunburst model for high-precision image generation and editing. Ensemble records cost from returned provider usage rather than a static per-image estimate.",
+    },
+    {
         id: 'gpt-image-1.5',
         aliases: ['gpt-image-1.5-2025-12-16'],
         provider: 'openai',
