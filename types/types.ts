@@ -109,6 +109,8 @@ export interface ModelSettings {
     seed?: number;
     /** Generic thinking budget in provider-specific units (provider implementations interpret this). */
     thinking_budget?: number;
+    /** Generic reasoning level. Providers may reject levels their model cannot disable or support. */
+    reasoning_effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
     /** Native provider thinking level where supported, such as Gemini 3 `thinkingLevel`. */
     thinking_level?: 'minimal' | 'low' | 'medium' | 'high';
     text?: { format: string };
