@@ -1107,6 +1107,14 @@ export class OpenAIProvider extends BaseModelProvider {
                 }
             }
 
+            if (settings?.max_tokens !== undefined) {
+                const modelMaxOutputTokens = findModel(model)?.features?.max_output_tokens;
+                requestParams.max_output_tokens =
+                    modelMaxOutputTokens !== undefined
+                        ? Math.min(settings.max_tokens, modelMaxOutputTokens)
+                        : settings.max_tokens;
+            }
+
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
             const thinkingBudgetEffort =
                 thinkingBudgetFromSettings !== null

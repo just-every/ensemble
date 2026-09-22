@@ -165,6 +165,7 @@ describe('GPT-6 support', () => {
             } as any)
         );
         expect(create.mock.calls.at(0)?.[0]?.reasoning).toMatchObject({ effort: 'medium' });
+        expect(create.mock.calls.at(0)?.[0]?.max_output_tokens).toBeUndefined();
 
         await drain(
             provider.createResponseStream([{ type: 'message', role: 'user', content: 'Hello' }] as any, 'gpt-6-sol', {
@@ -186,6 +187,29 @@ describe('GPT-6 support', () => {
             reasoning: { effort: 'low' },
         });
     });
+
+    it.each([
+        { model: 'gpt-6-sol', maxTokens: 8192, expected: 8192 },
+        { model: 'gpt-6-luna', maxTokens: 200000, expected: 128000 },
+        { model: 'gpt-5.6-terra', maxTokens: 8192, expected: 8192 },
+    ])(
+        'maps max_tokens for Responses model $model and respects its output cap',
+        async ({ model, maxTokens, expected }) => {
+            const provider = new OpenAIProvider('sk-test');
+            const create = vi.fn().mockResolvedValue(emptyStream());
+            (provider as any)._client = { responses: { create } };
+
+            await drain(
+                provider.createResponseStream(
+                    [{ type: 'message', role: 'user', content: 'Answer briefly.' }] as any,
+                    model,
+                    { agent_id: `${model}-max-output`, modelSettings: { max_tokens: maxTokens } } as any
+                )
+            );
+
+            expect(create.mock.calls.at(0)?.[0]?.max_output_tokens).toBe(expected);
+        }
+    );
 
     it.each([
         { model: 'gpt-6-sol', inputRate: 4, cachedRate: 0.4, writeRate: 5, outputRate: 15, expectedCost: 1.36 },
