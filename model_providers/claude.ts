@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema';
 import { v4 as uuidv4 } from 'uuid';
 import { createCitationTracker, formatCitation, generateFootnotes } from '../utils/citation_tracker.js';
 
@@ -59,10 +60,16 @@ const CLAUDE_ADAPTIVE_THINKING_MODEL_IDS = new Set([
     'claude-opus-4-7',
     'claude-opus-4-8',
     'claude-opus-5',
+    'claude-opus-5-5',
     'claude-sonnet-5',
     'claude-fable-5',
 ]);
-const CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS = new Set(['claude-opus-5', 'claude-sonnet-5', 'claude-fable-5']);
+const CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS = new Set([
+    'claude-opus-5',
+    'claude-opus-5-5',
+    'claude-sonnet-5',
+    'claude-fable-5',
+]);
 const CLAUDE_ADAPTIVE_EFFORT_SUFFIXES: Record<string, ClaudeAdaptiveEffortOrOff> = {
     '-none': 'off',
     '-minimal': 'low',
@@ -682,7 +689,27 @@ export class ClaudeProvider extends BaseModelProvider {
                 }
                 implicitAdaptiveThinking = CLAUDE_IMPLICIT_ADAPTIVE_THINKING_MODEL_IDS.has(model);
 
-                if (adaptiveEffort === 'max' && model !== 'claude-opus-5') {
+                if (model === 'claude-opus-5-5' && adaptiveEffort === undefined) {
+                    adaptiveEffort = 'medium';
+                }
+
+                if (model === 'claude-opus-5-5' && thinkingBudgetFromSettings === 0) {
+                    throw new Error(
+                        'Claude Opus 5.5 always-on adaptive thinking cannot be disabled with thinking_budget: 0; use reasoning_effort "low" as the minimum.'
+                    );
+                }
+
+                if (settings?.reasoning_effort !== undefined) {
+                    adaptiveEffort = settings.reasoning_effort === 'none' ? 'off' : settings.reasoning_effort;
+                }
+
+                if (model === 'claude-opus-5-5' && adaptiveEffort === 'off') {
+                    throw new Error(
+                        'Claude Opus 5.5 always-on adaptive thinking cannot be disabled; use reasoning_effort "low" as the minimum.'
+                    );
+                }
+
+                if (adaptiveEffort === 'max' && model !== 'claude-opus-5' && model !== 'claude-opus-5-5') {
                     adaptiveEffort = 'xhigh';
                 }
 
@@ -761,11 +788,22 @@ export class ClaudeProvider extends BaseModelProvider {
             }
 
             if (settings?.json_schema) {
-                messages.push({
-                    type: 'message',
-                    role: 'system',
-                    content: `Your response MUST be a valid JSON object that conforms to this schema:\n${JSON.stringify(settings.json_schema, null, 2)}`,
-                });
+                if (model === 'claude-opus-5-5') {
+                    const transformedFormat = jsonSchemaOutputFormat(settings.json_schema.schema as any);
+                    outputConfig = {
+                        ...outputConfig,
+                        format: {
+                            type: transformedFormat.type,
+                            schema: transformedFormat.schema,
+                        },
+                    };
+                } else {
+                    messages.push({
+                        type: 'message',
+                        role: 'system',
+                        content: `Your response MUST be a valid JSON object that conforms to this schema:\n${JSON.stringify(settings.json_schema, null, 2)}`,
+                    });
+                }
             }
 
             // Determine if thinking is enabled

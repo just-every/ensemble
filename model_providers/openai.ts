@@ -1065,6 +1065,7 @@ export class OpenAIProvider extends BaseModelProvider {
 
             const isO3Model = (m: string) => m === 'o3' || m.startsWith('o3-');
             const isGpt5Family = (m: string) => m.startsWith('gpt-5');
+            const isGpt6SolOrLuna = (m: string) => /^gpt-6-(?:sol|luna)(?:-|$)/.test(m);
             const isGptWithSamplingAtNoReasoning = (m: string) =>
                 m.startsWith('gpt-5.1') ||
                 m.startsWith('gpt-5.2') ||
@@ -1074,6 +1075,7 @@ export class OpenAIProvider extends BaseModelProvider {
                 if (m === 'gpt-5.5-pro' || m === 'gpt-5.4-pro' || m === 'gpt-5.2-pro' || m === 'gpt-5-pro')
                     return 'high';
                 if (m.startsWith('gpt-5.4') || m.startsWith('gpt-5.2') || m.startsWith('gpt-5.1')) return 'none';
+                if (isGpt6SolOrLuna(m)) return 'medium';
                 if (m.startsWith('gpt-5')) return 'medium';
                 if (m.startsWith('o')) return 'high';
                 return undefined;
@@ -1095,13 +1097,22 @@ export class OpenAIProvider extends BaseModelProvider {
             for (const effort of REASONING_EFFORT_CONFIGS) {
                 const suffix = `-${effort}`;
                 // `gpt-5.1-codex-max` is a real model ID. `max` is an effort suffix only for GPT-5.6.
-                const isSupportedEffortSuffix = effort !== 'max' || model.startsWith('gpt-5.6');
+                const isSupportedEffortSuffix =
+                    effort !== 'max' || model.startsWith('gpt-5.6') || isGpt6SolOrLuna(model);
                 if (isSupportedEffortSuffix && model.endsWith(suffix)) {
                     requestedReasoningEffort = effort;
                     model = model.slice(0, -suffix.length);
                     requestParams.model = model;
                     break;
                 }
+            }
+
+            if (settings?.max_tokens !== undefined) {
+                const modelMaxOutputTokens = findModel(model)?.features?.max_output_tokens;
+                requestParams.max_output_tokens =
+                    modelMaxOutputTokens !== undefined
+                        ? Math.min(settings.max_tokens, modelMaxOutputTokens)
+                        : settings.max_tokens;
             }
 
             const thinkingBudgetFromSettings = parseThinkingBudget(settings?.thinking_budget);
@@ -1111,6 +1122,17 @@ export class OpenAIProvider extends BaseModelProvider {
                     : undefined;
             if (thinkingBudgetEffort !== undefined) {
                 requestedReasoningEffort = thinkingBudgetEffort;
+            }
+
+            if (settings?.reasoning_effort !== undefined) {
+                requestedReasoningEffort = settings.reasoning_effort;
+            }
+
+            // GPT-6 supports `low` as its minimum named effort. The shared
+            // thinking-budget and suffix mappings can produce `minimal`, which
+            // is not accepted by these models, so normalize it before dispatch.
+            if (isGpt6SolOrLuna(model) && requestedReasoningEffort === 'minimal') {
+                requestedReasoningEffort = 'low';
             }
 
             if (settings?.reasoning_mode === 'pro' && !model.startsWith('gpt-5.6')) {
@@ -1171,6 +1193,12 @@ export class OpenAIProvider extends BaseModelProvider {
                     delete requestParams.temperature;
                     delete requestParams.top_p;
                 }
+            }
+
+            // GPT-6 models do not accept custom sampling parameters.
+            if (isGpt6SolOrLuna(model)) {
+                delete requestParams.temperature;
+                delete requestParams.top_p;
             }
 
             // Add other settings that work across models

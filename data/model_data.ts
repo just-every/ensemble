@@ -1246,6 +1246,94 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         description: 'GPT-5.6 model optimized for efficient, high-volume workloads (1.05M/128k).',
     },
 
+    // GPT-6 models
+    {
+        id: 'gpt-6-sol',
+        provider: 'openai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 2.0,
+                price_above_threshold_per_million: 4.0,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.2,
+                price_above_threshold_per_million: 0.4,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 2.5,
+                price_above_threshold_per_million: 5.0,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 10.0,
+                price_above_threshold_per_million: 15.0,
+                tier_basis: 'input_tokens',
+            },
+        },
+        features: {
+            context_length: 1050000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            reasoning_output: true,
+        },
+        class: 'reasoning',
+        description: 'GPT-6 Sol for complex coding and agentic workflows (1.05M context, 128K output).',
+    },
+    {
+        id: 'gpt-6-luna',
+        provider: 'openai',
+        cost: {
+            input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.1,
+                price_above_threshold_per_million: 0.2,
+                tier_basis: 'input_tokens',
+            },
+            cached_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.01,
+                price_above_threshold_per_million: 0.02,
+                tier_basis: 'input_tokens',
+            },
+            cache_write_input_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.125,
+                price_above_threshold_per_million: 0.25,
+                tier_basis: 'input_tokens',
+            },
+            output_per_million: {
+                threshold_tokens: 272000,
+                price_below_threshold_per_million: 0.5,
+                price_above_threshold_per_million: 0.75,
+                tier_basis: 'input_tokens',
+            },
+        },
+        features: {
+            context_length: 1050000,
+            max_output_tokens: 128000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            reasoning_output: true,
+        },
+        class: 'mini',
+        description: 'GPT-6 Luna for focused, high-volume tasks (1.05M context, 128K output).',
+    },
+
     // GPT-5.5 models
     {
         id: 'gpt-5.5',
@@ -2469,6 +2557,34 @@ export const MODEL_REGISTRY: ModelEntry[] = [
         score: 98,
         description:
             'Claude Opus 5 - frontier Anthropic model with 1M context, 128K output, vision, tools, and implicit adaptive thinking.',
+    },
+
+    // Claude Opus 5.5
+    {
+        id: 'claude-opus-5-5',
+        provider: 'anthropic',
+        cost: {
+            input_per_million: 4.0,
+            output_per_million: 20.0,
+            cached_input_per_million: 0.2,
+            cache_write_input_per_million: 5.0,
+            cache_write_1h_input_per_million: 8.0,
+        },
+        features: {
+            context_length: 1_000_000,
+            input_modality: ['text', 'image'],
+            output_modality: ['text'],
+            tool_use: true,
+            streaming: true,
+            json_output: true,
+            structured_output: true,
+            reasoning_output: true,
+            max_output_tokens: 128000,
+        },
+        class: 'reasoning',
+        score: 99,
+        description:
+            'Claude Opus 5.5 for long-running agentic coding and knowledge work, with always-on adaptive thinking (1M/128K).',
     },
 
     // Claude Fable 5
