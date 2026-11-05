@@ -13,6 +13,9 @@ jobs:
     name: Test, Build and Release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
     # Skip if commit message contains [skip ci]
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     
@@ -27,7 +30,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
         registry-url: 'https://registry.npmjs.org'
         
@@ -72,10 +75,11 @@ jobs:
         git commit -m "chore(release): ${NEW_VERSION} [skip ci]" || echo "No changes to commit"
         git tag "v${NEW_VERSION}"
       
+    - name: Update npm for trusted publishing
+      run: npm install -g npm@^11.5.1 && npm --version
+
     - name: Publish to npm
       run: npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
     - name: Push changes
       uses: ad-m/github-push-action@master
