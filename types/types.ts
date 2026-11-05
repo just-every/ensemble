@@ -1030,8 +1030,22 @@ export interface ImageGenerationOpts {
     zoom_out_percentage?: number;
     /** FAL flux-2-pro/outpaint: automatically crop the source image when needed */
     auto_crop?: boolean;
-    /** FAL outpaint: output image format */
-    output_format?: 'png' | 'jpeg' | 'jpg' | 'webp';
+    /**
+     * Output image format. FAL outpaint takes png/jpeg/webp. OpenAI honours it on
+     * GPT Image 2.6 only (png, jpeg, webp, or animated gif); earlier OpenAI image
+     * models always return PNG. `svg` is a GPT Image 2.6 format whose authoring
+     * model ensemble does not send yet, so the OpenAI provider refuses it.
+     */
+    output_format?: 'png' | 'jpeg' | 'jpg' | 'webp' | 'gif' | 'svg';
+
+    /** OpenAI GPT Image 2.6: animated GIF frame count (requires output_format 'gif'; API default 9) */
+    frame_count?: number;
+
+    /** OpenAI GPT Image 2.6: per-frame duration in ms (requires output_format 'gif'; API default 200) */
+    frame_duration_ms?: number;
+
+    /** OpenAI GPT Image 2.6: how much the model plans before drawing (API default 'high'; no separate fee) */
+    complexity?: 'low' | 'medium' | 'high';
     /** FAL outpaint: toggle safety checker */
     enable_safety_checker?: boolean;
 

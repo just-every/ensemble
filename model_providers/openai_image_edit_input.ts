@@ -1,5 +1,6 @@
 import { toFile } from 'openai';
 import type { ImageGenerationOpts } from '../types/types.js';
+import type { OpenAIImageOutputRequest } from './openai_image_output.js';
 
 type SourceImage =
     | string
@@ -18,6 +19,7 @@ type PrepareOpenAIImageEditInput = {
     quality: string;
     size: string;
     inputFidelity?: 'low' | 'medium' | 'high';
+    outputRequest: OpenAIImageOutputRequest;
     signal: AbortSignal;
 };
 
@@ -84,7 +86,7 @@ export const prepareOpenAIImageEditInput = async (args: PrepareOpenAIImageEditIn
         quality: args.quality,
         size: args.size,
         moderation: 'low',
-        output_format: 'png',
+        ...args.outputRequest,
         ...(args.inputFidelity ? { input_fidelity: args.inputFidelity } : {}),
         ...(maskFile ? { mask: maskFile } : {}),
     };
@@ -101,7 +103,7 @@ export const prepareOpenAIImageEditInput = async (args: PrepareOpenAIImageEditIn
         quality: args.quality,
         size: args.size,
         moderation: 'low',
-        output_format: 'png',
+        ...args.outputRequest,
         ...(args.inputFidelity ? { input_fidelity: args.inputFidelity } : {}),
         source_images: imageFiles.map(uploadMetadata),
         ...(maskFile ? { mask: uploadMetadata(maskFile) } : {}),

@@ -60,18 +60,23 @@ export function normalizeOpenAIImageQuality(
     if (quality === 'standard') return 'medium';
     if (quality === 'hd') return 'high';
     if (quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'auto') return quality;
-    if (quality === 'xhigh' || quality === 'max') return model && isGptImage25(model) ? quality : 'auto';
+    if (quality === 'xhigh' || quality === 'max') return model && isGptImageTieredModel(model) ? quality : 'auto';
     return 'auto';
 }
 
-export function normalizeOpenAIImageSize(model: string, size?: ImageGenerationOpts['size']): OpenAIImageSize {
+export function normalizeOpenAIImageSize(
+    model: string,
+    size?: ImageGenerationOpts['size'],
+    outputFormat?: ImageGenerationOpts['output_format']
+): OpenAIImageSize {
+    if (outputFormat === 'gif') return normalizeGifFrameSize(size);
     if (!size || size === 'auto') return 'auto';
     if (size === 'square') return '1024x1024';
     if (size === 'landscape') return '1536x1024';
     if (size === 'portrait') return '1024x1536';
     if (size === '1024x1024' || size === '1536x1024' || size === '1024x1536') return size;
 
-    if (isGptImage2(model) || isGptImage25(model)) {
+    if (isGptImage2(model) || isGptImageTieredModel(model)) {
         if (isPixelSize(size)) {
             assertValidGptImage2FamilySize(size);
             return size;
@@ -89,7 +94,7 @@ export function getOpenAIImageCostEstimate(
     quality: OpenAIImageQuality,
     size: OpenAIImageSize
 ): number | undefined {
-    if (isGptImage25(model)) return undefined;
+    if (isGptImageTieredModel(model)) return undefined;
 
     const normalizedQuality: OpenAIImageLegacyQuality =
         quality === 'auto' || quality === 'xhigh' || quality === 'max' ? 'medium' : quality;
@@ -202,13 +207,28 @@ function isGptImage2(model: string): boolean {
     return model === 'gpt-image-2' || model.startsWith('gpt-image-2-');
 }
 
-export function isGptImage25(model: string): boolean {
-    return (
-        model === 'gpt-image-2.5-flare' ||
-        model.startsWith('gpt-image-2.5-flare-') ||
-        model === 'gpt-image-2.5-sunburst' ||
-        model.startsWith('gpt-image-2.5-sunburst-')
-    );
+// The Flare/Sunburst generations (2.5 onward). They share the Image 2 family
+// geometry, accept xhigh/max, take no input_fidelity, and publish token rates
+// but no per-image formula, so cost comes only from returned provider usage.
+const GPT_IMAGE_TIERED_MODELS = [
+    'gpt-image-2.5-flare',
+    'gpt-image-2.5-sunburst',
+    'gpt-image-2.6-flare',
+    'gpt-image-2.6-sunburst',
+] as const;
+
+// The 2.6 generation adds request fields 2.5 rejects: complexity and animated GIF output.
+const GPT_IMAGE_26_MODELS = ['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'] as const;
+
+const matchesModelOrSnapshot = (model: string, ids: readonly string[]): boolean =>
+    ids.some(id => model === id || model.startsWith(`${id}-`));
+
+export function isGptImageTieredModel(model: string): boolean {
+    return matchesModelOrSnapshot(model, GPT_IMAGE_TIERED_MODELS);
+}
+
+export function isGptImage26(model: string): boolean {
+    return matchesModelOrSnapshot(model, GPT_IMAGE_26_MODELS);
 }
 
 function estimateGptImage2Cost(quality: OpenAIImageLegacyQuality, size: OpenAIImageSize): number {
@@ -267,6 +287,27 @@ function parseAspectRatioSize(size: string): { width: number; height: number } |
 
 function roundToMultiple(value: number, multiple: number): number {
     return Math.max(multiple, Math.round(value / multiple) * multiple);
+}
+
+// A GPT Image 2.6 GIF size is per finished frame. The provider lays the frames
+// out on one sprite sheet whose longest edge it bounds (3840px), so the still
+// pixel floor does not apply and the sheet bound is the provider's to enforce.
+function normalizeGifFrameSize(size?: ImageGenerationOpts['size']): OpenAIImageSize {
+    if (!size || size === 'auto') return 'auto';
+    if (isPixelSize(size)) {
+        const [width, height] = size.split('x').map(Number);
+        if (
+            width > 0 &&
+            height > 0 &&
+            width % GPT_IMAGE_2_SIZE_MULTIPLE === 0 &&
+            height % GPT_IMAGE_2_SIZE_MULTIPLE === 0
+        ) {
+            return size;
+        }
+    }
+    throw new Error(
+        `GPT Image 2.6 GIF frame size ${size} is invalid: use auto or WIDTHxHEIGHT with both edges multiples of 16px.`
+    );
 }
 
 function assertValidGptImage2FamilySize(size: `${number}x${number}`): void {

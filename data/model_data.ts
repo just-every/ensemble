@@ -3098,6 +3098,60 @@ export const MODEL_REGISTRY: ModelEntry[] = [
             "OpenAI's GPT Image 2.5 Sunburst model for high-precision image generation and editing. Ensemble records cost from returned provider usage rather than a static per-image estimate.",
     },
     {
+        id: 'gpt-image-2.6-flare',
+        provider: 'openai',
+        cost: {
+            // Same published token rates as GPT Image 2.5. OpenAI's own calculator bills
+            // 4.2x (low) and 3.3x (medium) the 2.5 output tokens per image, so cost comes
+            // from returned provider usage, never from a static per-image estimate.
+            input_per_million: {
+                text: 5.0,
+                image: 8.0,
+            },
+            cached_input_per_million: {
+                text: 1.25,
+                image: 2.0,
+            },
+            output_per_million: {
+                image: 30.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT Image 2.6 Flare model for fast image generation and editing, with a complexity setting and animated GIF output. Ensemble records cost from returned provider usage rather than a static per-image estimate.",
+    },
+    {
+        id: 'gpt-image-2.6-sunburst',
+        provider: 'openai',
+        cost: {
+            // Same published token rates as GPT Image 2.5; see gpt-image-2.6-flare.
+            input_per_million: {
+                text: 5.0,
+                image: 8.0,
+            },
+            cached_input_per_million: {
+                text: 1.25,
+                image: 2.0,
+            },
+            output_per_million: {
+                image: 30.0,
+            },
+        },
+        features: {
+            input_modality: ['text', 'image'],
+            output_modality: ['image'],
+            streaming: false,
+        },
+        class: 'image_generation',
+        description:
+            "OpenAI's GPT Image 2.6 Sunburst model for detailed image generation and editing, with a complexity setting and animated GIF output. Ensemble records cost from returned provider usage rather than a static per-image estimate.",
+    },
+    {
         id: 'gpt-image-1.5',
         aliases: ['gpt-image-1.5-2025-12-16'],
         provider: 'openai',

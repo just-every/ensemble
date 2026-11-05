@@ -40,10 +40,11 @@ import {
     getOpenAIImageCostMetadata,
     buildOpenAIImageUsageRecord,
     getOpenAIImageCostEstimate,
-    isGptImage25,
+    isGptImageTieredModel,
     normalizeOpenAIImageQuality,
     normalizeOpenAIImageSize,
 } from './openai_image_pricing.js';
+import { openAIImageOutputMime, resolveOpenAIImageOutputRequest } from './openai_image_output.js';
 import {
     DEFAULT_OPENAI_IMAGE_TIMEOUT_MS,
     OpenAIImageRequestError,
@@ -388,13 +389,14 @@ export class OpenAIProvider extends BaseModelProvider {
             const number_of_images = opts?.n || 1;
 
             const quality = normalizeOpenAIImageQuality(model, opts?.quality);
-            const size = normalizeOpenAIImageSize(model, opts?.size);
+            const outputRequest = resolveOpenAIImageOutputRequest(model, opts);
+            const size = normalizeOpenAIImageSize(model, opts?.size, outputRequest.output_format);
 
             // Default background to 'auto'
             const background: 'transparent' | 'opaque' | 'auto' = opts?.background || 'auto';
 
             // Extract input_fidelity if provided
-            const input_fidelity: 'low' | 'medium' | 'high' | undefined = isGptImage25(model)
+            const input_fidelity: 'low' | 'medium' | 'high' | undefined = isGptImageTieredModel(model)
                 ? undefined
                 : (opts?.input_fidelity ?? mapOpenAIImageInputFidelity(opts?.detail));
 
@@ -446,6 +448,7 @@ export class OpenAIProvider extends BaseModelProvider {
                             quality,
                             size,
                             inputFidelity: input_fidelity,
+                            outputRequest,
                             signal,
                         });
                         finalRequestId = log_llm_request(
@@ -472,7 +475,7 @@ export class OpenAIProvider extends BaseModelProvider {
                     quality,
                     size,
                     moderation: 'low',
-                    output_format: 'png',
+                    ...outputRequest,
                 } as any;
 
                 // Log the actual request being sent to OpenAI
@@ -505,8 +508,8 @@ export class OpenAIProvider extends BaseModelProvider {
                 ...(opts.request_id ? { request_id: opts.request_id } : {}),
             });
 
-            // Track usage for cost calculation. GPT Image 2.5 has no published
-            // output-token formula, so cost it only from the provider usage.
+            // Track usage for cost calculation. GPT Image 2.5 and 2.6 have no published
+            // per-image output-token formula, so cost them only from the provider usage.
             if (response.data && response.data.length > 0) {
                 const usageMetadata = {
                     quality,
@@ -564,7 +567,7 @@ export class OpenAIProvider extends BaseModelProvider {
                         providerRequestId,
                     });
                 }
-                return `data:image/png;base64,${imageData}`;
+                return `data:${openAIImageOutputMime(outputRequest.output_format)};base64,${imageData}`;
             });
 
             // Log the actual response from OpenAI
